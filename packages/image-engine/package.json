@@ -7,12 +7,15 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@stirling-image/shared": "workspace:*"
+    "@stirling-image/shared": "workspace:*",
+    "sharp": "^0.33.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }
