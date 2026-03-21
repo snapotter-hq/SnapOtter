@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.turbo/
+*.db
+*.db-journal
+*.db-wal
+.env
+.env.local
+.DS_Store
+.playwright-mcp/
