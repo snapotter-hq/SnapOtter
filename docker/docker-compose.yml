@@ -1,0 +1,23 @@
+services:
+  stirling-image:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: stirling-image
+    ports:
+      - "1349:1349"
+    environment:
+      - AUTH_ENABLED=true
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin
+      - STORAGE_MODE=local
+      - DEFAULT_THEME=light
+      - APP_NAME=Stirling Image
+    volumes:
+      - stirling-data:/data
+      - stirling-workspace:/tmp/workspace
+    restart: unless-stopped
+
+volumes:
+  stirling-data:
+  stirling-workspace:

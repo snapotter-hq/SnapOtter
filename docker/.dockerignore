@@ -1,0 +1,14 @@
+node_modules
+.git
+.turbo
+dist
+*.db
+*.db-journal
+*.db-wal
+.env
+.env.local
+.DS_Store
+.playwright-mcp
+*.png
+*.jpg
+*.jpeg
