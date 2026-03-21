@@ -48,8 +48,8 @@ async function compressToTargetSize(
   const maxIterations = 8;
   const tolerance = 0.05; // 5%
 
-  for (let i = 0; i < maxIterations; i++) {
-    const mid = Math.round((low + high) / 2);
+  for (let i = 0; i < maxIterations && low <= high; i++) {
+    const mid = Math.min(100, Math.max(1, Math.round((low + high) / 2)));
     const attempt = sharp(inputBuffer).toFormat(format, { quality: mid });
     const resultBuffer = await attempt.toBuffer();
     const resultSize = resultBuffer.length;

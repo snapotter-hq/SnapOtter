@@ -10,7 +10,7 @@ export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
   toolId: string;
   /** Zod schema that validates the settings JSON from the request. */
-  settingsSchema: z.ZodSchema<T>;
+  settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
   process: (
     inputBuffer: Buffer,
