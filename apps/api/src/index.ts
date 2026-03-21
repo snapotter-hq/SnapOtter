@@ -13,6 +13,7 @@ import { startCleanupCron } from "./lib/cleanup.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
 import { registerBatchRoutes } from "./routes/batch.js";
+import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { registerProgressRoutes } from "./routes/progress.js";
 
 // Run before anything else
@@ -67,6 +68,9 @@ await registerToolRoutes(app);
 
 // Batch processing routes (must be after tool routes so the registry is populated)
 await registerBatchRoutes(app);
+
+// Pipeline routes (must be after tool routes so the registry is populated)
+await registerPipelineRoutes(app);
 
 // Progress SSE routes
 await registerProgressRoutes(app);

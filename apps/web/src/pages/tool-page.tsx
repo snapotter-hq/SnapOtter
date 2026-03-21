@@ -1,10 +1,11 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { TOOLS } from "@stirling-image/shared";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Dropzone } from "@/components/common/dropzone";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { useFileStore } from "@/stores/file-store";
+import { useMobile } from "@/hooks/use-mobile";
 import { ResizeSettings } from "@/components/tools/resize-settings";
 import { CropSettings } from "@/components/tools/crop-settings";
 import { RotateSettings } from "@/components/tools/rotate-settings";
@@ -46,6 +47,7 @@ import { BlurFacesSettings } from "@/components/tools/blur-faces-settings";
 import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
 import { SmartCropSettings } from "@/components/tools/smart-crop-settings";
 import * as icons from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const COLOR_TOOL_IDS = new Set([
   "brightness-contrast",
@@ -111,6 +113,8 @@ export function ToolPage() {
   const { toolId } = useParams<{ toolId: string }>();
   const tool = useMemo(() => TOOLS.find((t) => t.id === toolId), [toolId]);
   const { files, setFiles, reset, processedUrl, originalBlobUrl, originalSize, processedSize } = useFileStore();
+  const isMobile = useMobile();
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(true);
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
@@ -141,6 +145,84 @@ export function ToolPage() {
   const hasFile = files.length > 0;
   const isNoDropzone = NO_DROPZONE_TOOLS.has(tool.id);
 
+  // Mobile layout: settings above dropzone (stacked)
+  if (isMobile) {
+    return (
+      <AppLayout showToolPanel={false}>
+        <div className="flex flex-col w-full h-full">
+          {/* Tool header */}
+          <div className="flex items-center gap-3 p-4 border-b border-border shrink-0">
+            <div className="p-2 rounded-lg bg-primary text-primary-foreground">
+              <IconComponent className="h-5 w-5" />
+            </div>
+            <h2 className="font-semibold text-lg text-foreground flex-1">
+              {tool.name}
+            </h2>
+            <button
+              onClick={() => setMobileSettingsOpen(!mobileSettingsOpen)}
+              className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted"
+            >
+              {mobileSettingsOpen ? "Hide Settings" : "Settings"}
+            </button>
+          </div>
+
+          {/* Collapsible settings */}
+          {mobileSettingsOpen && (
+            <div className="p-4 border-b border-border space-y-3 shrink-0 max-h-[40vh] overflow-y-auto">
+              {/* File info */}
+              {!isNoDropzone && hasFile && (
+                <div className="space-y-1">
+                  {files.map((f, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-xs text-foreground bg-muted rounded px-2 py-1"
+                    >
+                      <span className="truncate">{f.name}</span>
+                      <span className="text-muted-foreground shrink-0 ml-2">
+                        {(f.size / 1024).toFixed(0)} KB
+                      </span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => reset()}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+              <ToolSettingsPanel toolId={tool.id} />
+            </div>
+          )}
+
+          {/* Dropzone / Preview */}
+          <div className="flex-1 flex items-center justify-center p-4">
+            {isNoDropzone ? (
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">Configure settings and generate.</p>
+              </div>
+            ) : processedUrl && originalBlobUrl ? (
+              <BeforeAfterSlider
+                beforeSrc={originalBlobUrl}
+                afterSrc={processedUrl}
+                beforeSize={originalSize ?? undefined}
+                afterSize={processedSize ?? undefined}
+              />
+            ) : (
+              <Dropzone
+                onFiles={handleFiles}
+                accept="image/*"
+                multiple
+                currentFiles={files}
+              />
+            )}
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Desktop layout: side-by-side
   return (
     <AppLayout showToolPanel={false}>
       <div className="flex h-full w-full">
