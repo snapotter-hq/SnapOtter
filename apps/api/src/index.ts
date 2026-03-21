@@ -1,10 +1,14 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import { env } from "./config.js";
 import { APP_VERSION } from "@stirling-image/shared";
 import { runMigrations } from "./db/migrate.js";
 import { ensureDefaultAdmin, authRoutes, authMiddleware } from "./plugins/auth.js";
+import { registerStatic } from "./plugins/static.js";
+import { startCleanupCron } from "./lib/cleanup.js";
 
 // Run before anything else
 runMigrations();
@@ -25,6 +29,22 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
+// Swagger / OpenAPI documentation
+await app.register(swagger, {
+  openapi: {
+    info: {
+      title: "Stirling Image API",
+      description: "API for Stirling Image — self-hosted image processing suite",
+      version: APP_VERSION,
+    },
+    servers: [{ url: `http://localhost:${env.PORT}` }],
+  },
+});
+
+await app.register(swaggerUi, {
+  routePrefix: "/api/docs",
+});
+
 // Auth middleware (must be registered before routes it protects)
 await authMiddleware(app);
 
@@ -40,6 +60,14 @@ app.get("/api/v1/health", async () => ({
   queue: { active: 0, pending: 0 },
   ai: {},
 }));
+
+// Serve SPA in production
+if (process.env.NODE_ENV === "production") {
+  await registerStatic(app);
+}
+
+// Start workspace cleanup cron
+startCleanupCron();
 
 // Start
 try {
