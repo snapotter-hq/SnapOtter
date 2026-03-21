@@ -4,10 +4,14 @@ import rateLimit from "@fastify/rate-limit";
 import { env } from "./config.js";
 import { APP_VERSION } from "@stirling-image/shared";
 import { runMigrations } from "./db/migrate.js";
+import { ensureDefaultAdmin, authRoutes, authMiddleware } from "./plugins/auth.js";
 
 // Run before anything else
 runMigrations();
 console.log("Database initialized");
+
+// Create default admin user if no users exist
+await ensureDefaultAdmin();
 
 const app = Fastify({
   logger: true,
@@ -20,6 +24,12 @@ await app.register(rateLimit, {
   max: env.RATE_LIMIT_PER_MIN,
   timeWindow: "1 minute",
 });
+
+// Auth middleware (must be registered before routes it protects)
+await authMiddleware(app);
+
+// Auth routes
+await authRoutes(app);
 
 // Health check
 app.get("/api/v1/health", async () => ({
