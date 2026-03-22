@@ -3,7 +3,8 @@ import { writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface RemoveBackgroundOptions {
-  model?: "u2net" | "isnet";
+  model?: string;
+  backgroundColor?: string;
 }
 
 export async function removeBackground(
@@ -15,11 +16,13 @@ export async function removeBackground(
   const outputPath = join(outputDir, "output_bg.png");
 
   await writeFile(inputPath, inputBuffer);
+  // BiRefNet models need longer timeout (up to 10 min for first load)
+  const timeout = options.model?.startsWith("birefnet") ? 600000 : 300000;
   const { stdout } = await runPythonScript("remove_bg.py", [
     inputPath,
     outputPath,
     JSON.stringify(options),
-  ]);
+  ], timeout);
 
   const result = JSON.parse(stdout);
   if (!result.success) {

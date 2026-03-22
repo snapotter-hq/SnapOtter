@@ -8,7 +8,7 @@ def main():
     output_path = sys.argv[2]
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 
-    model = settings.get("model", "birefnet-general-lite")
+    model = settings.get("model", "u2net")
     bg_color = settings.get("backgroundColor", "")
 
     try:

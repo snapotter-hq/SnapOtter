@@ -12,12 +12,12 @@ type BgModel =
   | "u2net";
 
 const MODELS: { value: BgModel; label: string; description: string }[] = [
-  { value: "birefnet-general", label: "BiRefNet", description: "Best quality (recommended)" },
-  { value: "birefnet-general-lite", label: "BiRefNet Lite", description: "Faster, slightly less accurate" },
-  { value: "birefnet-portrait", label: "BiRefNet Portrait", description: "Optimized for people" },
-  { value: "bria-rmbg", label: "BRIA RMBG", description: "Great for products" },
+  { value: "u2net", label: "U2-Net", description: "Fast, good quality (recommended)" },
   { value: "isnet-general-use", label: "IS-Net", description: "Good general purpose" },
-  { value: "u2net", label: "U2-Net", description: "Classic, fast" },
+  { value: "bria-rmbg", label: "BRIA RMBG", description: "Great for products" },
+  { value: "birefnet-general-lite", label: "BiRefNet Lite", description: "Higher quality, slower (~15s)" },
+  { value: "birefnet-portrait", label: "BiRefNet Portrait", description: "Best for people, slower (~15s)" },
+  { value: "birefnet-general", label: "BiRefNet Full", description: "Best quality, very slow (~60s+)" },
 ];
 
 const BG_PRESETS = [
@@ -34,7 +34,7 @@ export function RemoveBgSettings() {
   const { processFiles, processing, error, downloadUrl, originalSize, processedSize } =
     useToolProcessor("remove-background");
 
-  const [model, setModel] = useState<BgModel>("birefnet-general-lite");
+  const [model, setModel] = useState<BgModel>("u2net");
   const [bgColor, setBgColor] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
