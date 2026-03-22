@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { inpaint } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
+import { updateSingleFileProgress } from "../progress.js";
 
 /**
  * Object eraser / inpainting route.
@@ -16,6 +17,7 @@ export function registerEraseObject(app: FastifyInstance) {
       let imageBuffer: Buffer | null = null;
       let maskBuffer: Buffer | null = null;
       let filename = "image";
+      let clientJobId: string | null = null;
 
       try {
         const parts = request.parts();
@@ -32,6 +34,8 @@ export function registerEraseObject(app: FastifyInstance) {
               imageBuffer = buf;
               filename = basename(part.filename ?? "image");
             }
+          } else if (part.fieldname === "clientJobId") {
+            clientJobId = part.value as string;
           }
         }
       } catch (err) {
@@ -59,10 +63,22 @@ export function registerEraseObject(app: FastifyInstance) {
         await writeFile(inputPath, imageBuffer);
 
         // Process
+        const onProgress = clientJobId
+          ? (percent: number, stage: string) => {
+              updateSingleFileProgress({
+                jobId: clientJobId!,
+                phase: "processing",
+                stage,
+                percent,
+              });
+            }
+          : undefined;
+
         const resultBuffer = await inpaint(
           imageBuffer,
           maskBuffer,
           join(workspacePath, "output"),
+          onProgress,
         );
 
         // Save output
@@ -70,6 +86,14 @@ export function registerEraseObject(app: FastifyInstance) {
           filename.replace(/\.[^.]+$/, "") + "_erased.png";
         const outputPath = join(workspacePath, "output", outputFilename);
         await writeFile(outputPath, resultBuffer);
+
+        if (clientJobId) {
+          updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "complete",
+            percent: 100,
+          });
+        }
 
         return reply.send({
           jobId,

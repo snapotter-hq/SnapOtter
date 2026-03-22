@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import { extractText } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
+import { updateSingleFileProgress } from "../progress.js";
 
 /**
  * OCR / text extraction route.
@@ -15,6 +16,7 @@ export function registerOcr(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
 
       try {
         const parts = request.parts();
@@ -28,6 +30,8 @@ export function registerOcr(app: FastifyInstance) {
             filename = basename(part.filename ?? "image");
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            clientJobId = part.value as string;
           }
         }
       } catch (err) {
@@ -46,10 +50,34 @@ export function registerOcr(app: FastifyInstance) {
         const jobId = randomUUID();
         const workspacePath = await createWorkspace(jobId);
 
-        const result = await extractText(fileBuffer, workspacePath, {
-          engine: settings.engine,
-          language: settings.language,
-        });
+        const onProgress = clientJobId
+          ? (percent: number, stage: string) => {
+              updateSingleFileProgress({
+                jobId: clientJobId!,
+                phase: "processing",
+                stage,
+                percent,
+              });
+            }
+          : undefined;
+
+        const result = await extractText(
+          fileBuffer,
+          workspacePath,
+          {
+            engine: settings.engine,
+            language: settings.language,
+          },
+          onProgress,
+        );
+
+        if (clientJobId) {
+          updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "complete",
+            percent: 100,
+          });
+        }
 
         return reply.send({
           jobId,

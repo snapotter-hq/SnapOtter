@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { blurFaces } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
+import { updateSingleFileProgress } from "../progress.js";
 
 /**
  * Face detection and blurring route.
@@ -16,6 +17,7 @@ export function registerBlurFaces(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
 
       try {
         const parts = request.parts();
@@ -29,6 +31,8 @@ export function registerBlurFaces(app: FastifyInstance) {
             filename = basename(part.filename ?? "image");
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            clientJobId = part.value as string;
           }
         }
       } catch (err) {
@@ -52,6 +56,17 @@ export function registerBlurFaces(app: FastifyInstance) {
         await writeFile(inputPath, fileBuffer);
 
         // Process
+        const onProgress = clientJobId
+          ? (percent: number, stage: string) => {
+              updateSingleFileProgress({
+                jobId: clientJobId!,
+                phase: "processing",
+                stage,
+                percent,
+              });
+            }
+          : undefined;
+
         const result = await blurFaces(
           fileBuffer,
           join(workspacePath, "output"),
@@ -59,6 +74,7 @@ export function registerBlurFaces(app: FastifyInstance) {
             blurRadius: settings.blurRadius ?? 30,
             sensitivity: settings.sensitivity ?? 0.5,
           },
+          onProgress,
         );
 
         // Save output
@@ -66,6 +82,14 @@ export function registerBlurFaces(app: FastifyInstance) {
           filename.replace(/\.[^.]+$/, "") + "_blurred.png";
         const outputPath = join(workspacePath, "output", outputFilename);
         await writeFile(outputPath, result.buffer);
+
+        if (clientJobId) {
+          updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "complete",
+            percent: 100,
+          });
+        }
 
         return reply.send({
           jobId,
