@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFileStore } from "@/stores/file-store";
-import { Loader2, Copy, Check } from "lucide-react";
+import { ProgressCard } from "@/components/common/progress-card";
+import { Copy, Check } from "lucide-react";
 
 function getToken(): string {
   return localStorage.getItem("stirling-token") || "";
@@ -26,6 +27,11 @@ export function OcrSettings() {
   const [text, setText] = useState<string | null>(null);
   const [detectedEngine, setDetectedEngine] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressStage, setProgressStage] = useState<string | undefined>();
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleProcess = async () => {
     if (files.length === 0) return;
@@ -33,31 +39,80 @@ export function OcrSettings() {
     setProcessing(true);
     setError(null);
     setText(null);
+    setProgressPhase("uploading");
+    setProgressPercent(0);
+    setProgressStage(undefined);
+    setElapsed(0);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", files[0]);
-      formData.append("settings", JSON.stringify({ engine, language }));
+    const startTime = Date.now();
+    elapsedRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
 
-      const res = await fetch("/api/v1/tools/ocr", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: formData,
-      });
+    const clientJobId = crypto.randomUUID();
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || body.details || `Failed: ${res.status}`);
+    // Open SSE for server-side progress
+    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "single" && typeof data.percent === "number") {
+          setProgressPhase("processing");
+          setProgressPercent(data.percent);
+          setProgressStage(data.stage);
+        }
+      } catch {}
+    };
+    es.onerror = () => es.close();
+
+    const formData = new FormData();
+    formData.append("file", files[0]);
+    formData.append("settings", JSON.stringify({ engine, language }));
+    formData.append("clientJobId", clientJobId);
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setProgressPercent((e.loaded / e.total) * 100);
       }
-
-      const data = await res.json();
-      setText(data.text || "");
-      setDetectedEngine(data.engine || engine);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "OCR failed");
-    } finally {
+    };
+    xhr.upload.onload = () => {
+      setProgressPhase("processing");
+      setProgressPercent(0);
+      setProgressStage("Starting...");
+    };
+    xhr.onload = () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          setText(data.text || "");
+          setDetectedEngine(data.engine || engine);
+        } catch {
+          setError("Invalid response");
+        }
+      } else {
+        try {
+          const body = JSON.parse(xhr.responseText);
+          setError(body.error || body.details || `Failed: ${xhr.status}`);
+        } catch {
+          setError(`Processing failed: ${xhr.status}`);
+        }
+      }
       setProcessing(false);
-    }
+      setProgressPhase("idle");
+    };
+    xhr.onerror = () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      setError("Network error");
+      setProcessing(false);
+      setProgressPhase("idle");
+    };
+    xhr.open("POST", "/api/v1/tools/ocr");
+    xhr.setRequestHeader("Authorization", `Bearer ${getToken()}`);
+    xhr.send(formData);
   };
 
   const handleCopy = async () => {
@@ -119,25 +174,23 @@ export function OcrSettings() {
       {error && <p className="text-xs text-red-500">{error}</p>}
 
       {/* Process button */}
-      <button
-        onClick={handleProcess}
-        disabled={!hasFile || processing}
-        className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {processing ? "Extracting Text..." : "Extract Text"}
-      </button>
-
-      {/* Progress indicator */}
-      {processing && (
-        <div className="space-y-2">
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '100%' }} />
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            AI processing may take 10-30 seconds...
-          </p>
-        </div>
+      {processing ? (
+        <ProgressCard
+          active={processing}
+          phase={progressPhase === "idle" ? "uploading" : progressPhase}
+          label="Extracting text"
+          stage={progressStage}
+          percent={progressPercent}
+          elapsed={elapsed}
+        />
+      ) : (
+        <button
+          onClick={handleProcess}
+          disabled={!hasFile || processing}
+          className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          Extract Text
+        </button>
       )}
 
       {/* Result */}

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useFileStore } from "@/stores/file-store";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { Download, Loader2 } from "lucide-react";
+import { ProgressCard } from "@/components/common/progress-card";
+import { Download } from "lucide-react";
 
 export function UpscaleSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize } =
+  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("upscale");
 
   const [scale, setScale] = useState(2);
@@ -55,25 +56,23 @@ export function UpscaleSettings() {
       )}
 
       {/* Process button */}
-      <button
-        onClick={handleProcess}
-        disabled={!hasFile || processing}
-        className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {processing ? "Upscaling..." : `Upscale ${scale}x`}
-      </button>
-
-      {/* Progress indicator */}
-      {processing && (
-        <div className="space-y-2">
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '100%' }} />
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            AI processing may take 10-30 seconds...
-          </p>
-        </div>
+      {processing ? (
+        <ProgressCard
+          active={processing}
+          phase={progress.phase === "idle" ? "uploading" : progress.phase}
+          label="Upscaling image"
+          stage={progress.stage}
+          percent={progress.percent}
+          elapsed={progress.elapsed}
+        />
+      ) : (
+        <button
+          onClick={handleProcess}
+          disabled={!hasFile || processing}
+          className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {`Upscale ${scale}x`}
+        </button>
       )}
 
       {/* Download */}

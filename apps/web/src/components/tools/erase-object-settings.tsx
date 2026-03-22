@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFileStore } from "@/stores/file-store";
-import { Download, Loader2, Upload } from "lucide-react";
+import { ProgressCard } from "@/components/common/progress-card";
+import { Download, Upload } from "lucide-react";
 
 function getToken(): string {
   return localStorage.getItem("stirling-token") || "";
@@ -13,6 +14,11 @@ export function EraseObjectSettings() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [processedSize, setProcessedSize] = useState<number | null>(null);
+  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressStage, setProgressStage] = useState<string | undefined>();
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleMaskSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -25,32 +31,81 @@ export function EraseObjectSettings() {
     setProcessing(true);
     setError(null);
     setDownloadUrl(null);
+    setProgressPhase("uploading");
+    setProgressPercent(0);
+    setProgressStage(undefined);
+    setElapsed(0);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", files[0]);
-      formData.append("mask", maskFile);
+    const startTime = Date.now();
+    elapsedRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
 
-      const res = await fetch("/api/v1/tools/erase-object", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: formData,
-      });
+    const clientJobId = crypto.randomUUID();
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || body.details || `Failed: ${res.status}`);
+    // Open SSE for server-side progress
+    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "single" && typeof data.percent === "number") {
+          setProgressPhase("processing");
+          setProgressPercent(data.percent);
+          setProgressStage(data.stage);
+        }
+      } catch {}
+    };
+    es.onerror = () => es.close();
+
+    const formData = new FormData();
+    formData.append("file", files[0]);
+    formData.append("mask", maskFile);
+    formData.append("clientJobId", clientJobId);
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setProgressPercent((e.loaded / e.total) * 100);
       }
-
-      const data = await res.json();
-      setDownloadUrl(data.downloadUrl);
-      setOriginalSize(data.originalSize);
-      setProcessedSize(data.processedSize);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Object erasing failed");
-    } finally {
+    };
+    xhr.upload.onload = () => {
+      setProgressPhase("processing");
+      setProgressPercent(0);
+      setProgressStage("Starting...");
+    };
+    xhr.onload = () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          setDownloadUrl(data.downloadUrl);
+          setOriginalSize(data.originalSize);
+          setProcessedSize(data.processedSize);
+        } catch {
+          setError("Invalid response");
+        }
+      } else {
+        try {
+          const body = JSON.parse(xhr.responseText);
+          setError(body.error || body.details || `Failed: ${xhr.status}`);
+        } catch {
+          setError(`Processing failed: ${xhr.status}`);
+        }
+      }
       setProcessing(false);
-    }
+      setProgressPhase("idle");
+    };
+    xhr.onerror = () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      setError("Network error");
+      setProcessing(false);
+      setProgressPhase("idle");
+    };
+    xhr.open("POST", "/api/v1/tools/erase-object");
+    xhr.setRequestHeader("Authorization", `Bearer ${getToken()}`);
+    xhr.send(formData);
   };
 
   const hasFile = files.length > 0;
@@ -100,25 +155,23 @@ export function EraseObjectSettings() {
       )}
 
       {/* Process button */}
-      <button
-        onClick={handleProcess}
-        disabled={!hasFile || !maskFile || processing}
-        className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {processing ? "Erasing..." : "Erase Object"}
-      </button>
-
-      {/* Progress indicator */}
-      {processing && (
-        <div className="space-y-2">
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '100%' }} />
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            AI processing may take 10-30 seconds...
-          </p>
-        </div>
+      {processing ? (
+        <ProgressCard
+          active={processing}
+          phase={progressPhase === "idle" ? "uploading" : progressPhase}
+          label="Erasing object"
+          stage={progressStage}
+          percent={progressPercent}
+          elapsed={elapsed}
+        />
+      ) : (
+        <button
+          onClick={handleProcess}
+          disabled={!hasFile || !maskFile || processing}
+          className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          Erase Object
+        </button>
       )}
 
       {/* Download */}
