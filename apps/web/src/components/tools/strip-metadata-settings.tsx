@@ -30,8 +30,13 @@ export function StripMetadataSettings() {
 
   const hasFile = files.length > 0;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Strip All */}
       <label className="flex items-center gap-2 text-sm text-foreground font-medium">
         <input
@@ -108,7 +113,7 @@ export function StripMetadataSettings() {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -127,6 +132,6 @@ export function StripMetadataSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }

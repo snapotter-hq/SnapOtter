@@ -33,13 +33,19 @@ export function RotateSettings() {
   const hasFile = files.length > 0;
   const hasChanges = angle !== 0 || flipH || flipV;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && hasChanges && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Quick rotate buttons */}
       <div>
         <label className="text-xs text-muted-foreground">Quick Rotate</label>
         <div className="flex gap-2 mt-1">
           <button
+            type="button"
             onClick={rotateLeft}
             className="flex-1 flex items-center justify-center gap-1 py-2 rounded bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm"
           >
@@ -47,6 +53,7 @@ export function RotateSettings() {
             90 Left
           </button>
           <button
+            type="button"
             onClick={rotateRight}
             className="flex-1 flex items-center justify-center gap-1 py-2 rounded bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm"
           >
@@ -77,6 +84,7 @@ export function RotateSettings() {
         <label className="text-xs text-muted-foreground">Flip</label>
         <div className="flex gap-2 mt-1">
           <button
+            type="button"
             onClick={() => setFlipH(!flipH)}
             className={`flex-1 flex items-center justify-center gap-1 py-2 rounded text-sm transition-colors ${
               flipH
@@ -88,6 +96,7 @@ export function RotateSettings() {
             Horizontal
           </button>
           <button
+            type="button"
             onClick={() => setFlipV(!flipV)}
             className={`flex-1 flex items-center justify-center gap-1 py-2 rounded text-sm transition-colors ${
               flipV
@@ -114,7 +123,7 @@ export function RotateSettings() {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || !hasChanges || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -133,6 +142,6 @@ export function RotateSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }

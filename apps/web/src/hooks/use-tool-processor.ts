@@ -43,9 +43,15 @@ export function useToolProcessor(toolId: string) {
         formData.append("file", files[0]);
         formData.append("settings", JSON.stringify(settings));
 
+        const headers: Record<string, string> = {};
+        const token = getToken();
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
         const res = await fetch(`/api/v1/tools/${toolId}`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers,
           body: formData,
         });
 

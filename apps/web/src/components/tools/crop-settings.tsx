@@ -41,8 +41,13 @@ export function CropSettings() {
   const hasFile = files.length > 0;
   const hasSize = Number(width) > 0 && Number(height) > 0;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && hasSize && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Position */}
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -97,6 +102,7 @@ export function CropSettings() {
         <div className="flex gap-1 mt-1">
           {ASPECT_PRESETS.map(({ label, w, h }) => (
             <button
+              type="button"
               key={label}
               onClick={() => applyAspect(w, h)}
               className="flex-1 text-xs py-1.5 rounded bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
@@ -120,7 +126,7 @@ export function CropSettings() {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || !hasSize || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -139,6 +145,6 @@ export function CropSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }

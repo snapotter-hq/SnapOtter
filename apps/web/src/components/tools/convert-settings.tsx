@@ -32,8 +32,13 @@ export function ConvertSettings() {
 
   const hasFile = files.length > 0;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Source format */}
       {hasFile && (
         <div>
@@ -98,7 +103,7 @@ export function ConvertSettings() {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -117,6 +122,6 @@ export function ConvertSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }

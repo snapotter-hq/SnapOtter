@@ -19,9 +19,10 @@ import { cn } from "@/lib/utils";
 interface AppLayoutProps {
   children?: React.ReactNode;
   showToolPanel?: boolean;
+  onFiles?: (files: File[]) => void;
 }
 
-export function AppLayout({ children, showToolPanel = true }: AppLayoutProps) {
+export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayoutProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useMobile();
@@ -89,7 +90,7 @@ export function AppLayout({ children, showToolPanel = true }: AppLayoutProps) {
         )}
       >
         <div className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
-          {children || <Dropzone />}
+          {children || <Dropzone onFiles={onFiles} accept="image/*" />}
         </div>
         {!isMobile && (
           <div className="text-center text-xs text-muted-foreground py-2 border-t border-border">

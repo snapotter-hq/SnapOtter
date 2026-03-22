@@ -63,12 +63,18 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
     { id: "effects", label: "Effects" },
   ];
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && hasChanges && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-1">
         {tabs.map((t) => (
           <button
+            type="button"
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 text-xs py-1.5 rounded ${
@@ -146,6 +152,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
           <div className="grid grid-cols-2 gap-1">
             {(["none", "grayscale", "sepia", "invert"] as const).map((e) => (
               <button
+                type="button"
                 key={e}
                 onClick={() => setEffect(e)}
                 className={`text-xs py-2 rounded capitalize transition-colors ${
@@ -164,6 +171,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
       {/* Reset button */}
       {hasChanges && (
         <button
+          type="button"
           onClick={() => {
             setBrightness(0);
             setContrast(0);
@@ -192,7 +200,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || !hasChanges || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -211,7 +219,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }
 

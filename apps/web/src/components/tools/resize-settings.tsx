@@ -41,19 +41,26 @@ export function ResizeSettings() {
   // Group presets by platform
   const platforms = [...new Set(SOCIAL_MEDIA_PRESETS.map((p) => p.platform))];
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Mode toggle */}
       <div>
         <label className="text-sm font-medium text-muted-foreground">Resize Mode</label>
         <div className="flex gap-1 mt-1">
           <button
+            type="button"
             onClick={() => setMode("pixels")}
             className={`flex-1 text-xs py-1.5 rounded ${mode === "pixels" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
             Pixels
           </button>
           <button
+            type="button"
             onClick={() => setMode("percentage")}
             className={`flex-1 text-xs py-1.5 rounded ${mode === "percentage" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
@@ -78,6 +85,7 @@ export function ResizeSettings() {
                 />
               </div>
               <button
+                type="button"
                 onClick={() => setLockAspect(!lockAspect)}
                 className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
                 title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
@@ -180,7 +188,7 @@ export function ResizeSettings() {
 
       {/* Process button */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -199,6 +207,6 @@ export function ResizeSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }

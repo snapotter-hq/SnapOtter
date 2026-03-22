@@ -85,6 +85,11 @@ app.get("/api/v1/health", async () => ({
   ai: {},
 }));
 
+// Public config endpoint (for frontend to know if auth is required)
+app.get("/api/v1/config/auth", async () => ({
+  authEnabled: env.AUTH_ENABLED,
+}));
+
 // Serve SPA in production
 if (process.env.NODE_ENV === "production") {
   await registerStatic(app);

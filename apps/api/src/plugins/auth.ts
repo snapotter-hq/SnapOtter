@@ -176,7 +176,7 @@ function extractToken(request: FastifyRequest): string | null {
 
 // ── Auth middleware ────────────────────────────────────────────────
 
-const PUBLIC_PATHS = ["/api/v1/health", "/api/auth/", "/api/docs"];
+const PUBLIC_PATHS = ["/api/v1/health", "/api/v1/config/", "/api/auth/", "/api/docs"];
 
 function isPublicRoute(url: string): boolean {
   return PUBLIC_PATHS.some((path) => url.startsWith(path));

@@ -4,7 +4,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(1350),
   AUTH_ENABLED: z
     .enum(["true", "false"])
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
   DEFAULT_USERNAME: z.string().default("admin"),
   DEFAULT_PASSWORD: z.string().default("admin"),

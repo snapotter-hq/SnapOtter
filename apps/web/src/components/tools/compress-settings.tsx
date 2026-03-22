@@ -28,19 +28,26 @@ export function CompressSettings() {
   const canProcess =
     mode === "quality" || (mode === "targetSize" && Number(targetSizeKb) > 0);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasFile && canProcess && !processing) handleProcess();
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Mode toggle */}
       <div>
         <label className="text-sm font-medium text-muted-foreground">Compression Mode</label>
         <div className="flex gap-1 mt-1">
           <button
+            type="button"
             onClick={() => setMode("quality")}
             className={`flex-1 text-xs py-1.5 rounded ${mode === "quality" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
             Quality
           </button>
           <button
+            type="button"
             onClick={() => setMode("targetSize")}
             className={`flex-1 text-xs py-1.5 rounded ${mode === "targetSize" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
@@ -102,7 +109,7 @@ export function CompressSettings() {
 
       {/* Process */}
       <button
-        onClick={handleProcess}
+        type="submit"
         disabled={!hasFile || !canProcess || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
@@ -121,6 +128,6 @@ export function CompressSettings() {
           Download
         </a>
       )}
-    </div>
+    </form>
   );
 }
