@@ -8,25 +8,26 @@ def main():
     output_path = sys.argv[2]
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 
-    model = settings.get("model", "birefnet-general")
+    model = settings.get("model", "birefnet-general-lite")
     bg_color = settings.get("backgroundColor", "")
 
     try:
         from rembg import remove, new_session
-        from PIL import Image
         import io
 
-        print(json.dumps({"progress": "loading_model"}), flush=True)
+        # Progress messages go to stderr (stdout reserved for JSON result)
+        sys.stderr.write(f"Loading model: {model}\n")
+        sys.stderr.flush()
 
-        # Create a session with the selected model
         session = new_session(model)
+
+        sys.stderr.write("Processing image...\n")
+        sys.stderr.flush()
 
         with open(input_path, "rb") as f:
             input_data = f.read()
 
-        print(json.dumps({"progress": "processing"}), flush=True)
-
-        # Try with alpha matting first for better edges
+        # Try with alpha matting for better edges, fall back without
         try:
             output_data = remove(
                 input_data,
@@ -40,6 +41,8 @@ def main():
 
         # If a background color is specified, composite onto it
         if bg_color and bg_color.startswith("#"):
+            from PIL import Image
+
             img = Image.open(io.BytesIO(output_data)).convert("RGBA")
             hex_color = bg_color.lstrip("#")
             r = int(hex_color[0:2], 16)

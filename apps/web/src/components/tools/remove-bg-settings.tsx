@@ -34,7 +34,7 @@ export function RemoveBgSettings() {
   const { processFiles, processing, error, downloadUrl, originalSize, processedSize } =
     useToolProcessor("remove-background");
 
-  const [model, setModel] = useState<BgModel>("birefnet-general");
+  const [model, setModel] = useState<BgModel>("birefnet-general-lite");
   const [bgColor, setBgColor] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
