@@ -100,4 +100,4 @@ export const SUPPORTED_OUTPUT_FORMATS = [
 
 export const DEFAULT_OUTPUT_FORMAT = "jpg" as const;
 
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.2.1";

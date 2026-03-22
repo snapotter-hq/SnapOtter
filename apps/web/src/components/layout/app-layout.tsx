@@ -13,6 +13,7 @@ import { ToolPanel } from "./tool-panel";
 import { Footer } from "./footer";
 import { Dropzone } from "../common/dropzone";
 import { SettingsDialog } from "../settings/settings-dialog";
+import { HelpDialog } from "../help/help-dialog";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayoutProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useMobile();
 
@@ -31,7 +33,7 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Desktop sidebar */}
       {!isMobile && (
-        <Sidebar onSettingsClick={() => setSettingsOpen(true)} />
+        <Sidebar onSettingsClick={() => setSettingsOpen(true)} onHelpClick={() => setHelpOpen(true)} />
       )}
 
       {/* Mobile sidebar overlay */}
@@ -58,6 +60,10 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
                 onSettingsClick={() => {
                   setMobileSidebarOpen(false);
                   setSettingsOpen(true);
+                }}
+                onHelpClick={() => {
+                  setMobileSidebarOpen(false);
+                  setHelpOpen(true);
                 }}
                 expanded
               />
@@ -121,6 +127,12 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      {/* Help dialog */}
+      <HelpDialog
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
       />
     </div>
   );

@@ -25,17 +25,18 @@ const topItems: SidebarItem[] = [
 ];
 
 const bottomItems: SidebarItem[] = [
-  { icon: HelpCircle, label: "Help", href: "/help" },
+  { icon: HelpCircle, label: "Help" },
   { icon: Settings, label: "Settings" },
 ];
 
 interface SidebarProps {
   onSettingsClick: () => void;
+  onHelpClick: () => void;
   /** When true, renders in expanded mode (for mobile overlay). */
   expanded?: boolean;
 }
 
-export function Sidebar({ onSettingsClick, expanded = false }: SidebarProps) {
+export function Sidebar({ onSettingsClick, onHelpClick, expanded = false }: SidebarProps) {
   const location = useLocation();
 
   const renderItem = (item: SidebarItem, isActive: boolean) => {
@@ -68,6 +69,13 @@ export function Sidebar({ onSettingsClick, expanded = false }: SidebarProps) {
     if (item.label === "Settings") {
       return (
         <button key={item.label} onClick={onSettingsClick} className="w-full">
+          {content}
+        </button>
+      );
+    }
+    if (item.label === "Help") {
+      return (
+        <button key={item.label} onClick={onHelpClick} className="w-full">
           {content}
         </button>
       );

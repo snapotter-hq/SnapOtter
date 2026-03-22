@@ -401,8 +401,22 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook(
     "preHandler",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // Skip if auth is disabled
-      if (!env.AUTH_ENABLED) return;
+      // When auth is disabled, attach the first admin user so requireAuth/requireAdmin pass
+      if (!env.AUTH_ENABLED) {
+        const adminUser = db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.role, "admin"))
+          .get();
+        if (adminUser) {
+          (request as FastifyRequest & { user?: AuthUser }).user = {
+            id: adminUser.id,
+            username: adminUser.username,
+            role: "admin",
+          };
+        }
+        return;
+      }
 
       const isPublic = isPublicRoute(request.url);
 

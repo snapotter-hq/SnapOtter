@@ -1,5 +1,3 @@
-export const AI_VERSION = "0.0.1";
-
 export { runPythonScript } from "./bridge.js";
 export { removeBackground } from "./background-removal.js";
 export type { RemoveBackgroundOptions } from "./background-removal.js";

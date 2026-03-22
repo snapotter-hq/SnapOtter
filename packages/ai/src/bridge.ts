@@ -25,8 +25,8 @@ function extractPythonError(error: unknown): string {
       stdout?: string;
       message?: string;
     };
-    // Try to parse JSON error from stderr or stdout
-    for (const output of [execError.stderr, execError.stdout]) {
+    // Try stdout first (Python scripts write JSON errors there), then stderr
+    for (const output of [execError.stdout, execError.stderr]) {
       if (output) {
         try {
           const parsed = JSON.parse(output.trim());

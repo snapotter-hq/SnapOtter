@@ -1,18 +1,31 @@
 {
   "name": "stirling-image",
+  "version": "0.2.1",
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "turbo dev",
+    "docs:dev": "pnpm --filter @stirling-image/docs docs:dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "clean": "turbo clean",
     "typecheck": "turbo typecheck",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "version:sync": "./scripts/sync-version.sh",
+    "release": "semantic-release",
+    "release:dry": "semantic-release --dry-run"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "semantic-release": "^25.0.3",
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   }

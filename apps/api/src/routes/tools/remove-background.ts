@@ -55,7 +55,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
         const resultBuffer = await removeBackground(
           fileBuffer,
           join(workspacePath, "output"),
-          { model: settings.model },
+          { model: settings.model, backgroundColor: settings.backgroundColor },
         );
 
         // Save output
