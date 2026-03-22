@@ -43,7 +43,7 @@ await app.register(swagger, {
       description: "API for Stirling Image — self-hosted image processing suite",
       version: APP_VERSION,
     },
-    servers: [{ url: `http://localhost:${env.PORT}` }],
+    servers: [{ url: `http://localhost:1349` }],
   },
 });
 
