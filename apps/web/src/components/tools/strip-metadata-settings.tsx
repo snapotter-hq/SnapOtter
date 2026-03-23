@@ -1,11 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFileStore } from "@/stores/file-store";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { Download } from "lucide-react";
+import { Download, Loader2, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { ProgressCard } from "@/components/common/progress-card";
 
+function getToken(): string {
+  return localStorage.getItem("stirling-token") || "";
+}
+
+interface MetadataResult {
+  filename: string;
+  fileSize: number;
+  exif?: Record<string, unknown> | null;
+  exifError?: string;
+  gps?: Record<string, unknown> | null;
+  icc?: Record<string, string> | null;
+  xmp?: Record<string, string> | null;
+}
+
 export function StripMetadataSettings() {
-  const { files } = useFileStore();
+  const { entries, selectedIndex, files } = useFileStore();
   const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("strip-metadata");
 
@@ -14,6 +28,74 @@ export function StripMetadataSettings() {
   const [stripGps, setStripGps] = useState(false);
   const [stripIcc, setStripIcc] = useState(false);
   const [stripXmp, setStripXmp] = useState(false);
+
+  // Metadata inspection state
+  const [metadataCache, setMetadataCache] = useState<Map<string, MetadataResult>>(new Map());
+  const [metadata, setMetadata] = useState<MetadataResult | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+  const [inspectError, setInspectError] = useState<string | null>(null);
+
+  // Collapsible sections
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const currentFile = entries[selectedIndex]?.file ?? null;
+  const fileKey = currentFile ? `${currentFile.name}-${currentFile.size}-${currentFile.lastModified}` : null;
+
+  // Auto-fetch metadata for the selected file
+  useEffect(() => {
+    if (!currentFile || !fileKey) {
+      setMetadata(null);
+      setInspectError(null);
+      return;
+    }
+
+    // Check cache first
+    const cached = metadataCache.get(fileKey);
+    if (cached) {
+      setMetadata(cached);
+      return;
+    }
+
+    const controller = new AbortController();
+    (async () => {
+      setInspecting(true);
+      setInspectError(null);
+      setMetadata(null);
+      try {
+        const formData = new FormData();
+        formData.append("file", currentFile);
+        const res = await fetch("/api/v1/tools/strip-metadata/inspect", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: formData,
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Failed: ${res.status}`);
+        }
+        const data: MetadataResult = await res.json();
+        setMetadata(data);
+        setMetadataCache((prev) => new Map(prev).set(fileKey!, data));
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        setInspectError(err instanceof Error ? err.message : "Failed to inspect metadata");
+      } finally {
+        setInspecting(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [currentFile, fileKey]);
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   const handleStripAllChange = (checked: boolean) => {
     setStripAll(checked);
@@ -36,8 +118,77 @@ export function StripMetadataSettings() {
     if (hasFile && !processing) handleProcess();
   };
 
+  const hasGps = metadata?.gps && Object.keys(metadata.gps).length > 0;
+
+  const renderMetadataSection = (title: string, key: string, data: Record<string, unknown> | null | undefined) => {
+    if (!data || Object.keys(data).length === 0) return null;
+    const expanded = expandedSections.has(key);
+    return (
+      <div className="border border-border rounded-lg overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleSection(key)}
+          className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+        >
+          {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          {title}
+          <span className="text-muted-foreground ml-auto">{Object.keys(data).length} fields</span>
+        </button>
+        {expanded && (
+          <div className="border-t border-border px-2.5 py-1.5 space-y-0.5">
+            {Object.entries(data).map(([k, v]) => (
+              <div key={k} className="flex gap-2 text-[11px]">
+                <span className="text-muted-foreground shrink-0">{k}:</span>
+                <span className="text-foreground font-mono break-all">{String(v)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Metadata inspection */}
+      {inspecting && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Inspecting metadata...
+        </div>
+      )}
+
+      {inspectError && <p className="text-xs text-red-500">{inspectError}</p>}
+
+      {metadata && (
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">Current File Metadata</label>
+
+          {hasGps && (
+            <div className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                This image contains GPS location data. Consider stripping it for privacy.
+              </p>
+            </div>
+          )}
+
+          {renderMetadataSection("EXIF", "exif", metadata.exif)}
+          {metadata.exifError && (
+            <p className="text-[11px] text-muted-foreground">EXIF: {metadata.exifError}</p>
+          )}
+          {renderMetadataSection("GPS", "gps", metadata.gps)}
+          {renderMetadataSection("ICC Profile", "icc", metadata.icc)}
+          {renderMetadataSection("XMP", "xmp", metadata.xmp)}
+
+          {!metadata.exif && !metadata.gps && !metadata.icc && !metadata.xmp && !metadata.exifError && (
+            <p className="text-xs text-muted-foreground">No metadata found in this file.</p>
+          )}
+        </div>
+      )}
+
+      <div className="border-t border-border" />
+
       {/* Strip All */}
       <label className="flex items-center gap-2 text-sm text-foreground font-medium">
         <input
