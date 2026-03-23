@@ -110,11 +110,11 @@ export function CropSettings({
         let newWidth: number;
         let newHeight: number;
         if (value > imgAspect) {
-          // Wider than image — constrain by width
+          // Desired ratio is wider than image — use full width, shrink height
           newWidth = 100;
           newHeight = (imgDimensions.width / value / imgDimensions.height) * 100;
         } else {
-          // Taller than image — constrain by height
+          // Desired ratio is taller than image — use full height, shrink width
           newHeight = 100;
           newWidth = (imgDimensions.height * value / imgDimensions.width) * 100;
         }

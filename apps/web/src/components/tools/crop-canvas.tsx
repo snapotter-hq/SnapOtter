@@ -109,7 +109,7 @@ export function CropCanvas({
       <div className="flex-1 flex items-center justify-center overflow-hidden bg-muted/20 p-4">
         <ReactCrop
           crop={crop}
-          onChange={onCropChange}
+          onChange={(_pixelCrop, percentCrop) => onCropChange(percentCrop)}
           aspect={aspect}
           className="max-h-full"
           ruleOfThirds={showGrid}
