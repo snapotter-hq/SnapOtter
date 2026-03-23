@@ -35,3 +35,4 @@ settings-*.png
 layout-*.png
 audit_report.md
 .worktrees/
+.release-version

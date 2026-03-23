@@ -18,7 +18,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "./scripts/sync-version.sh ${nextRelease.version}"
+        "prepareCmd": "./scripts/sync-version.sh ${nextRelease.version}",
+        "publishCmd": "echo '${nextRelease.version}' > .release-version"
       }
     ],
     [
