@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./config.js";
+import { APP_VERSION } from "@stirling-image/shared";
 import { runMigrations } from "./db/migrate.js";
 import { ensureDefaultAdmin, authRoutes, authMiddleware } from "./plugins/auth.js";
 import { registerUpload } from "./plugins/upload.js";
