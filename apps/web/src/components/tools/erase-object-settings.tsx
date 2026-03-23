@@ -50,7 +50,7 @@ export function EraseObjectSettings() {
         const data = JSON.parse(event.data);
         if (data.type === "single" && typeof data.percent === "number") {
           setProgressPhase("processing");
-          setProgressPercent(data.percent);
+          setProgressPercent(15 + (data.percent / 100) * 85);
           setProgressStage(data.stage);
         }
       } catch {}
@@ -65,12 +65,12 @@ export function EraseObjectSettings() {
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        setProgressPercent((e.loaded / e.total) * 100);
+        setProgressPercent((e.loaded / e.total) * 15);
       }
     };
     xhr.upload.onload = () => {
       setProgressPhase("processing");
-      setProgressPercent(0);
+      setProgressPercent(15);
       setProgressStage("Starting...");
     };
     xhr.onload = () => {
