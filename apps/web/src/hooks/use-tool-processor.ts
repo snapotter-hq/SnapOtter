@@ -97,10 +97,12 @@ export function useToolProcessor(toolId: string) {
             try {
               const data = JSON.parse(event.data);
               if (data.type === "single" && typeof data.percent === "number") {
+                // Scale server progress (0-100) into 15-100 range
+                const scaled = 15 + (data.percent / 100) * 85;
                 setProgress((prev) => ({
                   ...prev,
                   phase: "processing",
-                  percent: data.percent,
+                  percent: scaled,
                   stage: data.stage,
                 }));
               }
@@ -130,9 +132,13 @@ export function useToolProcessor(toolId: string) {
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
 
+      // For AI tools: upload = 0-15%, processing = 15-100% (continuous, no reset)
+      // For fast tools: upload = 0-100%, processing = brief 100% hold
+      const UPLOAD_WEIGHT = isAiTool ? 15 : 100;
+
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
-          const uploadPercent = (event.loaded / event.total) * 100;
+          const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
           setProgress((prev) => {
             if (prev.phase !== "uploading") return prev;
             return { ...prev, percent: uploadPercent };
@@ -144,7 +150,7 @@ export function useToolProcessor(toolId: string) {
         setProgress((prev) => ({
           ...prev,
           phase: "processing",
-          percent: isAiTool ? 0 : 100,
+          percent: UPLOAD_WEIGHT,
           stage: isAiTool ? "Starting..." : "Processing...",
         }));
       };
