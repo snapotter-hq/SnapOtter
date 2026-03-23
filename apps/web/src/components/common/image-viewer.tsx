@@ -6,12 +6,15 @@ interface ImageViewerProps {
   src: string;
   filename: string;
   fileSize: number;
+  cssRotate?: number;
+  cssFlipH?: boolean;
+  cssFlipV?: boolean;
 }
 
 const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 200, 300];
 const DEFAULT_ZOOM = 100;
 
-export function ImageViewer({ src, filename, fileSize }: ImageViewerProps) {
+export function ImageViewer({ src, filename, fileSize, cssRotate, cssFlipH, cssFlipV }: ImageViewerProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
   const [naturalHeight, setNaturalHeight] = useState<number | null>(null);
@@ -62,10 +65,26 @@ export function ImageViewer({ src, filename, fileSize }: ImageViewerProps) {
     setNaturalHeight(null);
   }, [src]);
 
+  const previewTransform = [
+    cssRotate ? `rotate(${cssRotate}deg)` : "",
+    cssFlipH ? "scaleX(-1)" : "",
+    cssFlipV ? "scaleY(-1)" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const imageStyle =
     fitMode === "fit"
-      ? { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" as const }
-      : { transform: `scale(${zoom / 100})`, transformOrigin: "center center" };
+      ? {
+          maxWidth: "100%",
+          maxHeight: "100%",
+          objectFit: "contain" as const,
+          ...(previewTransform && { transform: previewTransform }),
+        }
+      : {
+          transform: `scale(${zoom / 100})${previewTransform ? ` ${previewTransform}` : ""}`,
+          transformOrigin: "center center",
+        };
 
   return (
     <div className="flex flex-col w-full h-full max-w-3xl mx-auto">
