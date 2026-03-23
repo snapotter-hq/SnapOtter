@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFileStore } from "@/stores/file-store";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import {
@@ -10,14 +10,29 @@ import {
 } from "lucide-react";
 import { ProgressCard } from "@/components/common/progress-card";
 
-export function RotateSettings() {
+export interface PreviewTransform {
+  rotate: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
+interface RotateSettingsProps {
+  onPreviewTransform?: (transform: PreviewTransform) => void;
+}
+
+export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("rotate");
 
   const [angle, setAngle] = useState(0);
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
+
+  // Emit preview transform on every change
+  useEffect(() => {
+    onPreviewTransform?.({ rotate: angle, flipH, flipV });
+  }, [angle, flipH, flipV, onPreviewTransform]);
 
   const rotateLeft = () => setAngle((a) => (a - 90 + 360) % 360);
   const rotateRight = () => setAngle((a) => (a + 90) % 360);
@@ -113,20 +128,12 @@ export function RotateSettings() {
       {/* Error */}
       {error && <p className="text-xs text-red-500">{error}</p>}
 
-      {/* Size info */}
-      {originalSize != null && processedSize != null && (
-        <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
-        </div>
-      )}
-
       {/* Process */}
       {processing ? (
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Rotating"
+          label="Applying"
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -137,7 +144,7 @@ export function RotateSettings() {
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Rotate
+          Apply
         </button>
       )}
 
