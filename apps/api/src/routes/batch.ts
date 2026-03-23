@@ -42,6 +42,7 @@ export async function registerBatchRoutes(
       // Parse multipart: collect all files and the settings field
       const files: ParsedFile[] = [];
       let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
 
       try {
         const parts = request.parts();
@@ -60,6 +61,8 @@ export async function registerBatchRoutes(
             }
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            clientJobId = part.value as string;
           }
         }
       } catch (err) {
@@ -102,7 +105,7 @@ export async function registerBatchRoutes(
       }
 
       // Create a job ID for progress tracking
-      const jobId = randomUUID();
+      const jobId = clientJobId || randomUUID();
 
       const progress: JobProgress = {
         jobId,
@@ -120,6 +123,7 @@ export async function registerBatchRoutes(
         "Content-Disposition": `attachment; filename="batch-${toolId}-${jobId.slice(0, 8)}.zip"`,
         "Transfer-Encoding": "chunked",
         "X-Job-Id": jobId,
+        "X-File-Order": files.map(f => f.filename).join(","),
       });
 
       // Create ZIP archive that pipes directly to the response

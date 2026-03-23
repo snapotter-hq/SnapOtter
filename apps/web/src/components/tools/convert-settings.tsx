@@ -9,7 +9,7 @@ const LOSSY_FORMATS = new Set(["jpg", "webp", "avif"]);
 
 export function ConvertSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("convert");
 
   const [format, setFormat] = useState<string>("png");
@@ -28,7 +28,11 @@ export function ConvertSettings() {
     if (isLossy) {
       settings.quality = quality;
     }
-    processFiles(files, settings);
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -118,7 +122,7 @@ export function ConvertSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Convert
+          {files.length > 1 ? `Convert (${files.length} files)` : "Convert"}
         </button>
       )}
 

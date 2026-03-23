@@ -8,7 +8,7 @@ type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-ri
 
 export function WatermarkTextSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("watermark-text");
 
   const [text, setText] = useState("Sample Watermark");
@@ -19,7 +19,12 @@ export function WatermarkTextSettings() {
   const [rotation, setRotation] = useState(0);
 
   const handleProcess = () => {
-    processFiles(files, { text, fontSize, color, opacity, position, rotation });
+    const settings = { text, fontSize, color, opacity, position, rotation };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -106,7 +111,7 @@ export function WatermarkTextSettings() {
           disabled={!hasFile || processing || !text}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Add Watermark
+          {files.length > 1 ? `Apply Watermark (${files.length} files)` : "Apply Watermark"}
         </button>
       )}
 

@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 
 export function TextOverlaySettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("text-overlay");
 
   const [text, setText] = useState("Your Text Here");
@@ -18,7 +18,12 @@ export function TextOverlaySettings() {
   const [shadow, setShadow] = useState(true);
 
   const handleProcess = () => {
-    processFiles(files, { text, fontSize, color, position, backgroundBox, backgroundColor, shadow });
+    const settings = { text, fontSize, color, position, backgroundBox, backgroundColor, shadow };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -102,7 +107,7 @@ export function TextOverlaySettings() {
           disabled={!hasFile || processing || !text}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Add Text
+          {files.length > 1 ? `Apply Overlay (${files.length} files)` : "Apply Overlay"}
         </button>
       )}
 

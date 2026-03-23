@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 
 export function BorderSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("border");
 
   const [borderWidth, setBorderWidth] = useState(10);
@@ -16,7 +16,12 @@ export function BorderSettings() {
   const [shadowBlur, setShadowBlur] = useState(0);
 
   const handleProcess = () => {
-    processFiles(files, { borderWidth, borderColor, cornerRadius, padding, shadowBlur });
+    const settings = { borderWidth, borderColor, cornerRadius, padding, shadowBlur };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -84,7 +89,7 @@ export function BorderSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Add Border
+          {files.length > 1 ? `Apply Border (${files.length} files)` : "Apply Border"}
         </button>
       )}
 

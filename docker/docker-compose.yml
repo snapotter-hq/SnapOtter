@@ -1,3 +1,5 @@
+name: stirling-image
+
 services:
   stirling-image:
     build:

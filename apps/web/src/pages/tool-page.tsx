@@ -3,10 +3,8 @@ import { useMemo, useCallback, useState } from "react";
 import { TOOLS } from "@stirling-image/shared";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Dropzone } from "@/components/common/dropzone";
-import { ImageViewer } from "@/components/common/image-viewer";
-import { BeforeAfterSlider } from "@/components/common/before-after-slider";
+import { MultiImageViewer } from "@/components/common/multi-image-viewer";
 import { ReviewPanel } from "@/components/common/review-panel";
-import { SideBySideComparison } from "@/components/common/side-by-side-comparison";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import { useFileStore } from "@/stores/file-store";
 import { useMobile } from "@/hooks/use-mobile";
@@ -52,7 +50,7 @@ import { BlurFacesSettings } from "@/components/tools/blur-faces-settings";
 import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
 import { SmartCropSettings } from "@/components/tools/smart-crop-settings";
 import * as icons from "lucide-react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Download } from "lucide-react";
 
 const COLOR_TOOL_IDS = new Set([
   "brightness-contrast",
@@ -63,7 +61,6 @@ const COLOR_TOOL_IDS = new Set([
 
 // Tools that don't need a file dropzone (they generate content or have custom UI)
 const NO_DROPZONE_TOOLS = new Set(["qr-generate"]);
-const SIDE_BY_SIDE_TOOLS = new Set(["resize", "crop"]);
 const LIVE_PREVIEW_TOOLS = new Set(["rotate"]);
 
 function ToolSettingsPanel({
@@ -128,11 +125,13 @@ function FileSelectionInfo({
   selectedFileName,
   selectedFileSize,
   onClear,
+  onAddMore,
 }: {
   files: File[];
   selectedFileName: string | null;
   selectedFileSize: number | null;
   onClear: () => void;
+  onAddMore: () => void;
 }) {
   if (files.length === 0) {
     return (
@@ -144,26 +143,16 @@ function FileSelectionInfo({
 
   return (
     <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-foreground">Files ({files.length})</span>
+        <button onClick={onAddMore} className="text-xs text-primary hover:text-primary/80">+ Add more</button>
+      </div>
       <div className="flex items-center gap-1.5 text-xs text-foreground bg-muted rounded px-2 py-1.5">
         <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
-        <span className="truncate flex-1">
-          Selected: {selectedFileName ?? files[0].name}
-        </span>
-        <span className="text-muted-foreground shrink-0 ml-1">
-          {formatFileSize(selectedFileSize ?? files[0].size)}
-        </span>
+        <span className="truncate flex-1">{selectedFileName ?? files[0].name}</span>
+        <span className="text-muted-foreground shrink-0 ml-1">{formatFileSize(selectedFileSize ?? files[0].size)}</span>
       </div>
-      {files.length > 1 && (
-        <p className="text-xs text-muted-foreground px-1">
-          +{files.length - 1} more file{files.length > 2 ? "s" : ""}
-        </p>
-      )}
-      <button
-        onClick={onClear}
-        className="text-xs text-muted-foreground hover:text-foreground"
-      >
-        Clear
-      </button>
+      <button onClick={onClear} className="text-xs text-muted-foreground hover:text-foreground">Clear all</button>
     </div>
   );
 }
@@ -173,7 +162,9 @@ export function ToolPage() {
   const tool = useMemo(() => TOOLS.find((t) => t.id === toolId), [toolId]);
   const {
     files,
+    entries,
     setFiles,
+    addFiles,
     reset,
     processedUrl,
     originalBlobUrl,
@@ -182,6 +173,8 @@ export function ToolPage() {
     selectedFileName,
     selectedFileSize,
     undoProcessing,
+    batchZipBlob,
+    batchZipFilename,
   } = useFileStore();
   const isMobile = useMobile();
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(true);
@@ -198,6 +191,28 @@ export function ToolPage() {
   const handleUndo = useCallback(() => {
     undoProcessing();
   }, [undoProcessing]);
+
+  const handleAddMore = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "image/*";
+    input.onchange = (e) => {
+      const newFiles = Array.from((e.target as HTMLInputElement).files || []);
+      if (newFiles.length > 0) addFiles(newFiles);
+    };
+    input.click();
+  }, [addFiles]);
+
+  const handleDownloadAll = useCallback(() => {
+    if (!batchZipBlob) return;
+    const url = URL.createObjectURL(batchZipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = batchZipFilename ?? "processed-images.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [batchZipBlob, batchZipFilename]);
 
   if (!tool) {
     return (
@@ -264,6 +279,7 @@ export function ToolPage() {
                     selectedFileName={selectedFileName}
                     selectedFileSize={selectedFileSize}
                     onClear={reset}
+                    onAddMore={handleAddMore}
                   />
                 </div>
               )}
@@ -295,45 +311,14 @@ export function ToolPage() {
             </div>
           )}
 
-          {/* Main area: Dropzone / Image Viewer / Before-After */}
+          {/* Main area: Dropzone / MultiImageViewer */}
           <div className="flex-1 flex items-center justify-center p-4">
             {isNoDropzone ? (
               <div className="text-center text-muted-foreground">
                 <p className="text-sm">Configure settings and generate.</p>
               </div>
-            ) : hasProcessed && originalBlobUrl && SIDE_BY_SIDE_TOOLS.has(tool.id) ? (
-              <SideBySideComparison
-                beforeSrc={originalBlobUrl}
-                afterSrc={processedUrl}
-                beforeSize={originalSize ?? undefined}
-                afterSize={processedSize ?? undefined}
-              />
-            ) : hasProcessed && originalBlobUrl && LIVE_PREVIEW_TOOLS.has(tool.id) ? (
-              <ImageViewer
-                src={processedUrl}
-                filename={processedFileName}
-                fileSize={processedSize ?? 0}
-              />
-            ) : hasProcessed && originalBlobUrl ? (
-              <BeforeAfterSlider
-                beforeSrc={originalBlobUrl}
-                afterSrc={processedUrl}
-                beforeSize={originalSize ?? undefined}
-                afterSize={processedSize ?? undefined}
-              />
-            ) : hasFile && originalBlobUrl ? (
-              <ImageViewer
-                src={originalBlobUrl}
-                filename={selectedFileName ?? files[0].name}
-                fileSize={selectedFileSize ?? files[0].size}
-                {...(LIVE_PREVIEW_TOOLS.has(tool.id) && previewTransform
-                  ? {
-                      cssRotate: previewTransform.rotate,
-                      cssFlipH: previewTransform.flipH,
-                      cssFlipV: previewTransform.flipV,
-                    }
-                  : {})}
-              />
+            ) : hasFile ? (
+              <MultiImageViewer />
             ) : (
               <Dropzone
                 onFiles={handleFiles}
@@ -374,6 +359,7 @@ export function ToolPage() {
                 selectedFileName={selectedFileName}
                 selectedFileSize={selectedFileSize}
                 onClear={reset}
+                onAddMore={handleAddMore}
               />
             </div>
           )}
@@ -403,47 +389,30 @@ export function ToolPage() {
               currentToolId={tool.id}
             />
           )}
+
+          {/* Batch download */}
+          {entries.length > 1 && hasProcessed && batchZipBlob && (
+            <div className="space-y-2">
+              <div className="border-t border-border pt-2" />
+              <button
+                onClick={handleDownloadAll}
+                className="w-full py-2 rounded-lg bg-primary text-primary-foreground flex items-center justify-center gap-1.5 text-xs font-medium hover:bg-primary/90"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download All (ZIP)
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Main area: Dropzone / Image Viewer / Before-After */}
+        {/* Main area: Dropzone / MultiImageViewer */}
         <div className="flex-1 flex items-center justify-center p-6">
           {isNoDropzone ? (
             <div className="text-center text-muted-foreground">
               <p className="text-sm">Configure settings and generate.</p>
             </div>
-          ) : hasProcessed && originalBlobUrl && SIDE_BY_SIDE_TOOLS.has(tool.id) ? (
-            <SideBySideComparison
-              beforeSrc={originalBlobUrl}
-              afterSrc={processedUrl}
-              beforeSize={originalSize ?? undefined}
-              afterSize={processedSize ?? undefined}
-            />
-          ) : hasProcessed && originalBlobUrl && LIVE_PREVIEW_TOOLS.has(tool.id) ? (
-            <ImageViewer
-              src={processedUrl}
-              filename={processedFileName}
-              fileSize={processedSize ?? 0}
-            />
-          ) : hasProcessed && originalBlobUrl ? (
-            <BeforeAfterSlider
-              beforeSrc={originalBlobUrl}
-              afterSrc={processedUrl}
-              beforeSize={originalSize ?? undefined}
-              afterSize={processedSize ?? undefined}
-            />
-          ) : hasFile && originalBlobUrl ? (
-            <ImageViewer
-              src={originalBlobUrl}
-              filename={selectedFileName ?? files[0].name}
-              fileSize={selectedFileSize ?? files[0].size}
-              {...(LIVE_PREVIEW_TOOLS.has(tool.id) && previewTransform
-                ? {
-                    cssRotate: previewTransform.rotate,
-                    cssFlipH: previewTransform.flipH,
-                    cssFlipV: previewTransform.flipV,
-                  }
-                : {})}
-            />
+          ) : hasFile ? (
+            <MultiImageViewer />
           ) : (
             <Dropzone
               onFiles={handleFiles}

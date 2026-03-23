@@ -205,8 +205,125 @@ export function useToolProcessor(toolId: string) {
     [toolId, isAiTool, setProcessing, setError, setProcessedUrl, setSizes, setJobId],
   );
 
+  const processAllFiles = useCallback(
+    async (files: File[], settings: Record<string, unknown>) => {
+      if (files.length === 0) {
+        setError("No files selected");
+        return;
+      }
+      if (files.length === 1) {
+        processFiles(files, settings);
+        return;
+      }
+
+      const { updateEntry, setBatchZip } = useFileStore.getState();
+
+      setError(null);
+      setProcessing(true);
+      setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
+
+      const startTime = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
+      }, 1000);
+
+      const clientJobId = crypto.randomUUID();
+
+      // Open SSE before upload for real-time progress
+      try {
+        const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+        eventSourceRef.current = es;
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "batch") {
+              const pct = data.totalFiles > 0 ? 15 + (data.completedFiles / data.totalFiles) * 85 : 15;
+              setProgress((prev) => ({
+                ...prev,
+                phase: "processing",
+                percent: pct,
+                stage: data.currentFile
+                  ? `Processing ${data.currentFile} (${data.completedFiles}/${data.totalFiles})`
+                  : `Processing ${data.completedFiles}/${data.totalFiles}`,
+              }));
+            }
+          } catch { /* ignore malformed SSE */ }
+        };
+        es.onerror = () => { es.close(); eventSourceRef.current = null; };
+      } catch { /* SSE failed, proceed without */ }
+
+      const formData = new FormData();
+      for (const file of files) formData.append("file", file);
+      formData.append("settings", JSON.stringify(settings));
+      formData.append("clientJobId", clientJobId);
+
+      try {
+        const token = getToken();
+        const response = await fetch(`/api/v1/tools/${toolId}/batch`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (eventSourceRef.current) { eventSourceRef.current.close(); eventSourceRef.current = null; }
+
+        if (!response.ok) {
+          const text = await response.text();
+          let errorMsg: string;
+          try {
+            const body = JSON.parse(text);
+            errorMsg = body.error || body.details || `Batch processing failed: ${response.status}`;
+          } catch { errorMsg = `Batch processing failed: ${response.status}`; }
+          setError(errorMsg);
+          setProcessing(false);
+          setProgress(IDLE_PROGRESS);
+          return;
+        }
+
+        const zipBlob = await response.blob();
+        setBatchZip(zipBlob, `batch-${toolId}.zip`);
+
+        // Extract files from ZIP using fflate
+        const { unzipSync } = await import("fflate");
+        const zipBuffer = new Uint8Array(await zipBlob.arrayBuffer() as ArrayBuffer);
+        const extracted = unzipSync(zipBuffer);
+
+        const fileOrder = response.headers.get("X-File-Order")?.split(",") ?? [];
+        const entries = useFileStore.getState().entries;
+        const extractedNames = Object.keys(extracted);
+
+        for (let i = 0; i < entries.length; i++) {
+          let zipName: string | undefined;
+          if (fileOrder[i] && extracted[fileOrder[i]]) {
+            zipName = fileOrder[i];
+          } else {
+            zipName = extractedNames.find((n) => n === entries[i].file.name) ?? extractedNames[i];
+          }
+          if (zipName && extracted[zipName]) {
+            const blob = new Blob([extracted[zipName] as BlobPart]);
+            updateEntry(i, { processedUrl: URL.createObjectURL(blob), processedSize: blob.size, status: "completed" });
+          } else {
+            updateEntry(i, { status: "failed", error: "File not found in batch results" });
+          }
+        }
+
+        setProcessing(false);
+        setProgress(IDLE_PROGRESS);
+      } catch (err) {
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (eventSourceRef.current) { eventSourceRef.current.close(); eventSourceRef.current = null; }
+        setError(err instanceof Error ? err.message : "Batch processing failed");
+        setProcessing(false);
+        setProgress(IDLE_PROGRESS);
+      }
+    },
+    [toolId, processFiles, setProcessing, setError],
+  );
+
   return {
     processFiles,
+    processAllFiles,
     processing,
     error,
     downloadUrl: processedUrl,

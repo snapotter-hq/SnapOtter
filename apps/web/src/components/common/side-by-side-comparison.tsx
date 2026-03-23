@@ -27,6 +27,15 @@ export function SideBySideComparison({
       ? ((1 - afterSize / beforeSize) * 100).toFixed(1)
       : null;
 
+  const checkerboard = {
+    backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
+    backgroundSize: "16px 16px",
+    backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+  };
+
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto">
       {/* Side-by-side images */}
@@ -36,11 +45,14 @@ export function SideBySideComparison({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Original
           </span>
-          <div className="w-full rounded-lg border border-border overflow-hidden flex items-center justify-center bg-muted/30 p-2 min-h-[200px] max-h-[60vh]">
+          <div
+            className="w-full aspect-video rounded-lg border border-border overflow-hidden flex items-center justify-center"
+            style={checkerboard}
+          >
             <img
               src={beforeSrc}
               alt="Original"
-              className="max-w-full max-h-[56vh] object-contain rounded-sm"
+              className="max-w-full max-h-full object-contain"
               draggable={false}
               onLoad={(e) => {
                 const img = e.currentTarget;
@@ -51,23 +63,26 @@ export function SideBySideComparison({
           <div className="text-xs text-muted-foreground text-center space-y-0.5">
             {beforeDims && (
               <p>
-                {beforeDims.w} × {beforeDims.h}
+                {beforeDims.w} x {beforeDims.h}
               </p>
             )}
             {beforeSize != null && <p>{formatSize(beforeSize)}</p>}
           </div>
         </div>
 
-        {/* Processed */}
+        {/* Resized */}
         <div className="flex-1 flex flex-col items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Processed
+            Resized
           </span>
-          <div className="w-full rounded-lg border border-border overflow-hidden flex items-center justify-center bg-muted/30 p-2 min-h-[200px] max-h-[60vh]">
+          <div
+            className="w-full aspect-video rounded-lg border border-border overflow-hidden flex items-center justify-center"
+            style={checkerboard}
+          >
             <img
               src={afterSrc}
-              alt="Processed"
-              className="max-w-full max-h-[56vh] object-contain rounded-sm"
+              alt="Resized"
+              className="max-w-full max-h-full object-contain"
               draggable={false}
               onLoad={(e) => {
                 const img = e.currentTarget;
@@ -78,7 +93,7 @@ export function SideBySideComparison({
           <div className="text-xs text-muted-foreground text-center space-y-0.5">
             {afterDims && (
               <p>
-                {afterDims.w} × {afterDims.h}
+                {afterDims.w} x {afterDims.h}
               </p>
             )}
             {afterSize != null && <p>{formatSize(afterSize)}</p>}

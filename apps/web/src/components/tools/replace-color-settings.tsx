@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 
 export function ReplaceColorSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("replace-color");
 
   const [sourceColor, setSourceColor] = useState("#FF0000");
@@ -15,7 +15,12 @@ export function ReplaceColorSettings() {
   const [tolerance, setTolerance] = useState(30);
 
   const handleProcess = () => {
-    processFiles(files, { sourceColor, targetColor, makeTransparent, tolerance });
+    const settings = { sourceColor, targetColor, makeTransparent, tolerance };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -81,7 +86,7 @@ export function ReplaceColorSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Replace Color
+          {files.length > 1 ? `Replace Color (${files.length} files)` : "Replace Color"}
         </button>
       )}
 

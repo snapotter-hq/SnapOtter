@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useFileStore } from "@/stores/file-store";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import {
@@ -7,7 +7,6 @@ import {
   RotateCw,
   FlipHorizontal,
   FlipVertical,
-  RotateCcw as ResetIcon,
 } from "lucide-react";
 import { ProgressCard } from "@/components/common/progress-card";
 
@@ -23,7 +22,7 @@ interface RotateSettingsProps {
 
 export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("rotate");
 
   const [angle, setAngle] = useState(0);
@@ -35,29 +34,20 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
     onPreviewTransform?.({ rotate: angle, flipH, flipV });
   }, [angle, flipH, flipV, onPreviewTransform]);
 
-  const rotateLeft = () => setAngle((a) => {
-    const next = a - 90;
-    return next < -180 ? next + 360 : next;
-  });
-  const rotateRight = () => setAngle((a) => {
-    const next = a + 90;
-    return next > 180 ? next - 360 : next;
-  });
-
-  const setAngleClamped = useCallback((val: number) => {
-    // Clamp to -180..180
-    const clamped = Math.max(-180, Math.min(180, Math.round(val)));
-    setAngle(clamped);
-  }, []);
+  const rotateLeft = () => setAngle((a) => (a - 90 + 360) % 360);
+  const rotateRight = () => setAngle((a) => (a + 90) % 360);
 
   const handleProcess = () => {
-    // Convert -180..180 to 0..360 for the backend
-    const backendAngle = angle < 0 ? angle + 360 : angle;
-    processFiles(files, {
-      angle: backendAngle,
+    const settings = {
+      angle,
       horizontal: flipH,
       vertical: flipV,
-    });
+    };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -66,12 +56,6 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (hasFile && hasChanges && !processing) handleProcess();
-  };
-
-  const handleReset = () => {
-    setAngle(0);
-    setFlipH(false);
-    setFlipV(false);
   };
 
   return (
@@ -86,7 +70,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
             className="flex-1 flex items-center justify-center gap-1 py-2 rounded bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm"
           >
             <RotateCcw className="h-4 w-4" />
-            90° Left
+            90 Left
           </button>
           <button
             type="button"
@@ -94,51 +78,25 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
             className="flex-1 flex items-center justify-center gap-1 py-2 rounded bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm"
           >
             <RotateCw className="h-4 w-4" />
-            90° Right
+            90 Right
           </button>
         </div>
       </div>
 
-      {/* Angle control */}
+      {/* Angle slider */}
       <div>
         <div className="flex justify-between items-center">
-          <label className="text-xs text-muted-foreground">Fine Angle</label>
-          <div className="flex items-center gap-1.5">
-            <input
-              type="number"
-              value={angle}
-              onChange={(e) => setAngleClamped(Number(e.target.value))}
-              min={-180}
-              max={180}
-              className="w-16 px-1.5 py-0.5 rounded border border-border bg-background text-xs text-foreground text-right font-mono tabular-nums"
-            />
-            <span className="text-xs text-muted-foreground">°</span>
-            {angle !== 0 && (
-              <button
-                type="button"
-                onClick={() => setAngle(0)}
-                className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                title="Reset angle"
-              >
-                <ResetIcon className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+          <label className="text-xs text-muted-foreground">Angle</label>
+          <span className="text-xs font-mono text-foreground">{angle} deg</span>
         </div>
         <input
           type="range"
-          min={-180}
-          max={180}
-          step={1}
+          min={0}
+          max={360}
           value={angle}
           onChange={(e) => setAngle(Number(e.target.value))}
           className="w-full mt-1"
         />
-        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>-180°</span>
-          <span>0°</span>
-          <span>180°</span>
-        </div>
       </div>
 
       {/* Flip buttons */}
@@ -172,17 +130,6 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
         </div>
       </div>
 
-      {/* Reset all */}
-      {hasChanges && (
-        <button
-          type="button"
-          onClick={handleReset}
-          className="w-full text-xs text-muted-foreground hover:text-foreground py-1"
-        >
-          Reset all changes
-        </button>
-      )}
-
       {/* Error */}
       {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -202,7 +149,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Apply
+          {files.length > 1 ? `Apply (${files.length} files)` : "Apply"}
         </button>
       )}
 

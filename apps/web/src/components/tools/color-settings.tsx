@@ -14,7 +14,7 @@ interface ColorSettingsProps {
 
 export function ColorSettings({ toolId }: ColorSettingsProps) {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor(toolId);
 
   const [tab, setTab] = useState<Tab>(() => {
@@ -37,7 +37,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
   const [effect, setEffect] = useState<Effect>("none");
 
   const handleProcess = () => {
-    processFiles(files, {
+    const settings = {
       brightness,
       contrast,
       saturation,
@@ -45,7 +45,12 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
       green,
       blue,
       effect,
-    });
+    };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -215,7 +220,7 @@ export function ColorSettings({ toolId }: ColorSettingsProps) {
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Apply
+          {files.length > 1 ? `Apply (${files.length} files)` : "Apply"}
         </button>
       )}
 

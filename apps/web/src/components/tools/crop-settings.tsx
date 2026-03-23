@@ -14,7 +14,7 @@ const ASPECT_PRESETS = [
 
 export function CropSettings() {
   const { files } = useFileStore();
-  const { processFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, originalSize, processedSize, progress } =
     useToolProcessor("crop");
 
   const [left, setLeft] = useState("0");
@@ -31,12 +31,17 @@ export function CropSettings() {
   };
 
   const handleProcess = () => {
-    processFiles(files, {
+    const settings = {
       left: Number(left),
       top: Number(top),
       width: Number(width),
       height: Number(height),
-    });
+    };
+    if (files.length > 1) {
+      processAllFiles(files, settings);
+    } else {
+      processFiles(files, settings);
+    }
   };
 
   const hasFile = files.length > 0;
@@ -141,7 +146,7 @@ export function CropSettings() {
           disabled={!hasFile || !hasSize || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Crop
+          {files.length > 1 ? `Crop (${files.length} files)` : "Crop"}
         </button>
       )}
 
