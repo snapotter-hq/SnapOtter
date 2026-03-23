@@ -1,3 +1,33 @@
+# [0.5.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.4.1...v0.5.0) (2026-03-23)
+
+
+### Bug Fixes
+
+* resolve TypeScript Uint8Array type error with fflate ([c1b06b3](https://github.com/siddharthksah/Stirling-Image/commit/c1b06b37f2cf2aef6971f1b16b5691ce7d932b87))
+* white screen crash when uploading photos with null GPS EXIF data ([c913df9](https://github.com/siddharthksah/Stirling-Image/commit/c913df9c0eccb0a1d0ff305cc6dcb1c99ddf96f4))
+
+
+### Features
+
+* accept clientJobId in batch endpoint for SSE progress correlation ([8ed57f4](https://github.com/siddharthksah/Stirling-Image/commit/8ed57f400fd083fbef7528f51231f59ecd3b1bee))
+* add CSS transform props to ImageViewer for live rotate/flip preview ([7627853](https://github.com/siddharthksah/Stirling-Image/commit/762785394b2e66a25ee858da96868cd752942a7d))
+* add live preview callback to RotateSettings, rename button to Apply ([06844ec](https://github.com/siddharthksah/Stirling-Image/commit/06844ec1ada4d5685691f26655ecb8712b4d94d9))
+* add MultiImageViewer with arrow navigation and filmstrip ([1fa8747](https://github.com/siddharthksah/Stirling-Image/commit/1fa874758ca58efb4b9f68d76a02648d6a84abfe))
+* add processAllFiles batch method to tool processor hook ([cd1e180](https://github.com/siddharthksah/Stirling-Image/commit/cd1e18026fb4b866c4bbde6c259412674a501f05))
+* add SideBySideComparison component for resize results ([2d0ba5a](https://github.com/siddharthksah/Stirling-Image/commit/2d0ba5a65683b45a6382ca1aea9f7a75d1143702))
+* add ThumbnailStrip filmstrip component ([9caa613](https://github.com/siddharthksah/Stirling-Image/commit/9caa613883a7f0f0ccfbb268d3e88596e92ce094))
+* conditional result views — side-by-side for resize, live preview for rotate ([6682649](https://github.com/siddharthksah/Stirling-Image/commit/668264990c33667e586e4e24703f1957b18e1c0c))
+* **crop:** add CropCanvas component with visual overlay, grid, and keyboard controls ([018bbf4](https://github.com/siddharthksah/Stirling-Image/commit/018bbf44bfed4acf475de49ff9f3f5c20ee63295))
+* **crop:** add react-image-crop dependency ([b7ecd41](https://github.com/siddharthksah/Stirling-Image/commit/b7ecd41897de4f48e6f970dfbb1188848e9bcd2a))
+* **crop:** redesign CropSettings with aspect presets, pixel inputs, and grid toggle ([d75f458](https://github.com/siddharthksah/Stirling-Image/commit/d75f458dc0f13e69640bc012adea0ee29d02b82b))
+* **crop:** wire CropCanvas and CropSettings into tool-page with bidirectional state ([ea7fb46](https://github.com/siddharthksah/Stirling-Image/commit/ea7fb46f7ecad5639c007ba43d652fd72c75b39f))
+* integrate MultiImageViewer and multi-file UX into tool page ([52aab1e](https://github.com/siddharthksah/Stirling-Image/commit/52aab1e2bf5f938a800a78b4e5c11f5ad9fbae27))
+* merge multi-image UX — batch processing, filmstrip navigation, resize/rotate redesign ([9bfdb75](https://github.com/siddharthksah/Stirling-Image/commit/9bfdb75f5c205906f2bd62d496e96d6b402e1dc1))
+* multi-file metadata display with per-file caching ([42b59f3](https://github.com/siddharthksah/Stirling-Image/commit/42b59f3e2d84b3d9fd6724b9ed9fb272fb11201a))
+* rewrite file-store with FileEntry model for multi-image support ([abbb3e4](https://github.com/siddharthksah/Stirling-Image/commit/abbb3e4d6e8f21f35b385c51fb659010099556d1))
+* rewrite resize settings with tab-based UI (presets, custom, scale) ([3b39a8c](https://github.com/siddharthksah/Stirling-Image/commit/3b39a8cc5f11a5093f42bcdbe97989fce3841616))
+* wire up batch processing across tool settings components ([1d87091](https://github.com/siddharthksah/Stirling-Image/commit/1d87091bbc4bce9d8e78b0cddd474d21dd4dcd1c))
+
 ## [0.4.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.4.0...v0.4.1) (2026-03-23)
 
 
