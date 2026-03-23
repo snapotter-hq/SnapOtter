@@ -1,3 +1,10 @@
+## [0.5.2](https://github.com/siddharthksah/Stirling-Image/compare/v0.5.1...v0.5.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* restore APP_VERSION import used by health endpoint ([2a74b60](https://github.com/siddharthksah/Stirling-Image/commit/2a74b604466193994bcc87ba2ef589f4c15d9547))
+
 ## [0.5.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.5.0...v0.5.1) (2026-03-23)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@stirling-image/docs",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "scripts": {
     "docs:dev": "vitepress dev .",
