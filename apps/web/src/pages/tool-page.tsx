@@ -6,6 +6,8 @@ import { Dropzone } from "@/components/common/dropzone";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { ReviewPanel } from "@/components/common/review-panel";
+import { SideBySideComparison } from "@/components/common/side-by-side-comparison";
+import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import { useFileStore } from "@/stores/file-store";
 import { useMobile } from "@/hooks/use-mobile";
 import { formatFileSize } from "@/lib/download";
@@ -61,12 +63,20 @@ const COLOR_TOOL_IDS = new Set([
 
 // Tools that don't need a file dropzone (they generate content or have custom UI)
 const NO_DROPZONE_TOOLS = new Set(["qr-generate"]);
+const SIDE_BY_SIDE_TOOLS = new Set(["resize"]);
+const LIVE_PREVIEW_TOOLS = new Set(["rotate"]);
 
-function ToolSettingsPanel({ toolId }: { toolId: string }) {
+function ToolSettingsPanel({
+  toolId,
+  onPreviewTransform,
+}: {
+  toolId: string;
+  onPreviewTransform?: (t: PreviewTransform) => void;
+}) {
   // Phase 2: Core tools
   if (toolId === "resize") return <ResizeSettings />;
   if (toolId === "crop") return <CropSettings />;
-  if (toolId === "rotate") return <RotateSettings />;
+  if (toolId === "rotate") return <RotateSettings onPreviewTransform={onPreviewTransform} />;
   if (toolId === "convert") return <ConvertSettings />;
   if (toolId === "compress") return <CompressSettings />;
   if (toolId === "strip-metadata") return <StripMetadataSettings />;
@@ -175,6 +185,7 @@ export function ToolPage() {
   } = useFileStore();
   const isMobile = useMobile();
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(true);
+  const [previewTransform, setPreviewTransform] = useState<PreviewTransform | null>(null);
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
@@ -263,7 +274,10 @@ export function ToolPage() {
                 <h3 className="text-sm font-medium text-muted-foreground">
                   Settings
                 </h3>
-                <ToolSettingsPanel toolId={tool.id} />
+                <ToolSettingsPanel
+                  toolId={tool.id}
+                  onPreviewTransform={LIVE_PREVIEW_TOOLS.has(tool.id) ? setPreviewTransform : undefined}
+                />
               </div>
 
               {/* Review panel (mobile) */}
@@ -287,6 +301,19 @@ export function ToolPage() {
               <div className="text-center text-muted-foreground">
                 <p className="text-sm">Configure settings and generate.</p>
               </div>
+            ) : hasProcessed && originalBlobUrl && SIDE_BY_SIDE_TOOLS.has(tool.id) ? (
+              <SideBySideComparison
+                beforeSrc={originalBlobUrl}
+                afterSrc={processedUrl}
+                beforeSize={originalSize ?? undefined}
+                afterSize={processedSize ?? undefined}
+              />
+            ) : hasProcessed && originalBlobUrl && LIVE_PREVIEW_TOOLS.has(tool.id) ? (
+              <ImageViewer
+                src={processedUrl}
+                filename={processedFileName}
+                fileSize={processedSize ?? 0}
+              />
             ) : hasProcessed && originalBlobUrl ? (
               <BeforeAfterSlider
                 beforeSrc={originalBlobUrl}
@@ -299,6 +326,13 @@ export function ToolPage() {
                 src={originalBlobUrl}
                 filename={selectedFileName ?? files[0].name}
                 fileSize={selectedFileSize ?? files[0].size}
+                {...(LIVE_PREVIEW_TOOLS.has(tool.id) && previewTransform
+                  ? {
+                      cssRotate: previewTransform.rotate,
+                      cssFlipH: previewTransform.flipH,
+                      cssFlipV: previewTransform.flipV,
+                    }
+                  : {})}
               />
             ) : (
               <Dropzone
@@ -351,7 +385,10 @@ export function ToolPage() {
             <h3 className="text-sm font-medium text-muted-foreground">
               Settings
             </h3>
-            <ToolSettingsPanel toolId={tool.id} />
+            <ToolSettingsPanel
+              toolId={tool.id}
+              onPreviewTransform={LIVE_PREVIEW_TOOLS.has(tool.id) ? setPreviewTransform : undefined}
+            />
           </div>
 
           {/* Review panel (desktop - below settings) */}
@@ -372,10 +409,21 @@ export function ToolPage() {
         <div className="flex-1 flex items-center justify-center p-6">
           {isNoDropzone ? (
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">
-                Configure settings in the panel and generate.
-              </p>
+              <p className="text-sm">Configure settings and generate.</p>
             </div>
+          ) : hasProcessed && originalBlobUrl && SIDE_BY_SIDE_TOOLS.has(tool.id) ? (
+            <SideBySideComparison
+              beforeSrc={originalBlobUrl}
+              afterSrc={processedUrl}
+              beforeSize={originalSize ?? undefined}
+              afterSize={processedSize ?? undefined}
+            />
+          ) : hasProcessed && originalBlobUrl && LIVE_PREVIEW_TOOLS.has(tool.id) ? (
+            <ImageViewer
+              src={processedUrl}
+              filename={processedFileName}
+              fileSize={processedSize ?? 0}
+            />
           ) : hasProcessed && originalBlobUrl ? (
             <BeforeAfterSlider
               beforeSrc={originalBlobUrl}
@@ -388,6 +436,13 @@ export function ToolPage() {
               src={originalBlobUrl}
               filename={selectedFileName ?? files[0].name}
               fileSize={selectedFileSize ?? files[0].size}
+              {...(LIVE_PREVIEW_TOOLS.has(tool.id) && previewTransform
+                ? {
+                    cssRotate: previewTransform.rotate,
+                    cssFlipH: previewTransform.flipH,
+                    cssFlipV: previewTransform.flipV,
+                  }
+                : {})}
             />
           ) : (
             <Dropzone
