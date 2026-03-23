@@ -16,12 +16,21 @@ apps/api/data/
 apps/api/tmp/
 apps/web/.vite/
 
+# Build artifacts
+coverage/
+*.tsbuildinfo
+
 # Playwright
 test-results/
 playwright-report/
 blob-report/
 
-# Screenshots from UI research (not part of the app)
+# IDE / tool scratch
+.superpowers/
+
+# Ad-hoc test screenshots and reports
+test-*.png
 stirling-pdf-*.png
 settings-*.png
 layout-*.png
+audit_report.md

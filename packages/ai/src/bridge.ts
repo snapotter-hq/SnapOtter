@@ -148,14 +148,3 @@ export function runPythonWithProgress(
   });
 }
 
-/**
- * Run a Python script from packages/ai/python/ with the given arguments.
- * Falls back to system python3 if the venv is not available.
- */
-export async function runPythonScript(
-  scriptName: string,
-  args: string[],
-  timeoutMs = 300000,
-): Promise<{ stdout: string; stderr: string }> {
-  return runPythonWithProgress(scriptName, args, { timeout: timeoutMs });
-}

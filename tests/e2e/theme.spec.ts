@@ -11,9 +11,9 @@ test.describe("Theme System", () => {
   });
 
   test("footer has theme toggle buttons", async ({ loggedInPage: page }) => {
-    // Footer is fixed bottom-right
-    const footer = page.locator("[class*='fixed']").last();
-    await expect(footer).toBeVisible();
+    // Footer has a "Toggle Theme" button fixed at bottom-right
+    const themeBtn = page.locator("button[title='Toggle Theme']");
+    await expect(themeBtn).toBeVisible({ timeout: 10_000 });
   });
 
   test("privacy policy link is in footer", async ({

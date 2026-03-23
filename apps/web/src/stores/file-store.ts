@@ -15,7 +15,6 @@ interface FileState {
   setFiles: (files: File[]) => void;
   setJobId: (id: string) => void;
   setProcessedUrl: (url: string | null) => void;
-  setOriginalBlobUrl: (url: string | null) => void;
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
   setSizes: (original: number, processed: number) => void;
@@ -53,7 +52,6 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
   setJobId: (id) => set({ jobId: id }),
   setProcessedUrl: (url) => set({ processedUrl: url }),
-  setOriginalBlobUrl: (url) => set({ originalBlobUrl: url }),
   setProcessing: (v) => set({ processing: v }),
   setError: (e) => set({ error: e, processing: false }),
   setSizes: (original, processed) =>

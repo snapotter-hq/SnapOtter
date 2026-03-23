@@ -1,9 +1,7 @@
-import { z } from "zod";
 import sharp from "sharp";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
 
 const FAVICON_SIZES = [
   { name: "favicon-16x16.png", size: 16, format: "png" as const },

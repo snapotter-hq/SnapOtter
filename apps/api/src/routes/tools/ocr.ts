@@ -1,9 +1,16 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
+import { z } from "zod";
 import { extractText } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
+
+const settingsSchema = z.object({
+  engine: z.enum(["tesseract", "paddleocr"]).default("tesseract"),
+  language: z.enum(["en", "de", "fr", "es", "zh", "ja", "ko"]).default("en"),
+});
 
 /**
  * OCR / text extraction route.
@@ -45,8 +52,24 @@ export function registerOcr(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      const validation = await validateImageBuffer(fileBuffer);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+      }
+
       try {
-        const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply.status(400).send({ error: "Invalid settings", details: result.error.issues });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
         const jobId = randomUUID();
         const workspacePath = await createWorkspace(jobId);
 

@@ -13,6 +13,25 @@ const settingsSchema = z.object({
   outputFormat: z.enum(["png", "jpg", "webp"]).default("png"),
 });
 
+const MAX_SVG_SIZE = 10 * 1024 * 1024; // 10MB
+
+function sanitizeSvg(buffer: Buffer): Buffer {
+  if (buffer.length > MAX_SVG_SIZE) {
+    throw new Error(`SVG exceeds maximum size of ${MAX_SVG_SIZE / 1024 / 1024}MB`);
+  }
+  let svg = buffer.toString("utf-8");
+  // Remove DOCTYPE to prevent XXE
+  svg = svg.replace(/<!DOCTYPE[^>]*>/gi, "");
+  // Remove script tags
+  svg = svg.replace(/<script[\s\S]*?<\/script>/gi, "");
+  // Remove event handlers (onload, onclick, etc.)
+  svg = svg.replace(/\bon\w+\s*=/gi, "data-removed=");
+  // Remove external resource references
+  svg = svg.replace(/xlink:href\s*=\s*["']https?:\/\//gi, 'xlink:href="data:,');
+  svg = svg.replace(/href\s*=\s*["']https?:\/\//gi, 'href="data:,');
+  return Buffer.from(svg, "utf-8");
+}
+
 /**
  * SVG to raster conversion.
  * Custom route since input is SVG (not validated as image by magic bytes).
@@ -48,6 +67,15 @@ export function registerSvgToRaster(app: FastifyInstance) {
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No SVG file provided" });
+      }
+
+      // Sanitize SVG to prevent XXE, SSRF, and script injection
+      try {
+        fileBuffer = sanitizeSvg(fileBuffer);
+      } catch (err) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid SVG",
+        });
       }
 
       let settings: z.infer<typeof settingsSchema>;

@@ -17,6 +17,9 @@ export async function createWorkspace(jobId: string): Promise<string> {
  * Get the workspace root path for a job.
  */
 export function getWorkspacePath(jobId: string): string {
+  if (jobId.includes("..") || jobId.includes("/") || jobId.includes("\\") || jobId.includes("\0")) {
+    throw new Error("Invalid job ID");
+  }
   return join(env.WORKSPACE_PATH, jobId);
 }
 

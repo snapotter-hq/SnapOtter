@@ -49,9 +49,13 @@ export function registerWatermarkText(app: FastifyInstance) {
         const spacingX = settings.fontSize * 6;
         const spacingY = settings.fontSize * 4;
         let textElements = "";
-        for (let y = 0; y < height + spacingY; y += spacingY) {
+        const maxElements = 500;
+        let count = 0;
+        outer: for (let y = 0; y < height + spacingY; y += spacingY) {
           for (let x = 0; x < width + spacingX; x += spacingX) {
+            if (count >= maxElements) break outer;
             textElements += `<text x="${x}" y="${y}" font-size="${settings.fontSize}" fill="${rgba}" font-family="sans-serif" transform="rotate(${settings.rotation},${x},${y})">${escapedText}</text>`;
+            count++;
           }
         }
         svgOverlay = `<svg width="${width}" height="${height}">${textElements}</svg>`;

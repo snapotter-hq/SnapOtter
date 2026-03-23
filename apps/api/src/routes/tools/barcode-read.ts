@@ -2,6 +2,7 @@ import sharp from "sharp";
 import jsQR from "jsqr";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { basename } from "node:path";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 
 /**
  * Read QR codes and barcodes from uploaded images.
@@ -34,6 +35,12 @@ export function registerBarcodeRead(app: FastifyInstance) {
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      // Validate the uploaded image
+      const validation = await validateImageBuffer(fileBuffer);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
       try {

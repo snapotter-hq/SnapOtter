@@ -5,6 +5,7 @@ import { join, basename } from "node:path";
 import { blurFaces } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 
 /**
  * Face detection and blurring route.
@@ -44,6 +45,11 @@ export function registerBlurFaces(app: FastifyInstance) {
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      const validation = await validateImageBuffer(fileBuffer);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
       try {

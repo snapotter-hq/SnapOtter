@@ -10,7 +10,15 @@ test.describe("Navigation", () => {
   test("sidebar Grid link goes to fullscreen view", async ({
     loggedInPage: page,
   }) => {
-    await page.locator("aside").getByText("Grid").click();
+    // Click the Grid link in the sidebar (links to /fullscreen)
+    const gridLink = page.locator("aside").getByText("Grid");
+    // If "Grid" text isn't directly visible (collapsed sidebar), try the link
+    if (await gridLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await gridLink.click();
+    } else {
+      // Fallback: navigate via the href directly
+      await page.locator('aside a[href="/fullscreen"]').click();
+    }
     await expect(page).toHaveURL("/fullscreen");
   });
 

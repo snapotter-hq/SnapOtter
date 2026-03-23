@@ -1,0 +1,44 @@
+# ============================================
+# Stirling Image - Test Dockerfile
+# Runs the full test suite (unit + integration)
+# ============================================
+
+FROM node:22-bookworm
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+WORKDIR /app
+
+# Copy workspace config first (for layer caching)
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.json vitest.config.ts ./
+
+# Copy all package.json files
+COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.config.ts ./apps/web/
+COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
+COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
+COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./packages/image-engine/
+COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
+
+# Install ALL dependencies (including devDependencies for testing)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Environment for tests
+ENV NODE_ENV=test \
+    AUTH_ENABLED=true \
+    DEFAULT_USERNAME=admin \
+    DEFAULT_PASSWORD=admin \
+    DB_PATH=/tmp/test-stirling.db \
+    WORKSPACE_PATH=/tmp/test-workspace \
+    MAX_MEGAPIXELS=100 \
+    MAX_UPLOAD_SIZE_MB=100 \
+    MAX_BATCH_SIZE=200 \
+    CONCURRENT_JOBS=3 \
+    RATE_LIMIT_PER_MIN=1000 \
+    FILE_MAX_AGE_HOURS=1 \
+    CLEANUP_INTERVAL_MINUTES=60
+
+# Run unit + integration tests with coverage
+CMD ["pnpm", "test:all"]

@@ -37,7 +37,7 @@ test.describe("Essential Tools", () => {
     await waitForProcessing(page);
 
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -109,7 +109,7 @@ test.describe("Essential Tools", () => {
     await waitForProcessing(page);
 
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 });

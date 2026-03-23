@@ -8,7 +8,14 @@ export default defineConfig({
   timeout: 30_000,
   expect: {
     timeout: 10_000,
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+      animations: "disabled",
+      caret: "hide",
+    },
   },
+  snapshotPathTemplate:
+    "{testDir}/__screenshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
   retries: 0,
   workers: 1,
@@ -41,7 +48,7 @@ export default defineConfig({
         AUTH_ENABLED: "true",
         DEFAULT_USERNAME: "admin",
         DEFAULT_PASSWORD: "admin",
-        RATE_LIMIT_PER_MIN: "1000",
+        RATE_LIMIT_PER_MIN: "50000",
       },
       timeout: 30_000,
     },

@@ -85,7 +85,7 @@ export function registerBulkRename(app: FastifyInstance) {
               .replace(/\{\{original\}\}/g, files[i].filename.replace(ext, "")) +
             ext;
 
-          archive.append(files[i].buffer, { name: newName });
+          archive.append(files[i].buffer, { name: basename(newName) });
         }
 
         await archive.finalize();

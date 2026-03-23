@@ -88,16 +88,4 @@ export const SOCIAL_MEDIA_PRESETS: SocialMediaPreset[] = [
   { platform: "Threads", name: "Post Image", width: 1080, height: 1080 },
 ];
 
-export const SUPPORTED_INPUT_FORMATS = [
-  "jpg", "jpeg", "png", "webp", "avif", "tiff", "tif",
-  "bmp", "gif", "svg", "heic", "heif", "jxl", "ico",
-  "cr2", "nef", "arw", "dng", "orf", "rw2",
-] as const;
-
-export const SUPPORTED_OUTPUT_FORMATS = [
-  "jpg", "png", "webp", "avif", "tiff", "gif", "jxl", "svg", "ico", "pdf",
-] as const;
-
-export const DEFAULT_OUTPUT_FORMAT = "jpg" as const;
-
 export const APP_VERSION = "0.2.1";

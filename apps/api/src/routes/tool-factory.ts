@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { join, extname, basename } from "node:path";
+import { join } from "node:path";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { createWorkspace } from "../lib/workspace.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
+import { sanitizeFilename } from "../lib/filename.js";
 
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
@@ -32,19 +33,6 @@ const toolRegistry = new Map<string, ToolRouteConfig<any>>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getToolConfig(toolId: string): ToolRouteConfig<any> | undefined {
   return toolRegistry.get(toolId);
-}
-
-/**
- * Sanitize a filename to prevent path traversal attacks.
- */
-function sanitizeFilename(raw: string): string {
-  let name = basename(raw);
-  name = name.replace(/\.\./g, "");
-  name = name.replace(/\0/g, "");
-  if (!name || name === "." || name === "..") {
-    name = "image";
-  }
-  return name;
 }
 
 /**
@@ -159,11 +147,11 @@ export function createToolRoute<T>(
         });
       } catch (err) {
         // Catch Sharp / processing errors and return a clean API error
-        const message =
-          err instanceof Error ? err.message : "Image processing failed";
+        const message = err instanceof Error ? err.message : "Image processing failed";
+        request.log.error({ err, toolId: config.toolId }, "Tool processing failed");
         return reply.status(422).send({
           error: "Processing failed",
-          details: message,
+          details: process.env.NODE_ENV === "production" ? undefined : message,
         });
       }
     },

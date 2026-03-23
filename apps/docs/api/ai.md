@@ -71,25 +71,15 @@ Takes an image and a mask (white = area to erase, black = keep). Returns the inp
 
 **Python script:** `packages/ai/python/inpaint.py`
 
-## Smart crop
-
-Content-aware cropping that identifies the most relevant region of an image.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `width` | number | Target crop width |
-| `height` | number | Target crop height |
-
-Unlike regular cropping, smart crop analyzes the image content to decide where to place the crop window.
-
 ## How the bridge works
 
-The TypeScript bridge (`packages/ai/src/bridge.ts`) does the following for each AI call:
+The TypeScript bridge (`packages/ai/src/bridge.ts`) exposes a single function, `runPythonWithProgress`, that does the following for each AI call:
 
 1. Writes the input image to a temp file in the workspace directory.
 2. Spawns a Python subprocess with the appropriate script and arguments.
-3. Reads stdout for JSON output and stderr for error messages.
-4. Reads the output image from the filesystem.
-5. Cleans up temp files.
+3. Parses JSON progress lines from stderr (e.g. `{"progress": 50, "stage": "Processing..."}`) and forwards them via an `onProgress` callback for real-time SSE streaming.
+4. Reads stdout for JSON output.
+5. Reads the output image from the filesystem.
+6. Cleans up temp files.
 
-If the Python process exits with a non-zero code or writes to stderr, the bridge throws an error with the stderr content. Timeouts are handled at the API route level.
+If the Python process exits with a non-zero code, the bridge extracts a user-friendly error from stderr/stdout and throws. Timeouts default to 5 minutes.

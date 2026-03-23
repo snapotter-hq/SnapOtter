@@ -90,7 +90,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
       username: env.DEFAULT_USERNAME,
       passwordHash,
       role: "admin",
-      mustChangePassword: true,
+      mustChangePassword: false,
     })
     .run();
 
@@ -101,7 +101,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/login
-  app.post("/api/auth/login", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/auth/login", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as { username?: string; password?: string } | null;
 
     if (!body?.username || !body?.password) {
@@ -243,6 +243,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
       .where(eq(schema.users.id, authUser.id))
       .run();
+
+    // Invalidate all other sessions for this user
+    const currentToken = extractToken(request);
+    const allSessions = db.select().from(schema.sessions).where(eq(schema.sessions.userId, authUser.id)).all();
+    for (const s of allSessions) {
+      if (s.id !== currentToken) {
+        db.delete(schema.sessions).where(eq(schema.sessions.id, s.id)).run();
+      }
+    }
 
     return reply.send({ ok: true });
   });
@@ -388,7 +397,7 @@ function extractToken(request: FastifyRequest): string | null {
 
 // ── Auth middleware ────────────────────────────────────────────────
 
-const PUBLIC_PATHS = ["/api/v1/health", "/api/v1/config/", "/api/auth/", "/api/docs", "/api/v1/download/", "/api/v1/jobs/"];
+const PUBLIC_PATHS = ["/api/v1/health", "/api/v1/config/", "/api/auth/", "/api/v1/download/", "/api/v1/jobs/"];
 
 function isPublicRoute(url: string): boolean {
   // Non-API routes are public (SPA static files — auth is handled client-side)
@@ -439,6 +448,32 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
             .where(eq(schema.sessions.id, token))
             .run();
         }
+
+        // Try API key authentication if token has si_ prefix
+        if (token.startsWith("si_")) {
+          const apiKeys = db.select().from(schema.apiKeys).all();
+          for (const key of apiKeys) {
+            const matches = await verifyPassword(token, key.keyHash);
+            if (matches) {
+              // Update lastUsedAt
+              db.update(schema.apiKeys)
+                .set({ lastUsedAt: new Date() })
+                .where(eq(schema.apiKeys.id, key.id))
+                .run();
+              // Load the user
+              const apiUser = db.select().from(schema.users).where(eq(schema.users.id, key.userId)).get();
+              if (apiUser) {
+                (request as FastifyRequest & { user?: AuthUser }).user = {
+                  id: apiUser.id,
+                  username: apiUser.username,
+                  role: apiUser.role as "admin" | "user",
+                };
+                return;
+              }
+            }
+          }
+        }
+
         // Public routes can proceed without a valid session
         if (isPublic) return;
         return reply.status(401).send({ error: "Session expired or invalid" });
@@ -462,6 +497,17 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
         username: user.username,
         role: user.role as "admin" | "user",
       };
+
+      // Enforce mustChangePassword — block non-auth API calls
+      if (user.mustChangePassword) {
+        const allowed = ["/api/auth/change-password", "/api/auth/logout", "/api/auth/session", "/api/v1/config/"];
+        if (!allowed.some((p) => request.url.startsWith(p)) && request.url.startsWith("/api/")) {
+          return reply.status(403).send({
+            error: "Password change required",
+            code: "MUST_CHANGE_PASSWORD",
+          });
+        }
+      }
     },
   );
 }

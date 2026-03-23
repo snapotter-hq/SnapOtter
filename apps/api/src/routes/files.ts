@@ -1,27 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { writeFile, readFile, stat } from "node:fs/promises";
-import { join, basename, extname } from "node:path";
+import { join, extname } from "node:path";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createWorkspace, getWorkspacePath } from "../lib/workspace.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-
-/**
- * Sanitize a filename to prevent path traversal attacks.
- * Strips directory separators and `..` sequences, keeps only the base name.
- */
-function sanitizeFilename(raw: string): string {
-  // Take only the base name (no directories)
-  let name = basename(raw);
-  // Remove any remaining path traversal sequences
-  name = name.replace(/\.\./g, "");
-  // Remove null bytes
-  name = name.replace(/\0/g, "");
-  // If nothing is left, use a fallback
-  if (!name || name === "." || name === "..") {
-    name = "upload";
-  }
-  return name;
-}
+import { sanitizeFilename } from "../lib/filename.js";
 
 /**
  * Guard against path traversal in URL params.

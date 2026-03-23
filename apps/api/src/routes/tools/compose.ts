@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createWorkspace } from "../../lib/workspace.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 
 const settingsSchema = z.object({
   x: z.number().min(0).default(0),
@@ -41,7 +42,7 @@ export function registerCompose(app: FastifyInstance) {
               overlayBuffer = buf;
             } else {
               baseBuffer = buf;
-              filename = part.filename ?? "image";
+              filename = sanitizeFilename(part.filename ?? "image");
             }
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;

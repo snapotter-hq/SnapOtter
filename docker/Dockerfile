@@ -67,16 +67,14 @@ RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
     (/opt/venv/bin/pip install --no-cache-dir lama-cleaner || echo "WARNING: lama-cleaner not installed - object eraser will be unavailable") && \
     rm /tmp/requirements.txt
 
+# Remove build tools no longer needed in production
+RUN apt-get purge -y --auto-remove build-essential python3-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 # Pre-download ALL AI model weights into the image (no first-use download delays)
 # This makes the Docker image fully self-contained — works offline
-RUN /opt/venv/bin/python3 -c "\
-from rembg import new_session; \
-print('Downloading BiRefNet-Lite model (SOTA, fast)...'); \
-new_session('birefnet-general-lite'); \
-print('Downloading u2net model (fallback)...'); \
-new_session('u2net'); \
-print('Background removal models ready') \
-" 2>/dev/null || echo "WARNING: Could not pre-download rembg models"
+COPY docker/download_models.py /tmp/download_models.py
+RUN /opt/venv/bin/python3 /tmp/download_models.py && rm /tmp/download_models.py
 
 RUN /opt/venv/bin/python3 -c "\
 try: \
@@ -137,6 +135,11 @@ ENV PORT=1349 \
     CONCURRENT_JOBS=3 \
     MAX_MEGAPIXELS=100 \
     RATE_LIMIT_PER_MIN=100
+
+# Run as non-root user for security
+RUN groupadd -r stirling && useradd -r -g stirling -d /app -s /sbin/nologin stirling
+RUN chown -R stirling:stirling /app /data /tmp/workspace /opt/venv
+USER stirling
 
 EXPOSE 1349
 

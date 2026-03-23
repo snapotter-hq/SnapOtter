@@ -75,13 +75,6 @@ export function updateSingleFileProgress(
   }
 }
 
-/**
- * Get current progress for a job.
- */
-export function getJobProgress(jobId: string): JobProgress | undefined {
-  return jobProgressStore.get(jobId);
-}
-
 export async function registerProgressRoutes(
   app: FastifyInstance,
 ): Promise<void> {

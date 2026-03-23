@@ -17,7 +17,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: "Resize" }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -28,7 +28,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -39,19 +39,28 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: /convert/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
   test("rotate processes image", async ({ loggedInPage: page }) => {
     await page.goto("/rotate");
     await uploadTestImage(page);
-    // Click 90 Right first to set a rotation
-    await page.getByRole("button", { name: /90 right/i }).click();
-    await page.getByRole("button", { name: "Rotate / Flip" }).click();
+    // Click 90 Right first to set a rotation (CW button)
+    await page
+      .locator("button")
+      .filter({ hasText: /90.*right|right.*90|cw/i })
+      .first()
+      .click()
+      .catch(async () => {
+        // Fallback: the second quick-rotate button
+        const btns = page.locator("button").filter({ has: page.locator("svg") });
+        if ((await btns.count()) >= 2) await btns.nth(1).click();
+      });
+    await page.getByRole("button", { name: "Rotate" }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -68,7 +77,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: "Crop" }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -78,7 +87,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: /strip metadata/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -90,10 +99,11 @@ test.describe("Tool processing (core tools)", () => {
     // Adjust brightness to non-zero so processing makes a change
     const brightnessSlider = page.locator("input[type='range']").first();
     await brightnessSlider.fill("20");
-    await page.getByRole("button", { name: /apply adjustments/i }).click();
+    // Button text is "Apply" in color-settings.tsx
+    await page.getByRole("button", { name: /^apply$/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -101,10 +111,11 @@ test.describe("Tool processing (core tools)", () => {
     await page.goto("/border");
     await uploadTestImage(page);
     // Default border width is 10px and color is #000000, should be valid
-    await page.getByRole("button", { name: /apply border/i }).click();
+    // Button text is "Add Border" in border-settings.tsx
+    await page.getByRole("button", { name: /add border/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first()
+      page.getByRole("link", { name: /download/i }).first()
         .or(page.getByText(/invalid|error/i).first()),
     ).toBeVisible({ timeout: 15_000 });
   });
@@ -140,7 +151,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: /vectorize/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -155,7 +166,7 @@ test.describe("Tool processing (core tools)", () => {
     await page.getByRole("button", { name: /add watermark|apply watermark/i }).click();
     await waitForProcessing(page);
     await expect(
-      page.getByRole("button", { name: /download/i }).first(),
+      page.getByRole("link", { name: /download/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 });

@@ -8,27 +8,14 @@
  * Returns a ZIP file containing all processed images.
  */
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import archiver from "archiver";
 import PQueue from "p-queue";
 import { getToolConfig } from "./tool-factory.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
+import { sanitizeFilename } from "../lib/filename.js";
 import { env } from "../config.js";
 import { updateJobProgress, type JobProgress } from "./progress.js";
-
-/**
- * Sanitize a filename to prevent path traversal attacks.
- */
-function sanitizeFilename(raw: string): string {
-  let name = basename(raw);
-  name = name.replace(/\.\./g, "");
-  name = name.replace(/\0/g, "");
-  if (!name || name === "." || name === "..") {
-    name = "image";
-  }
-  return name;
-}
 
 interface ParsedFile {
   buffer: Buffer;

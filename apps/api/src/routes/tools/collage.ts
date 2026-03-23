@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { createWorkspace } from "../../lib/workspace.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 
 const settingsSchema = z.object({
   layout: z.enum(["2x2", "3x3", "1x3", "2x1", "3x1", "1x2"]).default("2x2"),
@@ -52,6 +53,14 @@ export function registerCollage(app: FastifyInstance) {
 
       if (files.length === 0) {
         return reply.status(400).send({ error: "No images provided" });
+      }
+
+      // Validate all files
+      for (const file of files) {
+        const validation = await validateImageBuffer(file.buffer);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid file "${file.filename}": ${validation.reason}` });
+        }
       }
 
       let settings: z.infer<typeof settingsSchema>;

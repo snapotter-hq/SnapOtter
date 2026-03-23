@@ -5,6 +5,7 @@ import { join, basename } from "node:path";
 import { inpaint } from "@stirling-image/ai";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 
 /**
  * Object eraser / inpainting route.
@@ -52,6 +53,15 @@ export function registerEraseObject(app: FastifyInstance) {
         return reply
           .status(400)
           .send({ error: "No mask image provided. Upload a mask as a second file with fieldname 'mask'" });
+      }
+
+      const imageValidation = await validateImageBuffer(imageBuffer);
+      if (!imageValidation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${imageValidation.reason}` });
+      }
+      const maskValidation = await validateImageBuffer(maskBuffer);
+      if (!maskValidation.valid) {
+        return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
       }
 
       try {

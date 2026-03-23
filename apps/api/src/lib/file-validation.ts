@@ -26,6 +26,7 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x42, 0x4d], offset: 0, format: "bmp" },
   { bytes: [0x49, 0x49, 0x2a, 0x00], offset: 0, format: "tiff" },
   { bytes: [0x4d, 0x4d, 0x00, 0x2a], offset: 0, format: "tiff" },
+  { bytes: [0x66, 0x74, 0x79, 0x70], offset: 4, format: "avif" }, // ftyp box; verified below
 ];
 
 export interface ValidationResult {
@@ -109,6 +110,12 @@ function detectMagicBytes(buffer: Buffer): string | null {
         if (buffer.length < 12) continue;
         const sig = buffer.slice(8, 12).toString("ascii");
         if (sig !== "WEBP") continue;
+      }
+      // For ftyp, verify AVIF brand at bytes 8-11
+      if (entry.format === "avif") {
+        if (buffer.length < 12) continue;
+        const brand = buffer.slice(8, 12).toString("ascii");
+        if (brand !== "avif" && brand !== "avis") continue;
       }
       return entry.format;
     }

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { createToolRoute } from "../tool-factory.js";
 import sharp from "sharp";
 import type { FastifyInstance } from "fastify";
 

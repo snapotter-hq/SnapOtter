@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
-  BookOpen,
   Workflow,
   FolderOpen,
   HelpCircle,

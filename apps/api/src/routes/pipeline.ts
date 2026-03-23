@@ -8,13 +8,14 @@
  */
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { join } from "node:path";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getToolConfig } from "./tool-factory.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { createWorkspace } from "../lib/workspace.js";
+import { sanitizeFilename } from "../lib/filename.js";
 import { db, schema } from "../db/index.js";
 
 /** Schema for a single pipeline step. */
@@ -25,28 +26,15 @@ const pipelineStepSchema = z.object({
 
 /** Schema for a full pipeline definition. */
 const pipelineDefinitionSchema = z.object({
-  steps: z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step"),
+  steps: z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step").max(20, "Pipeline cannot exceed 20 steps"),
 });
 
 /** Schema for saving a pipeline. */
 const savePipelineSchema = z.object({
   name: z.string().min(1, "Pipeline name is required").max(100),
   description: z.string().max(500).optional(),
-  steps: z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step"),
+  steps: z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step").max(20, "Pipeline cannot exceed 20 steps"),
 });
-
-/**
- * Sanitize a filename to prevent path traversal attacks.
- */
-function sanitizeFilename(raw: string): string {
-  let name = basename(raw);
-  name = name.replace(/\.\./g, "");
-  name = name.replace(/\0/g, "");
-  if (!name || name === "." || name === "..") {
-    name = "image";
-  }
-  return name;
-}
 
 export async function registerPipelineRoutes(app: FastifyInstance): Promise<void> {
   /**

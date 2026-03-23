@@ -4,7 +4,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(1350),
   AUTH_ENABLED: z
     .enum(["true", "false"])
-    .default("false")
+    .default("true")
     .transform((v) => v === "true"),
   DEFAULT_USERNAME: z.string().default("admin"),
   DEFAULT_PASSWORD: z.string().default("admin"),
@@ -21,6 +21,7 @@ const envSchema = z.object({
   DEFAULT_THEME: z.enum(["light", "dark"]).default("light"),
   DEFAULT_LOCALE: z.string().default("en"),
   APP_NAME: z.string().default("Stirling Image"),
+  CORS_ORIGIN: z.string().default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;
