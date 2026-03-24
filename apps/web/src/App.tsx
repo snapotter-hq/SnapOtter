@@ -4,6 +4,7 @@ import { HomePage } from "./pages/home-page";
 import { LoginPage } from "./pages/login-page";
 import { ToolPage } from "./pages/tool-page";
 import { AutomatePage } from "./pages/automate-page";
+import { FilesPage } from "./pages/files-page";
 import { FullscreenGridPage } from "./pages/fullscreen-grid-page";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { useAuth } from "./hooks/use-auth";
@@ -87,6 +88,7 @@ export function App() {
             <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/automate" element={<AutomatePage />} />
+            <Route path="/files" element={<FilesPage />} />
             <Route path="/fullscreen" element={<FullscreenGridPage />} />
             <Route path="/:toolId" element={<ToolPage />} />
             <Route path="/" element={<HomePage />} />

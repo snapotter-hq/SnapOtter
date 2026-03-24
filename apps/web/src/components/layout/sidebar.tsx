@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
   Workflow,
-  FolderOpen,
   HelpCircle,
   Settings,
   Grid3x3,
+  FolderOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
