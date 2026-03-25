@@ -14,6 +14,12 @@ export default defineConfig({
     globals: true,
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    exclude: [
+      "tests/e2e/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.{idea,git,cache,output,temp}/**",
+    ],
     // These env vars are injected into process.env BEFORE test files are
     // imported, ensuring apps/api/src/config.ts picks them up correctly.
     env: {
