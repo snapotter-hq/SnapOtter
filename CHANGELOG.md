@@ -1,3 +1,32 @@
+# [0.8.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.7.0...v0.8.0) (2026-03-25)
+
+
+### Bug Fixes
+
+* **docker:** skip husky prepare script in production install ([fdfb0a0](https://github.com/siddharthksah/Stirling-Image/commit/fdfb0a0e7412c86e3b85a70daf5093f44c34ee99))
+* prevent useAuth infinite loop causing rate limit storms ([9624dae](https://github.com/siddharthksah/Stirling-Image/commit/9624dae1569b6f2ad52ce990fc84eca809b849a8))
+
+
+### Features
+
+* **api:** add logo upload/serve/delete routes with tests ([6063f4d](https://github.com/siddharthksah/Stirling-Image/commit/6063f4daa98acf3f03e004a588de562e377105c7))
+* **api:** add persistent file management helpers to frontend api module ([ecbfcce](https://github.com/siddharthksah/Stirling-Image/commit/ecbfcceec82010fa44244c6839928b9930d59b5a))
+* **api:** add teams CRUD routes and update auth team references ([ec22e53](https://github.com/siddharthksah/Stirling-Image/commit/ec22e53a3b15ae030743e76db0d57584000727b6))
+* **api:** add tool filtering and DB-backed cleanup settings ([07e7e8d](https://github.com/siddharthksah/Stirling-Image/commit/07e7e8d58d311d89f43cee1c7fa21dd0eb4c9dfb))
+* **api:** add user files CRUD routes at /api/v1/files/* ([6a07007](https://github.com/siddharthksah/Stirling-Image/commit/6a070071456611d2bf2acf4a474be8c43680e1b0))
+* **db:** add teams table and migration ([365783b](https://github.com/siddharthksah/Stirling-Image/commit/365783b6dc1f5cfa631bb4f6915fcf99d91f574d))
+* **db:** add userFiles table and migration ([a2fdbd5](https://github.com/siddharthksah/Stirling-Image/commit/a2fdbd5fef2cf02f90692166d6386c5ac21c2cef))
+* **env:** add FILES_STORAGE_PATH config variable ([3c737a6](https://github.com/siddharthksah/Stirling-Image/commit/3c737a6c724f4862d302bf22a75ebcd745f0df4c))
+* **files:** add Files page with nav, list, details, upload, and routing ([3f127a4](https://github.com/siddharthksah/Stirling-Image/commit/3f127a457e8a7a07d22fdf8776c3166092db562f))
+* **files:** add mobile layout for Files page ([e864d1e](https://github.com/siddharthksah/Stirling-Image/commit/e864d1e430bd516ccbe1732ec7451e1e7d670177))
+* **files:** wire serverFileId for version tracking ([8868d3e](https://github.com/siddharthksah/Stirling-Image/commit/8868d3e556beedcff35de268e72241e7f10998a3))
+* **i18n:** add translation keys for settings phase 1 ([c5ff80a](https://github.com/siddharthksah/Stirling-Image/commit/c5ff80acfbe18b953cfd96a88498fc70b82b541e))
+* implement Files page with persistent storage and version tracking ([f6183d2](https://github.com/siddharthksah/Stirling-Image/commit/f6183d2c62e6ad04dec3fe0250468cbfd6cbc035))
+* **storage:** add file storage helpers module ([7c37213](https://github.com/siddharthksah/Stirling-Image/commit/7c372135c8eb9d65198c0720bc2d0c83ac145004))
+* **stores:** add Zustand store for Files page state management ([fb487be](https://github.com/siddharthksah/Stirling-Image/commit/fb487be051c6da6ca22a443323cf4788d4ca4e6b))
+* **tool-factory:** auto-save results to persistent file store when fileId provided ([27d8629](https://github.com/siddharthksah/Stirling-Image/commit/27d8629c704bc9cabed8c7dd87c34ea8e9433347))
+* **ui:** add teams, tools, feature flags, temp files, logo to settings dialog ([fbce0dd](https://github.com/siddharthksah/Stirling-Image/commit/fbce0dddd05c1e539bfbdb084c3b53d59f5dfd76))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
