@@ -1,7 +1,8 @@
 import { FolderOpen, LayoutGrid, Menu, Settings as SettingsIcon, Workflow, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMobile } from "@/hooks/use-mobile";
+import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Dropzone } from "../common/dropzone";
 import { HelpDialog } from "../help/help-dialog";
@@ -21,6 +22,13 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
   const [helpOpen, setHelpOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useMobile();
+  const [customLogo, setCustomLogo] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => setCustomLogo(data.settings.customLogo === "true"))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -41,9 +49,17 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
           />
           <div className="fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border shadow-xl animate-in slide-in-from-left">
             <div className="flex items-center justify-between p-3 border-b border-border">
-              <span className="text-sm font-bold text-foreground">
-                Stirling <span className="text-primary">Image</span>
-              </span>
+              {customLogo ? (
+                <img
+                  src="/api/v1/settings/logo"
+                  className="h-6 w-6 rounded object-contain"
+                  alt="Logo"
+                />
+              ) : (
+                <span className="text-sm font-bold text-foreground">
+                  Stirling <span className="text-primary">Image</span>
+                </span>
+              )}
               <button
                 onClick={() => setMobileSidebarOpen(false)}
                 className="p-1.5 rounded-lg hover:bg-muted"
@@ -77,9 +93,17 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-bold text-foreground">
-            Stirling <span className="text-primary">Image</span>
-          </span>
+          {customLogo ? (
+            <img
+              src="/api/v1/settings/logo"
+              className="h-6 w-6 rounded object-contain"
+              alt="Logo"
+            />
+          ) : (
+            <span className="text-sm font-bold text-foreground">
+              Stirling <span className="text-primary">Image</span>
+            </span>
+          )}
         </div>
       )}
 

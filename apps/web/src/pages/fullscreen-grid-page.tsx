@@ -2,25 +2,47 @@ import type { CategoryInfo, Tool } from "@stirling-image/shared";
 import { CATEGORIES, TOOLS } from "@stirling-image/shared";
 import * as icons from "lucide-react";
 import { Eye, EyeOff, FileImage, LayoutGrid, List, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function FullscreenGridPage() {
   const [search, setSearch] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const navigate = useNavigate();
+  const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [experimentalEnabled, setExperimentalEnabled] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => {
+        setDisabledTools(
+          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
+        );
+        setExperimentalEnabled(data.settings.enableExperimentalTools === "true");
+      })
+      .catch(() => {});
+  }, []);
+
+  const visibleTools = useMemo(() => {
+    return TOOLS.filter((t) => {
+      if (disabledTools.includes(t.id)) return false;
+      if (t.experimental && !experimentalEnabled) return false;
+      return true;
+    });
+  }, [disabledTools, experimentalEnabled]);
 
   const filteredTools = useMemo(() => {
-    if (!search) return TOOLS;
+    if (!search) return visibleTools;
     const q = search.toLowerCase();
-    return TOOLS.filter(
+    return visibleTools.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, visibleTools]);
 
   const groupedTools = useMemo(() => {
     const groups = new Map<string, Tool[]>();

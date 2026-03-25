@@ -13,12 +13,13 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PipelineStepSettings } from "./pipeline-step-settings";
 
 /** Tools that can be used as pipeline steps (excludes pipeline/batch/multi-file tools). */
-const PIPELINE_TOOLS = TOOLS.filter(
+const PIPELINE_TOOLS_BASE = TOOLS.filter(
   (t) => !["pipeline", "batch", "compare", "find-duplicates", "collage", "compose"].includes(t.id),
 );
 
@@ -58,6 +59,27 @@ export function PipelineBuilder({
   const [saveDescription, setSaveDescription] = useState("");
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [experimentalEnabled, setExperimentalEnabled] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => {
+        setDisabledTools(
+          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
+        );
+        setExperimentalEnabled(data.settings.enableExperimentalTools === "true");
+      })
+      .catch(() => {});
+  }, []);
+
+  const PIPELINE_TOOLS = useMemo(() => {
+    return PIPELINE_TOOLS_BASE.filter((t) => {
+      if (disabledTools.includes(t.id)) return false;
+      if (t.experimental && !experimentalEnabled) return false;
+      return true;
+    });
+  }, [disabledTools, experimentalEnabled]);
 
   const addStep = useCallback(
     (toolId: string) => {

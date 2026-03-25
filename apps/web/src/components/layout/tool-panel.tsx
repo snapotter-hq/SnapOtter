@@ -1,18 +1,40 @@
 import { CATEGORIES, TOOLS } from "@stirling-image/shared";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiGet } from "@/lib/api";
 import { SearchBar } from "../common/search-bar";
 import { ToolCard } from "../common/tool-card";
 
 export function ToolPanel() {
   const [search, setSearch] = useState("");
+  const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [experimentalEnabled, setExperimentalEnabled] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => {
+        setDisabledTools(
+          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
+        );
+        setExperimentalEnabled(data.settings.enableExperimentalTools === "true");
+      })
+      .catch(() => {});
+  }, []);
+
+  const visibleTools = useMemo(() => {
+    return TOOLS.filter((t) => {
+      if (disabledTools.includes(t.id)) return false;
+      if (t.experimental && !experimentalEnabled) return false;
+      return true;
+    });
+  }, [disabledTools, experimentalEnabled]);
 
   const filteredTools = useMemo(() => {
-    if (!search) return TOOLS;
+    if (!search) return visibleTools;
     const q = search.toLowerCase();
-    return TOOLS.filter(
+    return visibleTools.filter(
       (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, visibleTools]);
 
   const groupedTools = useMemo(() => {
     const groups = new Map<string, typeof TOOLS>();

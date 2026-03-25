@@ -1,4 +1,4 @@
-import { APP_VERSION } from "@stirling-image/shared";
+import { APP_VERSION, CATEGORIES, TOOLS } from "@stirling-image/shared";
 import {
   Check,
   Copy,
@@ -18,9 +18,11 @@ import {
   Trash2,
   UserPlus,
   Users,
+  UsersRound,
+  Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPost, apiPut, clearToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +31,15 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type Section = "general" | "system" | "security" | "people" | "api-keys" | "about";
+type Section =
+  | "general"
+  | "system"
+  | "security"
+  | "people"
+  | "teams"
+  | "api-keys"
+  | "tools"
+  | "about";
 
 interface NavItem {
   id: Section;
@@ -42,7 +52,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: "system", label: "System Settings", icon: Monitor },
   { id: "security", label: "Security", icon: Shield },
   { id: "people", label: "People", icon: Users },
+  { id: "teams", label: "Teams", icon: UsersRound },
   { id: "api-keys", label: "API Keys", icon: Key },
+  { id: "tools", label: "Tools", icon: Wrench },
   { id: "about", label: "About", icon: Info },
 ];
 
@@ -103,7 +115,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {section === "system" && <SystemSection />}
           {section === "security" && <SecuritySection />}
           {section === "people" && <PeopleSection />}
+          {section === "teams" && <TeamsSection />}
           {section === "api-keys" && <ApiKeysSection />}
+          {section === "tools" && <ToolsSection />}
           {section === "about" && <AboutSection />}
         </div>
       </div>
@@ -131,6 +145,13 @@ interface UserEntry {
   username: string;
   role: string;
   team: string;
+  createdAt: string;
+}
+
+interface TeamEntry {
+  id: number;
+  name: string;
+  memberCount: number;
   createdAt: string;
 }
 
@@ -252,6 +273,33 @@ function SystemSection() {
     }
   }, [settings]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const token = localStorage.getItem("stirling-token");
+      await fetch("/api/v1/settings/logo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      setSettings((prev) => ({ ...prev, customLogo: "true" }));
+    } catch {
+      /* handle error */
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    try {
+      await apiDelete("/v1/settings/logo");
+      setSettings((prev) => ({ ...prev, customLogo: "false" }));
+    } catch {
+      /* handle error */
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -274,6 +322,35 @@ function SystemSection() {
           onChange={(e) => updateSetting("appName", e.target.value)}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-48"
         />
+      </SettingRow>
+
+      <SettingRow
+        label="Custom Logo"
+        description="Upload a custom logo for the sidebar. PNG, SVG, or JPEG. Max 500KB."
+      >
+        <div className="flex items-center gap-3">
+          {settings.customLogo === "true" && (
+            <img
+              src="/api/v1/settings/logo"
+              className="w-10 h-10 rounded object-contain"
+              alt="Logo"
+            />
+          )}
+          <label className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm cursor-pointer hover:bg-muted transition-colors">
+            Upload
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+          </label>
+          {settings.customLogo === "true" && (
+            <button onClick={handleLogoDelete} className="text-sm text-destructive hover:underline">
+              Remove
+            </button>
+          )}
+        </div>
       </SettingRow>
 
       <SettingRow label="File Upload Limit (MB)" description="Maximum file size per upload">
@@ -325,6 +402,68 @@ function SystemSection() {
           min={1}
           max={100}
         />
+      </SettingRow>
+
+      <SettingRow
+        label="Enable Experimental Tools"
+        description="Show tools that are still in development. These may be unstable."
+      >
+        <button
+          onClick={() =>
+            updateSetting(
+              "enableExperimentalTools",
+              settings.enableExperimentalTools === "true" ? "false" : "true",
+            )
+          }
+          className={cn(
+            "w-11 h-6 rounded-full transition-colors relative",
+            settings.enableExperimentalTools === "true" ? "bg-primary" : "bg-muted-foreground/30",
+          )}
+        >
+          <span
+            className={cn(
+              "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
+              settings.enableExperimentalTools === "true" ? "translate-x-6" : "translate-x-1",
+            )}
+          />
+        </button>
+      </SettingRow>
+
+      <div className="pt-4 border-t border-border">
+        <h4 className="text-sm font-semibold text-foreground mb-3">File Management</h4>
+      </div>
+      <SettingRow
+        label="Max File Age (hours)"
+        description="How long processed files are kept before automatic cleanup"
+      >
+        <input
+          type="number"
+          value={settings.tempFileMaxAgeHours || "24"}
+          onChange={(e) => updateSetting("tempFileMaxAgeHours", e.target.value)}
+          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
+          min={1}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Startup Cleanup"
+        description="Clean up old temporary files when the server starts"
+      >
+        <button
+          onClick={() =>
+            updateSetting("startupCleanup", settings.startupCleanup === "false" ? "true" : "false")
+          }
+          className={cn(
+            "w-11 h-6 rounded-full transition-colors relative",
+            settings.startupCleanup !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+          )}
+        >
+          <span
+            className={cn(
+              "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
+              settings.startupCleanup !== "false" ? "translate-x-6" : "translate-x-1",
+            )}
+          />
+        </button>
       </SettingRow>
 
       <div className="flex items-center gap-3 pt-2">
@@ -509,6 +648,16 @@ function PeopleSection() {
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
+  const [teams, setTeams] = useState<TeamEntry[]>([]);
+
+  const loadTeams = useCallback(async () => {
+    try {
+      const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
+      setTeams(data.teams);
+    } catch {
+      setTeams([]);
+    }
+  }, []);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -524,7 +673,8 @@ function PeopleSection() {
 
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
+    loadTeams();
+  }, [loadUsers, loadTeams]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -731,13 +881,18 @@ function PeopleSection() {
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
-            <input
-              type="text"
+            <select
               value={newTeam}
               onChange={(e) => setNewTeam(e.target.value)}
-              placeholder="Team"
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
-            />
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+              {teams.length === 0 && <option value="Default">Default</option>}
+            </select>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -776,13 +931,18 @@ function PeopleSection() {
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
-            <input
-              type="text"
+            <select
               value={editTeam}
               onChange={(e) => setEditTeam(e.target.value)}
-              placeholder="Team"
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-40"
-            />
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+              {teams.length === 0 && <option value="Default">Default</option>}
+            </select>
             <button
               type="submit"
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -1100,6 +1260,426 @@ function ApiKeysSection() {
           No API keys yet. Generate one to get started.
         </p>
       )}
+    </div>
+  );
+}
+
+/* ────────────────────── Teams ────────────────────── */
+
+function TeamsSection() {
+  const [teams, setTeams] = useState<TeamEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [editingTeamName, setEditingTeamName] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
+    null,
+  );
+
+  const loadTeams = useCallback(async () => {
+    try {
+      const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
+      setTeams(data.teams);
+    } catch {
+      setTeams([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTeams();
+  }, [loadTeams]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handler = () => setOpenMenuId(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [openMenuId]);
+
+  const handleCreate = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newTeamName.trim()) return;
+      setCreating(true);
+      try {
+        await apiPost("/v1/teams", { name: newTeamName.trim() });
+        setNewTeamName("");
+        setShowCreateForm(false);
+        setActionMsg({ type: "success", text: "Team created successfully" });
+        await loadTeams();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to create team";
+        setActionMsg({
+          type: "error",
+          text: msg.includes("409") ? "A team with that name already exists" : msg,
+        });
+      } finally {
+        setCreating(false);
+        setTimeout(() => setActionMsg(null), 3000);
+      }
+    },
+    [newTeamName, loadTeams],
+  );
+
+  const handleRename = useCallback(
+    async (id: number) => {
+      if (!editingTeamName.trim()) return;
+      try {
+        await apiPut(`/v1/teams/${id}`, { name: editingTeamName.trim() });
+        setEditingTeamId(null);
+        setEditingTeamName("");
+        setActionMsg({ type: "success", text: "Team renamed" });
+        await loadTeams();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to rename team";
+        setActionMsg({ type: "error", text: msg });
+      }
+      setTimeout(() => setActionMsg(null), 3000);
+    },
+    [editingTeamName, loadTeams],
+  );
+
+  const handleDelete = useCallback(
+    async (id: number, name: string) => {
+      if (!confirm(`Delete team "${name}"? Members will be unassigned.`)) return;
+      try {
+        await apiDelete(`/v1/teams/${id}`);
+        setActionMsg({ type: "success", text: `Team "${name}" deleted` });
+        await loadTeams();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to delete team";
+        setActionMsg({
+          type: "error",
+          text: msg.includes("400") ? "Cannot delete the default team or a team with members" : msg,
+        });
+      }
+      setOpenMenuId(null);
+      setTimeout(() => setActionMsg(null), 3000);
+    },
+    [loadTeams],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">Teams</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Organize members into teams for better management.
+        </p>
+      </div>
+
+      {actionMsg && (
+        <div
+          className={cn(
+            "text-sm px-3 py-2 rounded-lg",
+            actionMsg.type === "error"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-green-500/10 text-green-600 dark:text-green-400",
+          )}
+        >
+          {actionMsg.text}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <UsersRound className="h-4 w-4" />
+          Create New Team
+        </button>
+      </div>
+
+      {showCreateForm && (
+        <form
+          onSubmit={handleCreate}
+          className="p-4 rounded-lg border border-border bg-muted/20 space-y-3"
+        >
+          <h4 className="text-sm font-medium text-foreground">New Team</h4>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              placeholder="Team name"
+              required
+              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground flex-1"
+            />
+            <button
+              type="submit"
+              disabled={creating}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div className="grid grid-cols-[1fr_100px_60px] gap-2 px-4 py-2.5 bg-muted/40 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span>Team Name</span>
+          <span>Members</span>
+          <span />
+        </div>
+
+        {teams.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">No teams found.</div>
+        ) : (
+          teams.map((t) => (
+            <div
+              key={t.id}
+              className="grid grid-cols-[1fr_100px_60px] gap-2 items-center px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+            >
+              <div className="min-w-0">
+                {editingTeamId === t.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingTeamName}
+                      onChange={(e) => setEditingTeamName(e.target.value)}
+                      className="px-2 py-1 rounded border border-border bg-background text-sm text-foreground w-40"
+                      ref={(el) => el?.focus()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRename(t.id);
+                        if (e.key === "Escape") setEditingTeamId(null);
+                      }}
+                    />
+                    <button
+                      onClick={() => handleRename(t.id)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingTeamId(null)}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-sm font-medium text-foreground truncate">{t.name}</span>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground">{t.memberCount}</span>
+              <div className="flex items-center gap-1 justify-end relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId(openMenuId === t.id ? null : t.id);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {openMenuId === t.id && (
+                  <div
+                    className="absolute right-0 top-8 z-50 w-36 rounded-lg border border-border bg-background shadow-lg py-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => {
+                        setEditingTeamId(t.id);
+                        setEditingTeamName(t.name);
+                        setOpenMenuId(null);
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Rename
+                    </button>
+                    <div className="border-t border-border my-1" />
+                    <button
+                      onClick={() => handleDelete(t.id, t.name)}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────── Tools ────────────────────── */
+
+function ToolsSection() {
+  const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showRestartBanner, setShowRestartBanner] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => {
+        setDisabledTools(
+          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
+        );
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredTools = useMemo(() => {
+    if (!search) return TOOLS;
+    const q = search.toLowerCase();
+    return TOOLS.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+    );
+  }, [search]);
+
+  const groupedTools = useMemo(() => {
+    const groups = new Map<string, typeof TOOLS>();
+    for (const tool of filteredTools) {
+      const list = groups.get(tool.category) || [];
+      list.push(tool);
+      groups.set(tool.category, list);
+    }
+    return groups;
+  }, [filteredTools]);
+
+  const toggleTool = useCallback((toolId: string) => {
+    setDisabledTools((prev) =>
+      prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId],
+    );
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await apiPut("/v1/settings", { disabledTools: JSON.stringify(disabledTools) });
+      setShowRestartBanner(true);
+    } catch {
+      /* handle error */
+    } finally {
+      setSaving(false);
+    }
+  }, [disabledTools]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">Tools</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Enable or disable individual tools. Disabled tools are hidden from all users.
+        </p>
+      </div>
+
+      {showRestartBanner && (
+        <div className="px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-700 dark:text-amber-400">
+          Restart required for changes to take effect.
+        </div>
+      )}
+
+      <div className="relative max-w-xs">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search tools..."
+          className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+
+      <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+        {CATEGORIES.filter((cat) => groupedTools.has(cat.id)).map((category) => (
+          <div key={category.id}>
+            <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+              {category.name}
+            </h4>
+            <div className="space-y-1">
+              {groupedTools.get(category.id)?.map((tool) => {
+                const isDisabled = disabledTools.includes(tool.id);
+                return (
+                  <div
+                    key={tool.id}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/20 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{tool.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{tool.description}</p>
+                    </div>
+                    <button
+                      onClick={() => toggleTool(tool.id)}
+                      className={cn(
+                        "w-11 h-6 rounded-full transition-colors relative shrink-0 ml-3",
+                        !isDisabled ? "bg-primary" : "bg-muted-foreground/30",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
+                          !isDisabled ? "translate-x-6" : "translate-x-1",
+                        )}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredTools.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No tools match your search.
+        </p>
+      )}
+
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          Save Tool Settings
+        </button>
+        <span className="text-xs text-muted-foreground">
+          {disabledTools.length} tool{disabledTools.length !== 1 ? "s" : ""} disabled
+        </span>
+      </div>
     </div>
   );
 }
