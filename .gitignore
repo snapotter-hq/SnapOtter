@@ -33,6 +33,7 @@ PRD.md
 
 # Ad-hoc test screenshots and reports
 test-*.png
+!tests/fixtures/*.png
 stirling-pdf-*.png
 settings-*.png
 layout-*.png
