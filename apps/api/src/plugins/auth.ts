@@ -15,7 +15,7 @@ export interface AuthUser {
   role: "admin" | "user";
 }
 
-const MAX_USERS = 5;
+const MAX_USERS = 50;
 
 // ── Password hashing ──────────────────────────────────────────────
 
@@ -111,7 +111,8 @@ export async function ensureDefaultAdmin(): Promise<void> {
   const id = randomUUID();
   const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
 
-  db.insert(schema.users)
+  const result = db
+    .insert(schema.users)
     .values({
       id,
       username: env.DEFAULT_USERNAME,
@@ -119,11 +120,14 @@ export async function ensureDefaultAdmin(): Promise<void> {
       role: "admin",
       mustChangePassword: true,
     })
+    .onConflictDoNothing()
     .run();
 
-  console.log(
-    `Default admin user '${env.DEFAULT_USERNAME}' created — password change required on first login`,
-  );
+  if (result.changes > 0) {
+    console.log(
+      `Default admin user '${env.DEFAULT_USERNAME}' created — password change required on first login`,
+    );
+  }
 }
 
 // ── Login attempt limit ──────────────────────────────────────────
@@ -386,16 +390,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const team = teamId;
 
-    // Check user limit
-    const userCount = db.select().from(schema.users).all().length;
-    if (userCount >= MAX_USERS) {
-      return reply.status(403).send({
-        error: `User limit reached (${MAX_USERS} max)`,
-        code: "USER_LIMIT_REACHED",
-      });
-    }
-
-    // Check for duplicate username
+    // Check for duplicate username first (so 409 takes priority over limit)
     const existing = db
       .select()
       .from(schema.users)
@@ -406,6 +401,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(409).send({
         error: "Username already exists",
         code: "CONFLICT",
+      });
+    }
+
+    // Check user limit
+    const userCount = db.select().from(schema.users).all().length;
+    if (userCount >= MAX_USERS) {
+      return reply.status(403).send({
+        error: `User limit reached (${MAX_USERS} max)`,
+        code: "USER_LIMIT_REACHED",
       });
     }
 
