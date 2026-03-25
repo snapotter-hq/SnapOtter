@@ -1,3 +1,11 @@
+## [0.8.2](https://github.com/siddharthksah/Stirling-Image/compare/v0.8.1...v0.8.2) (2026-03-25)
+
+
+### Bug Fixes
+
+* **test:** add missing PNG fixture files to repo ([45c6b9d](https://github.com/siddharthksah/Stirling-Image/commit/45c6b9de08124fb357ac759e43c4fbf1eb5fbfb9))
+* **test:** exclude e2e tests from vitest and fix CI test suite ([9d28485](https://github.com/siddharthksah/Stirling-Image/commit/9d28485339e17b80586cea91bd18dafc989d7f24))
+
 ## [0.8.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.8.0...v0.8.1) (2026-03-25)
 
 
