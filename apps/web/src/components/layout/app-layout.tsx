@@ -13,7 +13,13 @@ import { ToolPanel } from "./tool-panel";
 
 function GemLogo({ className = "h-6 w-6" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      className={className}
+      viewBox="0 0 140 140"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
       <polygon points="70,16 100,48 70,60 40,48" fill="currentColor" opacity="1" />
       <polygon points="40,48 70,60 70,124 22,60" fill="currentColor" opacity="0.7" />
       <polygon points="100,48 70,60 70,124 118,60" fill="currentColor" opacity="0.5" />
