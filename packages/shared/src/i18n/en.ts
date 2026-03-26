@@ -123,7 +123,7 @@ export const en = {
     regenerateKey: "Regenerate",
     copyKey: "Copy Key",
     aboutDescription:
-      "Stirling Image is a self-hosted, privacy-first image processing suite with 37+ tools.",
+      "Stirling Image is a self-hosted, privacy-first image processing suite with 33+ tools.",
     aboutLinks: "Links",
     github: "GitHub",
     documentation: "Documentation",

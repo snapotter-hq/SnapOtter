@@ -26,10 +26,10 @@ const SUBJECT_OPTIONS: { value: SubjectType; label: string; icon: typeof User }[
   { value: "general", label: "General", icon: ImageIcon },
 ];
 
-const QUALITY_OPTIONS: { value: Quality; label: string; hint: string }[] = [
-  { value: "fast", label: "Fast", hint: "~2s" },
-  { value: "balanced", label: "Balanced", hint: "~15s" },
-  { value: "best", label: "Best", hint: "~60s" },
+const QUALITY_OPTIONS: { value: Quality; label: string }[] = [
+  { value: "fast", label: "Fast" },
+  { value: "balanced", label: "Balanced" },
+  { value: "best", label: "Best" },
 ];
 
 const BG_PRESETS = [
@@ -119,8 +119,7 @@ export function RemoveBgSettings() {
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >
-              <div>{opt.label}</div>
-              <div className="text-[10px] opacity-60 mt-0.5">{opt.hint}</div>
+              {opt.label}
             </button>
           ))}
         </div>

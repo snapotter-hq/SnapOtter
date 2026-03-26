@@ -90,7 +90,7 @@ export function LoginPage() {
           <h2 className="text-3xl font-bold">Your one-stop-shop for all your image needs.</h2>
           <p className="text-lg text-white/80">
             A privacy-first image suite that lets you resize, compress, convert, and process images
-            with 30+ powerful tools.
+            with 33+ powerful tools.
           </p>
         </div>
       </div>

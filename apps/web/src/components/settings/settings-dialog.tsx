@@ -1734,7 +1734,7 @@ function AboutSection() {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          A self-hosted, privacy-first image processing suite with 37+ tools. Resize, compress,
+          A self-hosted, privacy-first image processing suite with 33+ tools. Resize, compress,
           convert, watermark, and automate your image workflows without sending data to the cloud.
         </p>
         <div className="flex items-center gap-4 text-sm">

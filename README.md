@@ -12,7 +12,7 @@
 
 ---
 
-Self-hosted image processing with 37+ tools in a single Docker container. Resize, compress, convert, watermark, remove backgrounds, run OCR, and more. Nothing leaves your server.
+Self-hosted image processing with 33+ tools in a single Docker container. Resize, compress, convert, watermark, remove backgrounds, run OCR, and more. Nothing leaves your server.
 
 Inspired by [Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF), built for images.
 
@@ -29,7 +29,7 @@ Open [http://localhost:1349](http://localhost:1349). Default login is `admin` / 
 
 ## What it does
 
-- **37+ image tools** in one place — resize, crop, rotate, compress, convert, watermark, color adjustments, and the rest.
+- **33+ image tools** in one place — resize, crop, rotate, compress, convert, watermark, color adjustments, and the rest.
 
 - **AI tools that run locally** — background removal (rembg), upscaling (Real-ESRGAN), OCR (PaddleOCR), face blurring (MediaPipe), object erasing (LaMa). No external API calls.
 
