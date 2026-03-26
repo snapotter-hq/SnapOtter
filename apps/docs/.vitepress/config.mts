@@ -7,7 +7,10 @@ export default defineConfig({
   srcDir: ".",
   outDir: "./.vitepress/dist",
 
-  head: [["meta", { name: "theme-color", content: "#3b82f6" }]],
+  head: [
+    ["meta", { name: "theme-color", content: "#3b82f6" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/Stirling-Image/favicon.svg" }],
+  ],
 
   themeConfig: {
     nav: [
