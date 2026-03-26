@@ -1,4 +1,4 @@
-import { FlipHorizontal, FlipVertical, RotateCcw, RotateCw } from "lucide-react";
+import { FlipHorizontal, FlipVertical, Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -44,8 +44,29 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
     prevProcessing.current = processing;
   }, [processing, error]);
 
+  // Display angle normalized to 0-359
+  const displayAngle = ((totalAngle % 360) + 360) % 360;
+
+  const [angleInput, setAngleInput] = useState(String(displayAngle));
+  const prevDisplayAngle = useRef(displayAngle);
+  if (prevDisplayAngle.current !== displayAngle) {
+    prevDisplayAngle.current = displayAngle;
+    setAngleInput(String(displayAngle));
+  }
+
   const rotateLeft = () => setRotation((r) => r - 90);
   const rotateRight = () => setRotation((r) => r + 90);
+
+  const commitAngleInput = () => {
+    const parsed = Number.parseInt(angleInput, 10);
+    if (!Number.isNaN(parsed)) {
+      const normalized = ((parsed % 360) + 360) % 360;
+      setAngleInput(String(normalized));
+      setRotation(normalized - straighten);
+    } else {
+      setAngleInput(String(displayAngle));
+    }
+  };
 
   const handleProcess = () => {
     const backendAngle = ((totalAngle % 360) + 360) % 360;
@@ -76,9 +97,6 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
     setFlipV(false);
   };
 
-  // Display angle normalized to 0-359
-  const displayAngle = ((totalAngle % 360) + 360) % 360;
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Quick rotate */}
@@ -94,9 +112,41 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
             <RotateCcw className="h-4 w-4" />
             Left
           </button>
-          <div className="px-3 py-1.5 rounded-md bg-background border border-border text-center min-w-[4rem]">
-            <span className="text-sm font-mono font-medium tabular-nums">{displayAngle}°</span>
+          <button
+            type="button"
+            onClick={() => setRotation((r) => r - 1)}
+            className="p-2 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+            title="Decrease 1°"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={angleInput}
+              onChange={(e) => setAngleInput(e.target.value)}
+              onBlur={commitAngleInput}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitAngleInput();
+                }
+              }}
+              className="w-14 text-center text-sm font-mono font-medium tabular-nums py-1.5 rounded-md bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 pr-4"
+            />
+            <span className="absolute right-2 text-sm font-mono text-muted-foreground pointer-events-none">
+              °
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setRotation((r) => r + 1)}
+            className="p-2 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+            title="Increase 1°"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={rotateRight}
