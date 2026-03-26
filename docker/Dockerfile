@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ============================================
 # Stirling Image - Production Dockerfile
 # Multi-stage build for single-container deployment
@@ -24,13 +25,15 @@ COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./pa
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
 # Install ALL dependencies (dev + prod needed for building)
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
+    pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build only the web frontend (API runs from TS source via tsx)
-RUN pnpm --filter @stirling-image/web build
+RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
+    pnpm --filter @stirling-image/web build
 
 # ============================================
 # Stage 2: Production runtime
@@ -57,14 +60,15 @@ RUN python3 -m venv /opt/venv
 COPY packages/ai/python/requirements.txt /tmp/requirements.txt
 
 # Install Python packages - fail loudly for critical ones, warn for optional
-RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir \
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install \
     Pillow numpy opencv-python-headless onnxruntime && \
-    (/opt/venv/bin/pip install --no-cache-dir rembg[cpu] || echo "WARNING: rembg not installed - background removal will be unavailable") && \
-    (/opt/venv/bin/pip install --no-cache-dir realesrgan || echo "WARNING: realesrgan not installed - will fallback to Lanczos upscaling") && \
-    (/opt/venv/bin/pip install --no-cache-dir paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed - will fallback to Tesseract") && \
-    (/opt/venv/bin/pip install --no-cache-dir mediapipe || echo "WARNING: mediapipe not installed - face detection will be unavailable") && \
-    (/opt/venv/bin/pip install --no-cache-dir lama-cleaner || echo "WARNING: lama-cleaner not installed - object eraser will be unavailable") && \
+    (/opt/venv/bin/pip install rembg[cpu] || echo "WARNING: rembg not installed - background removal will be unavailable") && \
+    (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed - will fallback to Lanczos upscaling") && \
+    (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed - will fallback to Tesseract") && \
+    (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed - face detection will be unavailable") && \
+    (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed - object eraser will be unavailable") && \
     rm /tmp/requirements.txt
 
 # Pre-download ALL AI model weights into the image (no first-use download delays)
@@ -94,7 +98,8 @@ COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
 # Install production dependencies (tsx is now in prod deps)
 # Skip the root prepare script (husky is a devDep, not available in prod)
-RUN npm pkg delete scripts.prepare && \
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
+    npm pkg delete scripts.prepare && \
     pnpm install --frozen-lockfile --prod
 
 # Remove build tools no longer needed in production
