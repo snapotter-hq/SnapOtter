@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Stirling Image API
+  version: 0.9.0
+  description: |
+    REST API for Stirling Image, a self-hosted image processing platform with 33+ tools.
+
+    ## Authentication
+
+    Most endpoints require authentication via one of two methods:
+
+    1. **Session cookie** — Call `POST /api/auth/login` with username and password. The response includes a `token` field. Pass it as `Authorization: Bearer <token>` on subsequent requests.
+
+    2. **API key** — Generate a key via the Settings UI or `POST /api/v1/api-keys`. Keys are prefixed with `si_`. Pass as `Authorization: Bearer si_...`.
+
+    Endpoints marked with a lock icon require authentication. Admin-only endpoints are noted in their description.
+  license:
+    name: MIT
+    url: https://github.com/siddharthksah/Stirling-Image/blob/main/LICENSE
+
+servers:
+  - url: /
+    description: Current instance
+
+tags:
+  - name: Tools
+    description: Image processing tools. Each accepts a multipart file upload and returns a download URL.
+  - name: Batch
+    description: Process multiple images through a tool in one request.
+  - name: Pipelines
+    description: Chain multiple tools into reusable workflows.
+  - name: Files
+    description: Upload, download, and manage processed images.
+  - name: Auth
+    description: Login, logout, session management, and user administration.
+  - name: API Keys
+    description: Create and manage API keys for programmatic access.
+  - name: Settings
+    description: System-wide configuration (admin only for writes).
+  - name: Teams
+    description: Organize users into teams.
+  - name: Branding
+    description: Custom logo management.
+  - name: System
+    description: Health checks, configuration, and job progress.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Session token from login or API key (prefixed with si_)
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Invalid image format
+
+    ToolResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          description: Unique job identifier
+        downloadUrl:
+          type: string
+          description: URL to download the processed image
+          example: /api/v1/download/abc123/output.png
+        originalSize:
+          type: integer
+          description: Original file size in bytes
+        processedSize:
+          type: integer
+          description: Processed file size in bytes
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        version:
+          type: string
+        uptime:
+          type: string
+        database:
+          type: string
+          enum: [ok, error]
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Returns server health status. Used by Docker HEALTHCHECK. Public endpoint.
+      security: []
+      responses:
+        "200":
+          description: Server health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
