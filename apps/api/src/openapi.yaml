@@ -113,3 +113,1630 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/tools/resize:
+    post:
+      tags: [Tools]
+      summary: Resize
+      description: Resize an image to specific dimensions or by percentage.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (number, optional) — Target width in pixels
+                    - `height` (number, optional) — Target height in pixels
+                    - `fit` (string, default "contain") — One of: contain, cover, fill, inside, outside
+                    - `withoutEnlargement` (boolean, default false) — Prevent upscaling
+                    - `percentage` (number, optional) — Scale by percentage instead of fixed dimensions
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/crop:
+    post:
+      tags: [Tools]
+      summary: Crop
+      description: Crop an image to a specific region.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `left` (integer, required) — Left offset in pixels
+                    - `top` (integer, required) — Top offset in pixels
+                    - `width` (integer, required) — Width of crop region in pixels
+                    - `height` (integer, required) — Height of crop region in pixels
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/rotate:
+    post:
+      tags: [Tools]
+      summary: Rotate and flip
+      description: Rotate an image by angle or flip horizontally/vertically.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `angle` (number, default 0) — Rotation angle in degrees
+                    - `horizontal` (boolean, default false) — Flip horizontally
+                    - `vertical` (boolean, default false) — Flip vertically
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/convert:
+    post:
+      tags: [Tools]
+      summary: Convert format
+      description: Convert an image to a different format.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, required) — One of: jpg, png, webp, avif, tiff, gif
+                    - `quality` (number 1-100, optional) — Output quality
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/compress:
+    post:
+      tags: [Tools]
+      summary: Compress
+      description: Reduce image file size by quality level or target size.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "quality") — One of: quality, targetSize
+                    - `quality` (number 1-100, optional) — Compression quality level
+                    - `targetSizeKb` (number, optional) — Target file size in kilobytes
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/strip-metadata:
+    post:
+      tags: [Tools]
+      summary: Strip metadata
+      description: Remove EXIF, GPS, ICC, or XMP metadata from an image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `stripExif` (boolean, default false) — Remove EXIF data
+                    - `stripGps` (boolean, default false) — Remove GPS data
+                    - `stripIcc` (boolean, default false) — Remove ICC profile
+                    - `stripXmp` (boolean, default false) — Remove XMP data
+                    - `stripAll` (boolean, default true) — Remove all metadata
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/border:
+    post:
+      tags: [Tools]
+      summary: Border and frame
+      description: Add a border, rounded corners, padding, or shadow to an image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `borderWidth` (number 0-200, default 10) — Border thickness in pixels
+                    - `borderColor` (hex string, default "#000000") — Border color
+                    - `cornerRadius` (number 0-500, default 0) — Corner rounding radius
+                    - `padding` (number 0-200, default 0) — Inner padding in pixels
+                    - `shadowBlur` (number 0-50, default 0) — Drop shadow blur radius
+                    - `shadowColor` (hex string, default "#00000080") — Drop shadow color
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/brightness-contrast:
+    post:
+      tags: [Tools]
+      summary: Brightness and contrast
+      description: Adjust brightness, contrast, saturation, color channels, and effects.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -100 to 100, default 0) — Brightness adjustment
+                    - `contrast` (number -100 to 100, default 0) — Contrast adjustment
+                    - `saturation` (number -100 to 100, default 0) — Saturation adjustment
+                    - `red` (number 0-200, default 100) — Red channel multiplier
+                    - `green` (number 0-200, default 100) — Green channel multiplier
+                    - `blue` (number 0-200, default 100) — Blue channel multiplier
+                    - `effect` (string, default "none") — One of: none, grayscale, sepia, invert
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/saturation:
+    post:
+      tags: [Tools]
+      summary: Saturation and exposure
+      description: Adjust color saturation and exposure settings.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -100 to 100, default 0) — Brightness adjustment
+                    - `contrast` (number -100 to 100, default 0) — Contrast adjustment
+                    - `saturation` (number -100 to 100, default 0) — Saturation adjustment
+                    - `red` (number 0-200, default 100) — Red channel multiplier
+                    - `green` (number 0-200, default 100) — Green channel multiplier
+                    - `blue` (number 0-200, default 100) — Blue channel multiplier
+                    - `effect` (string, default "none") — One of: none, grayscale, sepia, invert
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/color-channels:
+    post:
+      tags: [Tools]
+      summary: Color channels
+      description: Adjust individual RGB color channels.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -100 to 100, default 0) — Brightness adjustment
+                    - `contrast` (number -100 to 100, default 0) — Contrast adjustment
+                    - `saturation` (number -100 to 100, default 0) — Saturation adjustment
+                    - `red` (number 0-200, default 100) — Red channel multiplier
+                    - `green` (number 0-200, default 100) — Green channel multiplier
+                    - `blue` (number 0-200, default 100) — Blue channel multiplier
+                    - `effect` (string, default "none") — One of: none, grayscale, sepia, invert
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/color-effects:
+    post:
+      tags: [Tools]
+      summary: Color effects
+      description: Apply color effects like grayscale, sepia, or invert.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -100 to 100, default 0) — Brightness adjustment
+                    - `contrast` (number -100 to 100, default 0) — Contrast adjustment
+                    - `saturation` (number -100 to 100, default 0) — Saturation adjustment
+                    - `red` (number 0-200, default 100) — Red channel multiplier
+                    - `green` (number 0-200, default 100) — Green channel multiplier
+                    - `blue` (number 0-200, default 100) — Blue channel multiplier
+                    - `effect` (string, default "none") — One of: none, grayscale, sepia, invert
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/watermark-text:
+    post:
+      tags: [Tools]
+      summary: Text watermark
+      description: Add a text watermark to an image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `text` (string 1-500, required) — Watermark text
+                    - `fontSize` (number 8-200, default 48) — Font size in pixels
+                    - `color` (hex string, default "#000000") — Text color
+                    - `opacity` (number 0-100, default 50) — Opacity percentage
+                    - `position` (string, default "center") — One of: center, top-left, top-right, bottom-left, bottom-right, tiled
+                    - `rotation` (number -360 to 360, default 0) — Text rotation angle
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/text-overlay:
+    post:
+      tags: [Tools]
+      summary: Text overlay
+      description: Add styled text overlay with optional background box.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `text` (string 1-500, required) — Overlay text
+                    - `fontSize` (number 8-200, default 48) — Font size in pixels
+                    - `color` (hex string, default "#FFFFFF") — Text color
+                    - `position` (string, default "bottom") — One of: top, center, bottom
+                    - `backgroundBox` (boolean, default false) — Show background box behind text
+                    - `backgroundColor` (hex string, default "#000000") — Background box color
+                    - `shadow` (boolean, default true) — Add text shadow
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/replace-color:
+    post:
+      tags: [Tools]
+      summary: Replace color
+      description: Replace a specific color in an image with another color or transparency.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `sourceColor` (hex string, default "#FF0000") — Color to replace
+                    - `targetColor` (hex string, default "#00FF00") — Replacement color
+                    - `makeTransparent` (boolean, default false) — Make matched pixels transparent instead
+                    - `tolerance` (number 0-255, default 30) — Color matching tolerance
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/gif-tools:
+    post:
+      tags: [Tools]
+      summary: GIF tools
+      description: Resize, extract frames from, or optimize animated GIFs.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: GIF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (number 1-4096, optional) — Target width in pixels
+                    - `height` (number 1-4096, optional) — Target height in pixels
+                    - `extractFrame` (number, optional) — Extract specific frame index
+                    - `optimize` (boolean, default false) — Optimize GIF file size
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/smart-crop:
+    post:
+      tags: [Tools]
+      summary: Smart crop
+      description: Automatically crop to the most interesting region at the specified dimensions.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (integer, required) — Target width in pixels
+                    - `height` (integer, required) — Target height in pixels
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/vectorize:
+    post:
+      tags: [Tools]
+      summary: Image to SVG
+      description: Convert a raster image to SVG vector format.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `colorMode` (string, default "bw") — One of: bw, color
+                    - `threshold` (number 0-255, default 128) — Binarization threshold
+                    - `detail` (string, default "medium") — One of: low, medium, high
+      responses:
+        "200":
+          description: Processed image (downloadUrl points to .svg file)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/svg-to-raster:
+    post:
+      tags: [Tools]
+      summary: SVG to raster
+      description: Convert an SVG file to a raster image format.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SVG file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (number 1-8192, default 1024) — Output width in pixels
+                    - `height` (number 1-8192, optional) — Output height in pixels
+                    - `backgroundColor` (hex string, default "#00000000") — Background color
+                    - `outputFormat` (string, default "png") — One of: png, jpg, webp
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/image-to-pdf:
+    post:
+      tags: [Tools]
+      summary: Image to PDF
+      description: Convert one or more images into a PDF document.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: One or more image files to include in the PDF
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pageSize` (string, default "A4") — One of: A4, Letter, A3, A5
+                    - `orientation` (string, default "portrait") — One of: portrait, landscape
+                    - `margin` (number 0-100, default 20) — Page margin in points
+      responses:
+        "200":
+          description: Generated PDF (downloadUrl points to .pdf file)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/split:
+    post:
+      tags: [Tools]
+      summary: Split image
+      description: Split an image into a grid of tiles. Returns a ZIP file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to split
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `columns` (number 1-10, default 2) — Number of columns
+                    - `rows` (number 1-10, default 2) — Number of rows
+      responses:
+        "200":
+          description: ZIP archive with results
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/bulk-rename:
+    post:
+      tags: [Tools]
+      summary: Bulk rename
+      description: Rename multiple images using a pattern template. Supports {{index}}, {{padded}}, and {{original}} tokens. Returns a ZIP file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Multiple image files to rename
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pattern` (string 1-200, default "image-{{index}}") — Naming pattern template
+                    - `startIndex` (number, default 1) — Starting index number
+      responses:
+        "200":
+          description: ZIP archive with results
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/favicon:
+    post:
+      tags: [Tools]
+      summary: Favicon generator
+      description: Generate a complete favicon set (16px to 512px PNGs, ICO, and manifest.json) from an image. Returns a ZIP file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to use as favicon source
+      responses:
+        "200":
+          description: ZIP archive with results
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/watermark-image:
+    post:
+      tags: [Tools]
+      summary: Image watermark
+      description: Add an image watermark overlay.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, watermark, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Main image file
+                watermark:
+                  type: string
+                  format: binary
+                  description: Watermark overlay image
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `position` (string, default "bottom-right") — One of: center, top-left, top-right, bottom-left, bottom-right
+                    - `opacity` (number 0-100, default 50) — Watermark opacity percentage
+                    - `scale` (number 1-100, default 25) — Watermark size as percentage of base image
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/compose:
+    post:
+      tags: [Tools]
+      summary: Image composition
+      description: Composite an overlay image onto a base image with blend modes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, overlay, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Base image file
+                overlay:
+                  type: string
+                  format: binary
+                  description: Overlay image file
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `x` (number, default 0) — Horizontal offset of overlay
+                    - `y` (number, default 0) — Vertical offset of overlay
+                    - `opacity` (number 0-100, default 100) — Overlay opacity percentage
+                    - `blendMode` (string, default "over") — One of: over, multiply, screen, overlay, darken, lighten, hard-light, soft-light, difference, exclusion
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/compare:
+    post:
+      tags: [Tools]
+      summary: Image compare
+      description: Compare two images and generate a visual difference report.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file1, file2]
+              properties:
+                file1:
+                  type: string
+                  format: binary
+                  description: First image to compare
+                file2:
+                  type: string
+                  format: binary
+                  description: Second image to compare
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/erase-object:
+    post:
+      tags: [Tools]
+      summary: Object eraser
+      description: Erase objects from an image using a mask. White areas in the mask indicate regions to erase. Uses LaMa inpainting.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, mask]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Source image file
+                mask:
+                  type: string
+                  format: binary
+                  description: Mask image (white areas will be erased)
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/collage:
+    post:
+      tags: [Tools]
+      summary: Collage / grid
+      description: Combine multiple images into a grid collage.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Multiple image files to combine
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `layout` (string, default "2x2") — One of: 2x2, 3x3, 1x3, 2x1, 3x1, 1x2
+                    - `gap` (number 0-50, default 4) — Gap between images in pixels
+                    - `backgroundColor` (hex string, default "#FFFFFF") — Background fill color
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/remove-background:
+    post:
+      tags: [Tools]
+      summary: Remove background
+      description: Remove the background from an image using AI (rembg). Runs locally.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `model` (string, optional) — AI model name
+                    - `backgroundColor` (string, optional) — Hex color to replace removed background with
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/upscale:
+    post:
+      tags: [Tools]
+      summary: Image upscaling
+      description: Upscale an image using AI (Real-ESRGAN). Runs locally.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to upscale
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `scale` (number, default 2) — Upscale factor
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/blur-faces:
+    post:
+      tags: [Tools]
+      summary: Face blur
+      description: Detect and blur faces in an image for privacy. Uses OpenCV. Runs locally.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `blurRadius` (number, default 30) — Blur strength radius
+                    - `sensitivity` (number 0-1, default 0.5) — Face detection sensitivity
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/ocr:
+    post:
+      tags: [Tools]
+      summary: OCR / text extraction
+      description: Extract text from an image using OCR. Runs locally.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to extract text from
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `engine` (string, default "tesseract") — One of: tesseract, paddleocr
+                    - `language` (string, default "en") — One of: en, de, fr, es, zh, ja, ko
+      responses:
+        "200":
+          description: Extracted text
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text:
+                    type: string
+                    description: Extracted text content
+                  engine:
+                    type: string
+                  confidence:
+                    type: number
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/info:
+    post:
+      tags: [Tools]
+      summary: Image info
+      description: Get detailed metadata about an image including dimensions, format, color space, and EXIF data.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to inspect
+      responses:
+        "200":
+          description: Image metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  width:
+                    type: integer
+                  height:
+                    type: integer
+                  format:
+                    type: string
+                  space:
+                    type: string
+                  channels:
+                    type: integer
+                  depth:
+                    type: string
+                  density:
+                    type: integer
+                  hasAlpha:
+                    type: boolean
+                  fileSize:
+                    type: integer
+                  exif:
+                    type: object
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/color-palette:
+    post:
+      tags: [Tools]
+      summary: Color palette
+      description: Extract the dominant colors from an image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to analyze
+      responses:
+        "200":
+          description: Dominant colors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  colors:
+                    type: array
+                    items:
+                      type: string
+                    description: Hex color strings
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/barcode-read:
+    post:
+      tags: [Tools]
+      summary: Barcode reader
+      description: Read QR codes and barcodes from an image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file containing barcode or QR code
+      responses:
+        "200":
+          description: Decoded barcode data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+                  location:
+                    type: object
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/find-duplicates:
+    post:
+      tags: [Tools]
+      summary: Find duplicates
+      description: Find duplicate images in a set using perceptual hashing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Multiple image files to check for duplicates
+      responses:
+        "200":
+          description: Duplicate groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        files:
+                          type: array
+                          items:
+                            type: string
+                        similarity:
+                          type: number
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/qr-generate:
+    post:
+      tags: [Tools]
+      summary: QR code generator
+      description: Generate a QR code image from text. This tool accepts a JSON body, not multipart.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 2000
+                  description: Text to encode in the QR code
+                size:
+                  type: integer
+                  minimum: 100
+                  maximum: 2000
+                  default: 400
+                  description: Image size in pixels
+                errorCorrection:
+                  type: string
+                  enum: [L, M, Q, H]
+                  default: M
+                foreground:
+                  type: string
+                  default: "#000000"
+                  description: Foreground color (hex)
+                background:
+                  type: string
+                  default: "#FFFFFF"
+                  description: Background color (hex)
+      responses:
+        "200":
+          description: Generated QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/strip-metadata/inspect:
+    post:
+      tags: [Tools]
+      summary: Inspect metadata
+      description: View all metadata (EXIF, GPS, ICC, XMP) in an image without removing it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to inspect
+      responses:
+        "200":
+          description: Image metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exif:
+                    type: object
+                    description: EXIF metadata
+                  gps:
+                    type: object
+                    description: GPS metadata
+                  icc:
+                    type: object
+                    description: ICC profile metadata
+                  xmp:
+                    type: object
+                    description: XMP metadata
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
