@@ -49,9 +49,9 @@ export default defineConfig({
     },
 
     footer: {
-      message:
-        'Released under the MIT License. · <a href="/Stirling-Image/llms.txt" style="opacity:0.7">llms.txt</a> · <a href="/Stirling-Image/llms-full.txt" style="opacity:0.7">llms-full.txt</a>',
-      copyright: 'AI-friendly docs available at <a href="/Stirling-Image/llms-full.txt">/llms-full.txt</a>',
+      message: "Released under the MIT License.",
+      copyright:
+        'AI-friendly docs available at <a href="/Stirling-Image/llms.txt">/llms.txt</a> · <a href="/Stirling-Image/llms-full.txt">/llms-full.txt</a>',
     },
 
     editLink: {
