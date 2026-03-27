@@ -1,3 +1,10 @@
+## [0.12.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.12.0...v0.12.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* **docs:** clean up footer llms.txt links ([e842cde](https://github.com/siddharthksah/Stirling-Image/commit/e842cde838ad3deb1437c4c43c8ccd796276248c))
+
 # [0.12.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.11.1...v0.12.0) (2026-03-27)
 
 
