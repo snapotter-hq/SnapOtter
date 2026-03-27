@@ -1,0 +1,30 @@
+# Stirling Image
+
+> Self-hosted, open-source image processing platform with 33+ tools. Runs in a single Docker container.
+
+## Docs
+
+- [Getting Started](https://siddharthksah.github.io/Stirling-Image/guide/getting-started): Docker setup, build from source
+- [Architecture](https://siddharthksah.github.io/Stirling-Image/guide/architecture): Monorepo structure, request flow, packages
+- [Configuration](https://siddharthksah.github.io/Stirling-Image/guide/configuration): Environment variables, Docker volumes
+- [Database](https://siddharthksah.github.io/Stirling-Image/guide/database): SQLite schema, tables, migrations
+- [Deployment](https://siddharthksah.github.io/Stirling-Image/guide/deployment): Docker Compose, reverse proxy, CI/CD
+- [REST API](https://siddharthksah.github.io/Stirling-Image/api/rest): All API endpoints, auth, tools, pipelines, batch
+- [Image Engine](https://siddharthksah.github.io/Stirling-Image/api/image-engine): Sharp-based operations (resize, crop, rotate, convert, compress, color)
+- [AI Engine](https://siddharthksah.github.io/Stirling-Image/api/ai): Python ML models (rembg, RealESRGAN, PaddleOCR, MediaPipe, LaMa)
+- [Full Documentation (LLM-friendly)](https://siddharthksah.github.io/Stirling-Image/llms-full.txt): All docs in a single plain-text file
+
+## API Quick Reference
+
+- Base URL: `http://localhost:1349`
+- Auth: Session token via `POST /api/auth/login` or API key (`Authorization: Bearer si_...`)
+- Tools: `POST /api/v1/tools/{toolId}` (multipart: file + settings JSON)
+- Batch: `POST /api/v1/tools/{toolId}/batch` (multiple files, returns ZIP)
+- Pipelines: `POST /api/v1/pipeline/execute` (chain tools sequentially)
+- Interactive API docs on running instance: `/api/docs`
+- OpenAPI spec on running instance: `/api/v1/openapi.yaml`
+
+## Source
+
+- [GitHub](https://github.com/siddharthksah/Stirling-Image)
+- License: MIT

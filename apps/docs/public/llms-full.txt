@@ -1,0 +1,476 @@
+# Stirling Image — Complete Documentation
+
+Self-hosted, open-source image processing platform with 33+ tools. Runs in a single Docker container. Resize, compress, convert, remove backgrounds, upscale, run OCR, and more — without sending images to external services.
+
+- GitHub: https://github.com/siddharthksah/Stirling-Image
+- Docs: https://siddharthksah.github.io/Stirling-Image/
+- License: MIT
+
+---
+
+# Getting Started
+
+## Run with Docker
+
+The fastest way to get Stirling Image running:
+
+```bash
+docker run -d \
+  --name stirling-image \
+  -p 1349:1349 \
+  -v stirling-data:/data \
+  siddharth123sk/stirling-image:latest
+```
+
+Open `http://localhost:1349` in your browser. Log in with `admin` / `admin`.
+
+## Run with Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  stirling-image:
+    image: siddharth123sk/stirling-image:latest
+    container_name: stirling-image
+    ports:
+      - "1349:1349"
+    volumes:
+      - stirling-data:/data
+      - stirling-workspace:/tmp/workspace
+    environment:
+      - AUTH_ENABLED=true
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin
+    restart: unless-stopped
+
+volumes:
+  stirling-data:
+  stirling-workspace:
+```
+
+```bash
+docker compose up -d
+```
+
+## Build from source
+
+Requirements: Node.js 22+, pnpm 9+, Python 3.10+
+
+```bash
+git clone https://github.com/siddharthksah/Stirling-Image.git
+cd Stirling-Image
+pnpm install
+pnpm dev
+```
+
+This starts both the API server and the React frontend at `http://localhost:1349`.
+
+---
+
+# Architecture
+
+Stirling Image is a monorepo managed with pnpm workspaces and Turborepo. Everything ships as a single Docker container.
+
+## Project structure
+
+```
+Stirling-Image/
+├── apps/
+│   ├── api/          # Fastify backend
+│   ├── web/          # React + Vite frontend
+│   └── docs/         # VitePress documentation site
+├── packages/
+│   ├── image-engine/ # Sharp-based image operations
+│   ├── ai/           # Python AI model bridge
+│   └── shared/       # Types, constants, i18n
+└── docker/           # Dockerfile and Compose config
+```
+
+## Packages
+
+### @stirling-image/image-engine
+
+Core image processing library built on Sharp. Handles all non-AI operations: resize, crop, rotate, flip, convert, compress, strip metadata, and color adjustments. No network dependencies, runs entirely in-process.
+
+### @stirling-image/ai
+
+Bridge layer that calls Python scripts via child processes. Each AI capability has a TypeScript wrapper that spawns a Python subprocess, passes image data through the filesystem, and returns the result.
+
+Supported operations:
+- Background removal — BiRefNet-Lite model via rembg
+- Upscaling — RealESRGAN
+- OCR — PaddleOCR
+- Face detection/blurring — MediaPipe
+- Object erasing (inpainting) — LaMa Cleaner
+
+Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works offline.
+
+### @stirling-image/shared
+
+Shared TypeScript types, constants (like APP_VERSION and tool definitions), and i18n translation strings used by both frontend and backend.
+
+## How a request flows
+
+1. The user picks a tool in the web UI and uploads an image.
+2. The frontend sends a multipart POST to `/api/v1/tools/:toolId` with the file and settings.
+3. The API route validates the input with Zod, auto-orients the image based on EXIF metadata, then calls the appropriate package function.
+4. For AI tools, the TypeScript bridge spawns a Python subprocess, waits for it to finish, and reads the output file.
+5. The API returns a `jobId` and `downloadUrl`. The frontend can poll `/api/v1/jobs/:jobId/progress` via SSE for real time status.
+6. The user downloads the processed image from `/api/v1/download/:jobId/:filename`.
+
+---
+
+# Configuration
+
+All configuration is done through environment variables. Every variable has a sensible default.
+
+## Server
+
+| Variable | Default | Description |
+|---|---|---|
+| PORT | 1349 | Port the server listens on |
+| RATE_LIMIT_PER_MIN | 100 | Maximum requests per minute per IP |
+
+## Authentication
+
+| Variable | Default | Description |
+|---|---|---|
+| AUTH_ENABLED | false | Set to true to require login. Docker image defaults to true. |
+| DEFAULT_USERNAME | admin | Username for the initial admin account. Only used on first run. |
+| DEFAULT_PASSWORD | admin | Password for the initial admin account. Change after first login. |
+
+## Storage
+
+| Variable | Default | Description |
+|---|---|---|
+| STORAGE_MODE | local | local or s3. Only local is currently implemented. |
+| DB_PATH | ./data/stirling.db | Path to the SQLite database file |
+| WORKSPACE_PATH | ./tmp/workspace | Directory for temporary files during processing |
+| FILES_STORAGE_PATH | ./data/files | Directory for persistent user files |
+
+## Processing limits
+
+| Variable | Default | Description |
+|---|---|---|
+| MAX_UPLOAD_SIZE_MB | 100 | Maximum file size per upload in megabytes |
+| MAX_BATCH_SIZE | 200 | Maximum number of files in a single batch request |
+| CONCURRENT_JOBS | 3 | Number of batch jobs that run in parallel |
+| MAX_MEGAPIXELS | 100 | Maximum image resolution allowed |
+
+## Cleanup
+
+| Variable | Default | Description |
+|---|---|---|
+| FILE_MAX_AGE_HOURS | 24 | How long temporary files are kept before deletion |
+| CLEANUP_INTERVAL_MINUTES | 30 | How often the cleanup job runs |
+
+## Appearance
+
+| Variable | Default | Description |
+|---|---|---|
+| APP_NAME | Stirling Image | Display name shown in the UI |
+| DEFAULT_THEME | light | Default theme (light or dark) |
+| DEFAULT_LOCALE | en | Default interface language |
+
+## Volumes
+
+- `/data` — Persistent storage for SQLite database and user files. Mount to keep data across restarts.
+- `/tmp/workspace` — Temporary storage for images being processed. Optional but prevents container layer growth.
+
+---
+
+# Database
+
+SQLite with Drizzle ORM. Database file at DB_PATH (default: ./data/stirling.db).
+
+## Tables
+
+### users
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | Primary key, auto-increment |
+| username | text | Unique, required |
+| passwordHash | text | bcrypt hash |
+| role | text | admin or user |
+| mustChangePassword | integer | Boolean flag for forced password reset |
+| createdAt | text | ISO timestamp |
+
+### sessions
+| Column | Type | Notes |
+|---|---|---|
+| id | text | Primary key (session token) |
+| userId | integer | Foreign key to users.id |
+| expiresAt | text | ISO timestamp |
+
+### api_keys
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | Primary key |
+| userId | integer | Foreign key to users.id |
+| keyHash | text | SHA-256 hash of the key |
+| name | text | User-provided label |
+| createdAt | text | ISO timestamp |
+| lastUsedAt | text | Updated on each request |
+
+Keys are prefixed with `si_` followed by 96 hex characters.
+
+### pipelines
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | Primary key |
+| name | text | Pipeline name |
+| description | text | Optional |
+| steps | text | JSON array of { toolId, settings } |
+| createdAt | text | ISO timestamp |
+
+### settings
+| Column | Type | Notes |
+|---|---|---|
+| key | text | Primary key |
+| value | text | Setting value |
+
+---
+
+# Deployment
+
+## Docker Compose (recommended)
+
+```yaml
+services:
+  stirling-image:
+    image: siddharth123sk/stirling-image:latest
+    container_name: stirling-image
+    ports:
+      - "1349:1349"
+    volumes:
+      - stirling-data:/data
+      - stirling-workspace:/tmp/workspace
+    environment:
+      - AUTH_ENABLED=true
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin
+    restart: unless-stopped
+
+volumes:
+  stirling-data:
+  stirling-workspace:
+```
+
+## What's inside the container
+
+Multi-stage Docker build:
+1. Build stage — installs Node.js dependencies, builds React frontend with Vite
+2. Production stage — Node 22 image with Python 3, ImageMagick, Tesseract, potrace, ML packages, pre-downloaded model weights
+
+Python packages: rembg (BiRefNet-Lite), RealESRGAN, PaddleOCR, MediaPipe, LaMa Cleaner, onnxruntime, opencv-python, Pillow, numpy.
+
+## Health check
+
+```
+GET /api/v1/health
+```
+
+Returns 200 OK if the server is running. Used by Docker HEALTHCHECK.
+
+## Reverse proxy (nginx example)
+
+```nginx
+server {
+    listen 80;
+    server_name images.example.com;
+    client_max_body_size 200M;
+
+    location / {
+        proxy_pass http://localhost:1349;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+---
+
+# REST API
+
+Base URL: `http://localhost:1349`
+
+Interactive API docs on running instance: `/api/docs`
+OpenAPI 3.1 spec: `/api/v1/openapi.yaml`
+
+## Authentication
+
+1. Session token — POST /api/auth/login with {username, password}. Returns {token}. Pass as `Authorization: Bearer <token>`.
+2. API key — Generate via POST /api/v1/api-keys. Prefixed with `si_`. Pass as `Authorization: Bearer si_...`.
+
+## Tools
+
+### Execute a tool
+
+```
+POST /api/v1/tools/:toolId
+Content-Type: multipart/form-data
+```
+
+Fields: `file` (image), `settings` (JSON string with tool-specific options).
+
+Response: `{ jobId, downloadUrl, originalSize, processedSize }`
+
+### Available tool IDs
+
+Image operations: resize, crop, rotate, convert, compress, strip-metadata, border
+Color: brightness-contrast, saturation, color-channels, color-effects, replace-color
+Text/codes: watermark-text, watermark-image, text-overlay, qr-generate, barcode-read, ocr
+Composition: compose, collage, split, image-to-pdf
+Analysis: info, compare, find-duplicates, color-palette
+Conversion: svg-to-raster, vectorize, favicon, gif-tools
+AI-powered: remove-background, upscale, blur-faces, erase-object, smart-crop
+Utility: bulk-rename
+
+### Batch processing
+
+```
+POST /api/v1/tools/:toolId/batch
+Content-Type: multipart/form-data
+```
+
+Multiple files with same settings. Returns ZIP file. X-Job-Id header for progress tracking.
+
+## Pipelines
+
+- Execute: POST /api/v1/pipeline/execute (multipart: file + steps JSON array)
+- Save: POST /api/v1/pipeline/save (JSON: {name, description, steps})
+- List: GET /api/v1/pipeline/list
+- Delete: DELETE /api/v1/pipeline/:id
+
+## Files
+
+- Upload: POST /api/v1/upload
+- Download: GET /api/v1/download/:jobId/:filename (public, no auth)
+- List saved: GET /api/v1/files
+- Save to library: POST /api/v1/files/upload
+- Save result: POST /api/v1/files/save-result (JSON: {jobId, filename})
+- Get metadata: GET /api/v1/files/:id
+- Download saved: GET /api/v1/files/:id/download
+- Thumbnail: GET /api/v1/files/:id/thumbnail
+- Delete: DELETE /api/v1/files (JSON: {ids: [...]})
+
+## API Keys
+
+- Create: POST /api/v1/api-keys (JSON: {name}) — returns full key once
+- List: GET /api/v1/api-keys — metadata only
+- Delete: DELETE /api/v1/api-keys/:id
+
+## Settings
+
+- Get all: GET /api/v1/settings
+- Get one: GET /api/v1/settings/:key
+- Update: PUT /api/v1/settings (admin only, JSON key-value object)
+
+## Teams
+
+- List: GET /api/v1/teams
+- Create: POST /api/v1/teams (JSON: {name})
+- Rename: PUT /api/v1/teams/:id (JSON: {name})
+- Delete: DELETE /api/v1/teams/:id
+
+## Auth endpoints
+
+- Login: POST /api/auth/login
+- Logout: POST /api/auth/logout
+- Session: GET /api/auth/session
+- Change password: POST /api/auth/change-password
+- List users (admin): GET /api/auth/users
+- Create user (admin): POST /api/auth/register
+- Update user (admin): PUT /api/auth/users/:id
+- Delete user (admin): DELETE /api/auth/users/:id
+- Reset password (admin): POST /api/auth/users/:id/reset-password
+
+## Branding
+
+- Get logo: GET /api/v1/settings/logo (public)
+- Upload logo (admin): POST /api/v1/settings/logo
+- Delete logo (admin): DELETE /api/v1/settings/logo
+
+## Progress tracking (SSE)
+
+```
+GET /api/v1/jobs/:jobId/progress
+```
+
+Server-Sent Events stream: {status, progress (0-100), completedFiles, failedFiles}
+
+## Error responses
+
+```json
+{ "statusCode": 400, "error": "Bad Request", "message": "Invalid image format" }
+```
+
+Status codes: 400 (invalid input), 401 (not authenticated), 403 (not authorized), 413 (file too large), 429 (rate limited), 500 (server error)
+
+---
+
+# Image Engine
+
+The @stirling-image/image-engine package handles all non-AI image operations via Sharp.
+
+## Operations
+
+### resize
+width (number), height (number), fit (cover/contain/fill/inside/outside), withoutEnlargement (boolean), percentage (number)
+
+### crop
+left (number), top (number), width (number), height (number)
+
+### rotate
+angle (number, degrees)
+
+### flip
+direction: horizontal or vertical
+
+### convert
+format (jpeg/png/webp/avif/tiff/gif), quality (1-100)
+
+### compress
+quality (1-100), format (optional override)
+
+### strip-metadata
+Removes EXIF, IPTC, XMP metadata. No parameters.
+
+### Color adjustments
+brightness (-100 to 100), contrast (-100 to 100), saturation (-100 to 100)
+
+### Color filters
+grayscale, sepia, invert — no parameters
+
+### Color channels
+red (-100 to 100), green (-100 to 100), blue (-100 to 100)
+
+Supported input formats: JPEG, PNG, WebP, AVIF, TIFF, GIF, SVG, RAW (via libraw)
+
+---
+
+# AI Engine
+
+The @stirling-image/ai package wraps Python ML models. Each operation spawns a Python subprocess. All model weights are bundled in the Docker image.
+
+## Background removal
+Model: BiRefNet-Lite via rembg. Parameters: model (string), alphaMatting (boolean), alphaMattingForegroundThreshold (0-255), alphaMattingBackgroundThreshold (0-255).
+
+## Upscaling
+Model: RealESRGAN. Parameters: scale (2 or 4).
+
+## OCR
+Model: PaddleOCR. Parameters: language (en/ch/fr/de/etc). Returns text with bounding boxes and confidence scores.
+
+## Face detection and blurring
+Model: MediaPipe. Parameters: blurStrength (number). Returns blurred image with face region metadata.
+
+## Object erasing (inpainting)
+Model: LaMa. Input: image + mask (white = erase, black = keep). Returns inpainted image.
+
+## Bridge mechanism
+TypeScript bridge spawns Python subprocess, writes input to temp file, parses JSON progress from stderr for SSE streaming, reads output image, cleans up. Timeout: 5 minutes.
