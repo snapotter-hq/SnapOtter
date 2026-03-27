@@ -12,6 +12,7 @@ import { registerUpload } from "./plugins/upload.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { registerBatchRoutes } from "./routes/batch.js";
 import { brandingRoutes } from "./routes/branding.js";
+import { docsRoutes } from "./routes/docs.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { registerProgressRoutes } from "./routes/progress.js";
@@ -98,6 +99,9 @@ await brandingRoutes(app);
 
 // Teams routes
 await teamsRoutes(app);
+
+// API docs (Scalar)
+await docsRoutes(app);
 
 // Health check
 app.get("/api/v1/health", async () => {
