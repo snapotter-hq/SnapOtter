@@ -1,6 +1,12 @@
 # REST API
 
-The API server runs on port 1349 by default and serves all endpoints under `/api`. Interactive Swagger documentation is available at `/api/docs` when the server is running.
+The API server runs on port 1349 by default and serves all endpoints under `/api`.
+
+::: tip Interactive API Reference
+When your Stirling Image instance is running, visit [`/api/docs`](http://localhost:1349/api/docs) for an interactive API reference with full endpoint documentation, request schemas, and response examples.
+:::
+
+The reference below covers the key endpoints. For the complete specification, see the interactive docs.
 
 ## Authentication
 
