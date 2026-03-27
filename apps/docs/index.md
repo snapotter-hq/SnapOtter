@@ -5,9 +5,6 @@ hero:
   name: "Stirling Image"
   text: "Self-hosted image processing"
   tagline: Resize, compress, convert, remove backgrounds, and more. All on your own server, no data leaves your machine.
-  image:
-    src: /logo.svg
-    alt: Stirling Image
   actions:
     - theme: brand
       text: Get started
