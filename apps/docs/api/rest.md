@@ -6,6 +6,10 @@ The API server runs on port 1349 by default and serves all endpoints under `/api
 When your Stirling Image instance is running, visit [`/api/docs`](http://localhost:1349/api/docs) for an interactive API reference with full endpoint documentation, request schemas, and response examples.
 :::
 
+::: info LLM-friendly docs
+Need to feed these docs to an AI assistant? Use [`/llms.txt`](/Stirling-Image/llms.txt) for an index or [`/llms-full.txt`](/Stirling-Image/llms-full.txt) for the complete documentation in a single file. On a running instance, these are also available at `/llms.txt` and `/llms-full.txt`.
+:::
+
 The reference below covers the key endpoints. For the complete specification, see the interactive docs.
 
 ## Authentication
@@ -15,7 +19,7 @@ Requests can be authenticated in two ways:
 1. **Session cookie** -- Log in via `POST /api/auth/login` and the server sets a session cookie.
 2. **API key** -- Pass an `Authorization: Bearer si_...` header with an API key.
 
-Some endpoints (health check, login, Swagger docs) are public and don't require authentication.
+Some endpoints (health check, login, API docs) are public and don't require authentication.
 
 ## Tools
 
