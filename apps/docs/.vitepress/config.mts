@@ -6,6 +6,7 @@ export default defineConfig({
   base: "/Stirling-Image/",
   srcDir: ".",
   outDir: "./.vitepress/dist",
+  ignoreDeadLinks: [/localhost/],
 
   head: [
     ["meta", { name: "theme-color", content: "#3b82f6" }],
