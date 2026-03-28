@@ -284,17 +284,19 @@ export function PipelineBuilder({
                   </div>
                 </div>
 
-                {/* Expanded settings */}
-                {isExpanded && (
-                  <div className="border-t border-border p-3 bg-muted/10 space-y-3">
-                    <p className="text-xs text-muted-foreground">{tool.description}</p>
-                    <PipelineStepSettings
-                      toolId={step.toolId}
-                      settings={step.settings}
-                      onChange={(s) => updateStepSettings(step.id, s)}
-                    />
-                  </div>
-                )}
+                {/* Settings panel - hidden when collapsed, never unmounted so state persists */}
+                <div
+                  className={
+                    isExpanded ? "border-t border-border p-3 bg-muted/10 space-y-3" : "hidden"
+                  }
+                >
+                  <p className="text-xs text-muted-foreground">{tool.description}</p>
+                  <PipelineStepSettings
+                    toolId={step.toolId}
+                    settings={step.settings}
+                    onChange={(s) => updateStepSettings(step.id, s)}
+                  />
+                </div>
               </div>
             );
           })
