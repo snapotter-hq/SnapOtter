@@ -106,9 +106,14 @@ export function BeforeAfterSlider({
 
         {/* After image (clipped, top layer) */}
         <div
-          className="absolute inset-0 bg-muted/30"
+          className="absolute inset-0"
           style={{
             clipPath: `inset(0 0 0 ${position}%)`,
+            backgroundImage:
+              "linear-gradient(45deg, #d1d5db 25%, transparent 25%), linear-gradient(-45deg, #d1d5db 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1d5db 75%), linear-gradient(-45deg, transparent 75%, #d1d5db 75%)",
+            backgroundSize: "16px 16px",
+            backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+            backgroundColor: "#f9fafb",
           }}
         >
           <img
