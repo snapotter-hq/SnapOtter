@@ -1,3 +1,10 @@
+## [0.16.3](https://github.com/siddharthksah/Stirling-Image/compare/v0.16.2...v0.16.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* remove Google Drive coming soon placeholder from files nav ([e487fe0](https://github.com/siddharthksah/Stirling-Image/commit/e487fe06bf4cad6512100bf9660498e06c1047ba))
+
 ## [0.16.2](https://github.com/siddharthksah/Stirling-Image/compare/v0.16.1...v0.16.2) (2026-03-28)
 
 
