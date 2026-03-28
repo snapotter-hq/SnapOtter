@@ -2314,6 +2314,79 @@ describe("Pipeline", () => {
       });
     });
   });
+
+  describe("GET /api/v1/pipeline/tools", () => {
+    it("returns the list of pipeline-compatible tool IDs", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/pipeline/tools",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(Array.isArray(body.toolIds)).toBe(true);
+      expect(body.toolIds.length).toBeGreaterThan(0);
+    });
+
+    it("includes factory-registered tools (resize, crop, convert)", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/pipeline/tools",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { toolIds } = JSON.parse(res.body);
+      expect(toolIds).toContain("resize");
+      expect(toolIds).toContain("crop");
+      expect(toolIds).toContain("convert");
+      expect(toolIds).toContain("compress");
+      expect(toolIds).toContain("rotate");
+    });
+
+    it("excludes custom-route tools that are not pipeline-compatible", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/pipeline/tools",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { toolIds } = JSON.parse(res.body);
+      // These tools use custom routes and are not in the tool registry
+      expect(toolIds).not.toContain("remove-background");
+      expect(toolIds).not.toContain("upscale");
+      expect(toolIds).not.toContain("ocr");
+      expect(toolIds).not.toContain("blur-faces");
+      expect(toolIds).not.toContain("erase-object");
+      expect(toolIds).not.toContain("info");
+      expect(toolIds).not.toContain("collage");
+      expect(toolIds).not.toContain("compare");
+    });
+  });
+
+  describe("Pipeline rejects custom-route tools", () => {
+    const customRouteTools = ["remove-background", "upscale", "ocr", "blur-faces", "erase-object"];
+
+    for (const toolId of customRouteTools) {
+      it(`returns 400 when pipeline uses "${toolId}" (custom-route tool)`, async () => {
+        const pipeline = { steps: [{ toolId, settings: {} }] };
+
+        const { body: payload, contentType } = createMultipartPayload([
+          { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+          { name: "pipeline", content: JSON.stringify(pipeline) },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/pipeline/execute",
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            "content-type": contentType,
+          },
+          payload,
+        });
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body).error).toContain("not found");
+      });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
