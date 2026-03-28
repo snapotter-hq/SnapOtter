@@ -1,3 +1,10 @@
+## [0.16.2](https://github.com/siddharthksah/Stirling-Image/compare/v0.16.1...v0.16.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* pipeline only shows compatible tools and displays errors ([fe021c1](https://github.com/siddharthksah/Stirling-Image/commit/fe021c18b134c853262c8f0dac81c13f9ceeb435))
+
 ## [0.16.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.16.0...v0.16.1) (2026-03-28)
 
 
