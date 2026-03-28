@@ -1,4 +1,4 @@
-import { Clock, Cloud, Upload } from "lucide-react";
+import { Clock, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFilesPageStore } from "@/stores/files-page-store";
 
@@ -29,11 +29,6 @@ export function FilesNav() {
             {item.label}
           </button>
         ))}
-        <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground/40 cursor-not-allowed">
-          <Cloud className="h-4 w-4" />
-          Google Drive
-          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded ml-auto">Soon</span>
-        </div>
       </div>
     </div>
   );
