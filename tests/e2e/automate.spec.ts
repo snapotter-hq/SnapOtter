@@ -30,17 +30,32 @@ test.describe("Automate Page", () => {
       }
     }
 
-    // Final attempt — let it throw if it fails
+    // Final attempt - let it throw if it fails
     await page.goto("/automate", { waitUntil: "networkidle" });
     await expect(heading).toBeVisible({ timeout: 10_000 });
   }
 
-  /** Wait for pipeline steps to render after a template click. */
+  /** Wait for pipeline steps to render. */
   async function waitForSteps(page: import("@playwright/test").Page, count: number) {
-    // Step numbers (1, 2, 3...) appear inside the step cards
     await expect(page.getByTitle("Remove")).toHaveCount(count, {
       timeout: 5_000,
     });
+  }
+
+  /** Open the tool picker, search for a tool by name, and click it. */
+  async function addToolStep(
+    page: import("@playwright/test").Page,
+    name: string,
+    expectedCount: number,
+  ) {
+    await page.getByRole("button", { name: /add step/i }).click();
+    await expect(page.getByText("Add a step")).toBeVisible();
+    await page.getByPlaceholder("Search tools...").fill(name);
+    await page
+      .getByRole("button", { name: new RegExp(name, "i") })
+      .first()
+      .click();
+    await waitForSteps(page, expectedCount);
   }
 
   const testImagePath = getTestImagePath();
@@ -54,26 +69,11 @@ test.describe("Automate Page", () => {
     await page.waitForTimeout(500);
   }
 
-  // ─── Page Rendering ───────────────────────────────────────────────────
+  // --- Page Rendering ---
 
   test("automate page renders pipeline builder", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
     await expect(page.getByText(/chain multiple tools/i).first()).toBeVisible();
-  });
-
-  test("shows all five pipeline templates", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await expect(page.getByText("Social Media Ready")).toBeVisible();
-    await expect(page.getByText("Privacy Clean")).toBeVisible();
-    await expect(page.getByText("Web Optimization")).toBeVisible();
-    await expect(page.getByText("Profile Picture")).toBeVisible();
-    await expect(page.getByText("Watermark Batch")).toBeVisible();
-  });
-
-  test("shows template descriptions", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await expect(page.getByText(/resize 1080x1080/i).first()).toBeVisible();
-    await expect(page.getByText(/strip all metadata/i).first()).toBeVisible();
   });
 
   test("shows empty state message when no steps", async ({ loggedInPage: page }) => {
@@ -108,50 +108,7 @@ test.describe("Automate Page", () => {
     await expect(saveBtn).toBeDisabled();
   });
 
-  // ─── Template Loading ─────────────────────────────────────────────────
-
-  test("clicking Social Media Ready template loads 4 steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Social Media Ready").click();
-    await waitForSteps(page, 4);
-    // Verify empty state is gone
-    await expect(page.getByText(/add steps to build your automation pipeline/i)).not.toBeVisible();
-  });
-
-  test("clicking Privacy Clean template loads 2 steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
-  });
-
-  test("clicking Web Optimization template loads 3 steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Web Optimization").click();
-    await waitForSteps(page, 3);
-  });
-
-  test("clicking Profile Picture template loads 2 steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Profile Picture").click();
-    await waitForSteps(page, 2);
-  });
-
-  test("clicking Watermark Batch template loads 3 steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Watermark Batch").click();
-    await waitForSteps(page, 3);
-  });
-
-  test("loading a template replaces previous steps", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Social Media Ready").click();
-    await waitForSteps(page, 4);
-
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
-  });
-
-  // ─── Add Step ─────────────────────────────────────────────────────────
+  // --- Add Step ---
 
   test("clicking Add Step opens tool picker", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
@@ -162,39 +119,39 @@ test.describe("Automate Page", () => {
   test("tool picker shows available tools", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
     await page.getByRole("button", { name: /add step/i }).click();
-    const pickerArea = page.locator(".max-h-64.overflow-y-auto");
+    const pickerArea = page.locator(".max-h-80.overflow-y-auto");
     await expect(pickerArea.getByText("Resize").first()).toBeVisible();
     await expect(pickerArea.getByText("Convert").first()).toBeVisible();
   });
 
   test("selecting a tool from picker adds a step", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByRole("button", { name: /add step/i }).click();
-    const pickerArea = page.locator(".max-h-64.overflow-y-auto");
-    await pickerArea.getByText("Resize", { exact: false }).first().click();
-    await waitForSteps(page, 1);
+    await addToolStep(page, "Resize", 1);
+    // Verify empty state is gone
+    await expect(page.getByText(/add steps to build your automation pipeline/i)).not.toBeVisible();
   });
 
   test("can add multiple steps", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-
-    await page.getByRole("button", { name: /add step/i }).click();
-    let picker = page.locator(".max-h-64.overflow-y-auto");
-    await picker.getByText("Resize", { exact: false }).first().click();
-    await waitForSteps(page, 1);
-
-    await page.getByRole("button", { name: /add step/i }).click();
-    picker = page.locator(".max-h-64.overflow-y-auto");
-    await picker.getByText("Convert", { exact: false }).first().click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Convert", 2);
   });
 
-  // ─── Step Controls ────────────────────────────────────────────────────
+  test("can add resize, remove-background, then compress without drops", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoAutomate(page);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Remove Background", 2);
+    await addToolStep(page, "Compress", 3);
+  });
+
+  // --- Step Controls ---
 
   test("can remove a step", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
 
     await page.getByTitle("Remove").first().click();
     await waitForSteps(page, 1);
@@ -202,30 +159,32 @@ test.describe("Automate Page", () => {
 
   test("can expand step settings", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
+    // Adding a second step collapses the first (only one expanded at a time)
+    await addToolStep(page, "Compress", 2);
 
+    // Expand the first step's settings
     await page.getByTitle("Settings").first().click();
-    await expect(page.getByText(/default settings will be used/i)).toBeVisible();
+    await expect(page.getByText("Custom Size").first()).toBeVisible();
   });
 
   test("move up button disabled on first step", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Social Media Ready").click();
-    await waitForSteps(page, 4);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
 
     await expect(page.getByTitle("Move up").first()).toBeDisabled();
   });
 
   test("move down button disabled on last step", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Social Media Ready").click();
-    await waitForSteps(page, 4);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
 
     await expect(page.getByTitle("Move down").last()).toBeDisabled();
   });
 
-  // ─── File Upload ──────────────────────────────────────────────────────
+  // --- File Upload ---
 
   test("can upload a file via file chooser", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
@@ -243,27 +202,25 @@ test.describe("Automate Page", () => {
     await uploadTestFile(page);
     await expect(page.getByText("test-image.png")).toBeVisible();
 
-    // Remove file — the X button inside the dashed upload area
+    // Remove file - the X button inside the dashed upload area
     const uploadArea = page.locator("[class*='border-dashed']").first();
     await uploadArea.locator("button").click();
 
     await expect(page.getByRole("button", { name: /upload image to process/i })).toBeVisible();
   });
 
-  // ─── Save Pipeline ────────────────────────────────────────────────────
+  // --- Save Pipeline ---
 
   test("Save Pipeline button enables after adding steps", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
 
     await expect(page.getByRole("button", { name: "Save Pipeline" })).toBeEnabled();
   });
 
   test("clicking Save Pipeline shows name input form", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
 
     await page.getByRole("button", { name: "Save Pipeline" }).click();
     await expect(page.getByPlaceholder("Pipeline name")).toBeVisible();
@@ -271,8 +228,7 @@ test.describe("Automate Page", () => {
 
   test("Save button disabled when name is empty", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
 
     await page.getByRole("button", { name: "Save Pipeline" }).click();
     const saveSubmitBtn = page.getByRole("button", {
@@ -284,8 +240,8 @@ test.describe("Automate Page", () => {
 
   test("can save a pipeline with name and see it in sidebar", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
 
     const uniqueName = `E2E Pipeline ${Date.now()}`;
     await page.getByRole("button", { name: "Save Pipeline" }).click();
@@ -300,25 +256,23 @@ test.describe("Automate Page", () => {
 
   test("can close save form without saving", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
 
     await page.getByRole("button", { name: "Save Pipeline" }).click();
     await expect(page.getByPlaceholder("Pipeline name")).toBeVisible();
 
-    // Close the form — the last button in the save form row
+    // Close the form - the last button in the save form row
     const formRow = page.locator(".flex.items-center.gap-2.flex-1");
     await formRow.locator("button").last().click();
 
     await expect(page.getByRole("button", { name: "Save Pipeline" })).toBeVisible();
   });
 
-  // ─── Pipeline Execution ───────────────────────────────────────────────
+  // --- Pipeline Execution ---
 
   test("Process button enables when steps and file are set", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Compress", 1);
     await uploadTestFile(page);
 
     await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
@@ -326,8 +280,8 @@ test.describe("Automate Page", () => {
 
   test("executing pipeline shows success result", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Strip Metadata", 1);
+    await addToolStep(page, "Compress", 2);
     await uploadTestFile(page);
 
     await page.getByRole("button", { name: "Process", exact: true }).click();
@@ -343,27 +297,16 @@ test.describe("Automate Page", () => {
     await expect(page.getByRole("link", { name: /download result/i })).toBeVisible();
   });
 
-  test("executing Social Media Ready template works", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await page.getByText("Social Media Ready").click();
-    await waitForSteps(page, 4);
-    await uploadTestFile(page);
-
-    await page.getByRole("button", { name: "Process", exact: true }).click();
-
-    await expect(page.getByText(/pipeline completed/i)).toBeVisible({ timeout: 30_000 });
-  });
-
-  // ─── Saved Pipeline Interactions ──────────────────────────────────────
+  // --- Saved Pipeline Interactions ---
 
   test("can load a saved pipeline into builder", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
 
     const uniqueName = `Load Pipeline ${Date.now()}`;
 
-    // Save a pipeline
-    await page.getByText("Web Optimization").click();
-    await waitForSteps(page, 3);
+    // Build and save a 2-step pipeline
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
 
     await page.getByRole("button", { name: "Save Pipeline" }).click();
     await page.getByPlaceholder("Pipeline name").fill(uniqueName);
@@ -372,13 +315,13 @@ test.describe("Automate Page", () => {
       timeout: 5_000,
     });
 
-    // Switch to different template
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    // Remove a step so we can tell loading worked
+    await page.getByTitle("Remove").first().click();
+    await waitForSteps(page, 1);
 
     // Click on the saved pipeline to load it
     await page.getByRole("button", { name: uniqueName }).first().click();
-    await waitForSteps(page, 3);
+    await waitForSteps(page, 2);
   });
 
   test("can delete a saved pipeline", async ({ loggedInPage: page }) => {
@@ -386,9 +329,8 @@ test.describe("Automate Page", () => {
 
     const uniqueName = `Delete Pipeline ${Date.now()}`;
 
-    // Save a pipeline
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    // Build and save a pipeline
+    await addToolStep(page, "Resize", 1);
 
     await page.getByRole("button", { name: "Save Pipeline" }).click();
     await page.getByPlaceholder("Pipeline name").fill(uniqueName);
@@ -409,17 +351,11 @@ test.describe("Automate Page", () => {
     await expect(pipelineEntry).not.toBeVisible({ timeout: 5_000 });
   });
 
-  // ─── Sidebar ──────────────────────────────────────────────────────────
-
-  test("sidebar Templates section is visible", async ({ loggedInPage: page }) => {
-    await gotoAutomate(page);
-    await expect(page.getByRole("heading", { name: "Templates" })).toBeVisible();
-  });
+  // --- Sidebar ---
 
   test("sidebar shows Saved Automations when pipelines exist", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
-    await page.getByText("Privacy Clean").click();
-    await waitForSteps(page, 2);
+    await addToolStep(page, "Resize", 1);
 
     const uniqueName = `Sidebar Pipeline ${Date.now()}`;
     await page.getByRole("button", { name: "Save Pipeline" }).click();

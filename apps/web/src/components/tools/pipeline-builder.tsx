@@ -13,7 +13,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";
 import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,7 @@ export interface PipelineStep {
 
 interface PipelineBuilderProps {
   steps: PipelineStep[];
-  onStepsChange: (steps: PipelineStep[]) => void;
+  onStepsChange: (action: SetStateAction<PipelineStep[]>) => void;
   onSave: (name: string, description: string) => void;
   onExecute: (file: File) => void;
   saving?: boolean;
@@ -66,12 +66,6 @@ export function PipelineBuilder({
   const [experimentalEnabled, setExperimentalEnabled] = useState(false);
   const [pipelineToolIds, setPipelineToolIds] = useState<string[] | null>(null);
   const [toolSearch, setToolSearch] = useState("");
-
-  // Keep a ref to steps so callbacks always read the latest value
-  // without needing steps in their dependency arrays (prevents stale closures).
-  // Assigned during render (not useEffect) so it's current before child effects fire.
-  const stepsRef = useRef(steps);
-  stepsRef.current = steps;
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
@@ -111,7 +105,7 @@ export function PipelineBuilder({
         toolId,
         settings: {},
       };
-      onStepsChange([...stepsRef.current, step]);
+      onStepsChange((prev) => [...prev, step]);
       setShowToolPicker(false);
       setToolSearch("");
       setExpandedStep(step.id);
@@ -121,7 +115,7 @@ export function PipelineBuilder({
 
   const removeStep = useCallback(
     (id: string) => {
-      onStepsChange(stepsRef.current.filter((s) => s.id !== id));
+      onStepsChange((prev) => prev.filter((s) => s.id !== id));
       setExpandedStep((prev) => (prev === id ? null : prev));
     },
     [onStepsChange],
@@ -129,23 +123,22 @@ export function PipelineBuilder({
 
   const moveStep = useCallback(
     (id: string, direction: "up" | "down") => {
-      const current = stepsRef.current;
-      const idx = current.findIndex((s) => s.id === id);
-      if (idx < 0) return;
-      const newIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (newIdx < 0 || newIdx >= current.length) return;
-      const newSteps = [...current];
-      [newSteps[idx], newSteps[newIdx]] = [newSteps[newIdx], newSteps[idx]];
-      onStepsChange(newSteps);
+      onStepsChange((prev) => {
+        const idx = prev.findIndex((s) => s.id === id);
+        if (idx < 0) return prev;
+        const newIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (newIdx < 0 || newIdx >= prev.length) return prev;
+        const newSteps = [...prev];
+        [newSteps[idx], newSteps[newIdx]] = [newSteps[newIdx], newSteps[idx]];
+        return newSteps;
+      });
     },
     [onStepsChange],
   );
 
   const updateStepSettings = useCallback(
     (id: string, newSettings: Record<string, unknown>) => {
-      onStepsChange(
-        stepsRef.current.map((s) => (s.id === id ? { ...s, settings: newSettings } : s)),
-      );
+      onStepsChange((prev) => prev.map((s) => (s.id === id ? { ...s, settings: newSettings } : s)));
     },
     [onStepsChange],
   );

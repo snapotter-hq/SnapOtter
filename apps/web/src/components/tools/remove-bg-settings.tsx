@@ -1,5 +1,5 @@
 import { Download, ImageIcon, Package, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
@@ -56,12 +56,17 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
 
   const model = isPassport ? "birefnet-portrait" : MODEL_MAP[subject][quality];
 
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
   // Sync settings on every control change
   useEffect(() => {
     const next: Record<string, unknown> = { model };
     if (bgColor) next.backgroundColor = bgColor;
-    onChange(next);
-  }, [model, bgColor, onChange]);
+    onChangeRef.current(next);
+  }, [model, bgColor]);
 
   return (
     <div className="space-y-4">
