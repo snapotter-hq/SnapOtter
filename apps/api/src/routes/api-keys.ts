@@ -9,6 +9,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
+import { auditLog } from "../lib/audit.js";
 import { computeKeyPrefix, hashPassword, requireAuth } from "../plugins/auth.js";
 
 export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
@@ -42,6 +43,8 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         name,
       })
       .run();
+
+    auditLog(request.log, "API_KEY_CREATED", { userId: user.id, keyId: id, keyName: name });
 
     // Return the raw key ONCE — it cannot be retrieved again
     return reply.status(201).send({
@@ -102,6 +105,8 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       }
 
       db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id)).run();
+
+      auditLog(request.log, "API_KEY_DELETED", { userId: user.id, keyId: id });
 
       return reply.send({ ok: true });
     },

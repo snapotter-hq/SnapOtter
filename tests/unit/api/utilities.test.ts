@@ -467,6 +467,7 @@ describe("loadEnv", () => {
       "CONCURRENT_JOBS",
       "MAX_MEGAPIXELS",
       "RATE_LIMIT_PER_MIN",
+      "SKIP_MUST_CHANGE_PASSWORD",
       "DB_PATH",
       "WORKSPACE_PATH",
       "DEFAULT_THEME",
@@ -508,6 +509,7 @@ describe("loadEnv", () => {
     expect(typeof env.CONCURRENT_JOBS).toBe("number");
     expect(typeof env.MAX_MEGAPIXELS).toBe("number");
     expect(typeof env.RATE_LIMIT_PER_MIN).toBe("number");
+    expect(typeof env.SKIP_MUST_CHANGE_PASSWORD).toBe("boolean");
     expect(typeof env.DB_PATH).toBe("string");
     expect(typeof env.WORKSPACE_PATH).toBe("string");
     expect(["light", "dark"]).toContain(env.DEFAULT_THEME);

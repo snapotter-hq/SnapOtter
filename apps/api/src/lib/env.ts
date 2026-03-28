@@ -8,6 +8,10 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
   DEFAULT_USERNAME: z.string().default("admin"),
   DEFAULT_PASSWORD: z.string().default("admin"),
+  SKIP_MUST_CHANGE_PASSWORD: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   STORAGE_MODE: z.enum(["local", "s3"]).default("local"),
   FILE_MAX_AGE_HOURS: z.coerce.number().default(24),
   CLEANUP_INTERVAL_MINUTES: z.coerce.number().default(30),

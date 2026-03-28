@@ -49,6 +49,7 @@ export default defineConfig({
         DEFAULT_USERNAME: "admin",
         DEFAULT_PASSWORD: "admin",
         RATE_LIMIT_PER_MIN: "50000",
+        SKIP_MUST_CHANGE_PASSWORD: "true",
       },
       timeout: 30_000,
     },

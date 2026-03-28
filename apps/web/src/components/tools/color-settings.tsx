@@ -260,6 +260,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
       ) : (
         <button
           type="submit"
+          data-testid={`${toolId}-submit`}
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
@@ -272,6 +273,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
         <a
           href={downloadUrl}
           download
+          data-testid={`${toolId}-download`}
           className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />

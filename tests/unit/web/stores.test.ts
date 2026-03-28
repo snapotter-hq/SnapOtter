@@ -71,7 +71,7 @@ function failResponse(status: number) {
   return Promise.resolve({
     ok: false,
     status,
-    json: () => Promise.resolve({ error: "bad" }),
+    json: () => Promise.reject(new Error("no body")),
     blob: () => Promise.resolve(new Blob()),
   } as unknown as Response);
 }

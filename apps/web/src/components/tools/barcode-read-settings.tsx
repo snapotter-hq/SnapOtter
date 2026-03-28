@@ -63,6 +63,7 @@ export function BarcodeReadSettings() {
 
       <button
         type="button"
+        data-testid="barcode-read-submit"
         onClick={handleProcess}
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

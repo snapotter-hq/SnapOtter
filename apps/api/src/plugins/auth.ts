@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { auditLog } from "../lib/audit.js";
 
 const scryptAsync = promisify(scrypt);
 
@@ -111,6 +112,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
   const id = randomUUID();
   const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
 
+  const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
   const result = db
     .insert(schema.users)
     .values({
@@ -118,14 +120,16 @@ export async function ensureDefaultAdmin(): Promise<void> {
       username: env.DEFAULT_USERNAME,
       passwordHash,
       role: "admin",
-      mustChangePassword: true,
+      mustChangePassword: mustChange,
     })
     .onConflictDoNothing()
     .run();
 
   if (result.changes > 0) {
     console.log(
-      `Default admin user '${env.DEFAULT_USERNAME}' created — password change required on first login`,
+      mustChange
+        ? `Default admin user '${env.DEFAULT_USERNAME}' created — password change required on first login`
+        : `Default admin user '${env.DEFAULT_USERNAME}' created (password change skipped via env)`,
     );
   }
 }
@@ -168,11 +172,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .get();
 
       if (!user) {
+        auditLog(request.log, "LOGIN_FAILED", { username: body.username, reason: "unknown_user" });
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
       const valid = await verifyPassword(body.password, user.passwordHash);
       if (!valid) {
+        auditLog(request.log, "LOGIN_FAILED", { username: body.username, reason: "bad_password" });
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
@@ -187,6 +193,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           expiresAt,
         })
         .run();
+
+      auditLog(request.log, "LOGIN_SUCCESS", { userId: user.id, username: user.username });
 
       return reply.send({
         token,
@@ -204,9 +212,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/logout
   app.post("/api/auth/logout", async (request: FastifyRequest, reply: FastifyReply) => {
     const token = extractToken(request);
+    const user = getAuthUser(request);
     if (token) {
       db.delete(schema.sessions).where(eq(schema.sessions.id, token)).run();
     }
+    auditLog(request.log, "LOGOUT", { userId: user?.id });
     return reply.send({ ok: true });
   });
 
@@ -304,6 +314,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // Revoke all API keys — if credentials were compromised, keys must be rotated too
     db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id)).run();
+
+    auditLog(request.log, "PASSWORD_CHANGED", { userId: authUser.id, username: authUser.username });
 
     return reply.send({ ok: true });
   });
@@ -433,6 +445,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       })
       .run();
 
+    auditLog(request.log, "USER_CREATED", {
+      adminId: admin.id,
+      newUserId: id,
+      newUsername: body.username,
+      role,
+    });
+
     return reply.status(201).send({
       id,
       username: body.username,
@@ -486,6 +505,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       db.update(schema.users).set(updates).where(eq(schema.users.id, id)).run();
 
+      auditLog(request.log, "USER_UPDATED", {
+        adminId: admin.id,
+        targetUserId: id,
+        changes: { role: updates.role, team: updates.team },
+      });
+
       return reply.send({ ok: true });
     },
   );
@@ -534,6 +559,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Revoke all API keys
       db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id)).run();
 
+      auditLog(request.log, "PASSWORD_RESET", {
+        adminId: admin.id,
+        targetUserId: id,
+        targetUsername: user.username,
+      });
+
       return reply.send({ ok: true });
     },
   );
@@ -565,6 +596,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // Delete the user (cascades to api_keys via FK)
       db.delete(schema.users).where(eq(schema.users.id, id)).run();
+
+      auditLog(request.log, "USER_DELETED", {
+        adminId: admin.id,
+        deletedUserId: id,
+        deletedUsername: user.username,
+      });
 
       return reply.send({ ok: true });
     },
@@ -705,7 +742,8 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     };
 
     // Enforce mustChangePassword — block non-auth API calls
-    if (user.mustChangePassword) {
+    // (skipped when SKIP_MUST_CHANGE_PASSWORD=true for CI/dev environments)
+    if (user.mustChangePassword && !env.SKIP_MUST_CHANGE_PASSWORD) {
       const allowed = [
         "/api/auth/change-password",
         "/api/auth/logout",

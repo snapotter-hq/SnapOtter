@@ -7,7 +7,7 @@
 # ============================================
 # Stage 1: Build the frontend (Vite + React)
 # ============================================
-FROM --platform=linux/amd64 node:22-bookworm AS builder
+FROM node:22-bookworm AS builder
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -38,7 +38,7 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # ============================================
 # Stage 2: Production runtime
 # ============================================
-FROM --platform=linux/amd64 node:22-bookworm AS production
+FROM node:22-bookworm AS production
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 

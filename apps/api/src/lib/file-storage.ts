@@ -3,6 +3,20 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { env } from "../config.js";
 
+const SAFE_STORAGE_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".bmp",
+  ".tiff",
+  ".tif",
+  ".avif",
+  ".svg",
+  ".pdf",
+]);
+
 let storageReady = false;
 
 export async function ensureStorageDir(): Promise<void> {
@@ -13,7 +27,12 @@ export async function ensureStorageDir(): Promise<void> {
 
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   await ensureStorageDir();
-  const ext = extname(originalName).toLowerCase() || ".bin";
+  let ext = extname(originalName).toLowerCase() || ".bin";
+  // Only allow known image extensions to be stored — reject dangerous extensions
+  // even if they somehow pass upstream sanitization.
+  if (!SAFE_STORAGE_EXTENSIONS.has(ext)) {
+    ext = ".bin";
+  }
   const storedName = `${randomUUID()}${ext}`;
   await writeFile(join(env.FILES_STORAGE_PATH, storedName), buffer);
   return storedName;

@@ -45,9 +45,15 @@ export interface ValidationError {
 export async function validateImageBuffer(
   buffer: Buffer,
 ): Promise<ValidationResult | ValidationError> {
-  // 1. Empty check
+  // 1. Empty / null-byte check
   if (!buffer || buffer.length === 0) {
     return { valid: false, reason: "File is empty" };
+  }
+
+  // Reject buffers that are entirely null bytes — they are not valid images
+  // and would pass the length check but crash Sharp.
+  if (isNullByteBuffer(buffer)) {
+    return { valid: false, reason: "File contains no image data" };
   }
 
   // 2. Magic byte detection
@@ -82,6 +88,32 @@ export async function validateImageBuffer(
   } catch {
     return { valid: false, reason: "Failed to read image metadata" };
   }
+}
+
+/**
+ * Fast check whether a buffer is entirely null bytes.
+ * Samples the first 64 bytes + a few random positions to avoid
+ * a full scan on large buffers.
+ */
+function isNullByteBuffer(buffer: Buffer): boolean {
+  // Check the first 64 bytes (covers all magic byte positions)
+  const checkLen = Math.min(buffer.length, 64);
+  for (let i = 0; i < checkLen; i++) {
+    if (buffer[i] !== 0) return false;
+  }
+  // For larger buffers, spot-check a few additional positions
+  if (buffer.length > 64) {
+    const positions = [
+      Math.floor(buffer.length / 4),
+      Math.floor(buffer.length / 2),
+      Math.floor((buffer.length * 3) / 4),
+      buffer.length - 1,
+    ];
+    for (const pos of positions) {
+      if (buffer[pos] !== 0) return false;
+    }
+  }
+  return true;
 }
 
 function detectMagicBytes(buffer: Buffer): string | null {

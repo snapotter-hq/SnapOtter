@@ -122,6 +122,7 @@ export function VectorizeSettings() {
 
       <button
         type="button"
+        data-testid="vectorize-submit"
         onClick={handleProcess}
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -134,6 +135,7 @@ export function VectorizeSettings() {
         <a
           href={downloadUrl}
           download
+          data-testid="vectorize-download"
           className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />

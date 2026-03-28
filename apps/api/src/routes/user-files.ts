@@ -16,6 +16,7 @@ import { and, desc, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { db, schema, sqlite } from "../db/index.js";
+import { auditLog } from "../lib/audit.js";
 import { deleteStoredFile, getStoredFilePath, saveFile } from "../lib/file-storage.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
@@ -204,6 +205,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     if (created.length === 0) {
       return reply.status(400).send({ error: "No valid files uploaded" });
     }
+
+    auditLog(request.log, "FILE_UPLOADED", {
+      userId,
+      count: created.length,
+      files: created.map((f) => f.originalName),
+    });
 
     return reply.status(201).send({ files: created });
   });
@@ -409,6 +416,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         deletedCount++;
       }
     }
+
+    const user = getAuthUser(request);
+    auditLog(request.log, "FILE_DELETED", { userId: user?.id, count: deletedCount, ids });
 
     return reply.send({ deleted: deletedCount });
   });

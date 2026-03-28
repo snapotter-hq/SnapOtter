@@ -1,6 +1,6 @@
 # Deployment
 
-Stirling Image ships as a single Docker container. The frontend, API, and Python AI runtime all run inside one image.
+Stirling Image ships as a single Docker container. The frontend, API, and Python AI runtime all run inside one image. The image supports **linux/amd64** and **linux/arm64**, so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
 
 ## Docker Compose (recommended)
 
@@ -59,6 +59,10 @@ Everything runs from a single process. The Fastify server handles API requests a
 
 Model weights are downloaded at build time, so the container works fully offline.
 
+### Architecture notes
+
+All core image tools (resize, crop, compress, convert, watermark, etc.) work on both amd64 and arm64. Some ML packages (PaddleOCR, MediaPipe, LaMa Cleaner) have limited arm64 support and may be unavailable on ARM systems. The container logs a warning for any package that could not be installed and falls back gracefully — Tesseract handles OCR and Lanczos handles upscaling when the ML alternatives are missing.
+
 ## Volumes
 
 Mount these to persist data:
@@ -106,7 +110,7 @@ Set `client_max_body_size` to match your `MAX_UPLOAD_SIZE_MB` value.
 
 The GitHub repository has two workflows:
 
-- **docker-publish.yml** -- Builds and pushes the Docker image to Docker Hub on every push to `main` and on version tags. The image is published as `siddharth123sk/stirling-image`.
+- **release.yml** -- On release, builds multi-arch Docker images (amd64 + arm64) and pushes to both Docker Hub (`siddharth123sk/stirling-image`) and GitHub Container Registry (`ghcr.io/siddharthksah/stirling-image`).
 - **deploy-docs.yml** -- Builds this documentation site and deploys it to GitHub Pages.
 
 Both run automatically. No manual steps needed after merging to `main`.

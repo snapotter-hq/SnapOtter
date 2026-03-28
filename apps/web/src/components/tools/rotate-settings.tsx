@@ -105,6 +105,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
         <div className="flex items-center gap-2 mt-1">
           <button
             type="button"
+            data-testid="rotate-left"
             onClick={rotateLeft}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm font-medium"
             title="Rotate 90° counter-clockwise"
@@ -149,6 +150,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
           </button>
           <button
             type="button"
+            data-testid="rotate-right"
             onClick={rotateRight}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors text-sm font-medium"
             title="Rotate 90° clockwise"
@@ -193,6 +195,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
         <div className="flex gap-2 mt-1">
           <button
             type="button"
+            data-testid="rotate-flip-h"
             onClick={() => setFlipH(!flipH)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               flipH
@@ -205,6 +208,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
           </button>
           <button
             type="button"
+            data-testid="rotate-flip-v"
             onClick={() => setFlipV(!flipV)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               flipV
@@ -245,6 +249,7 @@ export function RotateSettings({ onPreviewTransform }: RotateSettingsProps) {
       ) : (
         <button
           type="submit"
+          data-testid="rotate-submit"
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
