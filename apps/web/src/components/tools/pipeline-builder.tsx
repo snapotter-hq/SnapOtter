@@ -107,6 +107,7 @@ export function PipelineBuilder({
       };
       onStepsChange([...steps, step]);
       setShowToolPicker(false);
+      setToolSearch("");
       setExpandedStep(step.id);
     },
     [steps, onStepsChange],
