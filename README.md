@@ -7,7 +7,7 @@
 <p align="center">Stirling-PDF but for images. 30+ tools and local AI in a single Docker container.</p>
 
 <p align="center">
-  <a href="https://github.com/siddharthksah/Stirling-Image/pkgs/container/stirling-image"><img src="https://img.shields.io/badge/Docker-ghcr.io-blue?logo=docker" alt="Docker"></a>
+  <a href="https://hub.docker.com/r/siddharth123sk/stirling-image"><img src="https://img.shields.io/badge/Docker-Hub-blue?logo=docker" alt="Docker"></a>
   <a href="https://github.com/siddharthksah/Stirling-Image/actions"><img src="https://img.shields.io/github/actions/workflow/status/siddharthksah/Stirling-Image/ci.yml?label=CI" alt="CI"></a>
   <a href="https://github.com/siddharthksah/Stirling-Image/blob/main/LICENSE"><img src="https://img.shields.io/github/license/siddharthksah/Stirling-Image" alt="License"></a>
   <a href="https://github.com/siddharthksah/Stirling-Image/stargazers"><img src="https://img.shields.io/github/stars/siddharthksah/Stirling-Image?style=social" alt="Stars"></a>
@@ -28,7 +28,7 @@
 ## Quick Start
 
 ```bash
-docker run -d -p 1349:1349 -v stirling-data:/data ghcr.io/siddharthksah/stirling-image:latest
+docker run -d -p 1349:1349 -v stirling-data:/data siddharth123sk/stirling-image:latest
 ```
 
 Open http://localhost:1349 in your browser.
