@@ -66,9 +66,12 @@ export function AutomatePage() {
         });
         if (res.ok) {
           await loadPipelines();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setExecutionError(data.error || "Failed to save pipeline");
         }
       } catch {
-        // Error handling could be added
+        setExecutionError("Connection error while saving pipeline.");
       } finally {
         setSaving(false);
       }

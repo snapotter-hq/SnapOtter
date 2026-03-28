@@ -295,7 +295,7 @@ function SystemSection() {
       });
       setSettings((prev) => ({ ...prev, customLogo: "true" }));
     } catch {
-      /* handle error */
+      setSaveMsg("Failed to upload logo.");
     }
   };
 
@@ -304,7 +304,7 @@ function SystemSection() {
       await apiDelete("/v1/settings/logo");
       setSettings((prev) => ({ ...prev, customLogo: "false" }));
     } catch {
-      /* handle error */
+      setSaveMsg("Failed to delete logo.");
     }
   };
 

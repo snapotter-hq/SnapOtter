@@ -2668,6 +2668,31 @@ describe("Batch processing", () => {
       expect(res.headers["content-type"]).toBe("application/zip");
     });
   });
+
+  describe("Batch rejects custom-route tools", () => {
+    const customRouteTools = ["remove-background", "upscale", "ocr", "blur-faces", "erase-object"];
+
+    for (const toolId of customRouteTools) {
+      it(`returns 404 for batch "${toolId}" (custom-route tool)`, async () => {
+        const { body: payload, contentType } = createMultipartPayload([
+          { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+          { name: "settings", content: JSON.stringify({}) },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/v1/tools/${toolId}/batch`,
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            "content-type": contentType,
+          },
+          payload,
+        });
+        expect(res.statusCode).toBe(404);
+        expect(JSON.parse(res.body).error).toContain("not found");
+      });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
