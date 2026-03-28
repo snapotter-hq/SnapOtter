@@ -13,7 +13,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";
 import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,13 @@ export function PipelineBuilder({
   const [pipelineToolIds, setPipelineToolIds] = useState<string[] | null>(null);
   const [toolSearch, setToolSearch] = useState("");
 
+  // Keep a ref to steps so callbacks always read the latest value
+  // without needing steps in their dependency arrays (prevents stale closures).
+  const stepsRef = useRef(steps);
+  useEffect(() => {
+    stepsRef.current = steps;
+  });
+
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
@@ -105,40 +112,43 @@ export function PipelineBuilder({
         toolId,
         settings: {},
       };
-      onStepsChange([...steps, step]);
+      onStepsChange([...stepsRef.current, step]);
       setShowToolPicker(false);
       setToolSearch("");
       setExpandedStep(step.id);
     },
-    [steps, onStepsChange],
+    [onStepsChange],
   );
 
   const removeStep = useCallback(
     (id: string) => {
-      onStepsChange(steps.filter((s) => s.id !== id));
-      if (expandedStep === id) setExpandedStep(null);
+      onStepsChange(stepsRef.current.filter((s) => s.id !== id));
+      setExpandedStep((prev) => (prev === id ? null : prev));
     },
-    [steps, onStepsChange, expandedStep],
+    [onStepsChange],
   );
 
   const moveStep = useCallback(
     (id: string, direction: "up" | "down") => {
-      const idx = steps.findIndex((s) => s.id === id);
+      const current = stepsRef.current;
+      const idx = current.findIndex((s) => s.id === id);
       if (idx < 0) return;
       const newIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (newIdx < 0 || newIdx >= steps.length) return;
-      const newSteps = [...steps];
+      if (newIdx < 0 || newIdx >= current.length) return;
+      const newSteps = [...current];
       [newSteps[idx], newSteps[newIdx]] = [newSteps[newIdx], newSteps[idx]];
       onStepsChange(newSteps);
     },
-    [steps, onStepsChange],
+    [onStepsChange],
   );
 
   const updateStepSettings = useCallback(
     (id: string, newSettings: Record<string, unknown>) => {
-      onStepsChange(steps.map((s) => (s.id === id ? { ...s, settings: newSettings } : s)));
+      onStepsChange(
+        stepsRef.current.map((s) => (s.id === id ? { ...s, settings: newSettings } : s)),
+      );
     },
-    [steps, onStepsChange],
+    [onStepsChange],
   );
 
   const handleFileSelect = useCallback(() => {
