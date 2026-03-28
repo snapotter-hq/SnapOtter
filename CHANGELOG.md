@@ -1,3 +1,10 @@
+## [0.17.5](https://github.com/siddharthksah/Stirling-Image/compare/v0.17.4...v0.17.5) (2026-03-28)
+
+
+### Bug Fixes
+
+* sync stepsRef during render, not useEffect ([0c86744](https://github.com/siddharthksah/Stirling-Image/commit/0c86744dda1073988c7e6bb55073f08e399c26f3))
+
 ## [0.17.4](https://github.com/siddharthksah/Stirling-Image/compare/v0.17.3...v0.17.4) (2026-03-28)
 
 

@@ -354,4 +354,4 @@ export const SOCIAL_MEDIA_PRESETS: SocialMediaPreset[] = [
   { platform: "Threads", name: "Post Image", width: 1080, height: 1080 },
 ];
 
-export const APP_VERSION = "0.17.4";
+export const APP_VERSION = "0.17.5";
