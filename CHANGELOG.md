@@ -1,3 +1,10 @@
+## [0.14.2](https://github.com/siddharthksah/Stirling-Image/compare/v0.14.1...v0.14.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* **tests:** remove temp DB cleanup that races with other test files ([498bfb3](https://github.com/siddharthksah/Stirling-Image/commit/498bfb3def2d6786fa5e387b3e30ede9768ef616))
+
 ## [0.14.1](https://github.com/siddharthksah/Stirling-Image/compare/v0.14.0...v0.14.1) (2026-03-28)
 
 
