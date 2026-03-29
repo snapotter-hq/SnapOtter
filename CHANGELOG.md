@@ -1,3 +1,10 @@
+# [0.19.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.18.0...v0.19.0) (2026-03-29)
+
+
+### Features
+
+* add privacy policy page and fix CSP blocking API docs ([3e314f0](https://github.com/siddharthksah/Stirling-Image/commit/3e314f032491c59196db3493d0b86f6aeec22c63))
+
 # [0.18.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.17.7...v0.18.0) (2026-03-29)
 
 
