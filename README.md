@@ -61,10 +61,7 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, th
 
 Bug reports and feature requests: [GitHub Issues](https://github.com/stirling-image/stirling-image/issues)
 
-<p align="center">
-  <a href="https://github.com/sponsors/stirling-image"><img src="https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=github-sponsors" alt="GitHub Sponsors"></a>
-  <a href="https://ko-fi.com/stirling-image"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Ko--fi-FF5E5B?logo=ko-fi" alt="Ko-fi"></a>
-</p>
+<!-- TODO: Add sponsorship links once Ko-fi and GitHub Sponsors are set up -->
 
 ## License
 
