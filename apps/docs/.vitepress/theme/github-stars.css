@@ -1,64 +1,88 @@
-.github-stars-wrapper {
+/* Hide the three-dots extra menu - its contents are now in the navbar directly */
+.VPNavBarExtra {
+  display: none !important;
+}
+
+/* Also hide the default appearance toggle since we render our own */
+.VPNavBarAppearance {
+  display: none !important;
+}
+
+/* Right side of navbar: toggle + GitHub button */
+.nav-bar-right {
   display: flex;
   align-items: center;
+  gap: 12px;
   margin-left: 16px;
 }
 
-.github-stars-btn {
+/* GitHub button group */
+.github-btn-wrapper {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+}
+
+.github-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
-  font-size: 13px;
+  padding: 0 10px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 30px;
   color: var(--vp-c-text-1);
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-divider);
-  border-radius: 6px 0 0 6px;
+  border-radius: 6px;
   text-decoration: none;
-  transition: background 0.2s, border-color 0.2s;
+  transition: border-color 0.25s, background 0.25s;
   white-space: nowrap;
 }
 
-.github-stars-btn:hover {
+.github-btn:hover {
   background: var(--vp-c-bg-mute);
   border-color: var(--vp-c-text-3);
 }
 
-.github-stars-btn svg {
-  color: var(--vp-c-yellow-2, #d4a72c);
+.github-icon {
+  opacity: 0.85;
 }
 
-.github-stars-count {
+.github-btn-label {
+  margin-top: -1px;
+}
+
+/* Star count badge - attached to right side of button */
+.github-btn-count {
   display: flex;
   align-items: center;
-  padding: 4px 10px;
-  font-size: 13px;
+  padding: 0 8px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 30px;
   color: var(--vp-c-text-2);
   background: var(--vp-c-bg);
   border: 1px solid var(--vp-c-divider);
   border-left: none;
   border-radius: 0 6px 6px 0;
   text-decoration: none;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.25s;
   white-space: nowrap;
 }
 
-.github-stars-count:hover {
+.github-btn-count:hover {
   color: var(--vp-c-brand-1);
 }
 
-/* When there's no count yet, round all corners on the button */
-.github-stars-btn:only-child {
-  border-radius: 6px;
+/* When count is present, left-button gets flat right edge */
+.github-btn-wrapper .github-btn:first-child:not(:last-child) {
+  border-radius: 6px 0 0 6px;
 }
 
-/* Hide on very small screens to avoid crowding */
+/* Hide stars on small screens, keep toggle */
 @media (max-width: 640px) {
-  .github-stars-wrapper {
+  .github-btn-wrapper {
     display: none;
   }
 }
