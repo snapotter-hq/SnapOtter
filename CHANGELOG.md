@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/stirling-image/stirling-image/compare/v1.0.1...v1.1.0) (2026-04-03)
+
+
+### Features
+
+* add GitHub stars button to docs navbar and fix footer license ([90030fc](https://github.com/stirling-image/stirling-image/commit/90030fccafed8ad247063ef71dca3cdedaff3916))
+
 ## [1.0.1](https://github.com/stirling-image/stirling-image/compare/v1.0.0...v1.0.1) (2026-03-30)
 
 
