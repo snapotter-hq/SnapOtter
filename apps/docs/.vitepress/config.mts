@@ -46,8 +46,6 @@ export default defineConfig({
       },
     ],
 
-    socialLinks: [{ icon: "github", link: "https://github.com/stirling-image/stirling-image" }],
-
     search: {
       provider: "local",
     },
