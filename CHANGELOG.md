@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/stirling-image/stirling-image/compare/v1.2.0...v1.2.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* handle volume permission issues for bind-mounted /data directory ([863a51c](https://github.com/stirling-image/stirling-image/commit/863a51c37d481f5f01b965f58e56eae0f7cd6538))
+
 # [1.2.0](https://github.com/stirling-image/stirling-image/compare/v1.1.0...v1.2.0) (2026-04-03)
 
 
