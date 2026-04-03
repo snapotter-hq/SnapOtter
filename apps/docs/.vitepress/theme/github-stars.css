@@ -1,0 +1,64 @@
+.github-stars-wrapper {
+  display: flex;
+  align-items: center;
+  margin-left: 16px;
+}
+
+.github-stars-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px 0 0 6px;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.github-stars-btn:hover {
+  background: var(--vp-c-bg-mute);
+  border-color: var(--vp-c-text-3);
+}
+
+.github-stars-btn svg {
+  color: var(--vp-c-yellow-2, #d4a72c);
+}
+
+.github-stars-count {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.github-stars-count:hover {
+  color: var(--vp-c-brand-1);
+}
+
+/* When there's no count yet, round all corners on the button */
+.github-stars-btn:only-child {
+  border-radius: 6px;
+}
+
+/* Hide on very small screens to avoid crowding */
+@media (max-width: 640px) {
+  .github-stars-wrapper {
+    display: none;
+  }
+}
