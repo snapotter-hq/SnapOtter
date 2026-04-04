@@ -1,7 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
-import { generateId } from "@/lib/utils";
+import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 function getToken(): string {
@@ -118,9 +118,11 @@ export function OcrSettings() {
 
   const handleCopy = async () => {
     if (text) {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const ok = await copyToClipboard(text);
+      if (ok) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     }
   };
 

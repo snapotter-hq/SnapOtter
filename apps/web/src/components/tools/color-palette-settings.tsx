@@ -1,5 +1,6 @@
 import { Check, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 function getToken(): string {
@@ -43,12 +44,10 @@ export function ColorPaletteSettings() {
   };
 
   const copyColor = async (color: string, idx: number) => {
-    try {
-      await navigator.clipboard.writeText(color);
+    const ok = await copyToClipboard(color);
+    if (ok) {
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 1500);
-    } catch {
-      // Fallback: silent fail
     }
   };
 

@@ -1,5 +1,6 @@
 import { Check, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 function getToken(): string {
@@ -44,12 +45,10 @@ export function BarcodeReadSettings() {
 
   const copyText = async () => {
     if (!result?.text) return;
-    try {
-      await navigator.clipboard.writeText(result.text);
+    const ok = await copyToClipboard(result.text);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Fallback: silent fail
     }
   };
 

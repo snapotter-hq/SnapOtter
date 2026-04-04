@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPost, apiPut, clearToken } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 import { GemLogo } from "../common/gem-logo";
 
 interface SettingsDialogProps {
@@ -1144,11 +1144,12 @@ function ApiKeysSection() {
     }
   }, [keyName, loadKeys]);
 
-  const copyKey = useCallback((key: string) => {
-    navigator.clipboard.writeText(key).then(() => {
+  const copyKey = useCallback(async (key: string) => {
+    const ok = await copyToClipboard(key);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }
   }, []);
 
   const deleteKey = useCallback(
