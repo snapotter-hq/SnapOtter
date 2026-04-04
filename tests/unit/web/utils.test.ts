@@ -15,7 +15,12 @@ describe("generateId", () => {
 });
 
 describe("copyToClipboard", () => {
+  const originalClipboard = navigator.clipboard;
+  const originalExecCommand = document.execCommand;
+
   afterEach(() => {
+    Object.assign(navigator, { clipboard: originalClipboard });
+    document.execCommand = originalExecCommand;
     vi.restoreAllMocks();
   });
 
