@@ -1,3 +1,4 @@
+import { PYTHON_SIDECAR_TOOLS } from "@stirling-image/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -29,13 +30,7 @@ const IDLE_PROGRESS: ToolProgress = {
 
 // AI tools that go through Python/bridge.ts and can emit SSE progress.
 // smart-crop is category "ai" but uses Sharp (no Python), so it's excluded.
-const AI_PYTHON_TOOLS = new Set([
-  "remove-background",
-  "upscale",
-  "blur-faces",
-  "erase-object",
-  "ocr",
-]);
+const AI_PYTHON_TOOLS = new Set<string>(PYTHON_SIDECAR_TOOLS);
 
 export function useToolProcessor(toolId: string) {
   const {

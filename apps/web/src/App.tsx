@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Toaster } from "sonner";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { useAuth } from "./hooks/use-auth";
 import { AutomatePage } from "./pages/automate-page";
@@ -94,6 +95,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 export function App() {
   return (
     <ErrorBoundary>
+      <Toaster position="bottom-right" />
       <BrowserRouter>
         <KeyboardShortcutProvider>
           <AuthGuard>

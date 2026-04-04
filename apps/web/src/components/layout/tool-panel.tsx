@@ -1,32 +1,28 @@
 import { CATEGORIES, TOOLS } from "@stirling-image/shared";
 import { useEffect, useMemo, useState } from "react";
-import { apiGet } from "@/lib/api";
+import { useSettingsStore } from "@/stores/settings-store";
 import { SearchBar } from "../common/search-bar";
 import { ToolCard } from "../common/tool-card";
 
 export function ToolPanel() {
   const [search, setSearch] = useState("");
-  const [disabledTools, setDisabledTools] = useState<string[]>([]);
-  const [experimentalEnabled, setExperimentalEnabled] = useState(false);
+  const { disabledTools, experimentalEnabled, variantUnavailableTools, loaded, fetch } =
+    useSettingsStore();
 
   useEffect(() => {
-    apiGet<{ settings: Record<string, string> }>("/v1/settings")
-      .then((data) => {
-        setDisabledTools(
-          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
-        );
-        setExperimentalEnabled(data.settings.enableExperimentalTools === "true");
-      })
-      .catch(() => {});
-  }, []);
+    fetch();
+  }, [fetch]);
+
+  const unavailableSet = useMemo(() => new Set(variantUnavailableTools), [variantUnavailableTools]);
 
   const visibleTools = useMemo(() => {
+    if (!loaded) return [];
     return TOOLS.filter((t) => {
       if (disabledTools.includes(t.id)) return false;
       if (t.experimental && !experimentalEnabled) return false;
       return true;
     });
-  }, [disabledTools, experimentalEnabled]);
+  }, [disabledTools, experimentalEnabled, loaded]);
 
   const filteredTools = useMemo(() => {
     if (!search) return visibleTools;
@@ -59,7 +55,11 @@ export function ToolPanel() {
             </h3>
             <div className="space-y-0.5">
               {groupedTools.get(category.id)?.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} />
+                <ToolCard
+                  key={tool.id}
+                  tool={tool}
+                  variantUnavailable={unavailableSet.has(tool.id)}
+                />
               ))}
             </div>
           </div>

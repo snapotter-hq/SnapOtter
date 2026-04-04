@@ -6,6 +6,7 @@
  * GET  /api/v1/settings/:key — Get a specific setting
  */
 
+import { PYTHON_SIDECAR_TOOLS } from "@stirling-image/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
@@ -26,7 +27,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       settings[row.key] = row.value;
     }
 
-    return reply.send({ settings });
+    const variant = process.env.STIRLING_VARIANT === "lite" ? "lite" : "full";
+    const variantUnavailableTools = variant === "lite" ? [...PYTHON_SIDECAR_TOOLS] : [];
+
+    return reply.send({ settings, variant, variantUnavailableTools });
   });
 
   // PUT /api/v1/settings — Save settings (admin only)

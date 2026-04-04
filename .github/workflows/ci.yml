@@ -80,8 +80,11 @@ jobs:
       - run: pnpm build
 
   docker:
-    name: Docker Build Test
+    name: Docker Build Test (${{ matrix.variant }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [full, lite]
     steps:
       - uses: actions/checkout@v4
 
@@ -92,6 +95,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
-          tags: stirling-image:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: VARIANT=${{ matrix.variant }}
+          tags: stirling-image:ci-${{ matrix.variant }}
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}

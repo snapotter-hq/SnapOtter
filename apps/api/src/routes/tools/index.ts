@@ -1,4 +1,4 @@
-import { TOOLS } from "@stirling-image/shared";
+import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@stirling-image/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";
@@ -66,6 +66,10 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   // Build skip set
   const skipTools = new Set([...disabledTools, ...(enableExperimental ? [] : experimentalToolIds)]);
 
+  // In lite mode, register 501 stubs for AI tools instead of real handlers
+  const isLite = process.env.STIRLING_VARIANT === "lite";
+  const liteStubTools = new Set<string>(PYTHON_SIDECAR_TOOLS);
+
   const toolRegistrations: Array<{
     id: string;
     register: (app: FastifyInstance) => void;
@@ -121,17 +125,32 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   ];
 
   let skipped = 0;
+  let stubbed = 0;
   for (const { id, register } of toolRegistrations) {
     if (skipTools.has(id)) {
       app.log.info(`Skipping disabled/experimental tool: ${id}`);
       skipped++;
       continue;
     }
+
+    if (isLite && liteStubTools.has(id)) {
+      // Register a 501 stub instead of the real handler
+      app.post(`/api/v1/tools/${id}`, async (_request, reply) => {
+        return reply.status(501).send({
+          statusCode: 501,
+          error: "Not Available",
+          message: `The "${id}" tool requires the full image. Pull stirlingimage/stirling-image:latest for all features.`,
+        });
+      });
+      stubbed++;
+      continue;
+    }
+
     register(app);
   }
 
-  const registered = toolRegistrations.length - skipped;
+  const registered = toolRegistrations.length - skipped - stubbed;
   app.log.info(
-    `Tool routes registered (${registered}/${toolRegistrations.length} tools, ${skipped} skipped)`,
+    `Tool routes: ${registered} active, ${stubbed} lite-stubbed, ${skipped} skipped (${toolRegistrations.length} total)`,
   );
 }
