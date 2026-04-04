@@ -1,3 +1,10 @@
+## [1.5.3](https://github.com/stirling-image/stirling-image/compare/v1.5.2...v1.5.3) (2026-04-04)
+
+
+### Bug Fixes
+
+* use heif-convert for HEIC decoding on Linux ([da15a1e](https://github.com/stirling-image/stirling-image/commit/da15a1e833c15c3d93a9da734d354b725b99b0bf))
+
 ## [1.5.2](https://github.com/stirling-image/stirling-image/compare/v1.5.1...v1.5.2) (2026-04-04)
 
 
