@@ -4,6 +4,8 @@
 # Multi-stage build for single-container deployment
 # ============================================
 
+ARG VARIANT=full
+
 # ============================================
 # Stage 1: Build the frontend (Vite + React)
 # ============================================
@@ -40,52 +42,56 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # ============================================
 FROM node:22-bookworm AS production
 
+ARG VARIANT
+
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-# Install system dependencies for image processing and AI
+# System dependencies shared by all variants
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv python3-dev \
     imagemagick \
-    tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     libraw-dev \
     potrace \
     curl \
-    build-essential \
-    libgl1 libglib2.0-0 \
     gosu \
     libheif-examples \
     && rm -rf /var/lib/apt/lists/*
 
-# Create Python venv and install ML packages
-RUN python3 -m venv /opt/venv
+# Python/ML system dependencies (full variant only)
+RUN if [ "$VARIANT" = "full" ]; then \
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip python3-venv python3-dev \
+        tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
+        build-essential \
+        libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+; fi
 
+# Python venv + ML packages + model weights (full variant only)
 COPY packages/ai/python/requirements.txt /tmp/requirements.txt
-
-# Install Python packages - fail loudly for critical ones, warn for optional
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
+RUN if [ "$VARIANT" = "full" ]; then \
+    python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install \
-    Pillow numpy opencv-python-headless onnxruntime && \
-    (/opt/venv/bin/pip install rembg[cpu] || echo "WARNING: rembg not installed - background removal will be unavailable") && \
-    (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed - will fallback to Lanczos upscaling") && \
-    (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed - will fallback to Tesseract") && \
-    (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed - face detection will be unavailable") && \
-    (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed - object eraser will be unavailable") && \
-    rm /tmp/requirements.txt
+        Pillow numpy opencv-python-headless onnxruntime && \
+    (/opt/venv/bin/pip install "rembg[cpu]" || echo "WARNING: rembg not installed") && \
+    (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed") && \
+    (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed") && \
+    (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
+    (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
+; fi && rm -f /tmp/requirements.txt
 
-# Pre-download ALL AI model weights into the image (no first-use download delays)
-# This makes the Docker image fully self-contained — works offline
 COPY docker/download_models.py /tmp/download_models.py
-RUN /opt/venv/bin/python3 /tmp/download_models.py && rm /tmp/download_models.py
-
-RUN /opt/venv/bin/python3 -c "\
+RUN if [ "$VARIANT" = "full" ]; then \
+    /opt/venv/bin/python3 /tmp/download_models.py && \
+    /opt/venv/bin/python3 -c "\
 try: \
     from paddleocr import PaddleOCR; \
     print('Downloading PaddleOCR models...'); \
     ocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False); \
     print('PaddleOCR models ready'); \
 except: print('PaddleOCR model pre-download skipped') \
-" 2>/dev/null || echo "WARNING: Could not pre-download PaddleOCR models"
+" 2>/dev/null || echo "WARNING: Could not pre-download PaddleOCR models" \
+; fi && rm -f /tmp/download_models.py
 
 WORKDIR /app
 
@@ -105,8 +111,10 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
     pnpm install --frozen-lockfile --prod
 
 # Remove build tools no longer needed in production
-RUN apt-get purge -y --auto-remove build-essential python3-dev && \
-    rm -rf /var/lib/apt/lists/*
+RUN if [ "$VARIANT" = "full" ]; then \
+    apt-get purge -y --auto-remove build-essential python3-dev && \
+    rm -rf /var/lib/apt/lists/* \
+; fi
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
 COPY apps/api/src ./apps/api/src
@@ -143,11 +151,13 @@ ENV PORT=1349 \
     MAX_BATCH_SIZE=200 \
     CONCURRENT_JOBS=3 \
     MAX_MEGAPIXELS=100 \
-    RATE_LIMIT_PER_MIN=100
+    RATE_LIMIT_PER_MIN=100 \
+    STIRLING_VARIANT=${VARIANT}
 
 # Create non-root user for runtime
 RUN groupadd -r stirling && useradd -r -g stirling -d /app -s /sbin/nologin stirling
-RUN chown -R stirling:stirling /app /data /tmp/workspace /opt/venv
+RUN chown -R stirling:stirling /app /data /tmp/workspace && \
+    ([ -d /opt/venv ] && chown -R stirling:stirling /opt/venv || true)
 
 # Entrypoint fixes volume permissions then drops to stirling via gosu
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
