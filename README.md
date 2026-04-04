@@ -1,3 +1,11 @@
+<blockquote>
+<p align="center">
+  <strong>We're renaming!</strong> The Stirling PDF team asked us to pick a new name, and we want you to choose it.<br>
+  <a href="https://github.com/stirling-image/stirling-image/discussions/8">Vote on the new name &rarr;</a><br>
+  <sub>Voting closes April 10, 2026</sub>
+</p>
+</blockquote>
+
 <p align="center">
   <img src="apps/web/public/logo-192.png" width="80" alt="Stirling Image logo">
 </p>
@@ -9,7 +17,7 @@
 <p align="center">
   <a href="https://hub.docker.com/r/stirlingimage/stirling-image"><img src="https://img.shields.io/badge/Docker-Hub-blue?logo=docker" alt="Docker"></a>
   <a href="https://github.com/stirling-image/stirling-image/actions"><img src="https://img.shields.io/github/actions/workflow/status/stirling-image/stirling-image/ci.yml?label=CI" alt="CI"></a>
-  <a href="https://github.com/stirling-image/stirling-image/blob/main/LICENSE"><img src="https://img.shields.io/github/license/stirling-image/stirling-image" alt="License"></a>
+  <a href="https://github.com/stirling-image/stirling-image/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-blue" alt="License"></a>
   <a href="https://github.com/stirling-image/stirling-image/stargazers"><img src="https://img.shields.io/github/stars/stirling-image/stirling-image?style=social" alt="Stars"></a>
 </p>
 
