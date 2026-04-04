@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 function getToken(): string {
@@ -88,7 +89,7 @@ export function useToolProcessor(toolId: string) {
       }, 1000);
 
       // Generate client job ID for SSE correlation
-      const clientJobId = crypto.randomUUID();
+      const clientJobId = generateId();
 
       // For AI tools, open SSE before uploading
       if (isAiTool) {
@@ -257,7 +258,7 @@ export function useToolProcessor(toolId: string) {
         setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
       }, 1000);
 
-      const clientJobId = crypto.randomUUID();
+      const clientJobId = generateId();
 
       // Open SSE before upload for real-time progress
       try {
