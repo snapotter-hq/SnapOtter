@@ -355,3 +355,16 @@ export const SOCIAL_MEDIA_PRESETS: SocialMediaPreset[] = [
 ];
 
 export const APP_VERSION = "1.5.2";
+
+/**
+ * Tool IDs that require the Python sidecar (AI/ML tools).
+ * Used by the API to register 501 stubs in lite mode,
+ * and by the frontend for progress/timeout behavior.
+ */
+export const PYTHON_SIDECAR_TOOLS = [
+  "remove-background",
+  "upscale",
+  "blur-faces",
+  "erase-object",
+  "ocr",
+] as const;
