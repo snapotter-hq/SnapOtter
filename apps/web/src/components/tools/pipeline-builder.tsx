@@ -16,7 +16,7 @@ import {
 import { type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";
 import { apiGet } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 import { PipelineStepSettings } from "./pipeline-step-settings";
 
 /** Tools that can be used as pipeline steps (excludes pipeline/batch/multi-file tools). */
@@ -101,7 +101,7 @@ export function PipelineBuilder({
   const addStep = useCallback(
     (toolId: string) => {
       const step: PipelineStep = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         toolId,
         settings: {},
       };

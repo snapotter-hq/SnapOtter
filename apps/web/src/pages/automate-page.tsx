@@ -2,6 +2,7 @@ import { Play, Trash2, Workflow } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { PipelineBuilder, type PipelineStep } from "@/components/tools/pipeline-builder";
+import { generateId } from "@/lib/utils";
 
 interface SavedPipeline {
   id: string;
@@ -144,7 +145,7 @@ export function AutomatePage() {
   // Load saved pipeline into builder
   const loadSaved = useCallback((pipeline: SavedPipeline) => {
     const newSteps: PipelineStep[] = pipeline.steps.map((s) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       toolId: s.toolId,
       settings: { ...s.settings },
     }));
