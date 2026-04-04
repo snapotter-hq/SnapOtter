@@ -49,10 +49,18 @@ jobs:
           fi
 
   docker:
-    name: Build and Push Docker Image
+    name: Docker (${{ matrix.variant }})
     needs: release
     if: needs.release.outputs.new_version != ''
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [full, lite]
+        include:
+          - variant: full
+            suffix: ""
+          - variant: lite
+            suffix: "-lite"
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
@@ -86,10 +94,10 @@ jobs:
             stirlingimage/stirling-image
             ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}},value=v${{ needs.release.outputs.new_version }}
-            type=raw,value=latest
+            type=semver,pattern={{version}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
+            type=semver,pattern={{major}}.{{minor}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
+            type=semver,pattern={{major}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
+            type=raw,value=${{ matrix.variant == 'full' && 'latest' || 'lite' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -97,8 +105,9 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          build-args: VARIANT=${{ matrix.variant }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
