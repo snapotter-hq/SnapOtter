@@ -1,6 +1,7 @@
 import { Download, Redo, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
 
@@ -49,7 +50,7 @@ export function EraseObjectSettings({
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
-    const clientJobId = crypto.randomUUID();
+    const clientJobId = generateId();
 
     const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
     es.onmessage = (event) => {

@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 function getToken(): string {
@@ -49,7 +50,7 @@ export function OcrSettings() {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
-    const clientJobId = crypto.randomUUID();
+    const clientJobId = generateId();
 
     // Open SSE for server-side progress
     const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
