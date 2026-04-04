@@ -1,3 +1,28 @@
+# [0.20.0](https://github.com/siddharthksah/Stirling-Image/compare/v0.19.0...v0.20.0) (2026-04-04)
+
+
+### Bug Fixes
+
+* add XHR timeout to prevent UI spinning forever ([0abacb2](https://github.com/siddharthksah/Stirling-Image/commit/0abacb211cc60f3c1e8dabccc24bc6ca46ce782a))
+* allow SVG files in the convert tool ([034281b](https://github.com/siddharthksah/Stirling-Image/commit/034281b1d4b19487ec0f900c3173465e0faf2510))
+* disable worker pool to prevent Docker processing hang ([e36cd0c](https://github.com/siddharthksah/Stirling-Image/commit/e36cd0c24a34c5f716b5018e57f3d319fe5c5c44))
+* handle volume permission issues for bind-mounted /data directory ([863a51c](https://github.com/siddharthksah/Stirling-Image/commit/863a51c37d481f5f01b965f58e56eae0f7cd6538))
+* log volume permission errors instead of swallowing them ([a3e6927](https://github.com/siddharthksah/Stirling-Image/commit/a3e6927df0f4fdd06f6c2aafbf6dbd1c52019cb2))
+* replace crypto.randomUUID with generateId in AI tool settings ([ed91861](https://github.com/siddharthksah/Stirling-Image/commit/ed918615d2449bdda93d6ea12420454571edbf2d))
+* replace crypto.randomUUID with generateId in pipeline/automation ([bcbf86c](https://github.com/siddharthksah/Stirling-Image/commit/bcbf86c04b76ecdbc2bfae5a67d5ac929ba2ae8e))
+* replace crypto.randomUUID with generateId in use-tool-processor ([07cc2d0](https://github.com/siddharthksah/Stirling-Image/commit/07cc2d002e5964a1dee20d05021aa4b479c75f6e))
+* replace navigator.clipboard with copyToClipboard utility ([1857aeb](https://github.com/siddharthksah/Stirling-Image/commit/1857aeb89407ecb878ae967594e6408150d20d37))
+* resolve multiple API and e2e test bugs ([00deafb](https://github.com/siddharthksah/Stirling-Image/commit/00deafb2c8ad5cef14eb74207f3b2bd2bc3f13f2))
+* restore navigator.clipboard and execCommand mocks in tests ([57e71b7](https://github.com/siddharthksah/Stirling-Image/commit/57e71b7c9a2c3d77bf6318df35bed7fe8c1d7e69))
+
+
+### Features
+
+* add copyToClipboard() utility with execCommand fallback ([8686131](https://github.com/siddharthksah/Stirling-Image/commit/868613188e010760e33c96df60d03930027535da))
+* add generateId() utility for non-secure context compatibility ([ee7741b](https://github.com/siddharthksah/Stirling-Image/commit/ee7741b26765e95cf145400f4a39bfa06b9dfe9a))
+* add GitHub stars button to docs navbar and fix footer license ([90030fc](https://github.com/siddharthksah/Stirling-Image/commit/90030fccafed8ad247063ef71dca3cdedaff3916))
+* move theme toggle and GitHub button to top-right navbar ([0ba9fa5](https://github.com/siddharthksah/Stirling-Image/commit/0ba9fa5db7efa2557ed569d638c15256f9453364))
+
 ## [1.2.1](https://github.com/stirling-image/stirling-image/compare/v1.2.0...v1.2.1) (2026-04-03)
 
 
