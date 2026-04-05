@@ -190,8 +190,7 @@ ENV PORT=1349 \
     CONCURRENT_JOBS=3 \
     MAX_MEGAPIXELS=100 \
     RATE_LIMIT_PER_MIN=100 \
-    STIRLING_VARIANT=${VARIANT} \
-    STIRLING_GPU=${GPU}
+    STIRLING_VARIANT=${VARIANT}
 
 # Create non-root user for runtime
 RUN groupadd -r stirling && useradd -r -g stirling -d /app -s /sbin/nologin stirling
