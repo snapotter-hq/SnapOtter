@@ -1,11 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function BulkRenameSettings() {
   const { files, processing, error, setProcessing, setError } = useFileStore();
   const [pattern, setPattern] = useState("image-{{index}}");
@@ -28,7 +24,7 @@ export function BulkRenameSettings() {
 
       const res = await fetch("/api/v1/tools/bulk-rename", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

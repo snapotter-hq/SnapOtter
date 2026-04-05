@@ -1,10 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
 
 interface DuplicateGroup {
   files: Array<{ filename: string; similarity: number }>;
@@ -35,7 +32,7 @@ export function FindDuplicatesSettings() {
 
       const res = await fetch("/api/v1/tools/find-duplicates", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

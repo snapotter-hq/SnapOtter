@@ -1,5 +1,26 @@
 const API_BASE = "/api";
 
+// ── Auth Headers ───────────────────────────────────────────────
+
+function getToken(): string {
+  try {
+    return localStorage.getItem("stirling-token") || "";
+  } catch {
+    return "";
+  }
+}
+
+// Skip Authorization header when no token exists.
+// An empty Bearer token breaks forward-auth proxies (e.g. Authelia).
+export function formatHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  const token = getToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return headers;
+}
+
 async function throwWithMessage(res: Response): Promise<never> {
   let msg = `API error: ${res.status}`;
   try {
@@ -14,7 +35,7 @@ async function throwWithMessage(res: Response): Promise<never> {
 
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: formatHeaders(),
   });
   if (!res.ok) await throwWithMessage(res);
   return res.json();
@@ -23,10 +44,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: formatHeaders({ "Content-Type": "application/json" }),
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) await throwWithMessage(res);
@@ -36,10 +54,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: formatHeaders({ "Content-Type": "application/json" }),
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) await throwWithMessage(res);
@@ -49,16 +64,10 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
 export async function apiDelete<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: formatHeaders(),
   });
   if (!res.ok) await throwWithMessage(res);
   return res.json();
-}
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
 }
 
 export function setToken(token: string) {
@@ -79,7 +88,7 @@ export async function apiUpload(files: File[]): Promise<{
   for (const f of files) formData.append("files", f);
   const res = await fetch("/api/v1/upload", {
     method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: formatHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
@@ -141,7 +150,7 @@ export async function apiUploadUserFiles(
   for (const f of files) formData.append("files", f);
   const res = await fetch("/api/v1/files/upload", {
     method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: formatHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
@@ -151,10 +160,7 @@ export async function apiUploadUserFiles(
 export async function apiDeleteUserFiles(ids: string[]): Promise<{ deleted: number }> {
   const res = await fetch("/api/v1/files", {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
+    headers: formatHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ ids }),
   });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
@@ -171,7 +177,7 @@ export function getFileDownloadUrl(id: string): string {
 
 export async function apiDownloadBlob(jobId: string, filename: string): Promise<Blob> {
   const res = await fetch(getDownloadUrl(jobId, filename), {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: formatHeaders(),
   });
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
   return res.blob();

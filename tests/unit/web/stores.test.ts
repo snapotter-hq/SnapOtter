@@ -525,18 +525,18 @@ describe("API lib", () => {
 
       const result = await apiGet<{ data: string }>("/v1/health");
 
-      expect(fetchMock).toHaveBeenCalledWith("/api/v1/health", {
-        headers: { Authorization: "Bearer tok-123" },
-      });
+      const [url, opts] = fetchMock.mock.calls[0];
+      expect(url).toBe("/api/v1/health");
+      expect(opts.headers.get("Authorization")).toBe("Bearer tok-123");
       expect(result).toEqual({ data: "ok" });
     });
 
-    it("sends empty Bearer when no token is set", async () => {
+    it("omits Authorization header when no token is set", async () => {
       fetchMock.mockReturnValueOnce(okJson({}));
       await apiGet("/v1/anything");
 
       const callArgs = fetchMock.mock.calls[0];
-      expect(callArgs[1].headers.Authorization).toBe("Bearer ");
+      expect(callArgs[1].headers.get("Authorization")).toBeNull();
     });
 
     it("throws on non-ok response (e.g., 401)", async () => {
@@ -567,8 +567,8 @@ describe("API lib", () => {
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe("/api/v1/items");
       expect(opts.method).toBe("POST");
-      expect(opts.headers["Content-Type"]).toBe("application/json");
-      expect(opts.headers.Authorization).toBe("Bearer post-tok");
+      expect(opts.headers.get("Content-Type")).toBe("application/json");
+      expect(opts.headers.get("Authorization")).toBe("Bearer post-tok");
       expect(opts.body).toBe(JSON.stringify({ name: "test" }));
       expect(result).toEqual({ id: 1 });
     });
@@ -599,8 +599,8 @@ describe("API lib", () => {
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe("/api/v1/items/1");
       expect(opts.method).toBe("PUT");
-      expect(opts.headers["Content-Type"]).toBe("application/json");
-      expect(opts.headers.Authorization).toBe("Bearer put-tok");
+      expect(opts.headers.get("Content-Type")).toBe("application/json");
+      expect(opts.headers.get("Authorization")).toBe("Bearer put-tok");
       expect(opts.body).toBe(JSON.stringify({ name: "updated" }));
       expect(result).toEqual({ updated: true });
     });
@@ -623,7 +623,7 @@ describe("API lib", () => {
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe("/api/v1/items/1");
       expect(opts.method).toBe("DELETE");
-      expect(opts.headers.Authorization).toBe("Bearer del-tok");
+      expect(opts.headers.get("Authorization")).toBe("Bearer del-tok");
       expect(opts.body).toBeUndefined();
       expect(result).toEqual({ deleted: true });
     });
@@ -651,7 +651,7 @@ describe("API lib", () => {
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe("/api/v1/upload");
       expect(opts.method).toBe("POST");
-      expect(opts.headers.Authorization).toBe("Bearer up-tok");
+      expect(opts.headers.get("Authorization")).toBe("Bearer up-tok");
       // Body should be FormData
       expect(opts.body).toBeInstanceOf(FormData);
       const fd = opts.body as FormData;
@@ -673,7 +673,7 @@ describe("API lib", () => {
       await apiUpload([makeFile("x.png")]);
 
       const headers = fetchMock.mock.calls[0][1].headers;
-      expect(headers["Content-Type"]).toBeUndefined();
+      expect(headers.get("Content-Type")).toBeNull();
     });
 
     it("throws on non-ok response with status in message", async () => {
@@ -708,7 +708,7 @@ describe("API lib", () => {
 
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe("/api/v1/download/job-1/result.png");
-      expect(opts.headers.Authorization).toBe("Bearer dl-tok");
+      expect(opts.headers.get("Authorization")).toBe("Bearer dl-tok");
       expect(result).toBe(blob);
     });
 
@@ -748,20 +748,20 @@ describe("API lib", () => {
       setToken("first-token");
       fetchMock.mockReturnValueOnce(okJson({}));
       await apiGet("/v1/a");
-      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer first-token");
+      expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer first-token");
 
       setToken("second-token");
       fetchMock.mockReturnValueOnce(okJson({}));
       await apiGet("/v1/b");
-      expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer second-token");
+      expect(fetchMock.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer second-token");
     });
 
-    it("uses empty Bearer immediately after clearToken", async () => {
+    it("omits Authorization header after clearToken", async () => {
       setToken("about-to-die");
       clearToken();
       fetchMock.mockReturnValueOnce(okJson({}));
       await apiGet("/v1/c");
-      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer ");
+      expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBeNull();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
 
 const PAGE_SIZES: Record<string, [number, number]> = {
@@ -108,11 +109,6 @@ function PdfPagePreview({
     </div>
   );
 }
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function ImageToPdfSettings() {
   const { files, selectedIndex, processing, error, setProcessing, setError } = useFileStore();
   const [pageSize, setPageSize] = useState<"A4" | "Letter" | "A3" | "A5">("A4");
@@ -136,7 +132,7 @@ export function ImageToPdfSettings() {
 
       const res = await fetch("/api/v1/tools/image-to-pdf", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

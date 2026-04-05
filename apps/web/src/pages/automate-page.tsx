@@ -2,6 +2,7 @@ import { Play, Trash2, Workflow } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { PipelineBuilder, type PipelineStep } from "@/components/tools/pipeline-builder";
+import { formatHeaders } from "@/lib/api";
 import { generateId } from "@/lib/utils";
 
 interface SavedPipeline {
@@ -11,11 +12,6 @@ interface SavedPipeline {
   steps: Array<{ toolId: string; settings: Record<string, unknown> }>;
   createdAt: string;
 }
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function AutomatePage() {
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [savedPipelines, setSavedPipelines] = useState<SavedPipeline[]>([]);
@@ -33,7 +29,7 @@ export function AutomatePage() {
   const loadPipelines = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/pipeline/list", {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
@@ -55,10 +51,7 @@ export function AutomatePage() {
       try {
         const res = await fetch("/api/v1/pipeline/save", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
+          headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             name,
             description: description || undefined,
@@ -86,7 +79,7 @@ export function AutomatePage() {
       try {
         await fetch(`/api/v1/pipeline/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: formatHeaders(),
         });
         await loadPipelines();
       } catch {
@@ -117,7 +110,7 @@ export function AutomatePage() {
 
         const res = await fetch("/api/v1/pipeline/execute", {
           method: "POST",
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: formatHeaders(),
           body: formData,
         });
 

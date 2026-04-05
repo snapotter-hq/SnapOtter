@@ -1,10 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
 
 const SIZES = [
   { name: "favicon-16x16.png", size: "16x16" },
@@ -33,7 +30,7 @@ export function FaviconSettings() {
 
       const res = await fetch("/api/v1/tools/favicon", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

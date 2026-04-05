@@ -1,12 +1,8 @@
 import { Check, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function BarcodeReadSettings() {
   const { files, processing, error, setProcessing, setError } = useFileStore();
   const [result, setResult] = useState<{ found: boolean; text: string | null } | null>(null);
@@ -25,7 +21,7 @@ export function BarcodeReadSettings() {
 
       const res = await fetch("/api/v1/tools/barcode-read", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

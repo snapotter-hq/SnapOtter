@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiDelete, apiGet, apiPost, apiPut, clearToken } from "@/lib/api";
+import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { GemLogo } from "../common/gem-logo";
 
@@ -287,10 +287,9 @@ function SystemSection() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const token = localStorage.getItem("stirling-token");
       await fetch("/api/v1/settings/logo", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: formatHeaders(),
         body: formData,
       });
       setSettings((prev) => ({ ...prev, customLogo: "true" }));

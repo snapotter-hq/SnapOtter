@@ -1,4 +1,5 @@
 import { type FormEvent, useRef, useState } from "react";
+import { formatHeaders } from "@/lib/api";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -85,13 +86,9 @@ export function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("stirling-token");
       const res = await fetch("/api/auth/change-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 

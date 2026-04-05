@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   apiGetFileDetails,
+  formatHeaders,
   getFileDownloadUrl,
   getFileThumbnailUrl,
   type UserFileDetail,
@@ -57,11 +58,10 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
         ? allFiles.filter((f) => checkedIds.has(f.id))
         : [{ id: details.id, originalName: details.originalName, mimeType: details.mimeType }];
 
-    const token = localStorage.getItem("stirling-token") || "";
     const downloaded = await Promise.all(
       filesToOpen.map(async (f) => {
         const res = await fetch(getFileDownloadUrl(f.id), {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: formatHeaders(),
         });
         if (!res.ok) return null;
         const blob = await res.blob();

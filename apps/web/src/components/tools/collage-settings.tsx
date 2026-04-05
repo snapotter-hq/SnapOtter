@@ -1,10 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
 
 type Layout = "2x2" | "3x3" | "1x3" | "2x1" | "3x1" | "1x2";
 
@@ -43,7 +40,7 @@ export function CollageSettings() {
 
       const res = await fetch("/api/v1/tools/collage", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

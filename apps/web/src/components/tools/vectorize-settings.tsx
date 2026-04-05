@@ -1,11 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function VectorizeSettings() {
   const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
     useFileStore();
@@ -30,7 +26,7 @@ export function VectorizeSettings() {
 
       const res = await fetch("/api/v1/tools/vectorize", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 

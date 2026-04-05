@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatHeaders } from "@/lib/api";
 
 interface AuthState {
   loading: boolean;
@@ -45,7 +46,7 @@ export function useAuth(): AuthState {
         }
 
         const sessionRes = await fetch("/api/auth/session", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: formatHeaders(),
         });
 
         if (sessionRes.ok) {

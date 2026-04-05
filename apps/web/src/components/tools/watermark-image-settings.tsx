@@ -1,13 +1,9 @@
 import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
 
 type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
-
-function getToken(): string {
-  return localStorage.getItem("stirling-token") || "";
-}
-
 export function WatermarkImageSettings() {
   const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
     useFileStore();
@@ -35,7 +31,7 @@ export function WatermarkImageSettings() {
 
       const res = await fetch("/api/v1/tools/watermark-image", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: formatHeaders(),
         body: formData,
       });
 
