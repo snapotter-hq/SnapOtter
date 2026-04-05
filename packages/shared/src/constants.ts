@@ -325,6 +325,14 @@ export const TOOLS: Tool[] = [
     icon: "Film",
     route: "/gif-tools",
   },
+  {
+    id: "pdf-to-image",
+    name: "PDF to Image",
+    description: "Convert PDF pages to images",
+    category: "format",
+    icon: "FileOutput",
+    route: "/pdf-to-image",
+  },
   // Automation
   {
     id: "pipeline",

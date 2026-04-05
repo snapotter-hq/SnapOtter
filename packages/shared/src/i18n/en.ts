@@ -39,6 +39,7 @@ export const en = {
     "edit-metadata": { name: "Edit Metadata", description: "Edit EXIF, GPS, and camera info" },
     "bulk-rename": { name: "Bulk Rename", description: "Rename multiple files with patterns" },
     "image-to-pdf": { name: "Image to PDF", description: "Combine images into a PDF document" },
+    "pdf-to-image": { name: "PDF to Image", description: "Convert PDF pages to images" },
     favicon: { name: "Favicon Generator", description: "Generate all favicon and app icon sizes" },
     "brightness-contrast": {
       name: "Brightness & Contrast",
