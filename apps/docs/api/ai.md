@@ -8,6 +8,10 @@ All model weights are bundled in the Docker image during the build. No downloads
 AI tools are not available in the `:lite` Docker image. The API returns `501 Not Available` for these endpoints when running the lite variant. Use `:latest` for AI features. See [Docker Tags](/guide/docker-tags) for details.
 :::
 
+::: tip GPU acceleration
+The `:cuda` Docker image includes GPU-accelerated versions of the ML libraries. Background removal, upscaling, and OCR all benefit from NVIDIA GPU acceleration. The image auto-detects your GPU and falls back to CPU if none is available. See [Docker Tags](/guide/docker-tags) for setup.
+:::
+
 ## Background removal
 
 Removes the background from an image and returns a transparent PNG.
