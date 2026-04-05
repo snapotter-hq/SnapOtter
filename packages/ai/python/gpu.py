@@ -11,21 +11,12 @@ def gpu_available():
     if override is not None and override.lower() in ("0", "false", "no"):
         return False
 
-    # Always check actual hardware, even if STIRLING_GPU=true.
-    # The env var can disable GPU but never force-enable it,
-    # because the :cuda image bakes STIRLING_GPU=true and we
-    # still need to handle "no GPU attached" gracefully.
-    try:
-        import onnxruntime
-        if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
-            return True
-    except ImportError:
-        pass
-
+    # Use torch.cuda as the source of truth. It actually probes
+    # the hardware. onnxruntime's get_available_providers() only
+    # reports compiled-in backends, not whether a GPU exists.
     try:
         import torch
-        if torch.cuda.is_available():
-            return True
+        return torch.cuda.is_available()
     except ImportError:
         pass
 
