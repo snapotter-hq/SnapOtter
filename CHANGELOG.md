@@ -1,3 +1,15 @@
+# [1.7.0](https://github.com/stirling-image/stirling-image/compare/v1.6.0...v1.7.0) (2026-04-05)
+
+
+### Bug Fixes
+
+* **web:** skip empty Authorization header for forward-auth proxy compatibility ([636153f](https://github.com/stirling-image/stirling-image/commit/636153f8f131e683b2553df2732e967772e07017)), closes [#6](https://github.com/stirling-image/stirling-image/issues/6)
+
+
+### Features
+
+* add GPU/CUDA acceleration support (:cuda Docker tag) ([a5f62f0](https://github.com/stirling-image/stirling-image/commit/a5f62f0d1426092b6b0164cf1ae1159a392ebf44))
+
 # [1.6.0](https://github.com/stirling-image/stirling-image/compare/v1.5.3...v1.6.0) (2026-04-04)
 
 

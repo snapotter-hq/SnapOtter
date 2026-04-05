@@ -354,7 +354,7 @@ export const SOCIAL_MEDIA_PRESETS: SocialMediaPreset[] = [
   { platform: "Threads", name: "Post Image", width: 1080, height: 1080 },
 ];
 
-export const APP_VERSION = "1.6.0";
+export const APP_VERSION = "1.7.0";
 
 /**
  * Tool IDs that require the Python sidecar (AI/ML tools).
