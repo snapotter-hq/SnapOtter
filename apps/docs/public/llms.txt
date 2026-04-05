@@ -1,6 +1,6 @@
 # Stirling Image
 
-> Self-hosted, open-source image processing platform with 30+ tools. Runs in a single Docker container.
+> Self-hosted, open-source image processing platform with 30+ tools. Runs in a single Docker container. Available as `:latest` (full, ~11 GB with AI/ML) or `:lite` (~1.5 GB, image processing only).
 
 ## Docs
 
@@ -9,6 +9,7 @@
 - [Configuration](https://stirling-image.github.io/stirling-image/guide/configuration): Environment variables, Docker volumes
 - [Database](https://stirling-image.github.io/stirling-image/guide/database): SQLite schema, tables, migrations
 - [Deployment](https://stirling-image.github.io/stirling-image/guide/deployment): Docker Compose, reverse proxy, CI/CD
+- [Docker Tags](https://stirling-image.github.io/stirling-image/guide/docker-tags): Full vs Lite image variants, version pinning
 - [REST API](https://stirling-image.github.io/stirling-image/api/rest): All API endpoints, auth, tools, pipelines, batch
 - [Image Engine](https://stirling-image.github.io/stirling-image/api/image-engine): Sharp-based operations (resize, crop, rotate, convert, compress, color)
 - [AI Engine](https://stirling-image.github.io/stirling-image/api/ai): Python ML models (rembg, RealESRGAN, PaddleOCR, MediaPipe, LaMa)
@@ -27,4 +28,4 @@
 ## Source
 
 - [GitHub](https://github.com/stirling-image/stirling-image)
-- License: MIT
+- License: AGPLv3 (commercial license also available)

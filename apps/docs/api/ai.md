@@ -4,6 +4,10 @@ The `@stirling-image/ai` package wraps Python ML models in TypeScript functions.
 
 All model weights are bundled in the Docker image during the build. No downloads happen at runtime.
 
+::: warning Lite image
+AI tools are not available in the `:lite` Docker image. The API returns `501 Not Available` for these endpoints when running the lite variant. Use `:latest` for AI features. See [Docker Tags](/guide/docker-tags) for details.
+:::
+
 ## Background removal
 
 Removes the background from an image and returns a transparent PNG.

@@ -1,10 +1,10 @@
 # Stirling Image — Complete Documentation
 
-Self-hosted, open-source image processing platform with 30+ tools. Runs in a single Docker container. Resize, compress, convert, remove backgrounds, upscale, run OCR, and more — without sending images to external services.
+Self-hosted, open-source image processing platform with 30+ tools. Runs in a single Docker container. Resize, compress, convert, remove backgrounds, upscale, run OCR, and more - without sending images to external services. Available as :latest (full, ~11 GB with AI/ML) or :lite (~1.5 GB, image processing only).
 
 - GitHub: https://github.com/stirling-image/stirling-image
 - Docs: https://stirling-image.github.io/stirling-image/
-- License: MIT
+- License: AGPLv3 (commercial license also available)
 
 ---
 
