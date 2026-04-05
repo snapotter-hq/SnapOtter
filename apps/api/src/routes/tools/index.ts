@@ -23,6 +23,7 @@ import { registerGifTools } from "./gif-tools.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerOcr } from "./ocr.js";
+import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRemoveBackground } from "./remove-background.js";
 import { registerReplaceColor } from "./replace-color.js";
@@ -111,6 +112,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "svg-to-raster", register: registerSvgToRaster },
     { id: "vectorize", register: registerVectorize },
     { id: "gif-tools", register: registerGifTools },
+    { id: "pdf-to-image", register: registerPdfToImage },
 
     // Optimization extras
     { id: "bulk-rename", register: registerBulkRename },
