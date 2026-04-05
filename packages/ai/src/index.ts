@@ -1,5 +1,5 @@
 export { removeBackground } from "./background-removal.js";
-export { shutdownDispatcher } from "./bridge.js";
+export { isGpuAvailable, shutdownDispatcher } from "./bridge.js";
 export { blurFaces } from "./face-detection.js";
 export { inpaint } from "./inpainting.js";
 export { extractText } from "./ocr.js";

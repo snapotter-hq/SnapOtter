@@ -80,11 +80,20 @@ jobs:
       - run: pnpm build
 
   docker:
-    name: Docker Build Test (${{ matrix.variant }})
+    name: Docker Build Test (${{ matrix.tag }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: [full, lite]
+        include:
+          - tag: full
+            variant: full
+            gpu: "false"
+          - tag: lite
+            variant: lite
+            gpu: "false"
+          - tag: cuda
+            variant: full
+            gpu: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -95,7 +104,9 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
-          build-args: VARIANT=${{ matrix.variant }}
-          tags: stirling-image:ci-${{ matrix.variant }}
-          cache-from: type=gha,scope=${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
+          build-args: |
+            VARIANT=${{ matrix.variant }}
+            GPU=${{ matrix.gpu }}
+          tags: stirling-image:ci-${{ matrix.tag }}
+          cache-from: type=gha,scope=${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}

@@ -34,9 +34,10 @@ def run_paddleocr(input_path, language):
     """Run PaddleOCR."""
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
     from paddleocr import PaddleOCR
+    from gpu import gpu_available
 
     emit_progress(20, "Loading")
-    ocr = PaddleOCR(lang=language)
+    ocr = PaddleOCR(lang=language, use_gpu=gpu_available())
     emit_progress(30, "Scanning")
     result = ocr.ocr(input_path)
     emit_progress(70, "Extracting text")

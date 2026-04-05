@@ -39,6 +39,7 @@ def _try_import(name, import_fn):
 _try_import("PIL", lambda: __import__("PIL"))
 _try_import("cv2", lambda: __import__("cv2"))
 _try_import("numpy", lambda: __import__("numpy"))
+_try_import("gpu", lambda: __import__("gpu"))
 
 # Heavy ML libraries - import but don't fail if unavailable
 _try_import("rembg", lambda: __import__("rembg"))
@@ -123,8 +124,14 @@ def _run_script_main(script_name, args):
 
 
 def main():
-    # Signal readiness
-    print(json.dumps({"ready": True}), file=sys.stderr, flush=True)
+    # Signal readiness with GPU status
+    gpu = False
+    try:
+        from gpu import gpu_available
+        gpu = gpu_available()
+    except ImportError:
+        pass
+    print(json.dumps({"ready": True, "gpu": gpu}), file=sys.stderr, flush=True)
 
     for line in sys.stdin:
         line = line.strip()

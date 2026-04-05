@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import { isGpuAvailable } from "@stirling-image/ai";
 import { APP_VERSION } from "@stirling-image/shared";
 import Fastify from "fastify";
 import { env } from "./config.js";
@@ -132,7 +133,7 @@ app.get("/api/v1/admin/health", async (request, reply) => {
     storage: { mode: env.STORAGE_MODE, available: "N/A" },
     database: dbOk ? "ok" : "error",
     queue: { active: 0, pending: 0 },
-    ai: {},
+    ai: { gpu: isGpuAvailable() },
   };
 });
 

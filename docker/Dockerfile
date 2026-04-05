@@ -5,6 +5,7 @@
 # ============================================
 
 ARG VARIANT=full
+ARG GPU=false
 
 # ============================================
 # Stage 1: Build the frontend (Vite + React)
@@ -38,11 +39,35 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
     pnpm --filter @stirling-image/web build
 
 # ============================================
-# Stage 2: Production runtime
+# Stage 2: Base image selection
 # ============================================
-FROM node:22-bookworm AS production
+FROM node:22-bookworm AS base-cpu
+FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS base-gpu
+
+# Select base: GPU=false -> base-cpu, GPU=true -> base-gpu
+FROM base-cpu AS production-base-false
+FROM base-gpu AS production-base-true
+
+# ============================================
+# Stage 3: Production runtime
+# ============================================
+FROM production-base-${GPU} AS production
 
 ARG VARIANT
+ARG GPU
+
+# Install Node.js when using CUDA base (node:22-bookworm already has it)
+RUN if [ "$GPU" = "true" ]; then \
+    apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates gnupg && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
+        gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > \
+        /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/* \
+; fi
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -68,17 +93,30 @@ RUN if [ "$VARIANT" = "full" ]; then \
 
 # Python venv + ML packages + model weights (full variant only)
 COPY packages/ai/python/requirements.txt /tmp/requirements.txt
+COPY packages/ai/python/requirements-gpu.txt /tmp/requirements-gpu.txt
 RUN if [ "$VARIANT" = "full" ]; then \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install \
-        Pillow numpy opencv-python-headless onnxruntime && \
-    (/opt/venv/bin/pip install "rembg[cpu]" || echo "WARNING: rembg not installed") && \
-    (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed") && \
-    (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed") && \
-    (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
-    (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
-; fi && rm -f /tmp/requirements.txt
+    if [ "$GPU" = "true" ]; then \
+        /opt/venv/bin/pip install \
+            Pillow numpy opencv-python-headless onnxruntime-gpu && \
+        (/opt/venv/bin/pip install rembg || echo "WARNING: rembg not installed") && \
+        (/opt/venv/bin/pip install realesrgan \
+            --extra-index-url https://download.pytorch.org/whl/cu126 \
+            || echo "WARNING: realesrgan not installed") && \
+        (/opt/venv/bin/pip install paddlepaddle-gpu paddleocr || echo "WARNING: PaddleOCR not installed") && \
+        (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
+        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
+    ; else \
+        /opt/venv/bin/pip install \
+            Pillow numpy opencv-python-headless onnxruntime && \
+        (/opt/venv/bin/pip install "rembg[cpu]" || echo "WARNING: rembg not installed") && \
+        (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed") && \
+        (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed") && \
+        (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
+        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
+    ; fi \
+; fi && rm -f /tmp/requirements.txt /tmp/requirements-gpu.txt
 
 COPY docker/download_models.py /tmp/download_models.py
 RUN if [ "$VARIANT" = "full" ]; then \
@@ -152,7 +190,8 @@ ENV PORT=1349 \
     CONCURRENT_JOBS=3 \
     MAX_MEGAPIXELS=100 \
     RATE_LIMIT_PER_MIN=100 \
-    STIRLING_VARIANT=${VARIANT}
+    STIRLING_VARIANT=${VARIANT} \
+    STIRLING_GPU=${GPU}
 
 # Create non-root user for runtime
 RUN groupadd -r stirling && useradd -r -g stirling -d /app -s /sbin/nologin stirling

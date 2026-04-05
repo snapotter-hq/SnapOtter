@@ -26,7 +26,12 @@ def main():
         try:
             from basicsr.archs.rrdbnet_arch import RRDBNet
             from realesrgan import RealESRGANer
+            from gpu import gpu_available
             import numpy as np
+            import torch
+
+            use_gpu = gpu_available()
+            device = torch.device("cuda" if use_gpu else "cpu")
 
             model = RRDBNet(
                 num_in_ch=3,
@@ -40,7 +45,8 @@ def main():
                 scale=scale,
                 model_path=None,
                 model=model,
-                half=False,
+                half=use_gpu,
+                device=device,
             )
             emit_progress(20, "Model ready")
             img_array = np.array(img.convert("RGB"))

@@ -1,0 +1,17 @@
+# GPU override - use with:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up
+services:
+  stirling-image:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        GPU: "true"
+    image: stirlingimage/stirling-image:cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

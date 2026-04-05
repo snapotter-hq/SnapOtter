@@ -1,0 +1,10 @@
+rembg==2.0.62
+realesrgan==0.3.0
+lama-cleaner==1.2.5
+paddleocr==2.9.1
+paddlepaddle-gpu==3.0.0
+mediapipe==0.10.21
+onnxruntime-gpu==1.20.1
+numpy==1.26.4
+Pillow==11.1.0
+opencv-python-headless==4.10.0.84

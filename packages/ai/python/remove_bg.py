@@ -24,11 +24,12 @@ def main():
 
     try:
         from rembg import remove, new_session
+        from gpu import onnx_providers
         import io
 
         emit_progress(10, "Loading model")
 
-        session = new_session(model)
+        session = new_session(model, providers=onnx_providers())
 
         emit_progress(25, "Model loaded")
 

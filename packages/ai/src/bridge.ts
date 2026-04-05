@@ -54,6 +54,8 @@ interface PendingRequest {
 let dispatcher: ChildProcess | null = null;
 let dispatcherReady = false;
 let dispatcherFailed = false;
+// biome-ignore lint/style/useConst: reassigned on dispatcher readiness signal
+let dispatcherGpuAvailable = false;
 const pendingRequests = new Map<string, PendingRequest>();
 let stdoutBuffer = "";
 
@@ -82,6 +84,7 @@ function startDispatcher(): ChildProcess | null {
           // Readiness signal
           if (parsed.ready === true) {
             dispatcherReady = true;
+            dispatcherGpuAvailable = parsed.gpu === true;
             continue;
           }
 
@@ -219,6 +222,13 @@ function dispatcherRun(
     const request = JSON.stringify({ id, script: scriptName.replace(".py", ""), args });
     proc.stdin!.write(request + "\n");
   });
+}
+
+/**
+ * Whether the Python dispatcher detected a CUDA GPU at startup.
+ */
+export function isGpuAvailable(): boolean {
+  return dispatcherGpuAvailable;
 }
 
 /**
