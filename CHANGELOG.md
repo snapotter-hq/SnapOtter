@@ -1,3 +1,10 @@
+## [1.7.6](https://github.com/stirling-image/stirling-image/compare/v1.7.5...v1.7.6) (2026-04-06)
+
+
+### Bug Fixes
+
+* batch SSE progress and non-AI processing UX ([#24](https://github.com/stirling-image/stirling-image/issues/24)) ([0ce42d1](https://github.com/stirling-image/stirling-image/commit/0ce42d1b2fa4f0b753a962a1f45a491e29ecee24))
+
 ## [1.7.5](https://github.com/stirling-image/stirling-image/compare/v1.7.4...v1.7.5) (2026-04-06)
 
 
