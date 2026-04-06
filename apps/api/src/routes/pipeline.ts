@@ -17,6 +17,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { createWorkspace } from "../lib/workspace.js";
+import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
 
@@ -57,6 +58,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
    * Returns the final processed image for download.
    */
   app.post("/api/v1/pipeline/execute", async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = requirePermission("tools:use")(request, reply);
+    if (!user) return;
+
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let pipelineRaw: string | null = null;

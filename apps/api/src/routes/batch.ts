@@ -16,6 +16,7 @@ import { autoOrient } from "../lib/auto-orient.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { requirePermission } from "../permissions.js";
 import { type JobProgress, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
@@ -28,6 +29,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/tools/:toolId/batch",
     async (request: FastifyRequest<{ Params: { toolId: string } }>, reply: FastifyReply) => {
+      const user = requirePermission("tools:use")(request, reply);
+      if (!user) return;
+
       const { toolId } = request.params;
 
       // Look up the tool config from the registry

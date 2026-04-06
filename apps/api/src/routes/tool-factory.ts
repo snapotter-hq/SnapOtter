@@ -14,6 +14,7 @@ import type { WorkerInput, WorkerOutput } from "../lib/image-worker.js";
 import { sanitizeSvg } from "../lib/svg-sanitize.js";
 import { getWorkerPool } from "../lib/worker-pool.js";
 import { createWorkspace } from "../lib/workspace.js";
+import { requirePermission } from "../permissions.js";
 
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
@@ -102,6 +103,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
   app.post(
     `/api/v1/tools/${config.toolId}`,
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requirePermission("tools:use")(request, reply);
+      if (!user) return;
+
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;

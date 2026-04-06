@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { createWorkspace, getWorkspacePath } from "../lib/workspace.js";
+import { requirePermission } from "../permissions.js";
 
 /**
  * Guard against path traversal in URL params.
@@ -21,6 +22,9 @@ function isPathTraversal(segment: string): boolean {
 export async function fileRoutes(app: FastifyInstance): Promise<void> {
   // ── POST /api/v1/upload ────────────────────────────────────────
   app.post("/api/v1/upload", async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = requirePermission("tools:use")(request, reply);
+    if (!user) return;
+
     const jobId = randomUUID();
     const workspacePath = await createWorkspace(jobId);
     const inputDir = join(workspacePath, "input");
