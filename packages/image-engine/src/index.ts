@@ -6,6 +6,7 @@ export { compress } from "./operations/compress.js";
 export { contrast } from "./operations/contrast.js";
 export { convert } from "./operations/convert.js";
 export { crop } from "./operations/crop.js";
+export { editMetadata } from "./operations/edit-metadata.js";
 export { flip } from "./operations/flip.js";
 export { grayscale } from "./operations/grayscale.js";
 export { invert } from "./operations/invert.js";

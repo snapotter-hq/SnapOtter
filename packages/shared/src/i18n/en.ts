@@ -36,6 +36,7 @@ export const en = {
     convert: { name: "Convert", description: "Convert between image formats" },
     compress: { name: "Compress", description: "Reduce file size by quality or target size" },
     "strip-metadata": { name: "Strip Metadata", description: "Remove EXIF, GPS, and camera info" },
+    "edit-metadata": { name: "Edit Metadata", description: "Edit EXIF, GPS, and camera info" },
     "bulk-rename": { name: "Bulk Rename", description: "Rename multiple files with patterns" },
     "image-to-pdf": { name: "Image to PDF", description: "Combine images into a PDF document" },
     favicon: { name: "Favicon Generator", description: "Generate all favicon and app icon sizes" },

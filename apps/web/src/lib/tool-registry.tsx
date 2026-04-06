@@ -81,6 +81,11 @@ const StripMetadataSettings = lazy(() =>
     default: m.StripMetadataSettings,
   })),
 );
+const EditMetadataSettings = lazy(() =>
+  import("@/components/tools/edit-metadata-settings").then((m) => ({
+    default: m.EditMetadataSettings,
+  })),
+);
 const ColorSettings = lazy(() =>
   import("@/components/tools/color-settings").then((m) => ({ default: m.ColorSettings })),
 );
@@ -238,6 +243,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ["convert", { displayMode: "no-comparison", Settings: ConvertSettings }],
   ["compress", { displayMode: "before-after", Settings: CompressSettings }],
   ["strip-metadata", { displayMode: "no-comparison", Settings: StripMetadataSettings }],
+  ["edit-metadata", { displayMode: "no-comparison", Settings: EditMetadataSettings }],
 
   // Color adjustments (all share ColorSettings with different toolId)
   ...(["brightness-contrast", "saturation", "color-channels", "color-effects"] as const).map(

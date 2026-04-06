@@ -89,6 +89,23 @@ test.describe("Tool processing (core tools)", () => {
     });
   });
 
+  test("edit-metadata processes image", async ({ loggedInPage: page }) => {
+    await page.goto("/edit-metadata");
+    await uploadTestImage(page);
+
+    // Wait for inspect to complete and form to populate
+    await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
+
+    // Edit the artist field
+    await page.fill('[id="em-artist"]', "E2E Test Artist");
+
+    await page.getByRole("button", { name: /apply metadata/i }).click();
+    await waitForProcessing(page);
+    await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("brightness-contrast processes image", async ({ loggedInPage: page }) => {
     await page.goto("/brightness-contrast");
     await uploadTestImage(page);

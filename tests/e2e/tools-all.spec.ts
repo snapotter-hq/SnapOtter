@@ -12,6 +12,7 @@ const TOOLS_WITH_DROPZONE = [
   { id: "convert", name: "Convert" },
   { id: "compress", name: "Compress" },
   { id: "strip-metadata", name: "Strip Metadata" },
+  { id: "edit-metadata", name: "Edit Metadata" },
   { id: "bulk-rename", name: "Bulk Rename" },
   { id: "image-to-pdf", name: "Image to PDF" },
   { id: "favicon", name: "Favicon" },

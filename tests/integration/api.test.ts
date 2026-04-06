@@ -20,6 +20,7 @@ const PNG_200x150 = readFileSync(join(FIXTURES, "test-200x150.png"));
 const JPG_100x100 = readFileSync(join(FIXTURES, "test-100x100.jpg"));
 const WEBP_50x50 = readFileSync(join(FIXTURES, "test-50x50.webp"));
 const PNG_1x1 = readFileSync(join(FIXTURES, "test-1x1.png"));
+const EXIF_JPG = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -3380,5 +3381,105 @@ describe("Workspace integrity", () => {
     const jobId2 = JSON.parse(res2.body).jobId;
 
     expect(jobId1).not.toBe(jobId2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDIT METADATA
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Edit metadata", () => {
+  describe("POST /api/v1/tools/edit-metadata/inspect", () => {
+    it("returns parsed EXIF for JPEG with metadata", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "exif.jpg", contentType: "image/jpeg", content: EXIF_JPG },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata/inspect",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.filename).toBe("exif.jpg");
+      expect(body.exif).toBeTruthy();
+      expect(body.exif.Artist).toBe("Test Artist");
+      expect(body.exif.Copyright).toBe("2026 Test Copyright");
+    });
+
+    it("returns no exif for metadata-free PNG", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "plain.png", contentType: "image/png", content: PNG_1x1 },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata/inspect",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.exif).toBeUndefined();
+    });
+
+    it("rejects request with no file", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata/inspect",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": "multipart/form-data; boundary=---test",
+        },
+        payload: Buffer.from("-----test--\r\n"),
+      });
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  describe("POST /api/v1/tools/edit-metadata", () => {
+    it("writes metadata and returns downloadable file", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "edit.jpg", contentType: "image/jpeg", content: EXIF_JPG },
+        { name: "settings", content: JSON.stringify({ artist: "New Author" }) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.downloadUrl).toBeDefined();
+      expect(body.jobId).toBeDefined();
+    });
+
+    it("strips specific fields via fieldsToRemove", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "strip.jpg", contentType: "image/jpeg", content: EXIF_JPG },
+        { name: "settings", content: JSON.stringify({ fieldsToRemove: ["Software"] }) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("preserves metadata with empty settings", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "noop.jpg", contentType: "image/jpeg", content: EXIF_JPG },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/edit-metadata",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+    });
   });
 });

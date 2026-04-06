@@ -1,6 +1,5 @@
 import { basename } from "node:path";
-import { stripMetadata } from "@stirling-image/image-engine";
-import exifReader from "exif-reader";
+import { parseExif, parseGps, parseXmp, stripMetadata } from "@stirling-image/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -13,76 +12,6 @@ const settingsSchema = z.object({
   stripXmp: z.boolean().default(false),
   stripAll: z.boolean().default(true),
 });
-
-/**
- * Serialize a value for JSON — convert Buffers/Dates and drop overly large blobs.
- */
-function sanitizeValue(v: unknown): unknown {
-  if (v instanceof Date) return v.toISOString();
-  if (Buffer.isBuffer(v)) {
-    if (v.length > 256) return `<binary ${v.length} bytes>`;
-    return Array.from(v);
-  }
-  if (Array.isArray(v)) return v.map(sanitizeValue);
-  if (v !== null && typeof v === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(v)) {
-      out[k] = sanitizeValue(val);
-    }
-    return out;
-  }
-  return v;
-}
-
-/**
- * Parse GPS coordinates from EXIF GPSInfo into decimal degrees.
- */
-function parseGpsCoordinates(gps: Record<string, unknown>): {
-  latitude: number | null;
-  longitude: number | null;
-  altitude: number | null;
-} {
-  let latitude: number | null = null;
-  let longitude: number | null = null;
-  let altitude: number | null = null;
-
-  const lat = gps.GPSLatitude as number[] | undefined;
-  const latRef = gps.GPSLatitudeRef as string | undefined;
-  if (lat && lat.length === 3 && lat.every((v) => typeof v === "number" && !Number.isNaN(v))) {
-    latitude = lat[0] + lat[1] / 60 + lat[2] / 3600;
-    if (latRef === "S") latitude = -latitude;
-  }
-
-  const lon = gps.GPSLongitude as number[] | undefined;
-  const lonRef = gps.GPSLongitudeRef as string | undefined;
-  if (lon && lon.length === 3 && lon.every((v) => typeof v === "number" && !Number.isNaN(v))) {
-    longitude = lon[0] + lon[1] / 60 + lon[2] / 3600;
-    if (lonRef === "W") longitude = -longitude;
-  }
-
-  if (typeof gps.GPSAltitude === "number" && !Number.isNaN(gps.GPSAltitude)) {
-    altitude = gps.GPSAltitude;
-    if (gps.GPSAltitudeRef === 1) altitude = -altitude;
-  }
-
-  return { latitude, longitude, altitude };
-}
-
-/**
- * Parse XMP XML buffer into key-value pairs.
- */
-function parseXmp(xmpBuffer: Buffer): Record<string, string> {
-  const xml = xmpBuffer.toString("utf-8");
-  const result: Record<string, string> = {};
-
-  for (const match of xml.matchAll(/(\w+:\w+)="([^"]+)"/g)) {
-    const key = match[1];
-    if (key.startsWith("xmlns:") || key.startsWith("rdf:")) continue;
-    result[key] = match[2];
-  }
-
-  return result;
-}
 
 /**
  * Parse ICC profile buffer into basic info.
@@ -206,33 +135,16 @@ export function registerStripMetadata(app: FastifyInstance) {
         // Parse EXIF
         if (metadata.exif) {
           try {
-            const parsed = exifReader(metadata.exif);
-            const exifData: Record<string, unknown> = {};
-            const gpsData: Record<string, unknown> = {};
+            const parsed = parseExif(metadata.exif);
+            const exifData: Record<string, unknown> = {
+              ...parsed.image,
+              ...parsed.photo,
+              ...parsed.iop,
+            };
+            const gpsData: Record<string, unknown> = { ...parsed.gps };
 
-            if (parsed.Image) {
-              for (const [k, v] of Object.entries(parsed.Image)) {
-                exifData[k] = sanitizeValue(v);
-              }
-            }
-
-            if (parsed.Photo) {
-              for (const [k, v] of Object.entries(parsed.Photo)) {
-                exifData[k] = sanitizeValue(v);
-              }
-            }
-
-            if (parsed.Iop) {
-              for (const [k, v] of Object.entries(parsed.Iop)) {
-                exifData[k] = sanitizeValue(v);
-              }
-            }
-
-            if (parsed.GPSInfo) {
-              for (const [k, v] of Object.entries(parsed.GPSInfo)) {
-                gpsData[k] = sanitizeValue(v);
-              }
-              const coords = parseGpsCoordinates(parsed.GPSInfo as Record<string, unknown>);
+            if (Object.keys(parsed.gps).length > 0) {
+              const coords = parseGps(parsed.gps);
               if (coords.latitude !== null) gpsData._latitude = coords.latitude;
               if (coords.longitude !== null) gpsData._longitude = coords.longitude;
               if (coords.altitude !== null) gpsData._altitude = coords.altitude;

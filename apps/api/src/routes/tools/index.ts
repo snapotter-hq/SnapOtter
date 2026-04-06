@@ -14,6 +14,7 @@ import { registerCompose } from "./compose.js";
 import { registerCompress } from "./compress.js";
 import { registerConvert } from "./convert.js";
 import { registerCrop } from "./crop.js";
+import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEraseObject } from "./erase-object.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
@@ -81,6 +82,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "convert", register: registerConvert },
     { id: "compress", register: registerCompress },
     { id: "strip-metadata", register: registerStripMetadata },
+    { id: "edit-metadata", register: registerEditMetadata },
     { id: "color-adjustments", register: registerColorAdjustments },
 
     // Watermark & Overlay

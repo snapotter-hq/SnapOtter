@@ -64,6 +64,14 @@ export const TOOLS: Tool[] = [
     route: "/strip-metadata",
   },
   {
+    id: "edit-metadata",
+    name: "Edit Metadata",
+    description: "Edit EXIF, GPS, and camera info",
+    category: "optimization",
+    icon: "PenLine",
+    route: "/edit-metadata",
+  },
+  {
     id: "bulk-rename",
     name: "Bulk Rename",
     description: "Rename multiple files with patterns",

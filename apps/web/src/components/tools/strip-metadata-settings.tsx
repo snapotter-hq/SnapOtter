@@ -1,8 +1,11 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Download, Loader2, MapPin } from "lucide-react";
+import { Download, Loader2, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { CollapsibleSection } from "@/components/common/collapsible-section";
+import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface MetadataResult {
@@ -13,160 +16,6 @@ interface MetadataResult {
   gps?: Record<string, unknown> | null;
   icc?: Record<string, string> | null;
   xmp?: Record<string, string> | null;
-}
-
-/** Human-friendly labels for common EXIF keys */
-const EXIF_LABELS: Record<string, string> = {
-  Make: "Camera Make",
-  Model: "Camera Model",
-  Software: "Software",
-  DateTime: "Date/Time",
-  DateTimeOriginal: "Date Taken",
-  DateTimeDigitized: "Date Digitized",
-  ExposureTime: "Exposure Time",
-  FNumber: "F-Number",
-  ISOSpeedRatings: "ISO",
-  FocalLength: "Focal Length",
-  FocalLengthIn35mmFilm: "Focal Length (35mm)",
-  ExposureBiasValue: "Exposure Bias",
-  MeteringMode: "Metering Mode",
-  Flash: "Flash",
-  WhiteBalance: "White Balance",
-  ExposureMode: "Exposure Mode",
-  SceneCaptureType: "Scene Type",
-  Contrast: "Contrast",
-  Saturation: "Saturation",
-  Sharpness: "Sharpness",
-  DigitalZoomRatio: "Digital Zoom",
-  ImageWidth: "Width",
-  ImageLength: "Height",
-  Orientation: "Orientation",
-  XResolution: "X Resolution",
-  YResolution: "Y Resolution",
-  ResolutionUnit: "Resolution Unit",
-  ColorSpace: "Color Space",
-  PixelXDimension: "Pixel Width",
-  PixelYDimension: "Pixel Height",
-  Artist: "Artist",
-  Copyright: "Copyright",
-  ImageDescription: "Description",
-  LensMake: "Lens Make",
-  LensModel: "Lens Model",
-  BodySerialNumber: "Body Serial",
-  CameraOwnerName: "Camera Owner",
-};
-
-/** Keys to skip in display (internal/binary/redundant) */
-const SKIP_KEYS = new Set([
-  "ExifTag",
-  "GPSTag",
-  "InteroperabilityTag",
-  "MakerNote",
-  "PrintImageMatching",
-  "ComponentsConfiguration",
-  "FlashpixVersion",
-  "ExifVersion",
-  "FileSource",
-  "SceneType",
-  "UserComment",
-  "InteroperabilityIndex",
-  "InteroperabilityVersion",
-]);
-
-function formatExifValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return "N/A";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") {
-    if (key === "ExposureTime" && value > 0 && value < 1) {
-      return `1/${Math.round(1 / value)}s`;
-    }
-    if (key === "FNumber") return `f/${value}`;
-    if (key === "FocalLength") return `${value}mm`;
-    if (key === "FocalLengthIn35mmFilm") return `${value}mm`;
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    if (typeof value[0] === "number" && value.length <= 4) {
-      return value.join(", ");
-    }
-    return `[${value.length} values]`;
-  }
-  return String(value);
-}
-
-function CollapsibleSection({
-  title,
-  badge,
-  warning,
-  defaultOpen,
-  children,
-}: {
-  title: string;
-  badge?: string;
-  warning?: boolean;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen ?? false);
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50 transition-colors"
-      >
-        {open ? (
-          <ChevronDown className="h-3 w-3 shrink-0" />
-        ) : (
-          <ChevronRight className="h-3 w-3 shrink-0" />
-        )}
-        <span className="flex-1 text-left">{title}</span>
-        {warning && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
-        {badge && (
-          <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[10px]">
-            {badge}
-          </span>
-        )}
-      </button>
-      {open && <div className="px-3 pb-2">{children}</div>}
-    </div>
-  );
-}
-
-function MetadataGrid({
-  data,
-  labelMap,
-}: {
-  data: Record<string, unknown>;
-  labelMap?: Record<string, string>;
-}) {
-  const entries = Object.entries(data).filter(
-    ([k, v]) =>
-      !SKIP_KEYS.has(k) && !k.startsWith("_") && v !== undefined && v !== null && String(v) !== "",
-  );
-
-  if (entries.length === 0) {
-    return <p className="text-[10px] text-muted-foreground italic">No data</p>;
-  }
-
-  return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-2 gap-y-0.5">
-      {entries.map(([k, v]) => (
-        <div key={k} className="contents">
-          <div className="text-[10px] text-muted-foreground truncate" title={k}>
-            {labelMap?.[k] ?? k}
-          </div>
-          <div
-            className="text-[10px] text-foreground font-mono truncate"
-            title={formatExifValue(k, v)}
-          >
-            {formatExifValue(k, v)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 interface StripMetadataControlsProps {

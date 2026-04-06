@@ -5,6 +5,7 @@ import { compress } from "./operations/compress.js";
 import { contrast } from "./operations/contrast.js";
 import { convert } from "./operations/convert.js";
 import { crop } from "./operations/crop.js";
+import { editMetadata } from "./operations/edit-metadata.js";
 import { flip } from "./operations/flip.js";
 import { grayscale } from "./operations/grayscale.js";
 import { invert } from "./operations/invert.js";
@@ -20,6 +21,7 @@ import type {
   ContrastOptions,
   ConvertOptions,
   CropOptions,
+  EditMetadataOptions,
   FlipOptions,
   OperationResult,
   OutputFormat,
@@ -54,6 +56,7 @@ const OPERATION_MAP: Record<
   grayscale: (img) => grayscale(img),
   sepia: (img) => sepia(img),
   invert: (img) => invert(img),
+  "edit-metadata": (img, opts) => editMetadata(img, opts as unknown as EditMetadataOptions),
 };
 
 const FORMAT_MAP: Record<string, string> = {

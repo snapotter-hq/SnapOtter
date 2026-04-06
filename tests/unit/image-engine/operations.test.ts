@@ -8,6 +8,9 @@ const require = createRequire(
   path.resolve(__dirname, "../../../packages/image-engine/src/index.ts"),
 );
 const sharp = require("sharp") as typeof import("sharp").default;
+const exifReader = require(
+  path.resolve(__dirname, "../../../packages/image-engine/node_modules/exif-reader"),
+) as typeof import("exif-reader").default;
 
 import {
   brightness,
@@ -16,12 +19,18 @@ import {
   contrast,
   convert,
   crop,
+  editMetadata,
   flip,
+  getImageInfo,
   grayscale,
   invert,
+  parseExif,
+  parseGps,
+  parseXmp,
   processImage,
   resize,
   rotate,
+  sanitizeValue,
   saturation,
   sepia,
   stripMetadata,
@@ -44,12 +53,14 @@ let png200x150: Buffer;
 let png1x1: Buffer;
 let jpg100x100: Buffer;
 let webp50x50: Buffer;
+let jpgWithExif: Buffer;
 
 beforeAll(() => {
   png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
   png1x1 = readFileSync(path.join(FIXTURES_DIR, "test-1x1.png"));
   jpg100x100 = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
   webp50x50 = readFileSync(path.join(FIXTURES_DIR, "test-50x50.webp"));
+  jpgWithExif = readFileSync(path.join(FIXTURES_DIR, "test-with-exif.jpg"));
 });
 
 // ---------------------------------------------------------------------------
@@ -1341,5 +1352,208 @@ describe("processImage", () => {
     expect(result.info.size).toBe(result.buffer.length);
     expect(typeof result.info.channels).toBe("number");
     expect(typeof result.info.hasAlpha).toBe("boolean");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shared metadata parsing utilities
+// ---------------------------------------------------------------------------
+describe("sanitizeValue", () => {
+  it("converts Date to ISO string", () => {
+    const d = new Date("2026-01-15T10:30:00Z");
+    expect(sanitizeValue(d)).toBe("2026-01-15T10:30:00.000Z");
+  });
+
+  it("converts small Buffer to number array", () => {
+    const buf = Buffer.from([1, 2, 3]);
+    expect(sanitizeValue(buf)).toEqual([1, 2, 3]);
+  });
+
+  it("converts large Buffer to placeholder string", () => {
+    const buf = Buffer.alloc(300, 0);
+    expect(sanitizeValue(buf)).toBe("<binary 300 bytes>");
+  });
+
+  it("recursively sanitizes objects", () => {
+    const d = new Date("2026-01-01T00:00:00Z");
+    const result = sanitizeValue({ nested: { date: d } });
+    expect(result).toEqual({ nested: { date: "2026-01-01T00:00:00.000Z" } });
+  });
+
+  it("passes through primitives unchanged", () => {
+    expect(sanitizeValue("hello")).toBe("hello");
+    expect(sanitizeValue(42)).toBe(42);
+    expect(sanitizeValue(null)).toBe(null);
+    expect(sanitizeValue(true)).toBe(true);
+  });
+});
+
+describe("parseExif", () => {
+  it("parses EXIF buffer from test fixture", async () => {
+    const metadata = await sharp(jpgWithExif).metadata();
+    expect(metadata.exif).toBeTruthy();
+    const result = parseExif(metadata.exif!);
+    expect(result.image.Artist).toBe("Test Artist");
+    expect(result.image.Copyright).toBe("2026 Test Copyright");
+    expect(result.image.Software).toBe("Stirling-Image Test");
+    expect(result.image.ImageDescription).toBe("Test Description");
+  });
+
+  it("returns empty sections for empty buffer", () => {
+    const result = parseExif(Buffer.from([]));
+    expect(result.image).toEqual({});
+    expect(result.gps).toEqual({});
+  });
+});
+
+describe("parseGps", () => {
+  it("parses DMS coordinates to decimal degrees", () => {
+    const result = parseGps({
+      GPSLatitude: [51, 30, 26.4],
+      GPSLatitudeRef: "N",
+      GPSLongitude: [0, 7, 39.6],
+      GPSLongitudeRef: "W",
+      GPSAltitude: 10,
+      GPSAltitudeRef: 0,
+    });
+    expect(result.latitude).toBeCloseTo(51.5073, 3);
+    expect(result.longitude).toBeCloseTo(-0.1277, 3);
+    expect(result.altitude).toBe(10);
+  });
+
+  it("returns nulls for empty GPS data", () => {
+    const result = parseGps({});
+    expect(result.latitude).toBeNull();
+    expect(result.longitude).toBeNull();
+    expect(result.altitude).toBeNull();
+  });
+
+  it("handles southern hemisphere", () => {
+    const result = parseGps({
+      GPSLatitude: [33, 51, 54],
+      GPSLatitudeRef: "S",
+      GPSLongitude: [151, 12, 36],
+      GPSLongitudeRef: "E",
+    });
+    expect(result.latitude).toBeCloseTo(-33.865, 2);
+    expect(result.longitude).toBeCloseTo(151.21, 2);
+  });
+});
+
+describe("parseXmp", () => {
+  it("extracts key-value pairs from XMP XML", () => {
+    const xml = Buffer.from(
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
+        '<rdf:Description dc:creator="Alice" dc:title="My Photo" />' +
+        "</rdf:RDF></x:xmpmeta>",
+    );
+    const result = parseXmp(xml);
+    expect(result["dc:creator"]).toBe("Alice");
+    expect(result["dc:title"]).toBe("My Photo");
+  });
+
+  it("skips xmlns and rdf namespace prefixes", () => {
+    const xml = Buffer.from(
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+        '<rdf:Description rdf:about="" dc:format="image/jpeg" />' +
+        "</x:xmpmeta>",
+    );
+    const result = parseXmp(xml);
+    expect(result["xmlns:x"]).toBeUndefined();
+    expect(result["xmlns:dc"]).toBeUndefined();
+    expect(result["rdf:about"]).toBeUndefined();
+    expect(result["dc:format"]).toBe("image/jpeg");
+  });
+
+  it("returns empty object for empty buffer", () => {
+    const result = parseXmp(Buffer.from(""));
+    expect(result).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// editMetadata
+// ---------------------------------------------------------------------------
+describe("editMetadata", () => {
+  it("writes common fields readable via exif-reader", async () => {
+    const image = sharp(jpgWithExif);
+    const result = await editMetadata(image, {
+      artist: "New Artist",
+      copyright: "New Copyright",
+    });
+    const buf = await result.jpeg().toBuffer();
+    const meta = await sharp(buf).metadata();
+    expect(meta.exif).toBeTruthy();
+    const parsed = exifReader(meta.exif!);
+    expect(parsed.Image?.Artist).toBe("New Artist");
+    expect(parsed.Image?.Copyright).toBe("New Copyright");
+    // Original fields should be preserved via withExifMerge
+    expect(parsed.Image?.Software).toBe("Stirling-Image Test");
+  });
+
+  it("clears GPS while preserving other EXIF", async () => {
+    // First write GPS to the image
+    const withGps = sharp(jpgWithExif).withExif({
+      IFD0: { Artist: "GPS Test" },
+      IFD3: { GPSLatitudeRef: "N" },
+    });
+    const gpsBuf = await withGps.jpeg().toBuffer();
+
+    const image = sharp(gpsBuf);
+    const result = await editMetadata(image, { clearGps: true });
+    const buf = await result.jpeg().toBuffer();
+    const meta = await sharp(buf).metadata();
+    const parsed = exifReader(meta.exif!);
+    // GPS should be gone
+    expect(parsed.GPSInfo).toBeUndefined();
+    // Other EXIF should still be present
+    expect(parsed.Image?.Artist).toBe("GPS Test");
+  });
+
+  it("removes specific fields via fieldsToRemove", async () => {
+    const image = sharp(jpgWithExif);
+    const result = await editMetadata(image, {
+      fieldsToRemove: ["Software"],
+    });
+    const buf = await result.jpeg().toBuffer();
+    const meta = await sharp(buf).metadata();
+    const parsed = exifReader(meta.exif!);
+    expect(parsed.Image?.Software).toBeUndefined();
+    // Other fields preserved
+    expect(parsed.Image?.Artist).toBe("Test Artist");
+  });
+
+  it("preserves metadata with no options", async () => {
+    const image = sharp(jpgWithExif);
+    const result = await editMetadata(image, {});
+    const buf = await result.jpeg().toBuffer();
+    const meta = await sharp(buf).metadata();
+    expect(meta.exif).toBeTruthy();
+    const parsed = exifReader(meta.exif!);
+    expect(parsed.Image?.Artist).toBe("Test Artist");
+  });
+
+  it("edit wins over remove for same field", async () => {
+    const image = sharp(jpgWithExif);
+    const result = await editMetadata(image, {
+      artist: "Override Artist",
+      fieldsToRemove: ["Artist"],
+    });
+    const buf = await result.jpeg().toBuffer();
+    const meta = await sharp(buf).metadata();
+    const parsed = exifReader(meta.exif!);
+    expect(parsed.Image?.Artist).toBe("Override Artist");
+  });
+
+  it("writes fresh EXIF to image without existing metadata", async () => {
+    const image = sharp(png1x1);
+    const result = await editMetadata(image, {
+      artist: "Fresh Artist",
+      copyright: "Fresh Copyright",
+    });
+    const buf = await result.png().toBuffer();
+    // The operation should not throw
+    expect(buf.length).toBeGreaterThan(0);
   });
 });
