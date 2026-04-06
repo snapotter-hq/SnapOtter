@@ -260,6 +260,9 @@ importers:
       '@stirling-image/shared':
         specifier: workspace:*
         version: link:../shared
+      exif-reader:
+        specifier: ^2.0.3
+        version: 2.0.3
       sharp:
         specifier: ^0.33.0
         version: 0.33.5

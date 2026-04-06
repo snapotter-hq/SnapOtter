@@ -63,6 +63,17 @@ export interface StripMetadataOptions {
   stripAll?: boolean;
 }
 
+export interface EditMetadataOptions {
+  artist?: string;
+  copyright?: string;
+  imageDescription?: string;
+  software?: string;
+  dateTime?: string;
+  dateTimeOriginal?: string;
+  clearGps?: boolean;
+  fieldsToRemove?: string[];
+}
+
 export interface BrightnessOptions {
   value: number; // -100 to +100
 }
