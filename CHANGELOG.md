@@ -1,3 +1,10 @@
+## [1.7.4](https://github.com/stirling-image/stirling-image/compare/v1.7.3...v1.7.4) (2026-04-06)
+
+
+### Bug Fixes
+
+* batch file ordering and format preservation for image tools ([#20](https://github.com/stirling-image/stirling-image/issues/20)) ([822a078](https://github.com/stirling-image/stirling-image/commit/822a078882ba4ade851c68bc8fe115dc69cb2a81)), closes [#13](https://github.com/stirling-image/stirling-image/issues/13) [#14](https://github.com/stirling-image/stirling-image/issues/14)
+
 ## [1.7.3](https://github.com/stirling-image/stirling-image/compare/v1.7.2...v1.7.3) (2026-04-06)
 
 
