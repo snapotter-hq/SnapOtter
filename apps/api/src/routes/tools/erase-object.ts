@@ -63,6 +63,10 @@ export function registerEraseObject(app: FastifyInstance) {
     }
 
     try {
+      request.log.info(
+        { toolId: "erase-object", imageSize: imageBuffer.length, maskSize: maskBuffer.length },
+        "Starting object erasure",
+      );
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
 
@@ -110,6 +114,7 @@ export function registerEraseObject(app: FastifyInstance) {
         processedSize: resultBuffer.length,
       });
     } catch (err) {
+      request.log.error({ err, toolId: "erase-object" }, "Object erasing failed");
       return reply.status(422).send({
         error: "Object erasing failed",
         details: err instanceof Error ? err.message : "Unknown error",
