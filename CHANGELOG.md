@@ -1,3 +1,20 @@
+# [1.8.0](https://github.com/stirling-image/stirling-image/compare/v1.7.7...v1.8.0) (2026-04-06)
+
+
+### Bug Fixes
+
+* filter unsafe round-trip keys server-side in editMetadata ([32bde85](https://github.com/stirling-image/stirling-image/commit/32bde85956c4d99c7b8c255fc3166a79a72644ff))
+
+
+### Features
+
+* add edit-metadata API route with inspect and edit endpoints ([ff07b83](https://github.com/stirling-image/stirling-image/commit/ff07b8301ce3db875307296d62a17037fa960360))
+* add edit-metadata UI component with granular strip support ([dcd600d](https://github.com/stirling-image/stirling-image/commit/dcd600d0f4a4ded2669d3471926d63288aaada84))
+* add EditMetadataOptions type and exif-reader dep to image-engine ([39bc5bc](https://github.com/stirling-image/stirling-image/commit/39bc5bc9eb02f21774fed1c0a4fbdd3d09623483))
+* extract shared metadata parsing utilities into image-engine ([c075849](https://github.com/stirling-image/stirling-image/commit/c07584993f99de2eaa455c9962e3ab3eaadd9613))
+* implement editMetadata operation in image-engine ([f3be1ef](https://github.com/stirling-image/stirling-image/commit/f3be1efd8b03bef84e9237fc3dac8bc6f70ff234))
+* register edit-metadata in shared constants and i18n ([4a424d7](https://github.com/stirling-image/stirling-image/commit/4a424d74b5a82aff26f09b67de3f3ab4c0f5555e))
+
 ## [1.7.7](https://github.com/stirling-image/stirling-image/compare/v1.7.6...v1.7.7) (2026-04-06)
 
 

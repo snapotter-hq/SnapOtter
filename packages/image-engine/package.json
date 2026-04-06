@@ -1,6 +1,6 @@
 {
   "name": "@stirling-image/image-engine",
-  "version": "1.7.7",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
