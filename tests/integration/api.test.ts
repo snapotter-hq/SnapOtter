@@ -2706,7 +2706,7 @@ describe("Batch processing", () => {
       expect(res.headers["content-type"]).toBe("application/zip");
     });
 
-    it("batch includes X-File-Order header", async () => {
+    it("batch includes X-File-Results header", async () => {
       const { body: payload, contentType } = createMultipartPayload([
         { name: "file", filename: "first.png", contentType: "image/png", content: PNG_1x1 },
         { name: "file", filename: "second.png", contentType: "image/png", content: PNG_200x150 },
@@ -2723,7 +2723,10 @@ describe("Batch processing", () => {
         payload,
       });
       expect(res.statusCode).toBe(200);
-      expect(res.headers["x-file-order"]).toBeDefined();
+      expect(res.headers["x-file-results"]).toBeDefined();
+      const parsed = JSON.parse(res.headers["x-file-results"] as string);
+      expect(parsed["0"]).toBeDefined();
+      expect(parsed["1"]).toBeDefined();
     });
 
     it("returns ZIP with content-disposition attachment header", async () => {
@@ -2786,6 +2789,59 @@ describe("Batch processing", () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toBe("application/zip");
+    });
+
+    it("batch returns X-File-Results header with index-to-filename mapping", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "first.png", contentType: "image/png", content: PNG_1x1 },
+        { name: "file", filename: "second.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/resize/batch",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+
+      const fileResults = res.headers["x-file-results"];
+      expect(fileResults).toBeDefined();
+      const parsed = JSON.parse(fileResults as string);
+      expect(parsed["0"]).toBeDefined();
+      expect(parsed["1"]).toBeDefined();
+      expect(typeof parsed["0"]).toBe("string");
+      expect(typeof parsed["1"]).toBe("string");
+    });
+
+    it("batch X-File-Results entries contain original filename stems in order", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "aaa.png", contentType: "image/png", content: PNG_1x1 },
+        { name: "file", filename: "bbb.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "file", filename: "ccc.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/resize/batch",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+
+      const fileResults = JSON.parse(res.headers["x-file-results"] as string);
+      const names = [fileResults["0"], fileResults["1"], fileResults["2"]];
+      expect(names[0]).toContain("aaa");
+      expect(names[1]).toContain("bbb");
+      expect(names[2]).toContain("ccc");
     });
   });
 

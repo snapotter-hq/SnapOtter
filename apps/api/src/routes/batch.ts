@@ -114,62 +114,19 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       };
       updateJobProgress({ ...progress });
 
-      // Tell Fastify we're taking over the response — without this,
-      // Fastify's lifecycle hooks conflict with reply.raw.writeHead()
-      // and can throw unhandled errors that crash the process.
-      reply.hijack();
-
-      // Set up response headers for ZIP streaming.
-      // X-File-Order must be URI-encoded because filenames can contain
-      // spaces/special chars that are invalid in HTTP header values.
-      reply.raw.writeHead(200, {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="batch-${toolId}-${jobId.slice(0, 8)}.zip"`,
-        "Transfer-Encoding": "chunked",
-        "X-Job-Id": jobId,
-        "X-File-Order": files.map((f) => encodeURIComponent(f.filename)).join(","),
-      });
-
-      // Create ZIP archive that pipes directly to the response
-      const archive = archiver("zip", { zlib: { level: 5 } });
-
-      // Handle archive-level errors to prevent unhandled exceptions
-      // that would crash the server process.
-      archive.on("error", (err) => {
-        request.log.error({ err }, "Archiver error during batch processing");
-        if (!reply.raw.writableEnded) {
-          reply.raw.end();
-        }
-      });
-
-      archive.pipe(reply.raw);
-
       // Use p-queue for concurrency control
       const queue = new PQueue({ concurrency: env.CONCURRENT_JOBS });
 
-      // Track unique filenames to avoid collisions in the ZIP
-      const usedNames = new Set<string>();
-      function getUniqueName(name: string): string {
-        if (!usedNames.has(name)) {
-          usedNames.add(name);
-          return name;
-        }
-        const dotIdx = name.lastIndexOf(".");
-        const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-        const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-        let counter = 1;
-        let candidate = `${base}_${counter}${ext}`;
-        while (usedNames.has(candidate)) {
-          counter++;
-          candidate = `${base}_${counter}${ext}`;
-        }
-        usedNames.add(candidate);
-        return candidate;
-      }
+      // All processed buffers are held in memory until ZIP streaming begins.
+      // Peak memory scales with files.length * avg output size. MAX_BATCH_SIZE bounds this.
+      // Collect results in indexed array to preserve upload order
+      const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
+        null,
+      );
 
       // Process all files through the queue
       try {
-        const tasks = files.map((file) =>
+        const tasks = files.map((file, index) =>
           queue.add(async () => {
             progress.currentFile = file.filename;
             updateJobProgress({ ...progress });
@@ -195,8 +152,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               processBuffer = await autoOrient(processBuffer);
               const result = await toolConfig.process(processBuffer, settings, file.filename);
 
-              const zipFilename = getUniqueName(result.filename);
-              archive.append(result.buffer, { name: zipFilename });
+              results[index] = { buffer: result.buffer, filename: result.filename };
 
               progress.completedFiles++;
               updateJobProgress({ ...progress });
@@ -212,7 +168,6 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }),
         );
 
-        // Wait for all tasks to complete
         await Promise.all(tasks);
       } catch (err) {
         request.log.error({ err }, "Unexpected error in batch queue");
@@ -223,7 +178,72 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       progress.currentFile = undefined;
       updateJobProgress({ ...progress });
 
-      // Finalize the ZIP archive (flushes remaining data and ends the stream)
+      // Deduplicate filenames in original order and build X-File-Results header
+      const usedNames = new Set<string>();
+      function getUniqueName(name: string): string {
+        if (!usedNames.has(name)) {
+          usedNames.add(name);
+          return name;
+        }
+        const dotIdx = name.lastIndexOf(".");
+        const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+        const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+        let counter = 1;
+        let candidate = `${base}_${counter}${ext}`;
+        while (usedNames.has(candidate)) {
+          counter++;
+          candidate = `${base}_${counter}${ext}`;
+        }
+        usedNames.add(candidate);
+        return candidate;
+      }
+
+      const fileResultsMap: Record<string, string> = {};
+      for (let i = 0; i < results.length; i++) {
+        const entry = results[i];
+        if (entry) {
+          const uniqueName = getUniqueName(entry.filename);
+          entry.filename = uniqueName;
+          fileResultsMap[String(i)] = uniqueName;
+        }
+      }
+
+      // If every file failed, return an error instead of an empty ZIP
+      if (progress.status === "failed") {
+        return reply.status(422).send({
+          error: "All files failed processing",
+          errors: progress.errors,
+        });
+      }
+
+      // Hijack and stream the ZIP response after all processing
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="batch-${toolId}-${jobId.slice(0, 8)}.zip"`,
+        "Transfer-Encoding": "chunked",
+        "X-Job-Id": jobId,
+        "X-File-Results": JSON.stringify(fileResultsMap),
+      });
+
+      const archive = archiver("zip", { zlib: { level: 5 } });
+
+      archive.on("error", (err) => {
+        request.log.error({ err }, "Archiver error during batch processing");
+        if (!reply.raw.writableEnded) {
+          reply.raw.end();
+        }
+      });
+
+      archive.pipe(reply.raw);
+
+      // Append results in original upload order
+      for (const result of results) {
+        if (result) {
+          archive.append(result.buffer, { name: result.filename });
+        }
+      }
+
       await archive.finalize();
     },
   );
