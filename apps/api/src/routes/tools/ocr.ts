@@ -70,6 +70,15 @@ export function registerOcr(app: FastifyInstance) {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
+      request.log.info(
+        {
+          toolId: "ocr",
+          imageSize: fileBuffer.length,
+          engine: settings.engine,
+          language: settings.language,
+        },
+        "Starting OCR",
+      );
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
 
@@ -110,6 +119,7 @@ export function registerOcr(app: FastifyInstance) {
         engine: result.engine,
       });
     } catch (err) {
+      request.log.error({ err, toolId: "ocr" }, "OCR failed");
       return reply.status(422).send({
         error: "OCR failed",
         details: err instanceof Error ? err.message : "Unknown error",

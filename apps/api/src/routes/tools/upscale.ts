@@ -56,6 +56,10 @@ export function registerUpscale(app: FastifyInstance) {
     try {
       const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
       const scale = Number(settings.scale) || 2;
+      request.log.info(
+        { toolId: "upscale", imageSize: fileBuffer.length, scale },
+        "Starting upscale",
+      );
 
       // Auto-orient to fix EXIF rotation before upscaling
       fileBuffer = await autoOrient(fileBuffer);
@@ -110,6 +114,7 @@ export function registerUpscale(app: FastifyInstance) {
         method: result.method,
       });
     } catch (err) {
+      request.log.error({ err, toolId: "upscale" }, "Upscaling failed");
       return reply.status(422).send({
         error: "Upscaling failed",
         details: err instanceof Error ? err.message : "Unknown error",

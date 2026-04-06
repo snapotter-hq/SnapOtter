@@ -55,6 +55,15 @@ export function registerBlurFaces(app: FastifyInstance) {
 
     try {
       const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+      request.log.info(
+        {
+          toolId: "blur-faces",
+          imageSize: fileBuffer.length,
+          blurRadius: settings.blurRadius,
+          sensitivity: settings.sensitivity,
+        },
+        "Starting face blur",
+      );
 
       // Auto-orient to fix EXIF rotation before face detection
       fileBuffer = await autoOrient(fileBuffer);
@@ -111,6 +120,7 @@ export function registerBlurFaces(app: FastifyInstance) {
         faces: result.faces,
       });
     } catch (err) {
+      request.log.error({ err, toolId: "blur-faces" }, "Face blur failed");
       return reply.status(422).send({
         error: "Face blur failed",
         details: err instanceof Error ? err.message : "Unknown error",

@@ -56,6 +56,10 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
       try {
         const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        request.log.info(
+          { toolId: "remove-background", imageSize: fileBuffer.length, model: settings.model },
+          "Starting background removal",
+        );
         const jobId = randomUUID();
         const workspacePath = await createWorkspace(jobId);
 
@@ -103,6 +107,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           processedSize: resultBuffer.length,
         });
       } catch (err) {
+        request.log.error({ err, toolId: "remove-background" }, "Background removal failed");
         return reply.status(422).send({
           error: "Background removal failed",
           details: err instanceof Error ? err.message : "Unknown error",
