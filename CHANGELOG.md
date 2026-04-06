@@ -1,3 +1,10 @@
+## [1.7.5](https://github.com/stirling-image/stirling-image/compare/v1.7.4...v1.7.5) (2026-04-06)
+
+
+### Bug Fixes
+
+* add server-side logging to AI tool routes ([#23](https://github.com/stirling-image/stirling-image/issues/23)) ([3645de8](https://github.com/stirling-image/stirling-image/commit/3645de89326644c5173cdfee58f6b762cb308609))
+
 ## [1.7.4](https://github.com/stirling-image/stirling-image/compare/v1.7.3...v1.7.4) (2026-04-06)
 
 
