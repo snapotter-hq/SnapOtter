@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/stirling-image/stirling-image/compare/v1.10.0...v1.11.0) (2026-04-07)
+
+
+### Features
+
+* **docs:** auto-generate llms.txt via vitepress-plugin-llms ([ee28ec6](https://github.com/stirling-image/stirling-image/commit/ee28ec66ea137127bb1f4f1bf9e43be0b9f78cbf))
+
 # [1.10.0](https://github.com/stirling-image/stirling-image/compare/v1.9.0...v1.10.0) (2026-04-07)
 
 
