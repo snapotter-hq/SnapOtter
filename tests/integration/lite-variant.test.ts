@@ -35,12 +35,20 @@ describe("Lite variant", () => {
         "blur-faces",
         "erase-object",
         "ocr",
+        "content-aware-resize",
       ]);
     });
   });
 
   describe("AI tool routes return 501", () => {
-    const aiTools = ["remove-background", "upscale", "blur-faces", "erase-object", "ocr"];
+    const aiTools = [
+      "remove-background",
+      "upscale",
+      "blur-faces",
+      "erase-object",
+      "ocr",
+      "content-aware-resize",
+    ];
 
     for (const toolId of aiTools) {
       it(`POST /api/v1/tools/${toolId} returns 501`, async () => {

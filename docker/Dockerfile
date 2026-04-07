@@ -106,7 +106,8 @@ RUN if [ "$VARIANT" = "full" ]; then \
             || echo "WARNING: realesrgan not installed") && \
         (/opt/venv/bin/pip install paddlepaddle-gpu paddleocr || echo "WARNING: PaddleOCR not installed") && \
         (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
-        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
+        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") && \
+        (/opt/venv/bin/pip install seam-carving || echo "WARNING: seam-carving not installed") \
     ; else \
         /opt/venv/bin/pip install \
             Pillow numpy opencv-python-headless onnxruntime && \
@@ -114,7 +115,8 @@ RUN if [ "$VARIANT" = "full" ]; then \
         (/opt/venv/bin/pip install realesrgan || echo "WARNING: realesrgan not installed") && \
         (/opt/venv/bin/pip install paddlepaddle paddleocr || echo "WARNING: PaddleOCR not installed") && \
         (/opt/venv/bin/pip install mediapipe || echo "WARNING: mediapipe not installed") && \
-        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") \
+        (/opt/venv/bin/pip install lama-cleaner || echo "WARNING: lama-cleaner not installed") && \
+        (/opt/venv/bin/pip install seam-carving || echo "WARNING: seam-carving not installed") \
     ; fi \
 ; fi && rm -f /tmp/requirements.txt /tmp/requirements-gpu.txt
 

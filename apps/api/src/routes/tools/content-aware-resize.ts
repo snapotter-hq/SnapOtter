@@ -1,0 +1,156 @@
+import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { seamCarve } from "@stirling-image/ai";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { autoOrient } from "../../lib/auto-orient.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
+import { createWorkspace } from "../../lib/workspace.js";
+import { updateSingleFileProgress } from "../progress.js";
+import { registerToolProcessFn } from "../tool-factory.js";
+
+/** Content-aware resize (seam carving) route. */
+export function registerContentAwareResize(app: FastifyInstance) {
+  app.post(
+    "/api/v1/tools/content-aware-resize",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      let fileBuffer: Buffer | null = null;
+      let filename = "image";
+      let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
+
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk);
+            }
+            fileBuffer = Buffer.concat(chunks);
+            filename = basename(part.filename ?? "image");
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            clientJobId = part.value as string;
+          }
+        }
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to parse multipart request",
+          details: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      if (!fileBuffer || fileBuffer.length === 0) {
+        return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      const validation = await validateImageBuffer(fileBuffer);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+      }
+
+      try {
+        const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        request.log.info(
+          {
+            toolId: "content-aware-resize",
+            imageSize: fileBuffer.length,
+            width: settings.width,
+            height: settings.height,
+            protectFaces: settings.protectFaces,
+          },
+          "Starting content-aware resize",
+        );
+
+        // Auto-orient to fix EXIF rotation before seam carving
+        fileBuffer = await autoOrient(fileBuffer);
+
+        const jobId = randomUUID();
+        const workspacePath = await createWorkspace(jobId);
+
+        // Save input
+        const inputPath = join(workspacePath, "input", filename);
+        await writeFile(inputPath, fileBuffer);
+
+        // Process
+        const jobIdForProgress = clientJobId;
+        const onProgress = jobIdForProgress
+          ? (percent: number, stage: string) => {
+              updateSingleFileProgress({
+                jobId: jobIdForProgress,
+                phase: "processing",
+                stage,
+                percent,
+              });
+            }
+          : undefined;
+
+        const result = await seamCarve(
+          fileBuffer,
+          join(workspacePath, "output"),
+          {
+            width: settings.width,
+            height: settings.height,
+            protectFaces: settings.protectFaces ?? true,
+          },
+          onProgress,
+        );
+
+        // Save output
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
+        const outputPath = join(workspacePath, "output", outputFilename);
+        await writeFile(outputPath, result.buffer);
+
+        if (clientJobId) {
+          updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "complete",
+            percent: 100,
+          });
+        }
+
+        return reply.send({
+          jobId,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          originalSize: fileBuffer.length,
+          processedSize: result.buffer.length,
+          width: result.width,
+          height: result.height,
+        });
+      } catch (err) {
+        request.log.error({ err, toolId: "content-aware-resize" }, "Content-aware resize failed");
+        return reply.status(422).send({
+          error: "Content-aware resize failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    },
+  );
+
+  // Register in the pipeline/batch registry so this tool can be used
+  // as a step in automation pipelines (without progress callbacks).
+  registerToolProcessFn({
+    toolId: "content-aware-resize",
+    settingsSchema: z.object({
+      width: z.number().positive().optional(),
+      height: z.number().positive().optional(),
+      protectFaces: z.boolean().default(true),
+    }),
+    process: async (inputBuffer, settings, filename) => {
+      const s = settings as { width?: number; height?: number; protectFaces?: boolean };
+      const orientedBuffer = await autoOrient(inputBuffer);
+      const jobId = randomUUID();
+      const workspacePath = await createWorkspace(jobId);
+      const result = await seamCarve(orientedBuffer, join(workspacePath, "output"), {
+        width: s.width,
+        height: s.height,
+        protectFaces: s.protectFaces ?? true,
+      });
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
+      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+    },
+  });
+}

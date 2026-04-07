@@ -66,6 +66,10 @@ export const en = {
       description: "Auto-detect and blur faces and sensitive info",
     },
     "smart-crop": { name: "Smart Crop", description: "AI detects subject and crops optimally" },
+    "content-aware-resize": {
+      name: "Content-Aware Resize",
+      description: "Intelligently resize images while preserving important content",
+    },
     "watermark-text": { name: "Text Watermark", description: "Add text watermark overlay" },
     "watermark-image": { name: "Image Watermark", description: "Overlay a logo as watermark" },
     "text-overlay": { name: "Text Overlay", description: "Add styled text to images" },

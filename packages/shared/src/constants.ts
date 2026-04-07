@@ -383,4 +383,5 @@ export const PYTHON_SIDECAR_TOOLS = [
   "blur-faces",
   "erase-object",
   "ocr",
+  "content-aware-resize",
 ] as const;
