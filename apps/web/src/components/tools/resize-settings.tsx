@@ -1,6 +1,6 @@
 import { SOCIAL_MEDIA_PRESETS } from "@stirling-image/shared";
 import { Download, Link, Unlink } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
@@ -30,6 +30,8 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
   const [fit, setFit] = useState<FitMode>("cover");
   const [lockAspect, setLockAspect] = useState(true);
   const [withoutEnlargement, setWithoutEnlargement] = useState(false);
+  const [contentAware, setContentAware] = useState(false);
+  const [protectFaces, setProtectFaces] = useState(true);
 
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -38,7 +40,12 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
 
   useEffect(() => {
     const settings: Record<string, unknown> = {};
-    if (tab === "scale") {
+    if (contentAware) {
+      settings.contentAware = true;
+      if (width) settings.width = Number(width);
+      if (height) settings.height = Number(height);
+      settings.protectFaces = protectFaces;
+    } else if (tab === "scale") {
       settings.percentage = Number(percentage);
     } else {
       if (width) settings.width = Number(width);
@@ -47,7 +54,7 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
       settings.withoutEnlargement = withoutEnlargement;
     }
     onChangeRef.current?.(settings);
-  }, [tab, width, height, percentage, fit, withoutEnlargement]);
+  }, [tab, width, height, percentage, fit, withoutEnlargement, contentAware, protectFaces]);
 
   const handlePreset = (preset: (typeof SOCIAL_MEDIA_PRESETS)[number]) => {
     const key = `${preset.platform}-${preset.name}`;
@@ -65,171 +72,222 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
   const tabClass = (t: ResizeTab) =>
     `flex-1 text-xs py-1.5 rounded ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`;
 
+  const dimensionInputs = (
+    <div className="flex items-end gap-2">
+      <div className="flex-1">
+        <label htmlFor="resize-width" className="text-xs text-muted-foreground">
+          Width (px)
+        </label>
+        <input
+          id="resize-width"
+          type="number"
+          value={width}
+          onChange={(e) => setWidth(e.target.value)}
+          placeholder="Auto"
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => setLockAspect(!lockAspect)}
+        className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
+        title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+      >
+        {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
+      </button>
+      <div className="flex-1">
+        <label htmlFor="resize-height" className="text-xs text-muted-foreground">
+          Height (px)
+        </label>
+        <input
+          id="resize-height"
+          type="number"
+          value={height}
+          onChange={(e) => setHeight(e.target.value)}
+          placeholder="Auto"
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
-      {/* Tab selector */}
-      <div>
-        <div className="flex gap-1">
-          <button type="button" onClick={() => setTab("custom")} className={tabClass("custom")}>
-            Custom Size
-          </button>
-          <button type="button" onClick={() => setTab("scale")} className={tabClass("scale")}>
-            Scale
-          </button>
-          <button type="button" onClick={() => setTab("presets")} className={tabClass("presets")}>
-            Presets
-          </button>
-        </div>
+      {/* Content-aware toggle */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-foreground">Content-aware</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={contentAware}
+          onClick={() => setContentAware(!contentAware)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            contentAware ? "bg-primary" : "bg-muted"
+          }`}
+        >
+          <span
+            className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+              contentAware ? "translate-x-4" : "translate-x-0.5"
+            }`}
+          />
+        </button>
       </div>
 
-      {/* Presets tab */}
-      {tab === "presets" && (
-        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-          {platforms.map((platform) => (
-            <div key={platform}>
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">{platform}</p>
-              <div className="space-y-1">
-                {SOCIAL_MEDIA_PRESETS.filter((p) => p.platform === platform).map((preset) => {
-                  const key = `${preset.platform}-${preset.name}`;
-                  const isSelected = selectedPreset === key;
-                  return (
+      {/* Content-aware inputs */}
+      {contentAware && (
+        <div className="space-y-3">
+          {dimensionInputs}
+
+          {/* Protect faces */}
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={protectFaces}
+              onChange={(e) => setProtectFaces(e.target.checked)}
+              className="rounded"
+            />
+            Protect faces
+          </label>
+        </div>
+      )}
+
+      {/* Standard resize tabs */}
+      {!contentAware && (
+        <>
+          {/* Tab selector */}
+          <div>
+            <div className="flex gap-1">
+              <button type="button" onClick={() => setTab("custom")} className={tabClass("custom")}>
+                Custom Size
+              </button>
+              <button type="button" onClick={() => setTab("scale")} className={tabClass("scale")}>
+                Scale
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("presets")}
+                className={tabClass("presets")}
+              >
+                Presets
+              </button>
+            </div>
+          </div>
+
+          {/* Presets tab */}
+          {tab === "presets" && (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+              {platforms.map((platform) => (
+                <div key={platform}>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">{platform}</p>
+                  <div className="space-y-1">
+                    {SOCIAL_MEDIA_PRESETS.filter((p) => p.platform === platform).map((preset) => {
+                      const key = `${preset.platform}-${preset.name}`;
+                      const isSelected = selectedPreset === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handlePreset(preset)}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-sm transition-colors ${
+                            isSelected
+                              ? "border-primary bg-primary/10 text-foreground"
+                              : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                          }`}
+                        >
+                          <span>{preset.name}</span>
+                          <span className="text-xs tabular-nums">
+                            {preset.width} × {preset.height}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {/* Don't enlarge */}
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={withoutEnlargement}
+                  onChange={(e) => setWithoutEnlargement(e.target.checked)}
+                  className="rounded"
+                />
+                Don&apos;t enlarge
+              </label>
+            </div>
+          )}
+
+          {/* Custom Size tab */}
+          {tab === "custom" && (
+            <div className="space-y-3">
+              {dimensionInputs}
+
+              {/* Fit mode */}
+              <div>
+                <p className="text-xs text-muted-foreground">Fit Mode</p>
+                <div className="flex gap-1 mt-1">
+                  {(Object.keys(FIT_LABELS) as FitMode[]).map((f) => (
                     <button
-                      key={key}
+                      key={f}
                       type="button"
-                      onClick={() => handlePreset(preset)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-sm transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                      }`}
+                      onClick={() => setFit(f)}
+                      className={`flex-1 text-xs py-1.5 rounded ${fit === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                     >
-                      <span>{preset.name}</span>
-                      <span className="text-xs tabular-nums">
-                        {preset.width} × {preset.height}
-                      </span>
+                      {FIT_LABELS[f]}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              {/* Don't enlarge */}
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={withoutEnlargement}
+                  onChange={(e) => setWithoutEnlargement(e.target.checked)}
+                  className="rounded"
+                />
+                Don&apos;t enlarge
+              </label>
+            </div>
+          )}
+
+          {/* Scale tab */}
+          {tab === "scale" && (
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="resize-scale" className="text-xs text-muted-foreground">
+                  Scale (%)
+                </label>
+                <input
+                  id="resize-scale"
+                  type="number"
+                  value={percentage}
+                  onChange={(e) => setPercentage(e.target.value)}
+                  min={1}
+                  className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+                />
+              </div>
+              <div className="flex gap-1">
+                {[25, 50, 75].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setPercentage(String(pct))}
+                    className={`flex-1 text-xs py-1.5 rounded ${
+                      percentage === String(pct)
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-
-          {/* Don't enlarge */}
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={withoutEnlargement}
-              onChange={(e) => setWithoutEnlargement(e.target.checked)}
-              className="rounded"
-            />
-            Don&apos;t enlarge
-          </label>
-        </div>
-      )}
-
-      {/* Custom Size tab */}
-      {tab === "custom" && (
-        <div className="space-y-3">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <label htmlFor="resize-width" className="text-xs text-muted-foreground">
-                Width (px)
-              </label>
-              <input
-                id="resize-width"
-                type="number"
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-                placeholder="Auto"
-                className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setLockAspect(!lockAspect)}
-              className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-              title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-            >
-              {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
-            </button>
-            <div className="flex-1">
-              <label htmlFor="resize-height" className="text-xs text-muted-foreground">
-                Height (px)
-              </label>
-              <input
-                id="resize-height"
-                type="number"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                placeholder="Auto"
-                className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-              />
-            </div>
-          </div>
-
-          {/* Fit mode */}
-          <div>
-            <p className="text-xs text-muted-foreground">Fit Mode</p>
-            <div className="flex gap-1 mt-1">
-              {(Object.keys(FIT_LABELS) as FitMode[]).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFit(f)}
-                  className={`flex-1 text-xs py-1.5 rounded ${fit === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
-                >
-                  {FIT_LABELS[f]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Don't enlarge */}
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={withoutEnlargement}
-              onChange={(e) => setWithoutEnlargement(e.target.checked)}
-              className="rounded"
-            />
-            Don&apos;t enlarge
-          </label>
-        </div>
-      )}
-
-      {/* Scale tab */}
-      {tab === "scale" && (
-        <div className="space-y-3">
-          <div>
-            <label htmlFor="resize-scale" className="text-xs text-muted-foreground">
-              Scale (%)
-            </label>
-            <input
-              id="resize-scale"
-              type="number"
-              value={percentage}
-              onChange={(e) => setPercentage(e.target.value)}
-              min={1}
-              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-            />
-          </div>
-          <div className="flex gap-1">
-            {[25, 50, 75].map((pct) => (
-              <button
-                key={pct}
-                type="button"
-                onClick={() => setPercentage(String(pct))}
-                className={`flex-1 text-xs py-1.5 rounded ${
-                  percentage === String(pct)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {pct}%
-              </button>
-            ))}
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -237,10 +295,19 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
 
 export function ResizeSettings() {
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
-    useToolProcessor("resize");
+  const standardResize = useToolProcessor("resize");
+  const contentAwareResize = useToolProcessor("content-aware-resize");
 
   const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [isContentAware, setIsContentAware] = useState(false);
+
+  const handleSettingsChange = useCallback((newSettings: Record<string, unknown>) => {
+    setSettings(newSettings);
+    setIsContentAware(!!newSettings.contentAware);
+  }, []);
+
+  const active = isContentAware ? contentAwareResize : standardResize;
+  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } = active;
 
   const handleProcess = () => {
     if (files.length > 1) {
@@ -255,9 +322,11 @@ export function ResizeSettings() {
   const canProcess =
     hasFile &&
     !processing &&
-    (tab === "scale"
-      ? Number(settings.percentage) > 0
-      : Boolean(settings.width) || Boolean(settings.height));
+    (isContentAware
+      ? Boolean(settings.width) || Boolean(settings.height)
+      : tab === "scale"
+        ? Number(settings.percentage) > 0
+        : Boolean(settings.width) || Boolean(settings.height));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,7 +335,7 @@ export function ResizeSettings() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <ResizeControls onChange={setSettings} />
+      <ResizeControls onChange={handleSettingsChange} />
 
       {/* Error */}
       {error && <p className="text-xs text-red-500">{error}</p>}
