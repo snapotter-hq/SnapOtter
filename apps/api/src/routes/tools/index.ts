@@ -12,6 +12,7 @@ import { registerColorPalette } from "./color-palette.js";
 import { registerCompare } from "./compare.js";
 import { registerCompose } from "./compose.js";
 import { registerCompress } from "./compress.js";
+import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConvert } from "./convert.js";
 import { registerCrop } from "./crop.js";
 import { registerEditMetadata } from "./edit-metadata.js";
@@ -126,6 +127,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "blur-faces", register: registerBlurFaces },
     { id: "erase-object", register: registerEraseObject },
     { id: "smart-crop", register: registerSmartCrop },
+    { id: "content-aware-resize", register: registerContentAwareResize },
   ];
 
   let skipped = 0;
