@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import llmstxt from "vitepress-plugin-llms";
 
 export default defineConfig({
   title: "Stirling Image",
@@ -13,6 +14,45 @@ export default defineConfig({
     ["link", { rel: "icon", type: "image/svg+xml", href: "/stirling-image/favicon.svg" }],
     ["link", { rel: "llms-txt", href: "/stirling-image/llms.txt" }],
   ],
+
+  vite: {
+    plugins: [
+      llmstxt({
+        domain: "https://stirling-image.github.io",
+        customLLMsTxtTemplate: `# {title}
+
+{description}
+
+{details}
+
+## Docs
+
+{toc}
+
+## API Quick Reference
+
+- Base URL: \`http://localhost:1349\`
+- Auth: Session token via \`POST /api/auth/login\` or API key (\`Authorization: Bearer si_...\`)
+- Tools: \`POST /api/v1/tools/{toolId}\` (multipart: file + settings JSON)
+- Batch: \`POST /api/v1/tools/{toolId}/batch\` (multiple files, returns ZIP)
+- Pipelines: \`POST /api/v1/pipeline/execute\` (chain tools sequentially)
+- Interactive API docs on running instance: \`/api/docs\`
+- OpenAPI spec on running instance: \`/api/v1/openapi.yaml\`
+
+## Source
+
+- [GitHub](https://github.com/stirling-image/stirling-image)
+- License: AGPLv3 (commercial license also available)
+`,
+        customTemplateVariables: {
+          description:
+            "Self-hosted, open-source image processing platform with 30+ tools. Runs in a single Docker container. Available as :latest (full, ~11 GB with AI/ML) or :lite (~1.5 GB, image processing only).",
+          details:
+            "Resize, compress, convert, remove backgrounds, upscale, run OCR, and more - without sending images to external services.",
+        },
+      }),
+    ],
+  },
 
   themeConfig: {
     logo: "/logo.svg",
