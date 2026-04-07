@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/stirling-image/stirling-image/compare/v1.8.0...v1.8.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* add variant diagnostics to health endpoint and lite mode banner ([2c6e499](https://github.com/stirling-image/stirling-image/commit/2c6e4996d5d711d1d20fb6105f55da48d6f04c62))
+
 # [1.8.0](https://github.com/stirling-image/stirling-image/compare/v1.7.7...v1.8.0) (2026-04-06)
 
 
