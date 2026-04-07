@@ -136,6 +136,9 @@ const BarcodeReadSettings = lazy(() =>
 const CollageSettings = lazy(() =>
   import("@/components/tools/collage-settings").then((m) => ({ default: m.CollageSettings })),
 );
+const StitchSettings = lazy(() =>
+  import("@/components/tools/stitch-settings").then((m) => ({ default: m.StitchSettings })),
+);
 const SplitSettings = lazy(() =>
   import("@/components/tools/split-settings").then((m) => ({ default: m.SplitSettings })),
 );
@@ -274,6 +277,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
 
   // Layout & Composition
   ["collage", { displayMode: "before-after", Settings: CollageSettings }],
+  ["stitch", { displayMode: "no-comparison", Settings: StitchSettings }],
   ["split", { displayMode: "before-after", Settings: SplitSettings }],
   ["border", { displayMode: "before-after", Settings: BorderSettings }],
 

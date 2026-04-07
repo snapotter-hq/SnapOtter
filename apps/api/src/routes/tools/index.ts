@@ -29,6 +29,7 @@ import { registerResize } from "./resize.js";
 import { registerRotate } from "./rotate.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
+import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
 import { registerTextOverlay } from "./text-overlay.js";
@@ -101,6 +102,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
 
     // Layout & Composition
     { id: "collage", register: registerCollage },
+    { id: "stitch", register: registerStitch },
     { id: "split", register: registerSplit },
     { id: "border", register: registerBorder },
 

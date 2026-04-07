@@ -86,6 +86,7 @@ export const en = {
       description: "Read QR codes and barcodes from images",
     },
     collage: { name: "Collage / Grid", description: "Combine images into a grid layout" },
+    stitch: { name: "Stitch", description: "Join images side by side or top to bottom" },
     split: { name: "Image Splitting", description: "Split image into grid parts" },
     border: { name: "Border & Frame", description: "Add borders, rounded corners, shadows" },
     "svg-to-raster": {

@@ -277,6 +277,14 @@ export const TOOLS: Tool[] = [
     route: "/collage",
   },
   {
+    id: "stitch",
+    name: "Stitch",
+    description: "Join images side by side or top to bottom",
+    category: "layout",
+    icon: "Columns",
+    route: "/stitch",
+  },
+  {
     id: "split",
     name: "Image Splitting",
     description: "Split image into grid parts",

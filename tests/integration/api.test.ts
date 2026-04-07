@@ -1627,6 +1627,136 @@ describe("API Keys", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// STITCH
+// ═══════════════════════════════════════════════════════════════════════════
+describe("POST /api/v1/tools/stitch", () => {
+  it("stitches two images horizontally with default settings", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.jobId).toBeDefined();
+    expect(body.downloadUrl).toMatch(/\/api\/v1\/download\//);
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  it("stitches vertically", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+      { name: "settings", content: JSON.stringify({ direction: "vertical" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("outputs jpeg when requested", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+      { name: "settings", content: JSON.stringify({ format: "jpeg" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.downloadUrl).toMatch(/stitch\.jpeg$/);
+  });
+
+  it("returns 400 with only one image", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/at least 2/i);
+  });
+
+  it("returns 400 with no images", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("accepts gap and backgroundColor settings", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ gap: 10, backgroundColor: "#FF0000" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PIPELINE
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline", () => {
