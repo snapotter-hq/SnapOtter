@@ -16,6 +16,10 @@ apps/api/data/
 apps/api/tmp/
 apps/web/.vite/
 
+# Python
+__pycache__/
+*.pyc
+
 # Build artifacts
 coverage/
 *.tsbuildinfo
