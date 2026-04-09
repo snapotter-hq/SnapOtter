@@ -49,28 +49,10 @@ jobs:
           fi
 
   docker:
-    name: Docker (${{ matrix.tag }})
+    name: Docker Build & Push
     needs: release
     if: needs.release.outputs.new_version != ''
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - tag: full
-            variant: full
-            gpu: "false"
-            suffix: ""
-            platforms: "linux/amd64,linux/arm64"
-          - tag: lite
-            variant: lite
-            gpu: "false"
-            suffix: "-lite"
-            platforms: "linux/amd64,linux/arm64"
-          - tag: cuda
-            variant: full
-            gpu: "true"
-            suffix: "-cuda"
-            platforms: "linux/amd64"
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
@@ -104,10 +86,10 @@ jobs:
             stirlingimage/stirling-image
             ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}}.{{minor}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}}${{ matrix.suffix }},value=v${{ needs.release.outputs.new_version }}
-            type=raw,value=${{ matrix.tag == 'full' && 'latest' || matrix.tag }}
+            type=semver,pattern={{version}},value=v${{ needs.release.outputs.new_version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.release.outputs.new_version }}
+            type=semver,pattern={{major}},value=v${{ needs.release.outputs.new_version }}
+            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -115,11 +97,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          build-args: |
-            VARIANT=${{ matrix.variant }}
-            GPU=${{ matrix.gpu }}
-          platforms: ${{ matrix.platforms }}
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+          cache-from: type=gha,scope=unified
+          cache-to: type=gha,mode=max,scope=unified
