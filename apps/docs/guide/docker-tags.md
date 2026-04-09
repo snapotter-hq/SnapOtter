@@ -1,53 +1,28 @@
-# Docker Image Tags
+# Docker Image
 
-Stirling Image ships three Docker image variants to fit different use cases.
+Stirling Image ships as a single Docker image that works on all platforms.
 
-## Full (default)
-
-```bash
-docker pull stirlingimage/stirling-image:latest
-```
-
-Includes all tools: image processing, AI-powered background removal, upscaling, face blurring, object erasing, and OCR. Size is ~11 GB due to bundled ML models.
-
-## Lite
+## Quick start
 
 ```bash
-docker pull stirlingimage/stirling-image:lite
+docker run -d -p 1349:1349 -v stirling-data:/data stirlingimage/stirling-image:latest
 ```
 
-Includes all image processing tools (resize, crop, rotate, convert, compress, watermark, collage, and 20+ more) but excludes AI/ML tools. Size is ~1-2 GB.
+The app is available at `http://localhost:1349`.
 
-Use this if you:
-- Only need standard image processing (no AI features)
-- Are running on constrained hardware (Raspberry Pi, small VPS)
-- Want faster pulls and smaller disk footprint
+## GPU acceleration
 
-### Tools excluded from lite
-
-| Tool | What it does |
-|------|-------------|
-| Remove Background | AI-powered background removal |
-| Upscale | AI super-resolution upscaling |
-| Blur Faces | AI face detection and blurring |
-| Erase Object | AI inpainting to remove objects |
-| OCR | Optical character recognition |
-
-All other tools (27+) work identically in both variants.
-
-## CUDA (GPU acceleration)
+The image includes CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
 
 ```bash
-docker pull stirlingimage/stirling-image:cuda
+docker run -d --gpus all -p 1349:1349 -v stirling-data:/data stirlingimage/stirling-image:latest
 ```
 
-Same tools as the full image, but built with GPU-accelerated Python packages (onnxruntime-gpu, PyTorch CUDA, PaddlePaddle GPU). The image auto-detects your NVIDIA GPU at runtime and falls back to CPU if none is found.
-
-Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host. Linux amd64 only.
+The image auto-detects your GPU at runtime. Without `--gpus all`, it runs on CPU. Same image either way.
 
 ### Benchmarks
 
-Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait. Both images ran on the same machine. "Warm" means the model is already loaded in memory (second request onward).
+Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 
 #### Warm performance
 
@@ -68,10 +43,6 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait. Both im
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 | OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
 
-Cold start includes loading the model into memory. GPU cold starts are faster because CUDA parallelizes the model loading.
-
-Larger images show bigger speedups, especially for upscaling. Non-AI tools (resize, crop, convert, etc.) are unaffected since they use Sharp (CPU-based).
-
 ### GPU health check
 
 After the first AI request, the admin health endpoint reports GPU status:
@@ -83,8 +54,6 @@ GET /api/v1/admin/health
 
 ## Docker Compose
 
-### Full
-
 ```yaml
 services:
   stirling-image:
@@ -94,35 +63,24 @@ services:
     volumes:
       - stirling-data:/data
       - stirling-workspace:/tmp/workspace
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   stirling-data:
   stirling-workspace:
 ```
 
-### Lite
+For GPU acceleration via Docker Compose, add the deploy section:
 
 ```yaml
 services:
   stirling-image:
-    image: stirlingimage/stirling-image:lite
-    ports:
-      - "1349:1349"
-    volumes:
-      - stirling-data:/data
-      - stirling-workspace:/tmp/workspace
-
-volumes:
-  stirling-data:
-  stirling-workspace:
-```
-
-### CUDA
-
-```yaml
-services:
-  stirling-image:
-    image: stirlingimage/stirling-image:cuda
+    image: stirlingimage/stirling-image:latest
     ports:
       - "1349:1349"
     volumes:
@@ -135,35 +93,34 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    restart: unless-stopped
 
 volumes:
   stirling-data:
   stirling-workspace:
 ```
 
-## Switching from lite to full
-
-To upgrade from lite to full and unlock AI tools:
-
-1. Stop your container
-2. Pull the full image: `docker pull stirlingimage/stirling-image:latest`
-3. Update your compose file or run command to use `:latest` instead of `:lite`
-4. Start the container
-
-Your data and settings are preserved in the volumes.
-
 ## Version pinning
-
-Both variants support semver tags for pinning:
 
 | Tag | Description |
 |-----|------------|
-| `latest` | Latest full release |
-| `lite` | Latest lite release |
-| `cuda` | Latest full release with GPU support |
-| `1.6.0` | Exact full version |
-| `1.6.0-lite` | Exact lite version |
-| `1.6.0-cuda` | Exact CUDA version |
-| `1.6` | Latest patch in 1.6.x (full) |
-| `1.6-lite` | Latest patch in 1.6.x (lite) |
-| `1.6-cuda` | Latest patch in 1.6.x (CUDA) |
+| `latest` | Latest release |
+| `1.11.0` | Exact version |
+| `1.11` | Latest patch in 1.11.x |
+| `1` | Latest minor in 1.x |
+
+## Platforms
+
+| Architecture | GPU support | Notes |
+|---|---|---|
+| linux/amd64 | NVIDIA CUDA | Full GPU acceleration for AI tools |
+| linux/arm64 | CPU only | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
+
+## Migration from previous tags
+
+If you were using `:lite` or `:cuda` tags, switch to `:latest`:
+
+- **From `:lite`**: Pull `:latest`. You now have all AI tools included.
+- **From `:cuda`**: Pull `:latest` and keep `--gpus all`. Same GPU support, unified image.
+
+Your data and settings are preserved in the volumes.

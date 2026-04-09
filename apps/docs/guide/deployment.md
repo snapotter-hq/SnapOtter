@@ -1,16 +1,8 @@
 # Deployment
 
-Stirling Image ships as a single Docker container. The image supports **linux/amd64** and **linux/arm64**, so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
+Stirling Image ships as a single Docker container. The image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
 
-Three variants are available:
-
-| Variant | Tag | Size | What's included |
-|---------|-----|------|-----------------|
-| Full | `:latest` | ~11 GB | All tools + AI/ML (background removal, upscaling, OCR, face blur, object eraser) |
-| Lite | `:lite` | ~1.5 GB | All image processing tools, no AI/ML |
-| CUDA | `:cuda` | ~14 GB | Full + GPU-accelerated AI (NVIDIA only, amd64) |
-
-See [Docker Tags](./docker-tags) for the full comparison, Docker Compose examples, and version pinning.
+See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
 ## Docker Compose (recommended)
 
@@ -64,14 +56,14 @@ Everything runs from a single process. The Fastify server handles API requests a
 - RealESRGAN (upscaling)
 - PaddleOCR (text recognition)
 - MediaPipe (face detection)
-- LaMa Cleaner (inpainting/object removal)
+- OpenCV (inpainting/object removal)
 - onnxruntime, opencv-python, Pillow, numpy
 
-Model weights are downloaded at build time, so the container works fully offline. The lite image (`:lite`) skips all Python packages and model downloads.
+Model weights are downloaded at build time, so the container works fully offline.
 
 ### Architecture notes
 
-All core image tools (resize, crop, compress, convert, watermark, etc.) work on both amd64 and arm64. Some ML packages (PaddleOCR, MediaPipe, LaMa Cleaner) have limited arm64 support and may be unavailable on ARM systems. The container logs a warning for any package that could not be installed and falls back gracefully — Tesseract handles OCR and Lanczos handles upscaling when the ML alternatives are missing.
+All tools work on both amd64 and arm64. AI tools (background removal, upscaling, OCR, face detection) use CUDA-accelerated packages on amd64 and CPU packages on arm64. GPU acceleration is auto-detected at runtime when `--gpus all` is passed.
 
 ## Volumes
 
@@ -120,7 +112,7 @@ Set `client_max_body_size` to match your `MAX_UPLOAD_SIZE_MB` value.
 
 The GitHub repository has two workflows:
 
-- **release.yml** -- On release, builds multi-arch Docker images (amd64 + arm64) for both the full and lite variants, and pushes to Docker Hub (`stirlingimage/stirling-image`) and GitHub Container Registry (`ghcr.io/stirling-image/stirling-image`).
+- **release.yml** -- On release, builds a multi-arch Docker image (amd64 + arm64), and pushes to Docker Hub (`stirlingimage/stirling-image`) and GitHub Container Registry (`ghcr.io/stirling-image/stirling-image`).
 - **deploy-docs.yml** -- Builds this documentation site and deploys it to GitHub Pages.
 
 Both run automatically. No manual steps needed after merging to `main`.

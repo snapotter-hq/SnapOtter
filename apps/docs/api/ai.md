@@ -4,12 +4,8 @@ The `@stirling-image/ai` package wraps Python ML models in TypeScript functions.
 
 All model weights are bundled in the Docker image during the build. No downloads happen at runtime.
 
-::: warning Lite image
-AI tools are not available in the `:lite` Docker image. The API returns `501 Not Available` for these endpoints when running the lite variant. Use `:latest` for AI features. See [Docker Tags](/guide/docker-tags) for details.
-:::
-
 ::: tip GPU acceleration
-The `:cuda` Docker image includes GPU-accelerated versions of the ML libraries. Background removal, upscaling, and OCR all benefit from NVIDIA GPU acceleration. The image auto-detects your GPU and falls back to CPU if none is available. See [Docker Tags](/guide/docker-tags) for setup.
+The Docker image includes CUDA-accelerated ML libraries on amd64. Add `--gpus all` to your Docker run command to enable GPU acceleration. The image auto-detects your GPU and falls back to CPU if none is available.
 :::
 
 ## Background removal
@@ -73,7 +69,7 @@ Returns the blurred image along with metadata about each detected face region (b
 
 Removes objects from images by filling in the area with generated content that matches the surroundings.
 
-**Model:** [LaMa](https://github.com/advimman/lama) (Large Mask Inpainting)
+**Model:** OpenCV TELEA algorithm
 
 Takes an image and a mask (white = area to erase, black = keep). Returns the inpainted image.
 

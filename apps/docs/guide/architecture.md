@@ -34,7 +34,7 @@ Supported operations:
 - **Upscaling** -- RealESRGAN
 - **OCR** -- PaddleOCR
 - **Face detection/blurring** -- MediaPipe
-- **Object erasing (inpainting)** -- LaMa Cleaner
+- **Object erasing (inpainting)** -- OpenCV
 
 Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works offline.
 
