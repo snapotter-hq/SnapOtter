@@ -1,32 +1,24 @@
-name: stirling-image
-
 services:
   stirling-image:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: stirling-image
+    image: stirlingimage/stirling-image:latest
     ports:
       - "1349:1349"
+    volumes:
+      - stirling-data:/data
+      - stirling-workspace:/tmp/workspace
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - STORAGE_MODE=local
-      - FILE_MAX_AGE_HOURS=24
-      - CLEANUP_INTERVAL_MINUTES=30
-      - MAX_UPLOAD_SIZE_MB=100
-      - MAX_BATCH_SIZE=200
-      - CONCURRENT_JOBS=3
-      - MAX_MEGAPIXELS=100
-      - RATE_LIMIT_PER_MIN=100
-      - DEFAULT_THEME=light
-      - DEFAULT_LOCALE=en
-      - APP_NAME=Stirling Image
-    volumes:
-      - stirling-data:/data
-      - stirling-workspace:/tmp/workspace
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   stirling-data:
