@@ -1,3 +1,24 @@
+# [1.13.0](https://github.com/stirling-image/stirling-image/compare/v1.12.0...v1.13.0) (2026-04-10)
+
+
+### Bug Fixes
+
+* complete RBAC implementation lost during merge ([cc8a272](https://github.com/stirling-image/stirling-image/commit/cc8a27239b02a63ca88abc3e363c8a46f89674e8))
+
+
+### Features
+
+* add backend permission map and requirePermission middleware ([1a99571](https://github.com/stirling-image/stirling-image/commit/1a995711535a1525e709cdd7bff75361f457e942))
+* add permission checks and admin override to API key routes ([d776680](https://github.com/stirling-image/stirling-image/commit/d776680f2d2342e35b84821792d6c24ae7e0ffbc))
+* add permission checks and admin override to pipeline routes ([59f40db](https://github.com/stirling-image/stirling-image/commit/59f40dbfd4a97f8691b5fbbf6d338063c389987b))
+* add permission checks and ownership scoping to user-files routes ([86ba698](https://github.com/stirling-image/stirling-image/commit/86ba69825a1dd87c9f868d79cd806b7d594cce1b))
+* add shared Permission and Role types ([2f594e9](https://github.com/stirling-image/stirling-image/commit/2f594e96057c72bf107f3012426e87af5f97eb94))
+* add tools:use permission check to tool, batch, pipeline, and upload routes ([885ace5](https://github.com/stirling-image/stirling-image/commit/885ace54f09b3301989f8aa404c15f60e19c054d))
+* extend useAuth hook with role and permissions from session ([e0ba8be](https://github.com/stirling-image/stirling-image/commit/e0ba8be7b3211299c8cde90b2d22e7796eee2206))
+* filter settings tabs by user permissions, remove admin fallback ([bcbd24a](https://github.com/stirling-image/stirling-image/commit/bcbd24a2395b93b64dbbf638ba0138f9ec9ba9da))
+* include permissions and teamName in login/session responses ([4943177](https://github.com/stirling-image/stirling-image/commit/49431772ec6a02eae8aced48da92ef87a6c89afb))
+* replace requireAdmin with requirePermission on all routes ([af7f57d](https://github.com/stirling-image/stirling-image/commit/af7f57d52f49c8f8412876639076084c96eba284))
+
 # [1.12.0](https://github.com/stirling-image/stirling-image/compare/v1.11.0...v1.12.0) (2026-04-10)
 
 
