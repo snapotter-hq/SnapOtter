@@ -4,6 +4,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: stirlingimage/stirling-image:latest
+    container_name: stirling-image
     ports:
       - "1349:1349"
     volumes:

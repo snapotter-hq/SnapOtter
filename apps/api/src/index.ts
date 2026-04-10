@@ -23,6 +23,14 @@ import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 
+// Warn about deprecated STIRLING_VARIANT env var
+if (process.env.STIRLING_VARIANT) {
+  console.warn(
+    `WARNING: STIRLING_VARIANT="${process.env.STIRLING_VARIANT}" is set but ignored. ` +
+      "There is now a single unified image with all features. Remove STIRLING_VARIANT from your environment.",
+  );
+}
+
 // Run before anything else
 runMigrations();
 console.log("Database initialized");
@@ -112,7 +120,7 @@ await docsRoutes(app);
 app.get("/api/v1/health", async (_request, reply) => {
   let dbOk = false;
   try {
-    db.select().from(schema.settings).limit(1).all();
+    db.select().from(schema.settings).limit(1).get();
     dbOk = true;
   } catch {
     /* db unreachable */

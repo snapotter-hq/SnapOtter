@@ -78,8 +78,8 @@ def main():
             emit_progress(95, "Saving result")
             result.save(output_path)
             method = "realesrgan"
-        except ImportError:
-            # RealESRGAN not installed - fall back to Lanczos
+        except (ImportError, FileNotFoundError, RuntimeError, OSError):
+            # RealESRGAN unavailable or failed - fall back to Lanczos
             emit_progress(50, "Upscaling with Lanczos")
             img_upscaled = img.resize(new_size, Image.LANCZOS)
             emit_progress(95, "Saving result")

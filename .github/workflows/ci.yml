@@ -87,11 +87,14 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           push: false
+          platforms: linux/amd64,linux/arm64
           tags: stirling-image:ci
           cache-from: type=gha,scope=unified
           cache-to: type=gha,mode=max,scope=unified
