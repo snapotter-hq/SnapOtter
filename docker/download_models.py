@@ -7,6 +7,12 @@ import os
 import sys
 import urllib.request
 
+# Force CPU mode during build - no GPU driver available at build time.
+# Must be set before any ML library import.
+os.environ["PADDLE_DEVICE"] = "cpu"
+os.environ["FLAGS_use_cuda"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 REALESRGAN_MODEL_DIR = "/opt/models/realesrgan"
 REALESRGAN_MODEL_URL = (
     "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
@@ -58,6 +64,9 @@ def download_paddleocr_models():
     """Pre-download PaddleOCR models for all supported languages."""
     print("=== Downloading PaddleOCR models ===")
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+    # Force CPU mode during build - no GPU driver available at build time
+    os.environ["PADDLE_DEVICE"] = "cpu"
+    os.environ["FLAGS_use_cuda"] = "0"
     from paddleocr import PaddleOCR
 
     for lang in PADDLEOCR_LANGUAGES:
