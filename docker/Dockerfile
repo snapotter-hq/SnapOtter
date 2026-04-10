@@ -101,6 +101,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     /opt/venv/bin/pip install realesrgan==0.3.0 \
         --extra-index-url https://download.pytorch.org/whl/cu126 && \
     /opt/venv/bin/pip install paddlepaddle-gpu==3.0.0 paddleocr==2.9.1 \
+        -i https://www.paddlepaddle.org.cn/packages/stable/cu126/ \
 ; else \
     /opt/venv/bin/pip install "rembg[cpu]==2.0.62" && \
     /opt/venv/bin/pip install realesrgan==0.3.0 && \
