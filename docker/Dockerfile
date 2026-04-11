@@ -36,13 +36,27 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
     pnpm --filter @stirling-image/web build
 
 # ============================================
-# Stage 2: Platform-specific base images
+# Stage 2: Build caire (content-aware resize)
+# ============================================
+FROM golang:1.23-bookworm AS caire-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev \
+    libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev \
+    libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev \
+    libvulkan-dev libxfixes-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN go install github.com/esimov/caire/cmd/caire@v1.5.0
+
+# ============================================
+# Stage 3: Platform-specific base images
 # ============================================
 FROM node:22-bookworm AS base-linux-arm64
 FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS base-linux-amd64
 
 # ============================================
-# Stage 3: Production runtime
+# Stage 4: Production runtime
 # ============================================
 ARG TARGETOS
 ARG TARGETARCH
@@ -78,7 +92,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     build-essential \
     libgl1 libglib2.0-0 \
+    libegl1 libwayland-egl1 libwayland-client0 libwayland-cursor0 \
+    libxkbcommon-x11-0 libxkbcommon0 libxcursor1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Caire binary (content-aware seam carving)
+COPY --from=caire-builder /go/bin/caire /usr/local/bin/caire
 
 # Python venv - Layer 1: Base packages (rarely change, ~3 GB)
 RUN python3 -m venv /opt/venv && \
@@ -115,8 +134,6 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 ; else \
     /opt/venv/bin/pip install mediapipe==0.10.18 \
 ; fi
-
-RUN /opt/venv/bin/pip install seam-carving==1.1.0
 
 # Pre-download and verify all ML models
 # Note: on amd64, paddlepaddle-gpu can't import without the CUDA driver (only

@@ -7,10 +7,20 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-/** Content-aware resize (seam carving) route. */
+const settingsSchema = z.object({
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  protectFaces: z.boolean().default(false),
+  blurRadius: z.number().min(0).max(20).default(4),
+  sobelThreshold: z.number().min(1).max(20).default(2),
+  square: z.boolean().default(false),
+});
+
+type Settings = z.infer<typeof settingsSchema>;
+
+/** Content-aware resize (seam carving via caire) route. */
 export function registerContentAwareResize(app: FastifyInstance) {
   app.post(
     "/api/v1/tools/content-aware-resize",
@@ -18,7 +28,6 @@ export function registerContentAwareResize(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;
-      let clientJobId: string | null = null;
 
       try {
         const parts = request.parts();
@@ -32,8 +41,6 @@ export function registerContentAwareResize(app: FastifyInstance) {
             filename = basename(part.filename ?? "image");
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
-          } else if (part.fieldname === "clientJobId") {
-            clientJobId = part.value as string;
           }
         }
       } catch (err) {
@@ -52,15 +59,37 @@ export function registerContentAwareResize(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
+      // Validate settings
+      let settings: Settings;
       try {
-        const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: result.error.issues.map((i) => ({
+              path: i.path.join("."),
+              message: i.message,
+            })),
+          });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      if (!settings.square && !settings.width && !settings.height) {
+        return reply.status(400).send({
+          error: "Either width, height, or square mode must be specified",
+        });
+      }
+
+      try {
         request.log.info(
           {
             toolId: "content-aware-resize",
             imageSize: fileBuffer.length,
-            width: settings.width,
-            height: settings.height,
-            protectFaces: settings.protectFaces,
+            ...settings,
           },
           "Starting content-aware resize",
         );
@@ -75,42 +104,20 @@ export function registerContentAwareResize(app: FastifyInstance) {
         const inputPath = join(workspacePath, "input", filename);
         await writeFile(inputPath, fileBuffer);
 
-        // Process
-        const jobIdForProgress = clientJobId;
-        const onProgress = jobIdForProgress
-          ? (percent: number, stage: string) => {
-              updateSingleFileProgress({
-                jobId: jobIdForProgress,
-                phase: "processing",
-                stage,
-                percent,
-              });
-            }
-          : undefined;
-
-        const result = await seamCarve(
-          fileBuffer,
-          join(workspacePath, "output"),
-          {
-            width: settings.width,
-            height: settings.height,
-            protectFaces: settings.protectFaces ?? true,
-          },
-          onProgress,
-        );
+        // Process with caire
+        const result = await seamCarve(fileBuffer, join(workspacePath, "output"), {
+          width: settings.width,
+          height: settings.height,
+          protectFaces: settings.protectFaces,
+          blurRadius: settings.blurRadius,
+          sobelThreshold: settings.sobelThreshold,
+          square: settings.square,
+        });
 
         // Save output
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
         const outputPath = join(workspacePath, "output", outputFilename);
         await writeFile(outputPath, result.buffer);
-
-        if (clientJobId) {
-          updateSingleFileProgress({
-            jobId: clientJobId,
-            phase: "complete",
-            percent: 100,
-          });
-        }
 
         return reply.send({
           jobId,
@@ -130,24 +137,22 @@ export function registerContentAwareResize(app: FastifyInstance) {
     },
   );
 
-  // Register in the pipeline/batch registry so this tool can be used
-  // as a step in automation pipelines (without progress callbacks).
+  // Register in the pipeline/batch registry
   registerToolProcessFn({
     toolId: "content-aware-resize",
-    settingsSchema: z.object({
-      width: z.number().positive().optional(),
-      height: z.number().positive().optional(),
-      protectFaces: z.boolean().default(true),
-    }),
+    settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const s = settings as { width?: number; height?: number; protectFaces?: boolean };
+      const s = settings as Settings;
       const orientedBuffer = await autoOrient(inputBuffer);
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
       const result = await seamCarve(orientedBuffer, join(workspacePath, "output"), {
         width: s.width,
         height: s.height,
-        protectFaces: s.protectFaces ?? true,
+        protectFaces: s.protectFaces,
+        blurRadius: s.blurRadius,
+        sobelThreshold: s.sobelThreshold,
+        square: s.square,
       });
       const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
       return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };

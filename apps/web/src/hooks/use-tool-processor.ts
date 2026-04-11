@@ -29,6 +29,10 @@ const IDLE_PROGRESS: ToolProgress = {
 // smart-crop is category "ai" but uses Sharp (no Python), so it's excluded.
 const AI_PYTHON_TOOLS = new Set<string>(PYTHON_SIDECAR_TOOLS);
 
+// Tools that take a few seconds (not instant like Sharp, not minutes like AI).
+// Uses a smoother progress: upload 0-40%, then a gradual fill during processing.
+const MEDIUM_TOOLS = new Set(["content-aware-resize"]);
+
 export function useToolProcessor(toolId: string) {
   const {
     processing,
@@ -49,11 +53,14 @@ export function useToolProcessor(toolId: string) {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
+  const isMediumTool = MEDIUM_TOOLS.has(toolId);
+  const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (processingTimerRef.current) clearInterval(processingTimerRef.current);
       if (eventSourceRef.current) eventSourceRef.current.close();
       if (xhrRef.current) xhrRef.current.abort();
     };
@@ -134,12 +141,13 @@ export function useToolProcessor(toolId: string) {
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
 
-      // Timeout: 60s for fast tools, 5 min for AI tools
+      // Timeout: 60s for fast/medium tools, 5 min for AI tools
       xhr.timeout = isAiTool ? 300_000 : 60_000;
 
-      // For AI tools: upload = 0-15%, processing = 15-100% (continuous, no reset)
+      // For AI tools: upload = 0-15%, processing = 15-100% (SSE-driven)
+      // For medium tools: upload = 0-40%, processing = 40-95% (gradual fill)
       // For fast tools: upload = 0-100%, processing = brief 100% hold
-      const UPLOAD_WEIGHT = isAiTool ? 15 : 100;
+      const UPLOAD_WEIGHT = isAiTool ? 15 : isMediumTool ? 40 : 100;
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -158,10 +166,25 @@ export function useToolProcessor(toolId: string) {
           percent: UPLOAD_WEIGHT,
           stage: isAiTool ? "Starting..." : "Processing...",
         }));
+
+        // Medium tools: gradually fill from upload weight to 95% over ~15s
+        if (isMediumTool) {
+          const start = UPLOAD_WEIGHT;
+          const target = 95;
+          const step = (target - start) / 30; // 30 ticks over ~15s
+          processingTimerRef.current = setInterval(() => {
+            setProgress((prev) => {
+              if (prev.phase !== "processing") return prev;
+              const next = Math.min(target, prev.percent + step);
+              return { ...prev, percent: next };
+            });
+          }, 500);
+        }
       };
 
       xhr.onload = () => {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (processingTimerRef.current) clearInterval(processingTimerRef.current);
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
@@ -201,6 +224,7 @@ export function useToolProcessor(toolId: string) {
 
       xhr.onerror = () => {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (processingTimerRef.current) clearInterval(processingTimerRef.current);
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
@@ -212,6 +236,7 @@ export function useToolProcessor(toolId: string) {
 
       xhr.ontimeout = () => {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (processingTimerRef.current) clearInterval(processingTimerRef.current);
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
@@ -227,7 +252,7 @@ export function useToolProcessor(toolId: string) {
       });
       xhr.send(formData);
     },
-    [toolId, isAiTool, setProcessing, setError, setProcessedUrl, setSizes, setJobId],
+    [toolId, isAiTool, isMediumTool, setProcessing, setError, setProcessedUrl, setSizes, setJobId],
   );
 
   const processAllFiles = useCallback(

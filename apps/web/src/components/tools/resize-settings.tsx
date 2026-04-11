@@ -1,5 +1,5 @@
 import { SOCIAL_MEDIA_PRESETS } from "@stirling-image/shared";
-import { Download, Link, Unlink } from "lucide-react";
+import { Download, Info, Link, Unlink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -17,6 +17,17 @@ const FIT_LABELS: Record<FitMode, string> = {
 // Group presets by platform
 const platforms = [...new Set(SOCIAL_MEDIA_PRESETS.map((p) => p.platform))];
 
+function HintIcon({ text }: { text: string }) {
+  return (
+    <span className="relative group">
+      <Info className="h-3 w-3 text-muted-foreground" />
+      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-48 rounded bg-foreground px-2 py-1.5 text-[11px] leading-tight text-background opacity-0 transition-opacity group-hover:opacity-100 z-10">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export interface ResizeControlsProps {
   onChange?: (settings: Record<string, unknown>) => void;
 }
@@ -31,7 +42,10 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
   const [lockAspect, setLockAspect] = useState(true);
   const [withoutEnlargement, setWithoutEnlargement] = useState(false);
   const [contentAware, setContentAware] = useState(false);
-  const [protectFaces, setProtectFaces] = useState(true);
+  const [protectFaces, setProtectFaces] = useState(false);
+  const [blurRadius, setBlurRadius] = useState(4);
+  const [sobelThreshold, setSobelThreshold] = useState(2);
+  const [squareMode, setSquareMode] = useState(false);
 
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -42,9 +56,14 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
     const settings: Record<string, unknown> = {};
     if (contentAware) {
       settings.contentAware = true;
-      if (width) settings.width = Number(width);
-      if (height) settings.height = Number(height);
+      if (!squareMode) {
+        if (width) settings.width = Number(width);
+        if (height) settings.height = Number(height);
+      }
       settings.protectFaces = protectFaces;
+      settings.blurRadius = blurRadius;
+      settings.sobelThreshold = sobelThreshold;
+      settings.square = squareMode;
     } else if (tab === "scale") {
       settings.percentage = Number(percentage);
     } else {
@@ -54,7 +73,19 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
       settings.withoutEnlargement = withoutEnlargement;
     }
     onChangeRef.current?.(settings);
-  }, [tab, width, height, percentage, fit, withoutEnlargement, contentAware, protectFaces]);
+  }, [
+    tab,
+    width,
+    height,
+    percentage,
+    fit,
+    withoutEnlargement,
+    contentAware,
+    protectFaces,
+    blurRadius,
+    sobelThreshold,
+    squareMode,
+  ]);
 
   const handlePreset = (preset: (typeof SOCIAL_MEDIA_PRESETS)[number]) => {
     const key = `${preset.platform}-${preset.name}`;
@@ -84,7 +115,8 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
           value={width}
           onChange={(e) => setWidth(e.target.value)}
           placeholder="Auto"
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          disabled={squareMode && contentAware}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
         />
       </div>
       <button
@@ -105,52 +137,28 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
           value={height}
           onChange={(e) => setHeight(e.target.value)}
           placeholder="Auto"
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          disabled={squareMode && contentAware}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
         />
       </div>
     </div>
   );
 
+  const enlargementCheckbox = (
+    <label className="flex items-center gap-1.5 text-xs text-foreground">
+      <input
+        type="checkbox"
+        checked={withoutEnlargement}
+        onChange={(e) => setWithoutEnlargement(e.target.checked)}
+        className="rounded"
+      />
+      <span>Limit to original size</span>
+      <HintIcon text="If your image is already smaller than the target, keep it as-is instead of scaling it up" />
+    </label>
+  );
+
   return (
     <div className="space-y-4">
-      {/* Content-aware toggle */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">Content-aware</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={contentAware}
-          onClick={() => setContentAware(!contentAware)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-            contentAware ? "bg-primary" : "bg-muted"
-          }`}
-        >
-          <span
-            className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
-              contentAware ? "translate-x-4" : "translate-x-0.5"
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* Content-aware inputs */}
-      {contentAware && (
-        <div className="space-y-3">
-          {dimensionInputs}
-
-          {/* Protect faces */}
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={protectFaces}
-              onChange={(e) => setProtectFaces(e.target.checked)}
-              className="rounded"
-            />
-            Protect faces
-          </label>
-        </div>
-      )}
-
       {/* Standard resize tabs */}
       {!contentAware && (
         <>
@@ -196,7 +204,7 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
                         >
                           <span>{preset.name}</span>
                           <span className="text-xs tabular-nums">
-                            {preset.width} × {preset.height}
+                            {preset.width} x {preset.height}
                           </span>
                         </button>
                       );
@@ -205,16 +213,7 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
                 </div>
               ))}
 
-              {/* Don't enlarge */}
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  checked={withoutEnlargement}
-                  onChange={(e) => setWithoutEnlargement(e.target.checked)}
-                  className="rounded"
-                />
-                Don&apos;t enlarge
-              </label>
+              {enlargementCheckbox}
             </div>
           )}
 
@@ -240,16 +239,7 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
                 </div>
               </div>
 
-              {/* Don't enlarge */}
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  checked={withoutEnlargement}
-                  onChange={(e) => setWithoutEnlargement(e.target.checked)}
-                  className="rounded"
-                />
-                Don&apos;t enlarge
-              </label>
+              {enlargementCheckbox}
             </div>
           )}
 
@@ -289,6 +279,98 @@ export function ResizeControls({ onChange }: ResizeControlsProps) {
           )}
         </>
       )}
+
+      {/* Content-aware section - positioned below standard resize */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">Content-aware</span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={contentAware}
+            onClick={() => setContentAware(!contentAware)}
+            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+              contentAware ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                contentAware ? "translate-x-3.5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Content-aware options (expanded when toggled) */}
+        {contentAware && (
+          <div className="mt-3 space-y-3">
+            {/* Dimensions */}
+            {dimensionInputs}
+
+            {/* Square mode */}
+            <label className="flex items-center gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={squareMode}
+                onChange={(e) => setSquareMode(e.target.checked)}
+                className="rounded"
+              />
+              Resize to square
+            </label>
+
+            {/* Face protection */}
+            <label className="flex items-center gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={protectFaces}
+                onChange={(e) => setProtectFaces(e.target.checked)}
+                className="rounded"
+              />
+              Protect faces
+            </label>
+
+            {/* Blur radius */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="blur-radius" className="text-xs text-muted-foreground">
+                  Smoothing
+                </label>
+                <span className="text-xs tabular-nums text-muted-foreground">{blurRadius}</span>
+              </div>
+              <input
+                id="blur-radius"
+                type="range"
+                min={0}
+                max={20}
+                value={blurRadius}
+                onChange={(e) => setBlurRadius(Number(e.target.value))}
+                className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
+              />
+            </div>
+
+            {/* Sobel threshold */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="sobel-threshold" className="text-xs text-muted-foreground">
+                  Edge sensitivity
+                </label>
+                <span className="text-xs tabular-nums text-muted-foreground">{sobelThreshold}</span>
+              </div>
+              <input
+                id="sobel-threshold"
+                type="range"
+                min={1}
+                max={20}
+                value={sobelThreshold}
+                onChange={(e) => setSobelThreshold(Number(e.target.value))}
+                className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -323,7 +405,7 @@ export function ResizeSettings() {
     hasFile &&
     !processing &&
     (isContentAware
-      ? Boolean(settings.width) || Boolean(settings.height)
+      ? Boolean(settings.width) || Boolean(settings.height) || Boolean(settings.square)
       : tab === "scale"
         ? Number(settings.percentage) > 0
         : Boolean(settings.width) || Boolean(settings.height));

@@ -110,9 +110,8 @@ def smoke_test():
     from PIL import Image
     import cv2
     import numpy
-    import seam_carving
     from rembg import new_session
-    print("  CPU imports OK (Pillow, cv2, numpy, seam_carving, rembg)")
+    print("  CPU imports OK (Pillow, cv2, numpy, rembg)")
 
     # MediaPipe is CPU-only, should always import
     import mediapipe as mp
