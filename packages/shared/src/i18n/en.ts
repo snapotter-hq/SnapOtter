@@ -59,7 +59,10 @@ export const en = {
     },
     upscale: { name: "Image Upscaling", description: "AI super-resolution enhancement" },
     "erase-object": { name: "Object Eraser", description: "Paint over unwanted elements" },
-    ocr: { name: "OCR / Text Extraction", description: "Extract text from images" },
+    ocr: {
+      name: "OCR / Text Extraction",
+      description: "Extract text from images with AI-powered accuracy",
+    },
     "blur-faces": {
       name: "Face / PII Blur",
       description: "Auto-detect and blur faces and sensitive info",
