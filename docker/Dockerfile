@@ -127,7 +127,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 ; else \
     /opt/venv/bin/pip install "rembg[cpu]==2.0.62" && \
     /opt/venv/bin/pip install realesrgan==0.3.0 && \
-    /opt/venv/bin/pip install paddlepaddle>=3.2.1 "paddleocr[doc-parser]>=3.4.0,<3.5.0" \
+    /opt/venv/bin/pip install paddlepaddle==3.0.0 "paddleocr[doc-parser]>=3.4.0,<3.5.0" \
 ; fi
 
 # mediapipe 0.10.21 only has amd64 wheels; arm64 maxes out at 0.10.18

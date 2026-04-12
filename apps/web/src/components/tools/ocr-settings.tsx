@@ -25,8 +25,8 @@ const LANGUAGES = [
 ];
 
 const ENHANCE_DEFAULTS: Record<OcrQuality, boolean> = {
-  fast: true,
-  balanced: true,
+  fast: false,
+  balanced: false,
   best: false,
 };
 
@@ -38,12 +38,73 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Send one file to the OCR API and return the extracted text. */
+function ocrOneFile(
+  file: File,
+  settings: { quality: string; language: string; enhance: boolean },
+  callbacks: {
+    onUploadProgress: (pct: number) => void;
+    onProcessingProgress: (pct: number, stage: string) => void;
+  },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const clientJobId = generateId();
+
+    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "single" && typeof data.percent === "number") {
+          callbacks.onProcessingProgress(data.percent, data.stage);
+        }
+      } catch {}
+    };
+    es.onerror = () => es.close();
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("settings", JSON.stringify(settings));
+    formData.append("clientJobId", clientJobId);
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) callbacks.onUploadProgress((e.loaded / e.total) * 100);
+    };
+    xhr.onload = () => {
+      es.close();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText).text ?? "");
+        } catch {
+          reject(new Error("Invalid response"));
+        }
+      } else {
+        try {
+          const body = JSON.parse(xhr.responseText);
+          reject(new Error(body.error || body.details || `Failed: ${xhr.status}`));
+        } catch {
+          reject(new Error(`Processing failed: ${xhr.status}`));
+        }
+      }
+    };
+    xhr.onerror = () => {
+      es.close();
+      reject(new Error("Network error"));
+    };
+    xhr.open("POST", "/api/v1/tools/ocr");
+    for (const [key, value] of formatHeaders()) {
+      xhr.setRequestHeader(key, value);
+    }
+    xhr.send(formData);
+  });
+}
+
 export function OcrSettings() {
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
   const [quality, setQuality] = useState<OcrQuality>("balanced");
   const [language, setLanguage] = useState("auto");
-  const [enhance, setEnhance] = useState(true);
+  const [enhance, setEnhance] = useState(false);
   const [enhanceManuallySet, setEnhanceManuallySet] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
@@ -57,10 +118,7 @@ export function OcrSettings() {
 
   const handleQualityChange = (q: OcrQuality) => {
     setQuality(q);
-    // Update enhance default unless user has manually toggled it
-    if (!enhanceManuallySet) {
-      setEnhance(ENHANCE_DEFAULTS[q]);
-    }
+    if (!enhanceManuallySet) setEnhance(ENHANCE_DEFAULTS[q]);
   };
 
   const handleEnhanceToggle = (checked: boolean) => {
@@ -84,70 +142,50 @@ export function OcrSettings() {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
-    const clientJobId = generateId();
+    const settings = { quality, language, enhance };
+    const total = files.length;
+    const results: string[] = [];
+    const errors: string[] = [];
 
-    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
-    es.onmessage = (event) => {
+    for (let i = 0; i < total; i++) {
+      const file = files[i];
+      const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+      // Each file gets an equal share of the 0-100 progress bar
+      const fileBase = (i / total) * 100;
+      const fileShare = 100 / total;
+
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === "single" && typeof data.percent === "number") {
-          setProgressPhase("processing");
-          setProgressPercent(15 + (data.percent / 100) * 85);
-          setProgressStage(data.stage);
-        }
-      } catch {}
-    };
-    es.onerror = () => es.close();
-
-    const formData = new FormData();
-    formData.append("file", files[0]);
-    formData.append("settings", JSON.stringify({ quality, language, enhance }));
-    formData.append("clientJobId", clientJobId);
-
-    const xhr = new XMLHttpRequest();
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setProgressPercent((e.loaded / e.total) * 15);
+        const text = await ocrOneFile(file, settings, {
+          onUploadProgress: (pct) => {
+            setProgressPhase("uploading");
+            setProgressPercent(fileBase + (pct / 100) * fileShare * 0.15);
+            setProgressStage(`${prefix}Uploading...`);
+          },
+          onProcessingProgress: (pct, stage) => {
+            setProgressPhase("processing");
+            setProgressPercent(fileBase + fileShare * 0.15 + (pct / 100) * fileShare * 0.85);
+            setProgressStage(`${prefix}${stage}`);
+          },
+        });
+        results.push(total > 1 ? `--- ${file.name} ---\n${text || "(no text detected)"}` : text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${file.name}: ${msg}`);
+        results.push(total > 1 ? `--- ${file.name} ---\n(error: ${msg})` : "");
       }
-    };
-    xhr.upload.onload = () => {
-      setProgressPhase("processing");
-      setProgressPercent(15);
-      setProgressStage("Starting...");
-    };
-    xhr.onload = () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      es.close();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          setText(data.text ?? "");
-        } catch {
-          setError("Invalid response");
-        }
-      } else {
-        try {
-          const body = JSON.parse(xhr.responseText);
-          setError(body.error || body.details || `Failed: ${xhr.status}`);
-        } catch {
-          setError(`Processing failed: ${xhr.status}`);
-        }
-      }
-      setProcessing(false);
-      setProgressPhase("idle");
-    };
-    xhr.onerror = () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      es.close();
-      setError("Network error");
-      setProcessing(false);
-      setProgressPhase("idle");
-    };
-    xhr.open("POST", "/api/v1/tools/ocr");
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+    }
+
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
+
+    if (errors.length === total) {
+      setError(errors.join("; "));
+    } else if (errors.length > 0) {
+      setError(`${errors.length} of ${total} files failed`);
+    }
+
+    setText(results.join("\n\n"));
+    setProcessing(false);
+    setProgressPhase("idle");
   };
 
   const handleCopy = async () => {
@@ -165,7 +203,8 @@ export function OcrSettings() {
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const baseName = files[0]?.name?.replace(/\.[^.]+$/, "") ?? "extracted";
+    const baseName =
+      files.length === 1 ? (files[0]?.name?.replace(/\.[^.]+$/, "") ?? "extracted") : "ocr_results";
     a.href = url;
     a.download = `${baseName}_ocr.txt`;
     document.body.appendChild(a);
@@ -264,7 +303,7 @@ export function OcrSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Extract Text
+          {files.length > 1 ? `Extract Text (${files.length} files)` : "Extract Text"}
         </button>
       )}
 
@@ -300,7 +339,7 @@ export function OcrSettings() {
                 data-testid="ocr-result-text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                rows={8}
+                rows={Math.min(16, Math.max(8, text.split("\n").length + 2))}
                 className="w-full px-2 py-1.5 rounded border border-border bg-muted text-xs text-foreground font-mono resize-y"
               />
               <p className="text-[10px] text-muted-foreground">{text.length} characters</p>

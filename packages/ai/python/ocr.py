@@ -24,21 +24,53 @@ PADDLE_LANG_MAP = {
 
 
 def auto_detect_language(input_path):
-    """Return the default language for OCR.
+    """Detect the predominant script in the image using Tesseract multi-lang.
 
-    Currently defaults to "en" which works well across engines.
-    PaddleOCR PP-OCRv5 and VL handle multi-script input natively
-    regardless of the language parameter, so the default is sufficient
-    for most use cases. Users can override via the language dropdown.
+    Runs a quick Tesseract pass with all installed language packs,
+    then analyzes the Unicode character ranges in the output to
+    determine which PaddleOCR language model to use.
     """
-    return "en"
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["tesseract", input_path, "stdout", "-l", "eng+kor+chi_sim+jpn"],
+            capture_output=True, text=True, timeout=30,
+        )
+        text = result.stdout.strip()
+        if not text:
+            return "en"
+
+        hangul = sum(1 for c in text if "\uAC00" <= c <= "\uD7AF" or "\u1100" <= c <= "\u11FF")
+        cjk = sum(1 for c in text if "\u4E00" <= c <= "\u9FFF")
+        hiragana = sum(1 for c in text if "\u3040" <= c <= "\u309F")
+        katakana = sum(1 for c in text if "\u30A0" <= c <= "\u30FF")
+        latin = sum(1 for c in text if c.isascii() and c.isalpha())
+
+        total = hangul + cjk + hiragana + katakana + latin
+        if total == 0:
+            return "en"
+
+        if hangul / total > 0.3:
+            return "ko"
+        if (hiragana + katakana) / total > 0.2:
+            return "ja"
+        if cjk / total > 0.3:
+            return "zh"
+        return "en"
+    except Exception:
+        return "en"
 
 
-def run_tesseract(input_path, language):
+def run_tesseract(input_path, language, is_auto=False):
     """Run Tesseract OCR (Fast tier)."""
     import subprocess
 
-    tess_lang = TESSERACT_LANG_MAP.get(language, "eng")
+    # When auto-detected, use all installed language packs for best coverage
+    if is_auto:
+        tess_lang = "eng+kor+chi_sim+jpn+deu+fra+spa"
+    else:
+        tess_lang = TESSERACT_LANG_MAP.get(language, "eng")
 
     emit_progress(30, "Scanning")
     result = subprocess.run(
@@ -54,6 +86,28 @@ def run_tesseract(input_path, language):
     return text
 
 
+def _extract_ocr_texts(results):
+    """Extract text from PaddleOCR 3.x result objects.
+
+    Handles multiple result formats across PaddleOCR versions:
+    - 3.4.x: OCRResult with .json["res"]["rec_texts"]
+    - Earlier: result objects with .res dict containing "text" list
+    """
+    text_parts = []
+    for res in results:
+        # PaddleOCR 3.4.x format: OCRResult with .json dict
+        if hasattr(res, "json") and isinstance(res.json, dict):
+            inner = res.json.get("res", {})
+            rec_texts = inner.get("rec_texts", [])
+            if rec_texts:
+                text_parts.extend(rec_texts)
+                continue
+        # Older format: .res dict with "text" list
+        if hasattr(res, "res") and isinstance(res.res, dict):
+            text_parts.extend(res.res.get("text", []))
+    return "\n".join(text_parts)
+
+
 def run_paddleocr_v5(input_path, language):
     """Run PaddleOCR PP-OCRv5 server models (Balanced tier)."""
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
@@ -62,30 +116,28 @@ def run_paddleocr_v5(input_path, language):
     os.dup2(2, 1)
 
     try:
+        import logging
         from paddleocr import PaddleOCR
         from gpu import gpu_available
 
+        # Suppress PaddleOCR internal logging (replaces removed show_log param)
+        for name in ("ppocr", "paddleocr", "paddle"):
+            logging.getLogger(name).setLevel(logging.ERROR)
+
         paddle_lang = PADDLE_LANG_MAP.get(language, "en")
+        device = "gpu:0" if gpu_available() else "cpu"
 
         emit_progress(20, "Loading")
         ocr = PaddleOCR(
             lang=paddle_lang,
-            use_gpu=gpu_available(),
-            show_log=False,
+            device=device,
             ocr_version="PP-OCRv5",
         )
         emit_progress(30, "Scanning")
-        result = ocr.ocr(input_path)
+        results = ocr.predict(input=input_path)
         emit_progress(70, "Extracting text")
-        text = "\n".join(
-            [
-                line[1][0]
-                for res in result
-                if res
-                for line in res
-                if line and line[1]
-            ]
-        )
+
+        text = _extract_ocr_texts(results)
     finally:
         os.dup2(stdout_fd, 1)
         os.close(stdout_fd)
@@ -98,6 +150,7 @@ def run_paddleocr_vl(input_path):
 
     The VLM is lazy-loaded on first call and stays resident in the
     dispatcher process for subsequent requests.
+    Requires PaddlePaddle >= 3.2 for fused_rms_norm_ext.
     """
     global _paddleocr_vl_instance
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
@@ -127,6 +180,11 @@ def run_paddleocr_vl(input_path):
                         text_parts.append(content)
             elif hasattr(res, "rec_text"):
                 text_parts.append(res.rec_text)
+            # Also try the json-based extraction as fallback
+            elif hasattr(res, "json") and isinstance(res.json, dict):
+                inner = res.json.get("res", {})
+                rec_texts = inner.get("rec_texts", [])
+                text_parts.extend(rec_texts)
 
         text = "\n".join(text_parts)
     finally:
@@ -166,14 +224,15 @@ def main():
                 preprocessed_path = None
 
         # Language auto-detection
-        if language == "auto":
+        was_auto = language == "auto"
+        if was_auto:
             emit_progress(10, "Detecting language")
             language = auto_detect_language(input_path)
 
         # Route to engine based on quality tier
         if quality == "fast":
             try:
-                text = run_tesseract(input_path, language)
+                text = run_tesseract(input_path, language, is_auto=was_auto)
             except FileNotFoundError:
                 print(json.dumps({"success": False, "error": "Tesseract is not installed"}))
                 sys.exit(1)
@@ -187,7 +246,7 @@ def main():
             except Exception:
                 emit_progress(25, "Falling back")
                 try:
-                    text = run_tesseract(input_path, language)
+                    text = run_tesseract(input_path, language, is_auto=was_auto)
                 except FileNotFoundError:
                     print(json.dumps({"success": False, "error": "OCR engines unavailable"}))
                     sys.exit(1)
@@ -200,13 +259,13 @@ def main():
                 try:
                     text = run_paddleocr_v5(input_path, language)
                 except Exception:
-                    text = run_tesseract(input_path, language)
+                    text = run_tesseract(input_path, language, is_auto=was_auto)
             except Exception:
                 emit_progress(20, "Falling back")
                 try:
                     text = run_paddleocr_v5(input_path, language)
                 except Exception:
-                    text = run_tesseract(input_path, language)
+                    text = run_tesseract(input_path, language, is_auto=was_auto)
 
         else:
             print(json.dumps({"success": False, "error": f"Unknown quality: {quality}"}))

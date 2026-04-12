@@ -103,30 +103,66 @@ export function registerOcr(app: FastifyInstance) {
           }
         : undefined;
 
-      const result = await extractText(
-        fileBuffer,
-        workspacePath,
-        {
-          quality,
-          language: settings.language,
-          enhance: settings.enhance,
-        },
-        onProgress,
-      );
+      // Fallback chain: best -> balanced -> fast
+      // PaddleOCR can crash with segfault on some platforms, so we retry
+      // with a lower quality tier at the Node.js level.
+      const fallbackChain: Array<"fast" | "balanced" | "best"> =
+        quality === "best"
+          ? ["best", "balanced", "fast"]
+          : quality === "balanced"
+            ? ["balanced", "fast"]
+            : ["fast"];
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
+      let lastError: unknown;
+      for (const tier of fallbackChain) {
+        try {
+          const result = await extractText(
+            fileBuffer,
+            workspacePath,
+            {
+              quality: tier,
+              language: settings.language,
+              enhance: settings.enhance,
+            },
+            onProgress,
+          );
+
+          if (clientJobId) {
+            updateSingleFileProgress({
+              jobId: clientJobId,
+              phase: "complete",
+              percent: 100,
+            });
+          }
+
+          return reply.send({
+            jobId,
+            filename,
+            text: result.text,
+          });
+        } catch (err) {
+          lastError = err;
+          const msg = err instanceof Error ? err.message : String(err);
+          // If the Python process crashed (segfault, dispatcher exit), try next tier
+          if (
+            msg.includes("exited unexpectedly") ||
+            msg.includes("exited with code") ||
+            msg.includes("Segmentation fault")
+          ) {
+            request.log.warn(
+              { toolId: "ocr", quality: tier, err },
+              `OCR ${tier} crashed, falling back`,
+            );
+            if (onProgress) onProgress(15, "Retrying...");
+            continue;
+          }
+          // Non-crash errors (validation, timeout) should not retry
+          throw err;
+        }
       }
 
-      return reply.send({
-        jobId,
-        filename,
-        text: result.text,
-      });
+      // All tiers failed
+      throw lastError;
     } catch (err) {
       request.log.error({ err, toolId: "ocr" }, "OCR failed");
       return reply.status(422).send({
