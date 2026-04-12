@@ -56,8 +56,13 @@ export function registerUpscale(app: FastifyInstance) {
     try {
       const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
       const scale = Number(settings.scale) || 2;
+      const model = settings.model || "auto";
+      const faceEnhance = Boolean(settings.faceEnhance);
+      const denoise = Number(settings.denoise) || 0;
+      const format = settings.format || "png";
+      const outputQuality = Number(settings.quality) || 95;
       request.log.info(
-        { toolId: "upscale", imageSize: fileBuffer.length, scale },
+        { toolId: "upscale", imageSize: fileBuffer.length, scale, model, format },
         "Starting upscale",
       );
 
@@ -87,12 +92,13 @@ export function registerUpscale(app: FastifyInstance) {
       const result = await upscale(
         fileBuffer,
         join(workspacePath, "output"),
-        { scale },
+        { scale, model, faceEnhance, denoise, format, quality: outputQuality },
         onProgress,
       );
 
-      // Save output
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.png`;
+      // Save output with correct extension for the chosen format
+      const ext = result.format === "jpeg" ? "jpg" : result.format === "webp" ? "webp" : "png";
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
       const outputPath = join(workspacePath, "output", outputFilename);
       await writeFile(outputPath, result.buffer);
 

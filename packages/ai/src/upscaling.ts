@@ -4,6 +4,11 @@ import { type ProgressCallback, runPythonWithProgress } from "./bridge.js";
 
 export interface UpscaleOptions {
   scale?: number;
+  model?: string;
+  faceEnhance?: boolean;
+  denoise?: number;
+  format?: string;
+  quality?: number;
 }
 
 export interface UpscaleResult {
@@ -11,6 +16,7 @@ export interface UpscaleResult {
   width: number;
   height: number;
   method: string;
+  format: string;
 }
 
 export async function upscale(
@@ -34,11 +40,14 @@ export async function upscale(
     throw new Error(result.error || "Upscaling failed");
   }
 
-  const buffer = await readFile(outputPath);
+  // Python may write to a different path when the output format changes
+  const actualOutputPath = result.output_path || outputPath;
+  const buffer = await readFile(actualOutputPath);
   return {
     buffer,
     width: result.width,
     height: result.height,
     method: result.method ?? "unknown",
+    format: result.format ?? "png",
   };
 }
