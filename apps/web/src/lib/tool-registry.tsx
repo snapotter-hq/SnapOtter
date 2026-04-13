@@ -187,6 +187,11 @@ const PdfToImageSettings = lazy(() =>
     default: m.PdfToImageSettings,
   })),
 );
+const PdfToImagePreview = lazy(() =>
+  import("@/components/tools/pdf-to-image-preview").then((m) => ({
+    default: m.PdfToImagePreview,
+  })),
+);
 const ReplaceColorSettings = lazy(() =>
   import("@/components/tools/replace-color-settings").then((m) => ({
     default: m.ReplaceColorSettings,
@@ -304,7 +309,10 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ["bulk-rename", { displayMode: "before-after", Settings: BulkRenameSettings }],
   ["favicon", { displayMode: "before-after", Settings: FaviconSettings }],
   ["image-to-pdf", { displayMode: "before-after", Settings: ImageToPdfSettings }],
-  ["pdf-to-image", { displayMode: "no-dropzone", Settings: PdfToImageSettings }],
+  [
+    "pdf-to-image",
+    { displayMode: "no-dropzone", Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview },
+  ],
 
   // Adjustments extra
   ["replace-color", { displayMode: "before-after", Settings: ReplaceColorSettings }],

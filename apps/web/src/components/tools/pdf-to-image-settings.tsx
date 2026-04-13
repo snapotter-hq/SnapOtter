@@ -1,13 +1,6 @@
 import { Download, FileUp, Loader2, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
-import { formatHeaders } from "@/lib/api";
-
-const DPI_OPTIONS = [
-  { value: 72, label: "72 (Screen)" },
-  { value: 150, label: "150 (Standard)" },
-  { value: 300, label: "300 (Print)" },
-  { value: 600, label: "600 (High Quality)" },
-];
+import { useCallback, useRef } from "react";
+import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 
 const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
@@ -15,58 +8,47 @@ const FORMAT_OPTIONS = [
   { value: "webp", label: "WebP" },
   { value: "avif", label: "AVIF" },
   { value: "tiff", label: "TIFF" },
+  { value: "gif", label: "GIF" },
+  { value: "heic", label: "HEIC" },
+  { value: "heif", label: "HEIF" },
 ];
 
+const DPI_PRESETS = [
+  { value: 72, label: "72" },
+  { value: 150, label: "150" },
+  { value: 300, label: "300" },
+  { value: 600, label: "600" },
+];
+
+const DPI_LABELS: Record<number, string> = {
+  72: "Screen",
+  150: "Standard",
+  300: "Print",
+  600: "High Quality",
+};
+
+const COLOR_MODE_OPTIONS = [
+  { value: "color", label: "Color" },
+  { value: "grayscale", label: "Grayscale" },
+  { value: "bw", label: "B&W" },
+] as const;
+
+const LOSSY_FORMATS = ["jpg", "webp", "avif", "heic", "heif"];
+
 export function PdfToImageSettings() {
-  const [file, setFile] = useState<File | null>(null);
-  const [pageCount, setPageCount] = useState<number | null>(null);
-  const [format, setFormat] = useState("png");
-  const [dpi, setDpi] = useState(150);
-  const [pages, setPages] = useState("");
-  const [processing, setProcessing] = useState(false);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [downloadName, setDownloadName] = useState<string>("");
+  const store = usePdfToImageStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchPageCount = useCallback(async (pdfFile: File) => {
-    setLoadingInfo(true);
-    setError(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", pdfFile);
-      const res = await fetch("/api/v1/tools/pdf-to-image/info", {
-        method: "POST",
-        headers: formatHeaders(),
-        body: formData,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed: ${res.status}`);
-      }
-      const data = await res.json();
-      setPageCount(data.pageCount);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to read PDF");
-      setFile(null);
-      setPageCount(null);
-    } finally {
-      setLoadingInfo(false);
-    }
-  }, []);
+  const isLossy = LOSSY_FORMATS.includes(store.format);
 
   const handleFileChange = useCallback(
     (files: FileList | null) => {
       const pdfFile = files?.[0];
       if (!pdfFile) return;
-      setFile(pdfFile);
-      setPageCount(null);
-      setDownloadUrl(null);
-      setError(null);
-      fetchPageCount(pdfFile);
+      store.setFile(pdfFile);
+      store.loadPreview(pdfFile);
     },
-    [fetchPageCount],
+    [store],
   );
 
   const handleDrop = useCallback(
@@ -78,82 +60,16 @@ export function PdfToImageSettings() {
   );
 
   const handleRemoveFile = useCallback(() => {
-    setFile(null);
-    setPageCount(null);
-    setDownloadUrl(null);
-    setError(null);
+    store.setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [store]);
 
-  const getSelectedPageCount = (): number => {
-    if (!pageCount) return 0;
-    const trimmed = pages.trim();
-    if (trimmed === "" || trimmed.toLowerCase() === "all") return pageCount;
-    try {
-      const nums = new Set<number>();
-      for (const seg of trimmed.split(",")) {
-        const s = seg.trim();
-        if (s.includes("-")) {
-          const [a, b] = s.split("-").map((x) => Number(x.trim()));
-          for (let i = a; i <= b; i++) nums.add(i);
-        } else {
-          nums.add(Number(s));
-        }
-      }
-      return nums.size;
-    } catch {
-      return pageCount;
-    }
-  };
-
-  const handleProcess = async () => {
-    if (!file) return;
-    setProcessing(true);
-    setError(null);
-    setDownloadUrl(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("settings", JSON.stringify({ format, dpi, pages: pages || "all" }));
-
-      const res = await fetch("/api/v1/tools/pdf-to-image", {
-        method: "POST",
-        headers: formatHeaders(),
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Conversion failed: ${res.status}`);
-      }
-
-      const selectedCount = getSelectedPageCount();
-
-      if (selectedCount === 1) {
-        const data = await res.json();
-        setDownloadUrl(data.downloadUrl);
-        setDownloadName(`page.${format === "jpg" ? "jpg" : format}`);
-      } else {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        setDownloadUrl(url);
-        setDownloadName("pdf-pages.zip");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Conversion failed");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const selectedCount = getSelectedPageCount();
-  const isMultiPage = selectedCount > 1;
+  const selectedCount = store.selectedPages.size;
 
   return (
     <div className="space-y-4">
       {/* PDF upload area */}
-      {!file ? (
+      {!store.file ? (
         <div
           role="button"
           tabIndex={0}
@@ -166,7 +82,7 @@ export function PdfToImageSettings() {
               fileInputRef.current?.click();
             }
           }}
-          className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
         >
           <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Drop a PDF here or click to select</p>
@@ -181,15 +97,15 @@ export function PdfToImageSettings() {
       ) : (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{file.name}</p>
+            <p className="text-sm font-medium truncate">{store.file.name}</p>
             <p className="text-xs text-muted-foreground">
-              {loadingInfo ? (
+              {store.loadingPreview ? (
                 <span className="flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Reading PDF...
                 </span>
-              ) : pageCount !== null ? (
-                `${pageCount} page${pageCount !== 1 ? "s" : ""}`
+              ) : store.pageCount !== null ? (
+                `${store.pageCount} page${store.pageCount !== 1 ? "s" : ""}`
               ) : null}
             </p>
           </div>
@@ -203,42 +119,114 @@ export function PdfToImageSettings() {
         </div>
       )}
 
-      {/* Format dropdown */}
+      {/* Output Format - grid buttons */}
       <div>
-        <label htmlFor="pdf-format" className="text-xs text-muted-foreground">
-          Output Format
-        </label>
-        <select
-          id="pdf-format"
-          value={format}
-          onChange={(e) => setFormat(e.target.value)}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        >
+        <p className="text-xs text-muted-foreground mb-1.5">Output Format</p>
+        <div className="grid grid-cols-4 gap-1">
           {FORMAT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => store.setFormat(opt.value)}
+              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                store.format === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
               {opt.label}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
-      {/* DPI dropdown */}
+      {/* Quality slider (lossy formats only) */}
+      {isLossy && (
+        <div>
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-muted-foreground">Quality</p>
+            <span className="text-xs font-mono text-foreground">{store.quality}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={store.quality}
+            onChange={(e) => store.setQuality(Number(e.target.value))}
+            className="w-full mt-1"
+          />
+        </div>
+      )}
+
+      {/* DPI presets + custom */}
       <div>
-        <label htmlFor="pdf-dpi" className="text-xs text-muted-foreground">
-          Resolution (DPI)
-        </label>
-        <select
-          id="pdf-dpi"
-          value={dpi}
-          onChange={(e) => setDpi(Number(e.target.value))}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        >
-          {DPI_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+        <p className="text-xs text-muted-foreground mb-1.5">Resolution (DPI)</p>
+        <div className="grid grid-cols-5 gap-1">
+          {DPI_PRESETS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                store.setDpi(opt.value);
+                store.setCustomDpi(false);
+              }}
+              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                store.dpi === opt.value && !store.customDpi
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
               {opt.label}
-            </option>
+            </button>
           ))}
-        </select>
+          <button
+            type="button"
+            onClick={() => store.setCustomDpi(true)}
+            className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+              store.customDpi
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            Custom
+          </button>
+        </div>
+        {store.customDpi ? (
+          <input
+            type="number"
+            min={36}
+            max={1200}
+            value={store.dpi}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (v >= 36 && v <= 1200) store.setDpi(v);
+            }}
+            className="w-full mt-1.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+          />
+        ) : (
+          <p className="text-xs text-muted-foreground/60 mt-1">{DPI_LABELS[store.dpi] ?? ""}</p>
+        )}
+      </div>
+
+      {/* Color Mode */}
+      <div>
+        <p className="text-xs text-muted-foreground mb-1.5">Color Mode</p>
+        <div className="grid grid-cols-3 gap-1">
+          {COLOR_MODE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => store.setColorMode(opt.value)}
+              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                store.colorMode === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Page range input */}
@@ -249,45 +237,52 @@ export function PdfToImageSettings() {
         <input
           id="pdf-pages"
           type="text"
-          value={pages}
-          onChange={(e) => setPages(e.target.value)}
+          value={store.pages}
+          onChange={(e) => store.setPages(e.target.value)}
           placeholder="All pages"
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground"
         />
-        {pageCount !== null && (
+        {store.pageCount !== null && (
           <p className="text-xs text-muted-foreground mt-1">
-            e.g. 1-3, 5, 8-10 (document has {pageCount} pages)
+            e.g. 1-3, 5, 8-10 (document has {store.pageCount} pages)
           </p>
         )}
       </div>
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {store.error && <p className="text-xs text-red-500">{store.error}</p>}
 
       {/* Convert button */}
       <button
         type="button"
         data-testid="pdf-to-image-submit"
-        onClick={handleProcess}
-        disabled={!file || !pageCount || processing}
+        onClick={() => store.convert()}
+        disabled={!store.file || !store.pageCount || store.processing || selectedCount === 0}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {processing
+        {store.processing && <Loader2 className="h-4 w-4 animate-spin" />}
+        {store.processing
           ? "Converting..."
-          : `Convert${pageCount ? ` ${selectedCount} page${selectedCount !== 1 ? "s" : ""}` : ""}`}
+          : `Convert ${selectedCount} page${selectedCount !== 1 ? "s" : ""}`}
       </button>
 
-      {/* Download link */}
-      {downloadUrl && (
+      {/* Download ZIP */}
+      {store.zipUrl && (
         <a
-          href={downloadUrl}
-          download={downloadName}
+          href={store.zipUrl}
+          download="pdf-pages.zip"
           data-testid="pdf-to-image-download"
           className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          {isMultiPage ? `Download ZIP (${selectedCount} pages)` : "Download Image"}
+          Download All (ZIP)
+          {store.zipSize != null && (
+            <span className="text-xs opacity-70">
+              {store.zipSize < 1024 * 1024
+                ? `${(store.zipSize / 1024).toFixed(0)} KB`
+                : `${(store.zipSize / (1024 * 1024)).toFixed(1)} MB`}
+            </span>
+          )}
         </a>
       )}
     </div>

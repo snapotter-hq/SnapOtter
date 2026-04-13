@@ -80,8 +80,59 @@ describe("POST /api/v1/tools/pdf-to-image/info", () => {
   });
 });
 
+describe("POST /api/v1/tools/pdf-to-image/preview", () => {
+  it("returns thumbnails for all pages", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.pdf",
+        contentType: "application/pdf",
+        content: PDF_3PAGE,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image/preview",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data.pageCount).toBe(3);
+    expect(data.thumbnails).toHaveLength(3);
+    expect(data.thumbnails[0].page).toBe(1);
+    expect(data.thumbnails[0].dataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(data.thumbnails[0].width).toBeGreaterThan(0);
+    expect(data.thumbnails[0].height).toBeGreaterThan(0);
+  });
+
+  it("returns 400 for invalid PDF", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image/preview",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 describe("POST /api/v1/tools/pdf-to-image", () => {
-  it("converts a single page to PNG and returns a download URL", async () => {
+  it("converts a single page to PNG with per-page URLs and ZIP", async () => {
     const { body, contentType } = createMultipartPayload([
       {
         name: "file",
@@ -105,8 +156,10 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
     });
     expect(res.statusCode).toBe(200);
     const data = JSON.parse(res.body);
-    expect(data.downloadUrl).toContain("/api/v1/download/");
-    expect(data.downloadUrl).toContain("page-1.png");
+    expect(data.pages).toHaveLength(1);
+    expect(data.pages[0].downloadUrl).toContain("page-1.png");
+    expect(data.pages[0].size).toBeGreaterThan(0);
+    expect(data.zipUrl).toContain("pdf-pages.zip");
     expect(data.pageCount).toBe(3);
     expect(data.selectedPages).toEqual([1]);
     expect(data.format).toBe("png");
@@ -122,7 +175,7 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
       },
       {
         name: "settings",
-        content: JSON.stringify({ format: "jpg", dpi: 72, pages: "2" }),
+        content: JSON.stringify({ format: "jpg", dpi: 72, quality: 80, pages: "2" }),
       },
     ]);
     const res = await app.inject({
@@ -136,10 +189,10 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
     });
     expect(res.statusCode).toBe(200);
     const data = JSON.parse(res.body);
-    expect(data.downloadUrl).toContain("page-2.jpg");
+    expect(data.pages[0].downloadUrl).toContain("page-2.jpg");
   });
 
-  it("returns a ZIP for multiple pages", async () => {
+  it("converts multiple pages and returns JSON with ZIP URL", async () => {
     const { body, contentType } = createMultipartPayload([
       {
         name: "file",
@@ -161,13 +214,12 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
         authorization: `Bearer ${adminToken}`,
       },
     });
-    // reply.hijack() bypasses Fastify's normal response handling, so
-    // app.inject() returns statusCode 200 and the raw ZIP payload.
     expect(res.statusCode).toBe(200);
-    expect(res.rawPayload.length).toBeGreaterThan(0);
-    // ZIP files start with the PK magic bytes (0x50, 0x4B)
-    expect(res.rawPayload[0]).toBe(0x50);
-    expect(res.rawPayload[1]).toBe(0x4b);
+    const data = JSON.parse(res.body);
+    expect(data.pages).toHaveLength(3);
+    expect(data.zipUrl).toContain("pdf-pages.zip");
+    expect(data.zipSize).toBeGreaterThan(0);
+    expect(data.selectedPages).toEqual([1, 2, 3]);
   });
 
   it("uses defaults when no settings provided", async () => {
@@ -188,12 +240,118 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
         authorization: `Bearer ${adminToken}`,
       },
     });
-    // Default pages="all" means 3 pages, which triggers ZIP streaming
     expect(res.statusCode).toBe(200);
-    expect(res.rawPayload.length).toBeGreaterThan(0);
-    // Verify ZIP magic bytes
-    expect(res.rawPayload[0]).toBe(0x50);
-    expect(res.rawPayload[1]).toBe(0x4b);
+    const data = JSON.parse(res.body);
+    expect(data.pages).toHaveLength(3);
+    expect(data.format).toBe("png");
+    expect(data.zipUrl).toBeTruthy();
+  });
+
+  it("applies grayscale color mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.pdf",
+        contentType: "application/pdf",
+        content: PDF_3PAGE,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ format: "png", dpi: 72, colorMode: "grayscale", pages: "1" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data.pages).toHaveLength(1);
+    expect(data.pages[0].size).toBeGreaterThan(0);
+  });
+
+  it("applies black and white color mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.pdf",
+        contentType: "application/pdf",
+        content: PDF_3PAGE,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ format: "png", dpi: 72, colorMode: "bw", pages: "1" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data.pages).toHaveLength(1);
+  });
+
+  it("accepts custom DPI values", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.pdf",
+        contentType: "application/pdf",
+        content: PDF_3PAGE,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ format: "png", dpi: 200, pages: "1" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data.pages).toHaveLength(1);
+  });
+
+  it("rejects DPI below minimum", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.pdf",
+        contentType: "application/pdf",
+        content: PDF_3PAGE,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ format: "png", dpi: 10, pages: "1" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf-to-image",
+      body,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it("returns 400 for invalid page range", async () => {
@@ -245,8 +403,6 @@ describe("POST /api/v1/tools/pdf-to-image", () => {
         authorization: `Bearer ${adminToken}`,
       },
     });
-    // mupdf may attempt to repair the broken file, so the error can surface
-    // during rendering rather than at open time, resulting in a 422.
     expect([400, 422]).toContain(res.statusCode);
   });
 

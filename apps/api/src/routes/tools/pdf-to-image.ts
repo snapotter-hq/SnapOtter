@@ -1,17 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
 import sharp from "sharp";
 import { z } from "zod";
+import { encodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
-  format: z.enum(["png", "jpg", "webp", "avif", "tiff"]).default("png"),
-  dpi: z.union([z.literal(72), z.literal(150), z.literal(300), z.literal(600)]).default(150),
+  format: z.enum(["png", "jpg", "webp", "avif", "tiff", "gif", "heic", "heif"]).default("png"),
+  dpi: z.number().min(36).max(1200).default(150),
+  quality: z.number().min(1).max(100).default(85),
+  colorMode: z.enum(["color", "grayscale", "bw"]).default("color"),
   pages: z.string().default("all"),
 });
 
@@ -77,19 +81,42 @@ const FORMAT_EXT: Record<string, string> = {
   webp: ".webp",
   avif: ".avif",
   tiff: ".tiff",
+  gif: ".gif",
+  heic: ".heic",
+  heif: ".heif",
 };
 
-function convertWithSharp(pngBuffer: Uint8Array, format: string): Promise<Buffer> {
-  const s = sharp(Buffer.from(pngBuffer));
+async function convertWithSharp(
+  pngBuffer: Uint8Array,
+  format: string,
+  quality: number,
+  colorMode: string,
+): Promise<Buffer> {
+  let s = sharp(Buffer.from(pngBuffer));
+
+  // Apply color mode before format conversion
+  if (colorMode === "grayscale") {
+    s = s.grayscale();
+  } else if (colorMode === "bw") {
+    s = s.grayscale().threshold(128);
+  }
+
   switch (format) {
     case "jpg":
-      return s.jpeg().toBuffer();
+      return s.jpeg({ quality }).toBuffer();
     case "webp":
-      return s.webp().toBuffer();
+      return s.webp({ quality }).toBuffer();
     case "avif":
-      return s.avif().toBuffer();
+      return s.avif({ quality }).toBuffer();
     case "tiff":
       return s.tiff().toBuffer();
+    case "gif":
+      return s.gif().toBuffer();
+    case "heic":
+    case "heif": {
+      const pngBuf = await s.png().toBuffer();
+      return encodeHeic(pngBuf, quality);
+    }
     default:
       return s.png().toBuffer();
   }
@@ -116,23 +143,35 @@ function renderPage(doc: mupdf.Document, pageIndex: number, dpi: number): Uint8A
   }
 }
 
+// ── Helper: read multipart PDF file ──────────────────────────────
+async function readPdfFromParts(
+  request: import("fastify").FastifyRequest,
+): Promise<{ fileBuffer: Buffer | null; settingsRaw: string | null }> {
+  let fileBuffer: Buffer | null = null;
+  let settingsRaw: string | null = null;
+  const parts = request.parts();
+  for await (const part of parts) {
+    if (part.type === "file") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of part.file) {
+        chunks.push(chunk);
+      }
+      fileBuffer = Buffer.concat(chunks);
+    } else if (part.fieldname === "settings") {
+      settingsRaw = part.value as string;
+    }
+  }
+  return { fileBuffer, settingsRaw };
+}
+
 // ── Route registration ───────────────────────────────────────────
 export function registerPdfToImage(app: FastifyInstance) {
   // ── Info endpoint ────────────────────────────────────────────
   app.post("/api/v1/tools/pdf-to-image/info", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
-
     try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          fileBuffer = Buffer.concat(chunks);
-        }
-      }
+      const result = await readPdfFromParts(request);
+      fileBuffer = result.fileBuffer;
     } catch (err) {
       return reply.status(400).send({
         error: "Failed to parse multipart request",
@@ -165,24 +204,76 @@ export function registerPdfToImage(app: FastifyInstance) {
     }
   });
 
+  // ── Preview endpoint (thumbnails) ─────────────────────────────
+  app.post("/api/v1/tools/pdf-to-image/preview", async (request, reply) => {
+    let fileBuffer: Buffer | null = null;
+    try {
+      const result = await readPdfFromParts(request);
+      fileBuffer = result.fileBuffer;
+    } catch (err) {
+      return reply.status(400).send({
+        error: "Failed to parse multipart request",
+        details: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return reply.status(400).send({ error: "No PDF file provided" });
+    }
+
+    let doc: mupdf.Document | null = null;
+    try {
+      doc = mupdf.Document.openDocument(fileBuffer, "application/pdf");
+      if (doc.needsPassword()) {
+        return reply.status(400).send({ error: "Password-protected PDFs are not supported" });
+      }
+      const pageCount = doc.countPages();
+      const maxPages = Math.min(pageCount, 200);
+      const thumbnails: Array<{
+        page: number;
+        dataUrl: string;
+        width: number;
+        height: number;
+      }> = [];
+
+      for (let i = 0; i < maxPages; i++) {
+        const pngBytes = renderPage(doc, i, 72);
+        const thumb = await sharp(Buffer.from(pngBytes))
+          .resize({ width: 300, withoutEnlargement: true })
+          .jpeg({ quality: 60 })
+          .toBuffer();
+        const meta = await sharp(thumb).metadata();
+        thumbnails.push({
+          page: i + 1,
+          dataUrl: `data:image/jpeg;base64,${thumb.toString("base64")}`,
+          width: meta.width ?? 0,
+          height: meta.height ?? 0,
+        });
+      }
+
+      return reply.send({ pageCount, thumbnails });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes("password") || err.message.includes("Password"))
+      ) {
+        return reply.status(400).send({ error: "Password-protected PDFs are not supported" });
+      }
+      return reply.status(400).send({ error: "Invalid or corrupt PDF file" });
+    } finally {
+      doc?.destroy();
+    }
+  });
+
   // ── Main processing endpoint ─────────────────────────────────
   app.post("/api/v1/tools/pdf-to-image", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let settingsRaw: string | null = null;
 
     try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          fileBuffer = Buffer.concat(chunks);
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
-        }
-      }
+      const result = await readPdfFromParts(request);
+      fileBuffer = result.fileBuffer;
+      settingsRaw = result.settingsRaw;
     } catch (err) {
       return reply.status(400).send({
         error: "Failed to parse multipart request",
@@ -225,61 +316,65 @@ export function registerPdfToImage(app: FastifyInstance) {
       }
 
       const ext = FORMAT_EXT[settings.format] ?? ".png";
-
-      // ── Single page: workspace + JSON response ─────────────
-      if (selectedPages.length === 1) {
-        const pageNum = selectedPages[0];
-        const pngBytes = renderPage(doc, pageNum - 1, settings.dpi);
-        doc.destroy();
-        doc = null;
-
-        const imageBuffer = await convertWithSharp(pngBytes, settings.format);
-
-        const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
-        const filename = `page-${pageNum}${ext}`;
-        await writeFile(join(workspacePath, "output", filename), imageBuffer);
-
-        return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
-          pageCount: totalPages,
-          selectedPages,
-          format: settings.format,
-        });
-      }
-
-      // ── Multiple pages: stream ZIP ─────────────────────────
       const jobId = randomUUID();
-
-      reply.hijack();
-      reply.raw.writeHead(200, {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="pdf-pages-${jobId.slice(0, 8)}.zip"`,
-        "Transfer-Encoding": "chunked",
-      });
-
-      const archive = archiver("zip", { zlib: { level: 5 } });
-      archive.pipe(reply.raw);
+      const workspacePath = await createWorkspace(jobId);
+      const outputDir = join(workspacePath, "output");
+      const pages: Array<{ page: number; downloadUrl: string; size: number }> = [];
 
       for (const pageNum of selectedPages) {
         const pngBytes = renderPage(doc, pageNum - 1, settings.dpi);
-        const imageBuffer = await convertWithSharp(pngBytes, settings.format);
-        archive.append(imageBuffer, { name: `page-${pageNum}${ext}` });
+        const imageBuffer = await convertWithSharp(
+          pngBytes,
+          settings.format,
+          settings.quality,
+          settings.colorMode,
+        );
+        const filename = `page-${pageNum}${ext}`;
+        const filePath = join(outputDir, filename);
+        await writeFile(filePath, imageBuffer);
+        pages.push({
+          page: pageNum,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+          size: imageBuffer.length,
+        });
       }
 
       doc.destroy();
       doc = null;
 
-      await archive.finalize();
+      // Generate ZIP
+      const zipFilename = "pdf-pages.zip";
+      const zipPath = join(outputDir, zipFilename);
+      await new Promise<void>((resolve, reject) => {
+        const output = createWriteStream(zipPath);
+        const archive = archiver("zip", { zlib: { level: 5 } });
+        output.on("close", resolve);
+        archive.on("error", reject);
+        archive.pipe(output);
+        for (const p of pages) {
+          const fname = `page-${p.page}${ext}`;
+          archive.file(join(outputDir, fname), { name: fname });
+        }
+        archive.finalize();
+      });
+
+      const zipStat = await stat(zipPath);
+
+      return reply.send({
+        jobId,
+        pageCount: totalPages,
+        selectedPages,
+        format: settings.format,
+        pages,
+        zipUrl: `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`,
+        zipSize: zipStat.size,
+      });
     } catch (err) {
       doc?.destroy();
-      if (!reply.raw.headersSent) {
-        return reply.status(422).send({
-          error: "PDF conversion failed",
-          details: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
+      return reply.status(422).send({
+        error: "PDF conversion failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
     }
   });
 }
