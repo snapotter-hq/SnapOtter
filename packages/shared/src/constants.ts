@@ -105,6 +105,14 @@ export const TOOLS: Tool[] = [
     route: "/adjust-colors",
   },
   {
+    id: "sharpening",
+    name: "Sharpening",
+    description: "Adaptive, unsharp mask, and high-pass sharpening with presets",
+    category: "adjustments",
+    icon: "Focus",
+    route: "/sharpening",
+  },
+  {
     id: "replace-color",
     name: "Replace & Invert Color",
     description: "Replace specific colors or invert",

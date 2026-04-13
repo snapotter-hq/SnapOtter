@@ -49,6 +49,10 @@ export const en = {
       description:
         "Brightness, contrast, exposure, saturation, temperature, sharpness, and effects",
     },
+    sharpening: {
+      name: "Sharpening",
+      description: "Adaptive, unsharp mask, and high-pass sharpening with presets",
+    },
     "replace-color": {
       name: "Replace & Invert Color",
       description: "Replace specific colors or invert",
