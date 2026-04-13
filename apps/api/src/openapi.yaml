@@ -15,7 +15,7 @@ info:
 
     Endpoints marked with a lock icon require authentication. Admin-only endpoints are noted in their description.
   license:
-    name: MIT
+    name: AGPL-3.0
     url: https://github.com/stirling-image/stirling-image/blob/main/LICENSE
 
 servers:
@@ -149,6 +149,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/content-aware-resize:
+    post:
+      tags: [Tools]
+      summary: Content-aware resize
+      description: Resize an image using seam carving to intelligently remove or insert content while preserving important features.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (number, optional) — Target width in pixels
+                    - `height` (number, optional) — Target height in pixels
+                    - `protectFaces` (boolean, default false) — Detect and protect faces from distortion
+                    - `blurRadius` (number 0-20, default 4) — Blur radius for energy map
+                    - `sobelThreshold` (number 1-20, default 2) — Edge detection threshold
+                    - `square` (boolean, default false) — Crop to square aspect ratio
+
+                    At least one of `width`, `height`, or `square` must be provided.
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      width:
+                        type: integer
+                      height:
+                        type: integer
         "400":
           description: Invalid input
           content:
@@ -776,6 +830,59 @@ paths:
         "401":
           description: Authentication required
 
+  /api/v1/tools/gif-tools/info:
+    post:
+      tags: [Tools]
+      summary: GIF info
+      description: Get metadata about an animated GIF including dimensions, frame count, delays, and duration.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: GIF file to inspect
+      responses:
+        "200":
+          description: GIF metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  width:
+                    type: integer
+                  height:
+                    type: integer
+                  pages:
+                    type: integer
+                    description: Number of frames
+                  delay:
+                    type: array
+                    items:
+                      type: integer
+                    description: Per-frame delay in milliseconds
+                  loop:
+                    type: integer
+                    description: Loop count (0 = infinite)
+                  fileSize:
+                    type: integer
+                  duration:
+                    type: integer
+                    description: Total duration in milliseconds
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/tools/smart-crop:
     post:
       tags: [Tools]
@@ -1004,6 +1111,162 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+
+  /api/v1/tools/pdf-to-image:
+    post:
+      tags: [Tools]
+      summary: PDF to image
+      description: Convert PDF pages to images. Returns individual page downloads and a ZIP of all pages.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "png") — Output format: png, jpg, webp, avif, tiff, gif, heic, heif
+                    - `dpi` (number 36-1200, default 150) — Resolution in dots per inch
+                    - `quality` (number 1-100, default 85) — Output quality
+                    - `colorMode` (string, default "color") — One of: color, grayscale, bw
+                    - `pages` (string, default "all") — Page selection, e.g. "all", "1-3", "1,3,5"
+      responses:
+        "200":
+          description: Converted pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  pageCount:
+                    type: integer
+                    description: Total pages in the PDF
+                  selectedPages:
+                    type: array
+                    items:
+                      type: integer
+                  format:
+                    type: string
+                  pages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        page:
+                          type: integer
+                        downloadUrl:
+                          type: string
+                        size:
+                          type: integer
+                  zipUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  zipSize:
+                    type: integer
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/pdf-to-image/info:
+    post:
+      tags: [Tools]
+      summary: PDF page count
+      description: Get the number of pages in a PDF file.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to inspect
+      responses:
+        "200":
+          description: PDF info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pageCount:
+                    type: integer
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/pdf-to-image/preview:
+    post:
+      tags: [Tools]
+      summary: PDF page thumbnails
+      description: Generate thumbnail previews for each page in a PDF (max 200 pages, JPEG 300px wide).
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to preview
+      responses:
+        "200":
+          description: Page thumbnails
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pageCount:
+                    type: integer
+                  thumbnails:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        page:
+                          type: integer
+                        dataUrl:
+                          type: string
+                          description: Base64-encoded JPEG data URL
+                        width:
+                          type: integer
+                        height:
+                          type: integer
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/tools/split:
     post:
@@ -1342,6 +1605,57 @@ paths:
         "401":
           description: Authentication required
 
+  /api/v1/tools/stitch:
+    post:
+      tags: [Tools]
+      summary: Stitch images
+      description: Join multiple images horizontally, vertically, or in a grid layout.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more image files to stitch together
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `direction` (string, default "horizontal") — One of: horizontal, vertical, grid
+                    - `gridColumns` (integer 2-10, default 2) — Columns when direction is grid
+                    - `resizeMode` (string, default "fit") — One of: fit, original, stretch, crop
+                    - `alignment` (string, default "center") — One of: start, center, end
+                    - `gap` (number 0-200, default 0) — Gap between images in pixels
+                    - `border` (number 0-50, default 0) — Border width in pixels
+                    - `cornerRadius` (number 0-50, default 0) — Corner radius in pixels
+                    - `backgroundColor` (string, default "#FFFFFF") — Hex color for background and gap fill
+                    - `format` (string, default "png") — One of: png, jpeg, webp
+                    - `quality` (number 1-100, default 90) — Output quality
+      responses:
+        "200":
+          description: Stitched image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
   /api/v1/tools/remove-background:
     post:
       tags: [Tools]
@@ -1374,6 +1688,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/remove-background/effects:
+    post:
+      tags: [Tools]
+      summary: Apply background effects
+      description: >
+        Apply background replacement or effects to a previously processed remove-background result.
+        Requires a jobId from a prior POST /api/v1/tools/remove-background call.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                backgroundImage:
+                  type: string
+                  format: binary
+                  description: Custom background image (required when backgroundType is "image")
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `jobId` (string, required) — Job ID from the initial remove-background call
+                    - `filename` (string, required) — Original filename
+                    - `backgroundType` (string) — One of: transparent, color, gradient, blur, image
+                    - `backgroundColor` (string) — Hex color for solid background
+                    - `gradientColor1` (string) — First gradient color
+                    - `gradientColor2` (string) — Second gradient color
+                    - `gradientAngle` (number) — Gradient angle in degrees
+                    - `blurEnabled` (boolean) — Enable background blur effect
+                    - `blurIntensity` (number 0-100) — Blur strength
+                    - `shadowEnabled` (boolean) — Enable drop shadow
+                    - `shadowOpacity` (number 0-100) — Shadow opacity
+      responses:
+        "200":
+          description: Image with applied effects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  downloadUrl:
+                    type: string
+                  processedSize:
+                    type: integer
         "400":
           description: Invalid input
           content:
@@ -1800,6 +2173,98 @@ paths:
         "401":
           description: Authentication required
 
+  /api/v1/tools/edit-metadata:
+    post:
+      tags: [Tools]
+      summary: Edit metadata
+      description: Edit EXIF, IPTC, GPS, and other metadata fields in an image using ExifTool.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `artist` (string) — Artist or author name
+                    - `copyright` (string) — Copyright notice
+                    - `imageDescription` (string) — Image description
+                    - `software` (string) — Software used
+                    - `dateTime` (string) — Date/time string
+                    - `dateTimeOriginal` (string) — Original capture date/time
+                    - `clearGps` (boolean, default false) — Remove all GPS data
+                    - `fieldsToRemove` (string[]) — Specific metadata fields to remove
+                    - `gpsLatitude` (number -90 to 90) — GPS latitude
+                    - `gpsLongitude` (number -180 to 180) — GPS longitude
+                    - `gpsAltitude` (number) — GPS altitude in meters
+                    - `keywords` (string[]) — Keywords or tags
+                    - `keywordsMode` (string, default "add") — One of: add, set
+                    - `dateShift` (string) — Shift dates by offset, e.g. "+2:00" or "-1:30"
+                    - `setAllDates` (string) — Set all date fields to this value
+                    - `iptcTitle` (string) — IPTC title
+                    - `iptcHeadline` (string) — IPTC headline
+                    - `iptcCity` (string) — IPTC city
+                    - `iptcState` (string) — IPTC state or province
+                    - `iptcCountry` (string) — IPTC country
+      responses:
+        "200":
+          description: Image with updated metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
+  /api/v1/tools/edit-metadata/inspect:
+    post:
+      tags: [Tools]
+      summary: Inspect metadata (ExifTool)
+      description: Read all metadata from an image using ExifTool. Returns all embedded EXIF, IPTC, XMP, and GPS fields.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to inspect
+      responses:
+        "200":
+          description: Full metadata object (keys vary by image)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # ─── Batch ────────────────────────────────────────────────────────────────
 
   /api/v1/tools/{toolId}/batch:
@@ -2017,6 +2482,82 @@ paths:
         "401":
           description: Authentication required
 
+  /api/v1/pipeline/tools:
+    get:
+      tags: [Pipelines]
+      summary: List pipeline-compatible tools
+      description: Returns all tool IDs that can be used as pipeline steps.
+      security: []
+      responses:
+        "200":
+          description: Tool IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  toolIds:
+                    type: array
+                    items:
+                      type: string
+
+  /api/v1/pipeline/batch:
+    post:
+      tags: [Pipelines]
+      summary: Run pipeline on multiple files
+      description: Execute a pipeline across multiple images. Returns a ZIP file with all processed results.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, pipeline]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Image files to process
+                pipeline:
+                  type: string
+                  description: |
+                    JSON string with pipeline definition:
+                    - `steps` (array, required, 1-20 items) — Pipeline steps
+                    - `steps[].toolId` (string, required) — Tool ID for this step
+                    - `steps[].settings` (object, optional) — Tool-specific settings
+                clientJobId:
+                  type: string
+                  description: Optional client-provided job ID for progress tracking via SSE
+      responses:
+        "200":
+          description: ZIP file with processed images
+          headers:
+            X-Job-Id:
+              schema:
+                type: string
+              description: Job ID for progress tracking
+            X-File-Results:
+              schema:
+                type: string
+              description: JSON mapping of input index to output filename
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+
   # ─── Files ────────────────────────────────────────────────────────────────
 
   /api/v1/upload:
@@ -2084,6 +2625,39 @@ paths:
         "404":
           description: File not found
 
+  /api/v1/preview:
+    post:
+      tags: [Files]
+      summary: Generate image preview
+      description: Convert any image (including HEIC/HEIF) to a WebP preview, resized to fit within 1200x1200 pixels.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to preview
+      responses:
+        "200":
+          description: WebP preview image
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/files:
     get:
       tags: [Files]
@@ -2124,7 +2698,8 @@ paths:
           description: Authentication required
     delete:
       tags: [Files]
-      summary: Delete saved files
+      summary: Bulk delete saved files
+      description: Delete files and their entire version chains. Non-admin users can only delete their own files.
       security:
         - bearerAuth: []
       requestBody:
@@ -2139,9 +2714,18 @@ paths:
                   type: array
                   items:
                     type: string
+                  description: File IDs to delete (deletes entire version chain for each)
       responses:
-        "204":
-          description: Files deleted
+        "200":
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+                    description: Total number of records deleted across all version chains
         "400":
           description: Invalid input
           content:

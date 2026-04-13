@@ -3,7 +3,7 @@
 The API server runs on port 1349 by default and serves all endpoints under `/api`.
 
 ::: tip Full API Reference
-Your Stirling Image instance includes a complete interactive API reference at `/api/docs` (e.g. `http://your-host:1349/api/docs`) with all 67 endpoints, request/response schemas, and examples.
+Your Stirling Image instance includes a complete interactive API reference at `/api/docs` (e.g. `http://your-host:1349/api/docs`) with all 80+ endpoints, request/response schemas, and examples.
 :::
 
 ::: info LLM-friendly docs
@@ -48,13 +48,13 @@ Send a multipart request with:
 | Category | Tools |
 |----------|-------|
 | **Essentials** | `resize`, `crop`, `rotate`, `convert`, `compress` |
-| **Optimization** | `strip-metadata`, `bulk-rename`, `image-to-pdf`, `favicon` |
-| **Adjustments** | `brightness-contrast`, `saturation`, `color-channels`, `color-effects`, `replace-color` |
-| **AI** | `remove-background`, `upscale`, `erase-object`, `ocr`, `blur-faces`, `smart-crop` |
+| **Optimization** | `strip-metadata`, `edit-metadata`, `bulk-rename`, `image-to-pdf`, `favicon` |
+| **Adjustments** | `adjust-colors`, `replace-color` |
+| **AI** | `remove-background`, `upscale`, `erase-object`, `ocr`, `blur-faces`, `smart-crop`, `content-aware-resize` |
 | **Watermark** | `watermark-text`, `watermark-image`, `text-overlay`, `compose` |
 | **Utilities** | `info`, `compare`, `find-duplicates`, `color-palette`, `qr-generate`, `barcode-read` |
-| **Layout** | `collage`, `split`, `border` |
-| **Format** | `svg-to-raster`, `vectorize`, `gif-tools` |
+| **Layout** | `collage`, `split`, `border`, `stitch` |
+| **Format** | `svg-to-raster`, `vectorize`, `gif-tools`, `pdf-to-image` |
 
 Each tool's specific settings are documented in the interactive API reference at `/api/docs` on your running instance.
 
@@ -72,8 +72,10 @@ Chain tools into reusable workflows.
 
 ```
 POST /api/v1/pipeline/execute   -- Run a pipeline (multipart: file + steps JSON)
+POST /api/v1/pipeline/batch     -- Run a pipeline across multiple files (returns ZIP)
 POST /api/v1/pipeline/save      -- Save a named pipeline
 GET  /api/v1/pipeline/list      -- List saved pipelines
+GET  /api/v1/pipeline/tools     -- List all pipeline-compatible tool IDs
 DELETE /api/v1/pipeline/:id     -- Delete a pipeline
 ```
 
