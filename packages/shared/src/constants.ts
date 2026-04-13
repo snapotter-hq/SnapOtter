@@ -296,7 +296,8 @@ export const TOOLS: Tool[] = [
   {
     id: "gif-tools",
     name: "GIF Tools",
-    description: "Resize/crop/convert animated GIFs",
+    description:
+      "Resize, optimize, change speed, reverse, extract frames, and rotate animated GIFs",
     category: "format",
     icon: "Film",
     route: "/gif-tools",

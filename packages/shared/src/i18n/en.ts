@@ -113,7 +113,11 @@ export const en = {
         "Convert SVG to PNG, JPEG, WebP, AVIF, TIFF, GIF, or HEIF at custom scale and DPI",
     },
     vectorize: { name: "Image to SVG", description: "Convert images to scalable vector graphics" },
-    "gif-tools": { name: "GIF Tools", description: "Resize/crop/convert animated GIFs" },
+    "gif-tools": {
+      name: "GIF Tools",
+      description:
+        "Resize, optimize, change speed, reverse, extract frames, and rotate animated GIFs",
+    },
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
     batch: { name: "Batch Processing", description: "Apply any tool to multiple images" },
   },
