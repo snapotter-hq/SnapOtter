@@ -13,6 +13,19 @@ import { createWorkspace, getWorkspacePath } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
+const landmarkPointSchema = z.object({ x: z.number(), y: z.number() });
+
+const landmarksSchema = z.object({
+  leftEye: landmarkPointSchema,
+  rightEye: landmarkPointSchema,
+  eyeCenter: landmarkPointSchema,
+  chin: landmarkPointSchema,
+  forehead: landmarkPointSchema,
+  crown: landmarkPointSchema,
+  nose: landmarkPointSchema,
+  faceCenterX: z.number(),
+});
+
 const generateSettingsSchema = z.object({
   jobId: z.string(),
   filename: z.string(),
@@ -22,6 +35,9 @@ const generateSettingsSchema = z.object({
   printLayout: z.string().default("none"),
   adjustX: z.number().default(0),
   adjustY: z.number().default(0),
+  landmarks: landmarksSchema,
+  imageWidth: z.number(),
+  imageHeight: z.number(),
 });
 
 /**
@@ -264,8 +280,19 @@ export function registerPassportPhoto(app: FastifyInstance) {
         });
       }
 
-      const { jobId, filename, countryCode, documentType, bgColor, printLayout, adjustX, adjustY } =
-        parsed;
+      const {
+        jobId,
+        filename,
+        countryCode,
+        documentType,
+        bgColor,
+        printLayout,
+        adjustX,
+        adjustY,
+        landmarks: rawLandmarks,
+        imageWidth: imgW,
+        imageHeight: imgH,
+      } = parsed;
 
       // Look up country spec
       const countrySpec = PASSPORT_SPECS.find((s) => s.code === countryCode);
@@ -289,51 +316,30 @@ export function registerPassportPhoto(app: FastifyInstance) {
           readFile(join(workspacePath, "input", filename)),
         ]);
 
-        // Re-detect landmarks from original for crop computation
-        const landmarksResult = await detectFaceLandmarks(originalBuffer);
-        if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
-          return reply.status(422).send({
-            error: "Face landmarks no longer available",
-            details: "Could not re-detect face landmarks. Please re-analyze the image.",
-          });
-        }
-
-        const landmarks = landmarksResult.landmarks;
-        const imgW = landmarksResult.imageWidth;
-        const imgH = landmarksResult.imageHeight;
+        // Convert normalized landmarks (0-1) to pixel coordinates
+        const crownYPx = (rawLandmarks.crown.y + adjustY) * imgH;
+        const chinYPx = (rawLandmarks.chin.y + adjustY) * imgH;
+        const eyeYPx = (rawLandmarks.eyeCenter.y + adjustY) * imgH;
+        const faceCenterXPx = (rawLandmarks.faceCenterX + adjustX) * imgW;
 
         // Compute crop region from landmarks
         const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
-        const crownToChinPx = landmarks.chin.y - landmarks.crown.y;
-        const photoHeightPx = crownToChinPx / targetHeadRatio;
+        const headHeightPx = chinYPx - crownYPx;
+        const photoHeightPx = headHeightPx / targetHeadRatio;
         const aspectRatio = docSpec.width / docSpec.height;
         const photoWidthPx = photoHeightPx * aspectRatio;
 
-        // Position eye line at the correct fraction from bottom
-        const eyeY = landmarks.eyeCenter.y;
-        const bottomY = eyeY + photoHeightPx * docSpec.eyeLineFromBottom;
-        const topY = bottomY - photoHeightPx;
-
-        // Center horizontally on face center
-        const centerX = landmarks.faceCenterX;
-        const leftX = centerX - photoWidthPx / 2;
-
-        // Apply user adjustments (in pixels)
-        const adjustedLeft = leftX + adjustX;
-        const adjustedTop = topY + adjustY;
+        // Position: eye line should be at eyeLineFromBottom from photo bottom
+        const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
+        const leftX = faceCenterXPx - photoWidthPx / 2;
 
         // Clamp to image bounds
         const cropW = Math.min(Math.round(photoWidthPx), imgW);
         const cropH = Math.min(Math.round(photoHeightPx), imgH);
-        let cropLeft = Math.round(adjustedLeft);
-        let cropTop = Math.round(adjustedTop);
-
-        if (cropLeft < 0) cropLeft = 0;
-        if (cropTop < 0) cropTop = 0;
+        let cropLeft = Math.max(0, Math.round(leftX));
+        let cropTop = Math.max(0, Math.round(topY));
         if (cropLeft + cropW > imgW) cropLeft = imgW - cropW;
         if (cropTop + cropH > imgH) cropTop = imgH - cropH;
-
-        // Ensure non-negative after clamping
         cropLeft = Math.max(0, cropLeft);
         cropTop = Math.max(0, cropTop);
 
@@ -472,25 +478,25 @@ export function registerPassportPhoto(app: FastifyInstance) {
       const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
       if (!docSpec) throw new Error(`No ${s.documentType} spec for ${s.countryCode}`);
 
+      // Convert normalized landmarks (0-1) to pixel coordinates
+      const crownYPx = (landmarks.crown.y + s.adjustY) * imgH;
+      const chinYPx = (landmarks.chin.y + s.adjustY) * imgH;
+      const eyeYPx = (landmarks.eyeCenter.y + s.adjustY) * imgH;
+      const faceCenterXPx = (landmarks.faceCenterX + s.adjustX) * imgW;
+
       const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
-      const crownToChinPx = landmarks.chin.y - landmarks.crown.y;
-      const photoHeightPx = crownToChinPx / targetHeadRatio;
+      const headHeightPx = chinYPx - crownYPx;
+      const photoHeightPx = headHeightPx / targetHeadRatio;
       const aspectRatio = docSpec.width / docSpec.height;
       const photoWidthPx = photoHeightPx * aspectRatio;
 
-      const eyeY = landmarks.eyeCenter.y;
-      const bottomY = eyeY + photoHeightPx * docSpec.eyeLineFromBottom;
-      const topY = bottomY - photoHeightPx;
-      const centerX = landmarks.faceCenterX;
-      const leftX = centerX - photoWidthPx / 2;
-
-      const adjustedLeft = leftX + s.adjustX;
-      const adjustedTop = topY + s.adjustY;
+      const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
+      const leftX = faceCenterXPx - photoWidthPx / 2;
 
       const cropW = Math.min(Math.round(photoWidthPx), imgW);
       const cropH = Math.min(Math.round(photoHeightPx), imgH);
-      let cropLeft = Math.max(0, Math.round(adjustedLeft));
-      let cropTop = Math.max(0, Math.round(adjustedTop));
+      let cropLeft = Math.max(0, Math.round(leftX));
+      let cropTop = Math.max(0, Math.round(topY));
       if (cropLeft + cropW > imgW) cropLeft = imgW - cropW;
       if (cropTop + cropH > imgH) cropTop = imgH - cropH;
       cropLeft = Math.max(0, cropLeft);
