@@ -1,11 +1,11 @@
 import { BlurFacesControls } from "./blur-faces-settings";
 import { BorderControls } from "./border-settings";
-import { NoiseRemovalControls } from "./noise-removal-settings";
 import { ColorControls } from "./color-settings";
 import { CompressControls } from "./compress-settings";
 import { ConvertControls } from "./convert-settings";
 import { CropControls } from "./crop-settings";
 import { GifToolsControls } from "./gif-tools-settings";
+import { NoiseRemovalControls } from "./noise-removal-settings";
 import { RemoveBgControls } from "./remove-bg-settings";
 import { ReplaceColorControls } from "./replace-color-settings";
 import { ResizeControls } from "./resize-settings";

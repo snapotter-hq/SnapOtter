@@ -10,7 +10,13 @@ const TIERS: { id: Tier; icon: string; label: string; algo: string; time: string
   { id: "quick", icon: "\u26A1", label: "Quick", algo: "Median filter", time: "~1s" },
   { id: "balanced", icon: "\u2696\uFE0F", label: "Balanced", algo: "Non-local means", time: "~3s" },
   { id: "quality", icon: "\u2728", label: "Quality", algo: "AI denoiser", time: "~10s" },
-  { id: "maximum", icon: "\uD83D\uDC8E", label: "Maximum", algo: "AI + detail recovery", time: "~20s" },
+  {
+    id: "maximum",
+    icon: "\uD83D\uDC8E",
+    label: "Maximum",
+    algo: "AI + detail recovery",
+    time: "~20s",
+  },
 ];
 
 const LOSSY_FORMATS = new Set(["jpeg", "webp"]);

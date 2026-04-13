@@ -24,124 +24,121 @@ const settingsSchema = z.object({
  * Uses the Python sidecar for multi-tier denoising.
  */
 export function registerNoiseRemoval(app: FastifyInstance) {
-  app.post(
-    "/api/v1/tools/noise-removal",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      let fileBuffer: Buffer | null = null;
-      let filename = "image";
-      let settingsRaw: string | null = null;
-      let clientJobId: string | null = null;
+  app.post("/api/v1/tools/noise-removal", async (request: FastifyRequest, reply: FastifyReply) => {
+    let fileBuffer: Buffer | null = null;
+    let filename = "image";
+    let settingsRaw: string | null = null;
+    let clientJobId: string | null = null;
 
-      try {
-        const parts = request.parts();
-        for await (const part of parts) {
-          if (part.type === "file") {
-            const chunks: Buffer[] = [];
-            for await (const chunk of part.file) {
-              chunks.push(chunk);
-            }
-            fileBuffer = Buffer.concat(chunks);
-            filename = part.filename ?? "image";
-          } else if (part.fieldname === "settings") {
-            settingsRaw = part.value as string;
-          } else if (part.fieldname === "clientJobId") {
-            clientJobId = part.value as string;
+    try {
+      const parts = request.parts();
+      for await (const part of parts) {
+        if (part.type === "file") {
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) {
+            chunks.push(chunk);
           }
+          fileBuffer = Buffer.concat(chunks);
+          filename = part.filename ?? "image";
+        } else if (part.fieldname === "settings") {
+          settingsRaw = part.value as string;
+        } else if (part.fieldname === "clientJobId") {
+          clientJobId = part.value as string;
         }
-      } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
+      }
+    } catch (err) {
+      return reply.status(400).send({
+        error: "Failed to parse multipart request",
+        details: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return reply.status(400).send({ error: "No image file provided" });
+    }
+
+    const validation = await validateImageBuffer(fileBuffer);
+    if (!validation.valid) {
+      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    }
+
+    try {
+      const parsed = settingsSchema.parse(settingsRaw ? JSON.parse(settingsRaw) : {});
+      request.log.info(
+        { toolId: "noise-removal", imageSize: fileBuffer.length, tier: parsed.tier },
+        "Starting noise removal",
+      );
+
+      // Decode HEIC/HEIF input via system decoder
+      if (validation.format === "heif") {
+        fileBuffer = await decodeHeic(fileBuffer);
+      }
+
+      // Auto-orient to fix EXIF rotation before processing
+      fileBuffer = await autoOrient(fileBuffer);
+
+      const jobId = randomUUID();
+      const workspacePath = await createWorkspace(jobId);
+
+      // Progress callback
+      const jobIdForProgress = clientJobId;
+      const onProgress = jobIdForProgress
+        ? (percent: number, stage: string) => {
+            updateSingleFileProgress({
+              jobId: jobIdForProgress,
+              phase: "processing",
+              stage,
+              percent,
+            });
+          }
+        : undefined;
+
+      const result = await noiseRemoval(
+        fileBuffer,
+        join(workspacePath, "output"),
+        {
+          tier: parsed.tier,
+          strength: parsed.strength,
+          detailPreservation: parsed.detailPreservation,
+          colorNoise: parsed.colorNoise,
+          format: parsed.format,
+          quality: parsed.quality,
+        },
+        onProgress,
+      );
+
+      if (clientJobId) {
+        updateSingleFileProgress({
+          jobId: clientJobId,
+          phase: "complete",
+          percent: 100,
         });
       }
 
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
+      const CONTENT_TYPES: Record<string, string> = {
+        png: "image/png",
+        jpeg: "image/jpeg",
+        jpg: "image/jpeg",
+        webp: "image/webp",
+      };
+      const contentType = CONTENT_TYPES[result.format] || "image/png";
+      const ext = result.format === "jpeg" ? "jpg" : result.format;
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
 
-      const validation = await validateImageBuffer(fileBuffer);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      try {
-        const parsed = settingsSchema.parse(settingsRaw ? JSON.parse(settingsRaw) : {});
-        request.log.info(
-          { toolId: "noise-removal", imageSize: fileBuffer.length, tier: parsed.tier },
-          "Starting noise removal",
-        );
-
-        // Decode HEIC/HEIF input via system decoder
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-        }
-
-        // Auto-orient to fix EXIF rotation before processing
-        fileBuffer = await autoOrient(fileBuffer);
-
-        const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
-
-        // Progress callback
-        const jobIdForProgress = clientJobId;
-        const onProgress = jobIdForProgress
-          ? (percent: number, stage: string) => {
-              updateSingleFileProgress({
-                jobId: jobIdForProgress,
-                phase: "processing",
-                stage,
-                percent,
-              });
-            }
-          : undefined;
-
-        const result = await noiseRemoval(
-          fileBuffer,
-          join(workspacePath, "output"),
-          {
-            tier: parsed.tier,
-            strength: parsed.strength,
-            detailPreservation: parsed.detailPreservation,
-            colorNoise: parsed.colorNoise,
-            format: parsed.format,
-            quality: parsed.quality,
-          },
-          onProgress,
-        );
-
-        if (clientJobId) {
-          updateSingleFileProgress({
-            jobId: clientJobId,
-            phase: "complete",
-            percent: 100,
-          });
-        }
-
-        const CONTENT_TYPES: Record<string, string> = {
-          png: "image/png",
-          jpeg: "image/jpeg",
-          jpg: "image/jpeg",
-          webp: "image/webp",
-        };
-        const contentType = CONTENT_TYPES[result.format] || "image/png";
-        const ext = result.format === "jpeg" ? "jpg" : result.format;
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
-
-        return reply
-          .header("Content-Type", contentType)
-          .header("Content-Disposition", `attachment; filename="${outputFilename}"`)
-          .header("X-Image-Width", String(result.width))
-          .header("X-Image-Height", String(result.height))
-          .send(result.buffer);
-      } catch (err) {
-        request.log.error({ err, toolId: "noise-removal" }, "Noise removal failed");
-        return reply.status(422).send({
-          error: "Noise removal failed",
-          details: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
-    },
-  );
+      return reply
+        .header("Content-Type", contentType)
+        .header("Content-Disposition", `attachment; filename="${outputFilename}"`)
+        .header("X-Image-Width", String(result.width))
+        .header("X-Image-Height", String(result.height))
+        .send(result.buffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "noise-removal" }, "Noise removal failed");
+      return reply.status(422).send({
+        error: "Noise removal failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  });
 
   // Register in the pipeline/batch registry so this tool can be used
   // as a step in automation pipelines (without progress callbacks).
