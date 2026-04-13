@@ -91,6 +91,7 @@ test.describe("Tool pages accept file upload", () => {
     "info",
     "border",
     "vectorize",
+    "gif-tools",
   ];
 
   for (const toolId of REPRESENTATIVE_TOOLS) {
