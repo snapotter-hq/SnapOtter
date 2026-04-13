@@ -319,7 +319,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
     "split",
     { displayMode: "interactive-split", Settings: SplitSettings, ResultsPanel: SplitCanvas },
   ],
-  ["border", { displayMode: "no-comparison", Settings: BorderSettings }],
+  ["border", { displayMode: "live-preview", livePreview: true, Settings: BorderSettings as never }],
 
   // Format & Conversion
   ["svg-to-raster", { displayMode: "before-after", Settings: SvgToRasterSettings }],

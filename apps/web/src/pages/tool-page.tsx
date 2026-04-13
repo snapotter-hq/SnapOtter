@@ -139,6 +139,7 @@ export function ToolPage() {
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(true);
   const [previewTransform, setPreviewTransform] = useState<PreviewTransform | null>(null);
   const [previewFilter, setPreviewFilter] = useState<string>("");
+  const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
   const [bgPreview, setBgPreview] = useState<BgPreviewState | null>(null);
 
   const [cropCrop, setCropCrop] = useState<Crop>({
@@ -249,6 +250,7 @@ export function ToolPage() {
   const settingsProps = {
     onPreviewTransform: isLivePreview ? setPreviewTransform : undefined,
     onPreviewFilter: isLivePreview ? setPreviewFilter : undefined,
+    onImageStyle: isLivePreview ? setImageWrapperStyle : undefined,
     onBgPreview: setBgPreview,
     cropProps:
       displayMode === "interactive-crop"
@@ -446,6 +448,7 @@ export function ToolPage() {
               }
             : {})}
           {...(isLivePreview && previewFilter ? { cssFilter: previewFilter } : {})}
+          {...(isLivePreview && imageWrapperStyle ? { imageWrapperStyle } : {})}
         />
       );
     }
