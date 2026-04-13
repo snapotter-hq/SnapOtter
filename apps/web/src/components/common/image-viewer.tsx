@@ -24,6 +24,7 @@ interface ImageViewerProps {
   cssFlipV?: boolean;
   cssFilter?: string;
   bgPreview?: BgPreviewState;
+  imageWrapperStyle?: React.CSSProperties;
 }
 
 const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 200, 300];
@@ -38,6 +39,7 @@ export function ImageViewer({
   cssFlipV,
   cssFilter,
   bgPreview,
+  imageWrapperStyle,
 }: ImageViewerProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
@@ -246,6 +248,33 @@ export function ImageViewer({
                 objectFit: "contain" as const,
                 filter: bgPreview.dropShadow || undefined,
                 transition: "filter 0.15s ease",
+              }}
+              draggable={false}
+            />
+          </div>
+        ) : imageWrapperStyle ? (
+          <div
+            style={{
+              ...imageWrapperStyle,
+              display: "inline-block",
+              overflow: "hidden",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <img
+              ref={imgRef}
+              src={src}
+              alt={filename}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              className="select-none"
+              style={{
+                display: "block",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain" as const,
               }}
               draggable={false}
             />

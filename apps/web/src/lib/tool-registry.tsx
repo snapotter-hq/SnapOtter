@@ -56,6 +56,7 @@ export interface ToolRegistryEntry {
     onPreviewTransform?: (t: PreviewTransform) => void;
     onPreviewFilter?: (filter: string) => void;
     onBgPreview?: (state: BgPreviewState | null) => void;
+    onImageStyle?: (style: React.CSSProperties | null) => void;
     cropProps?: CropProps;
     eraserProps?: EraserProps;
   }>;
@@ -300,7 +301,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
     "split",
     { displayMode: "interactive-split", Settings: SplitSettings, ResultsPanel: SplitCanvas },
   ],
-  ["border", { displayMode: "before-after", Settings: BorderSettings }],
+  ["border", { displayMode: "no-comparison", Settings: BorderSettings }],
 
   // Format & Conversion
   ["svg-to-raster", { displayMode: "before-after", Settings: SvgToRasterSettings }],

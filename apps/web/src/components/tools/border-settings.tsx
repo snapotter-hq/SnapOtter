@@ -1,4 +1,5 @@
 import { Download } from "lucide-react";
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -177,13 +178,48 @@ function ColorSwatches({
   );
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function hexToRgb(hex: string) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function buildPreviewStyle(s: {
+  borderWidth: number;
+  borderColor: string;
+  padding: number;
+  paddingColor: string;
+  cornerRadius: number;
+  shadow: boolean;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+  shadowColor: string;
+  shadowOpacity: number;
+}): React.CSSProperties {
+  const sc = hexToRgb(s.shadowColor);
+  return {
+    border: s.borderWidth > 0 ? `${s.borderWidth}px solid ${s.borderColor}` : undefined,
+    padding: s.padding > 0 ? `${s.padding}px` : undefined,
+    backgroundColor: s.padding > 0 ? s.paddingColor : undefined,
+    borderRadius: s.cornerRadius > 0 ? `${s.cornerRadius}px` : undefined,
+    boxShadow: s.shadow
+      ? `${s.shadowOffsetX}px ${s.shadowOffsetY}px ${s.shadowBlur}px rgba(${sc.r},${sc.g},${sc.b},${s.shadowOpacity / 100})`
+      : undefined,
+  };
+}
+
 // ── Controls ─────────────────────────────────────────────────────────
 
 export interface BorderControlsProps {
   onChange?: (settings: Record<string, unknown>) => void;
+  onImageStyle?: (style: React.CSSProperties | null) => void;
 }
 
-export function BorderControls({ onChange }: BorderControlsProps) {
+export function BorderControls({ onChange, onImageStyle }: BorderControlsProps) {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [borderWidth, setBorderWidth] = useState(10);
   const [borderColor, setBorderColor] = useState("#000000");
@@ -202,8 +238,13 @@ export function BorderControls({ onChange }: BorderControlsProps) {
     onChangeRef.current = onChange;
   });
 
+  const onImageStyleRef = useRef(onImageStyle);
   useEffect(() => {
-    onChangeRef.current?.({
+    onImageStyleRef.current = onImageStyle;
+  });
+
+  useEffect(() => {
+    const vals = {
       borderWidth,
       borderColor,
       padding,
@@ -215,7 +256,9 @@ export function BorderControls({ onChange }: BorderControlsProps) {
       shadowOffsetY,
       shadowColor,
       shadowOpacity,
-    });
+    };
+    onChangeRef.current?.(vals);
+    onImageStyleRef.current?.(buildPreviewStyle(vals));
   }, [
     borderWidth,
     borderColor,
@@ -505,7 +548,11 @@ export function BorderControls({ onChange }: BorderControlsProps) {
 
 // ── Settings Panel ───────────────────────────────────────────────────
 
-export function BorderSettings() {
+export function BorderSettings({
+  onImageStyle,
+}: {
+  onImageStyle?: (style: React.CSSProperties | null) => void;
+}) {
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("border");
@@ -539,7 +586,7 @@ export function BorderSettings() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <BorderControls onChange={handleSettingsChange} />
+      <BorderControls onChange={handleSettingsChange} onImageStyle={onImageStyle} />
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
