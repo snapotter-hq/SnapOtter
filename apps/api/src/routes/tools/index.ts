@@ -27,6 +27,7 @@ import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
+import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
@@ -138,6 +139,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "colorize", register: registerColorize },
     { id: "enhance-faces", register: registerEnhanceFaces },
     { id: "noise-removal", register: registerNoiseRemoval },
+    { id: "passport-photo", register: registerPassportPhoto },
     { id: "red-eye-removal", register: registerRedEyeRemoval },
     { id: "restore-photo", register: registerRestorePhoto },
   ];
