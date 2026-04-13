@@ -259,6 +259,11 @@ const NoiseRemovalSettings = lazy(() =>
     default: m.NoiseRemovalSettings,
   })),
 );
+const PassportPhotoSettings = lazy(() =>
+  import("@/components/tools/passport-photo-settings").then((m) => ({
+    default: m.PassportPhotoSettings,
+  })),
+);
 const RedEyeRemovalSettings = lazy(() =>
   import("@/components/tools/red-eye-removal-settings").then((m) => ({
     default: m.RedEyeRemovalSettings,
@@ -400,6 +405,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ],
   ["colorize", { displayMode: "before-after", Settings: ColorizeSettings }],
   ["noise-removal", { displayMode: "before-after", Settings: NoiseRemovalSettings }],
+  ["passport-photo", { displayMode: "no-comparison", Settings: PassportPhotoSettings }],
   ["red-eye-removal", { displayMode: "before-after", Settings: RedEyeRemovalSettings }],
   ["restore-photo", { displayMode: "before-after", Settings: RestorePhotoSettings }],
 ]);
