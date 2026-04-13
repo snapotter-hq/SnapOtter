@@ -7,9 +7,9 @@ import { useFileStore } from "@/stores/file-store";
 type Model = "auto" | "ddcolor" | "opencv";
 
 const MODEL_OPTIONS: { value: Model; label: string; desc: string }[] = [
-  { value: "auto", label: "Auto", desc: "Best available" },
-  { value: "ddcolor", label: "DDColor", desc: "SOTA deep learning" },
-  { value: "opencv", label: "Classic", desc: "Fast, lightweight" },
+  { value: "opencv", label: "Fast", desc: "Quick results" },
+  { value: "auto", label: "Balanced", desc: "Best available" },
+  { value: "ddcolor", label: "Best", desc: "Highest quality" },
 ];
 
 export function ColorizeSettings() {
