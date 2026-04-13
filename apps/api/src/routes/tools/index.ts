@@ -25,9 +25,11 @@ import { registerGifTools } from "./gif-tools.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
+import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerQrGenerate } from "./qr-generate.js";
+import { registerRedEyeRemoval } from "./red-eye-removal.js";
 import { registerRemoveBackground } from "./remove-background.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
@@ -134,6 +136,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "content-aware-resize", register: registerContentAwareResize },
     { id: "colorize", register: registerColorize },
     { id: "enhance-faces", register: registerEnhanceFaces },
+    { id: "noise-removal", register: registerNoiseRemoval },
+    { id: "red-eye-removal", register: registerRedEyeRemoval },
   ];
 
   let skipped = 0;

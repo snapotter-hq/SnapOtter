@@ -84,6 +84,14 @@ export const en = {
       description:
         "One-click auto-improve with smart exposure, contrast, color, and sharpness correction",
     },
+    "noise-removal": {
+      name: "Noise Removal",
+      description: "AI-powered noise and grain removal",
+    },
+    "red-eye-removal": {
+      name: "Red Eye Removal",
+      description: "AI-powered red eye detection and correction for flash photos",
+    },
     "content-aware-resize": {
       name: "Content-Aware Resize",
       description: "Intelligently resize images while preserving important content",

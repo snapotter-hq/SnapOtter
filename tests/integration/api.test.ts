@@ -2720,6 +2720,7 @@ describe("Pipeline", () => {
       expect(toolIds).toContain("remove-background");
       expect(toolIds).toContain("upscale");
       expect(toolIds).toContain("blur-faces");
+      expect(toolIds).toContain("noise-removal");
     });
 
     it("excludes tools that are not pipeline-compatible", async () => {
@@ -4054,5 +4055,114 @@ describe("Image Enhancement", () => {
       payload,
     });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOISE REMOVAL
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Noise Removal", () => {
+  it("POST /api/v1/tools/noise-removal processes with quick tier", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "noisy.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ tier: "quick", strength: 50 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/noise-removal",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    // Either succeeds or Python sidecar unavailable in test env
+    expect(res.statusCode).not.toBe(400);
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      expect(res.headers["content-type"]).toMatch(/^image\//);
+      expect(res.headers["content-disposition"]).toMatch(/attachment/);
+    }
+  });
+
+  it("returns 400 when no file is provided", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "settings",
+        content: JSON.stringify({ tier: "quick", strength: 50 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/noise-removal",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 for empty file", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      {
+        name: "settings",
+        content: JSON.stringify({ tier: "quick" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/noise-removal",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("accepts JPEG input", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "noisy.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+      {
+        name: "settings",
+        content: JSON.stringify({ tier: "quick", strength: 30 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/noise-removal",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).not.toBe(400);
+    expect([200, 422]).toContain(res.statusCode);
+  });
+
+  it("uses default settings when none provided", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "noisy.png", contentType: "image/png", content: PNG_200x150 },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/noise-removal",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    // Defaults should be accepted without validation errors
+    expect(res.statusCode).not.toBe(400);
+    expect([200, 422]).toContain(res.statusCode);
   });
 });

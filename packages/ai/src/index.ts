@@ -5,6 +5,8 @@ export type { DetectFacesResult, FaceRegion } from "./face-detection.js";
 export { blurFaces, detectFaces } from "./face-detection.js";
 export { enhanceFaces } from "./face-enhancement.js";
 export { inpaint } from "./inpainting.js";
+export { noiseRemoval } from "./noise-removal.js";
 export { extractText } from "./ocr.js";
+export { removeRedEye } from "./red-eye-removal.js";
 export { seamCarve } from "./seam-carving.js";
 export { upscale } from "./upscaling.js";

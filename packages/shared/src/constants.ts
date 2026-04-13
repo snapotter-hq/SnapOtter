@@ -193,6 +193,22 @@ export const TOOLS: Tool[] = [
     icon: "Palette",
     route: "/colorize",
   },
+  {
+    id: "noise-removal",
+    name: "Noise Removal",
+    description: "AI-powered noise and grain removal",
+    category: "ai",
+    icon: "Sparkles",
+    route: "/noise-removal",
+  },
+  {
+    id: "red-eye-removal",
+    name: "Red Eye Removal",
+    description: "AI-detect and fix red eye in flash photos",
+    category: "ai",
+    icon: "Eye",
+    route: "/red-eye-removal",
+  },
   // Watermark & Overlay
   {
     id: "watermark-text",
@@ -414,4 +430,6 @@ export const PYTHON_SIDECAR_TOOLS = [
   "ocr",
   "colorize",
   "enhance-faces",
+  "noise-removal",
+  "red-eye-removal",
 ] as const;
