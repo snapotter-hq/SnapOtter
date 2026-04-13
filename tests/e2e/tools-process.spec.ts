@@ -120,6 +120,21 @@ test.describe("Tool processing (core tools)", () => {
     });
   });
 
+  test("image-enhancement processes image", async ({ loggedInPage: page }) => {
+    await page.goto("/image-enhancement");
+    await uploadTestImage(page);
+    // Wait for analysis to complete (badges appear)
+    await expect(
+      page.locator("text=Intensity").or(page.locator("text=Enhancement Mode")),
+    ).toBeVisible({ timeout: 10_000 });
+    // Click Enhance button
+    await page.getByRole("button", { name: /^enhance$/i }).click();
+    await waitForProcessing(page);
+    await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("border processes image", async ({ loggedInPage: page }) => {
     await page.goto("/border");
     await uploadTestImage(page);

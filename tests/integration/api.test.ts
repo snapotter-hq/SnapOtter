@@ -3952,3 +3952,107 @@ describe("Edit metadata", () => {
     });
   });
 });
+
+describe("Image Enhancement", () => {
+  it("POST /api/v1/tools/image-enhancement processes an image", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          mode: "auto",
+          intensity: 50,
+          corrections: {
+            exposure: true,
+            contrast: true,
+            whiteBalance: true,
+            saturation: true,
+            sharpness: true,
+            denoise: true,
+          },
+        }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.jobId).toBeDefined();
+    expect(body.downloadUrl).toBeDefined();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  it("POST /api/v1/tools/image-enhancement/analyze returns analysis data", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement/analyze",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.scores).toBeDefined();
+    expect(body.corrections).toBeDefined();
+    expect(body.issues).toBeInstanceOf(Array);
+    expect(body.suggestedMode).toBeDefined();
+    expect(typeof body.scores.exposure).toBe("number");
+  });
+
+  it("preserves JPEG format through enhancement", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          mode: "auto",
+          intensity: 50,
+        }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.downloadUrl).toMatch(/\.jpg/);
+  });
+
+  it("rejects empty file", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "auto" }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      payload,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
