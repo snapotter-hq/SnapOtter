@@ -4,6 +4,63 @@ import sharp from "sharp";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
 
+/**
+ * Assemble multiple single-frame GIF buffers into one animated GIF.
+ *
+ * Sharp 0.33.x cannot set the page-height metadata on images constructed
+ * from raw pixel data, so re-encoding reversed frames through sharp's
+ * `.gif()` produces a single tall frame instead of an animation.
+ *
+ * This helper works at the GIF89a binary level: it takes the header,
+ * logical screen descriptor, and global color table from the first frame,
+ * adds a NETSCAPE2.0 looping extension, then appends the graphic control
+ * extension + image data blocks from every frame.
+ */
+function assembleAnimatedGif(frameGifs: Buffer[], loop: number): Buffer {
+  const first = frameGifs[0];
+
+  // Parse the Logical Screen Descriptor to find the Global Color Table size
+  const packed = first[10]; // byte 10 = packed field in LSD
+  const hasGCT = (packed & 0x80) !== 0;
+  const gctSize = hasGCT ? 3 * (1 << ((packed & 0x07) + 1)) : 0;
+  const headerEnd = 13 + gctSize; // 6 (sig) + 7 (LSD) + GCT
+
+  // Header + LSD + GCT from the first frame
+  const header = first.subarray(0, headerEnd);
+
+  // NETSCAPE2.0 application extension for looping
+  const loopLo = loop & 0xff;
+  const loopHi = (loop >> 8) & 0xff;
+  const loopExt = Buffer.from([
+    0x21,
+    0xff,
+    0x0b, // application extension introducer
+    ...Buffer.from("NETSCAPE2.0"),
+    0x03,
+    0x01,
+    loopLo,
+    loopHi, // sub-block: loop count
+    0x00, // block terminator
+  ]);
+
+  const parts: Buffer[] = [header, loopExt];
+
+  // Extract frame data (everything between the header/GCT and the trailer)
+  for (const gif of frameGifs) {
+    const p = gif[10];
+    const hasTable = (p & 0x80) !== 0;
+    const tableSize = hasTable ? 3 * (1 << ((p & 0x07) + 1)) : 0;
+    const dataStart = 13 + tableSize;
+    const dataEnd = gif.length - 1; // exclude 0x3B trailer
+    if (dataEnd > dataStart) {
+      parts.push(gif.subarray(dataStart, dataEnd));
+    }
+  }
+
+  parts.push(Buffer.from([0x3b])); // GIF trailer
+  return Buffer.concat(parts);
+}
+
 const settingsSchema = z.object({
   mode: z.enum(["resize", "optimize", "speed", "reverse", "extract", "rotate"]).default("resize"),
 
@@ -137,8 +194,6 @@ export function registerGifTools(app: FastifyInstance) {
         case "reverse": {
           const meta = await sharp(inputBuffer, { animated: true }).metadata();
           const pageCount = meta.pages ?? 1;
-          const pageHeight = meta.pageHeight ?? meta.height ?? 0;
-          const width = meta.width ?? 0;
           const delays = [...(meta.delay ?? Array(pageCount).fill(100))];
 
           if (pageCount <= 1) {
@@ -146,18 +201,6 @@ export function registerGifTools(app: FastifyInstance) {
             return { buffer, filename, contentType: "image/gif" };
           }
 
-          const rawData = await sharp(inputBuffer, { animated: true })
-            .raw()
-            .ensureAlpha()
-            .toBuffer();
-
-          const frameSize = width * pageHeight * 4;
-          const frames: Buffer[] = [];
-          for (let i = 0; i < pageCount; i++) {
-            frames.push(Buffer.from(rawData.subarray(i * frameSize, (i + 1) * frameSize)));
-          }
-
-          frames.reverse();
           delays.reverse();
 
           // Apply optional speed adjustment (used when "Also adjust speed" is checked)
@@ -167,12 +210,19 @@ export function registerGifTools(app: FastifyInstance) {
             }
           }
 
-          const buffer = await sharp(Buffer.concat(frames), {
-            raw: { width, height: pageHeight * pageCount, channels: 4 },
-          })
-            .gif({ delay: delays, loop })
-            .toBuffer();
+          // Extract each frame as a single-frame GIF with the correct delay,
+          // then combine into a multi-frame GIF at the binary level.
+          // This avoids going through raw pixel data, which loses the
+          // page-height metadata that sharp/libvips needs for animation.
+          const frameGifs: Buffer[] = [];
+          for (let i = pageCount - 1; i >= 0; i--) {
+            const frameBuf = await sharp(inputBuffer, { page: i })
+              .gif({ delay: [delays[pageCount - 1 - i]], loop })
+              .toBuffer();
+            frameGifs.push(frameBuf);
+          }
 
+          const buffer = assembleAnimatedGif(frameGifs, loop);
           return { buffer, filename, contentType: "image/gif" };
         }
 
@@ -219,19 +269,29 @@ export function registerGifTools(app: FastifyInstance) {
         }
 
         case "rotate": {
-          let image = sharp(inputBuffer, { animated: true });
+          const meta = await sharp(inputBuffer, { animated: true }).metadata();
+          const pageCount = meta.pages ?? 1;
+          const delays = meta.delay ?? Array(pageCount).fill(100);
 
-          if (settings.angle) {
-            image = image.rotate(settings.angle);
-          }
-          if (settings.flipV) {
-            image = image.flip();
-          }
-          if (settings.flipH) {
-            image = image.flop();
+          // Sharp cannot rotate multi-page images directly, so process
+          // each frame individually and reassemble the animation.
+          const frameGifs: Buffer[] = [];
+          for (let i = 0; i < pageCount; i++) {
+            let frame = sharp(inputBuffer, { page: i });
+            if (settings.angle) {
+              frame = frame.rotate(settings.angle);
+            }
+            if (settings.flipV) {
+              frame = frame.flip();
+            }
+            if (settings.flipH) {
+              frame = frame.flop();
+            }
+            const frameBuf = await frame.gif({ delay: [delays[i]], loop }).toBuffer();
+            frameGifs.push(frameBuf);
           }
 
-          const buffer = await image.gif({ loop }).toBuffer();
+          const buffer = pageCount > 1 ? assembleAnimatedGif(frameGifs, loop) : frameGifs[0];
           return { buffer, filename, contentType: "image/gif" };
         }
 
