@@ -40,6 +40,7 @@ const TOOLS_WITH_DROPZONE = [
   { id: "svg-to-raster", name: "SVG to Raster" },
   { id: "vectorize", name: "Image to SVG" },
   { id: "gif-tools", name: "GIF" },
+  { id: "noise-removal", name: "Noise Removal" },
 ];
 
 const TOOLS_WITHOUT_DROPZONE = [{ id: "qr-generate", name: "QR Code" }];
