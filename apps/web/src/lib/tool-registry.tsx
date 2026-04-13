@@ -58,6 +58,8 @@ export interface ToolRegistryEntry {
     cropProps?: CropProps;
     eraserProps?: EraserProps;
   }>;
+  /** Optional panel for tools that render custom content in the main area. */
+  ResultsPanel?: React.ComponentType;
 }
 
 // ── Lazy-loaded settings components ────────────────────────────────
