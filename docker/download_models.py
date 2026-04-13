@@ -32,6 +32,21 @@ GFPGAN_MODEL_URL = (
 GFPGAN_MODEL_PATH = os.path.join(GFPGAN_MODEL_DIR, "GFPGANv1.3.pth")
 GFPGAN_MIN_SIZE = 300_000_000  # ~332 MB
 
+SCUNET_MODEL_DIR = "/opt/models/scunet"
+SCUNET_MODEL_URL = (
+    "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth"
+)
+SCUNET_MODEL_PATH = os.path.join(SCUNET_MODEL_DIR, "scunet_color_real_psnr.pth")
+SCUNET_MIN_SIZE = 3_000_000  # ~4 MB
+
+NAFNET_MODEL_DIR = "/opt/models/nafnet"
+NAFNET_MODEL_URL = (
+    "https://github.com/megvii-research/NAFNet/releases/download/v0.0.1/"
+    "NAFNet-SIDD-width64.pth"
+)
+NAFNET_MODEL_PATH = os.path.join(NAFNET_MODEL_DIR, "NAFNet-SIDD-width64.pth")
+NAFNET_MIN_SIZE = 60_000_000  # ~67 MB
+
 REMBG_MODELS = [
     "u2net",
     "isnet-general-use",
@@ -179,6 +194,30 @@ def download_paddleocr_vl_model():
     print(f"  {model_name} ready\n")
 
 
+def download_scunet_model():
+    """Download SCUNet real-noise denoising model."""
+    print(f"Downloading SCUNet model to {SCUNET_MODEL_PATH}...")
+    os.makedirs(SCUNET_MODEL_DIR, exist_ok=True)
+    urllib.request.urlretrieve(SCUNET_MODEL_URL, SCUNET_MODEL_PATH)
+    size = os.path.getsize(SCUNET_MODEL_PATH)
+    assert size > SCUNET_MIN_SIZE, (
+        f"SCUNet model too small: {size} bytes (expected >{SCUNET_MIN_SIZE})"
+    )
+    print(f"  SCUNet model downloaded: {size:,} bytes")
+
+
+def download_nafnet_model():
+    """Download NAFNet SIDD width-64 denoising model."""
+    print(f"Downloading NAFNet model to {NAFNET_MODEL_PATH}...")
+    os.makedirs(NAFNET_MODEL_DIR, exist_ok=True)
+    urllib.request.urlretrieve(NAFNET_MODEL_URL, NAFNET_MODEL_PATH)
+    size = os.path.getsize(NAFNET_MODEL_PATH)
+    assert size > NAFNET_MIN_SIZE, (
+        f"NAFNet model too small: {size} bytes (expected >{NAFNET_MIN_SIZE})"
+    )
+    print(f"  NAFNet model downloaded: {size:,} bytes")
+
+
 def verify_mediapipe():
     """Verify MediaPipe face detection models are bundled in the wheel."""
     print("=== Verifying MediaPipe models ===")
@@ -242,6 +281,16 @@ def smoke_test():
     )
     print("  GFPGAN model file verified")
 
+    # SCUNet model file must exist
+    assert os.path.exists(SCUNET_MODEL_PATH), f"SCUNet model not found: {SCUNET_MODEL_PATH}"
+    assert os.path.getsize(SCUNET_MODEL_PATH) > SCUNET_MIN_SIZE
+    print("  SCUNet model file verified")
+
+    # NAFNet model file must exist
+    assert os.path.exists(NAFNET_MODEL_PATH), f"NAFNet model not found: {NAFNET_MODEL_PATH}"
+    assert os.path.getsize(NAFNET_MODEL_PATH) > NAFNET_MIN_SIZE
+    print("  NAFNet model file verified")
+
     # PaddleOCR model directories must exist
     for repo_id in PADDLEOCR_MODELS:
         model_name = repo_id.split("/", 1)[1]
@@ -266,6 +315,8 @@ def main():
     download_gfpgan_model()
     download_paddleocr_models()
     download_paddleocr_vl_model()
+    download_scunet_model()
+    download_nafnet_model()
     verify_mediapipe()
     smoke_test()
     print("All models downloaded and verified.")
