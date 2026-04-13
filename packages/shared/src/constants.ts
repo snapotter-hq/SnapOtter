@@ -238,7 +238,7 @@ export const TOOLS: Tool[] = [
   {
     id: "barcode-read",
     name: "Barcode Reader",
-    description: "Read QR codes and barcodes from images",
+    description: "Scan images for QR codes, barcodes, and 2D codes",
     category: "utilities",
     icon: "ScanLine",
     route: "/barcode-read",

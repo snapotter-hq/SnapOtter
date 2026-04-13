@@ -92,7 +92,7 @@ export const en = {
     },
     "barcode-read": {
       name: "Barcode Reader",
-      description: "Read QR codes and barcodes from images",
+      description: "Scan images for QR codes, barcodes, and 2D codes",
     },
     collage: { name: "Collage / Grid", description: "Combine images into a grid layout" },
     stitch: { name: "Stitch", description: "Join images side by side or top to bottom" },
