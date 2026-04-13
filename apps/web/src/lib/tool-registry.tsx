@@ -96,6 +96,11 @@ const EditMetadataSettings = lazy(() =>
 const ColorSettings = lazy(() =>
   import("@/components/tools/color-settings").then((m) => ({ default: m.ColorSettings })),
 );
+const SharpeningSettings = lazy(() =>
+  import("@/components/tools/sharpening-settings").then((m) => ({
+    default: m.SharpeningSettings,
+  })),
+);
 const WatermarkTextSettings = lazy(() =>
   import("@/components/tools/watermark-text-settings").then((m) => ({
     default: m.WatermarkTextSettings,
@@ -292,6 +297,9 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
       Settings: makeColorSettingsComponent("adjust-colors") as never,
     },
   ],
+
+  // Sharpening
+  ["sharpening", { displayMode: "before-after", Settings: SharpeningSettings }],
 
   // Watermark & Overlay
   ["watermark-text", { displayMode: "before-after", Settings: WatermarkTextSettings }],
