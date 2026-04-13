@@ -229,6 +229,11 @@ const BlurFacesSettings = lazy(() =>
     default: m.BlurFacesSettings,
   })),
 );
+const EnhanceFacesSettings = lazy(() =>
+  import("@/components/tools/enhance-faces-settings").then((m) => ({
+    default: m.EnhanceFacesSettings,
+  })),
+);
 const EraseObjectSettings = lazy(() =>
   import("@/components/tools/erase-object-settings").then((m) => ({
     default: m.EraseObjectSettings,
@@ -361,6 +366,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ["upscale", { displayMode: "before-after", Settings: UpscaleSettings }],
   ["ocr", { displayMode: "before-after", Settings: OcrSettings }],
   ["blur-faces", { displayMode: "before-after", Settings: BlurFacesSettings }],
+  ["enhance-faces", { displayMode: "before-after", Settings: EnhanceFacesSettings }],
   [
     "erase-object",
     {
