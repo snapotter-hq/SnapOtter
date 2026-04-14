@@ -150,8 +150,13 @@ export function registerImageToBase64(app: FastifyInstance) {
           } else if (ext === "svg" || ext === "svgz") {
             outputBuffer = buffer;
             mimeType = "image/svg+xml";
-          } else {
+          } else if (opts.maxWidth > 0 || opts.maxHeight > 0) {
+            // Resize requested - must go through Sharp pipeline
             outputBuffer = await pipeline.toBuffer();
+            mimeType = detectMimeType(metadata.format ?? ext);
+          } else {
+            // No conversion, no resize - pass through decoded buffer as-is
+            outputBuffer = decoded;
             mimeType = detectMimeType(metadata.format ?? ext);
           }
 
