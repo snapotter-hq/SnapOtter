@@ -173,6 +173,9 @@ const ImageToBase64Results = lazy(() =>
 const CollageSettings = lazy(() =>
   import("@/components/tools/collage-settings").then((m) => ({ default: m.CollageSettings })),
 );
+const CollagePreview = lazy(() =>
+  import("@/components/tools/collage-preview").then((m) => ({ default: m.CollagePreview })),
+);
 const StitchSettings = lazy(() =>
   import("@/components/tools/stitch-settings").then((m) => ({ default: m.StitchSettings })),
 );
@@ -384,7 +387,10 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ],
 
   // Layout & Composition
-  ["collage", { displayMode: "before-after", Settings: CollageSettings }],
+  [
+    "collage",
+    { displayMode: "no-dropzone", Settings: CollageSettings, ResultsPanel: CollagePreview },
+  ],
   ["stitch", { displayMode: "no-comparison", Settings: StitchSettings }],
   [
     "split",

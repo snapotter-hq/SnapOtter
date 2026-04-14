@@ -9,19 +9,412 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 
-const settingsSchema = z.object({
-  layout: z.enum(["2x2", "3x3", "1x3", "2x1", "3x1", "1x2"]).default("2x2"),
-  gap: z.number().min(0).max(50).default(4),
-  backgroundColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .default("#FFFFFF"),
+// ── Template definitions (mirrors the frontend) ─────────────────────
+// We only need the grid proportions and cell definitions here.
+
+interface TemplateCell {
+  gridColumn: string;
+  gridRow: string;
+}
+
+interface Template {
+  id: string;
+  imageCount: number;
+  gridTemplateColumns: string;
+  gridTemplateRows: string;
+  cells: TemplateCell[];
+}
+
+// Kept in sync with apps/web/src/lib/collage-templates.ts
+const TEMPLATES: Template[] = [
+  {
+    id: "2-h-equal",
+    imageCount: 2,
+    gridTemplateColumns: "1fr 1fr",
+    gridTemplateRows: "1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+    ],
+  },
+  {
+    id: "2-v-equal",
+    imageCount: 2,
+    gridTemplateColumns: "1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+    ],
+  },
+  {
+    id: "2-h-left-large",
+    imageCount: 2,
+    gridTemplateColumns: "2fr 1fr",
+    gridTemplateRows: "1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+    ],
+  },
+  {
+    id: "2-h-right-large",
+    imageCount: 2,
+    gridTemplateColumns: "1fr 2fr",
+    gridTemplateRows: "1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+    ],
+  },
+  {
+    id: "3-left-large",
+    imageCount: 3,
+    gridTemplateColumns: "2fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1 / 3" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "2", gridRow: "2" },
+    ],
+  },
+  {
+    id: "3-right-large",
+    imageCount: 3,
+    gridTemplateColumns: "1fr 2fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "1 / 3" },
+    ],
+  },
+  {
+    id: "3-top-large",
+    imageCount: 3,
+    gridTemplateColumns: "1fr 1fr",
+    gridTemplateRows: "2fr 1fr",
+    cells: [
+      { gridColumn: "1 / 3", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+    ],
+  },
+  {
+    id: "3-h-equal",
+    imageCount: 3,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+    ],
+  },
+  {
+    id: "3-v-equal",
+    imageCount: 3,
+    gridTemplateColumns: "1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "1", gridRow: "3" },
+    ],
+  },
+  {
+    id: "4-grid",
+    imageCount: 4,
+    gridTemplateColumns: "1fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+    ],
+  },
+  {
+    id: "4-left-large",
+    imageCount: 4,
+    gridTemplateColumns: "2fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1 / 4" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "2", gridRow: "3" },
+    ],
+  },
+  {
+    id: "4-top-large",
+    imageCount: 4,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "2fr 1fr",
+    cells: [
+      { gridColumn: "1 / 4", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+    ],
+  },
+  {
+    id: "4-bottom-large",
+    imageCount: 4,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "1fr 2fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "1 / 4", gridRow: "2" },
+    ],
+  },
+  {
+    id: "5-top2-bottom3",
+    imageCount: 5,
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1 / 4", gridRow: "1" },
+      { gridColumn: "4 / 7", gridRow: "1" },
+      { gridColumn: "1 / 3", gridRow: "2" },
+      { gridColumn: "3 / 5", gridRow: "2" },
+      { gridColumn: "5 / 7", gridRow: "2" },
+    ],
+  },
+  {
+    id: "5-top3-bottom2",
+    imageCount: 5,
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1 / 3", gridRow: "1" },
+      { gridColumn: "3 / 5", gridRow: "1" },
+      { gridColumn: "5 / 7", gridRow: "1" },
+      { gridColumn: "1 / 4", gridRow: "2" },
+      { gridColumn: "4 / 7", gridRow: "2" },
+    ],
+  },
+  {
+    id: "5-left-large",
+    imageCount: 5,
+    gridTemplateColumns: "2fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1 / 5" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "2", gridRow: "3" },
+      { gridColumn: "2", gridRow: "4" },
+    ],
+  },
+  {
+    id: "5-center-large",
+    imageCount: 5,
+    gridTemplateColumns: "1fr 2fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1 / 3" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+    ],
+  },
+  {
+    id: "6-grid-2x3",
+    imageCount: 6,
+    gridTemplateColumns: "1fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "1", gridRow: "3" },
+      { gridColumn: "2", gridRow: "3" },
+    ],
+  },
+  {
+    id: "6-grid-3x2",
+    imageCount: 6,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+    ],
+  },
+  {
+    id: "6-top-large",
+    imageCount: 6,
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
+    gridTemplateRows: "2fr 1fr",
+    cells: [
+      { gridColumn: "1 / 6", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+      { gridColumn: "4", gridRow: "2" },
+      { gridColumn: "5", gridRow: "2" },
+    ],
+  },
+  {
+    id: "7-mosaic",
+    imageCount: 7,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1 / 3", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+      { gridColumn: "1", gridRow: "3" },
+      { gridColumn: "2 / 4", gridRow: "3" },
+    ],
+  },
+  {
+    id: "8-mosaic",
+    imageCount: 8,
+    gridTemplateColumns: "1fr 1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1 / 3", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "4", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3 / 5", gridRow: "2" },
+      { gridColumn: "1 / 3", gridRow: "3" },
+      { gridColumn: "3 / 5", gridRow: "3" },
+    ],
+  },
+  {
+    id: "9-grid",
+    imageCount: 9,
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateRows: "1fr 1fr 1fr",
+    cells: [
+      { gridColumn: "1", gridRow: "1" },
+      { gridColumn: "2", gridRow: "1" },
+      { gridColumn: "3", gridRow: "1" },
+      { gridColumn: "1", gridRow: "2" },
+      { gridColumn: "2", gridRow: "2" },
+      { gridColumn: "3", gridRow: "2" },
+      { gridColumn: "1", gridRow: "3" },
+      { gridColumn: "2", gridRow: "3" },
+      { gridColumn: "3", gridRow: "3" },
+    ],
+  },
+];
+
+// ── Zod schema ──────────────��───────────────────────────────────────
+
+const cellSchema = z.object({
+  imageIndex: z.number().int().min(0),
+  panX: z.number().min(-100).max(100).default(0),
+  panY: z.number().min(-100).max(100).default(0),
+  zoom: z.number().min(1).max(3).default(1),
 });
 
-function parseLayout(layout: string): { cols: number; rows: number } {
-  const [cols, rows] = layout.split("x").map(Number);
-  return { cols, rows };
+const settingsSchema = z.object({
+  templateId: z.string(),
+  cells: z.array(cellSchema).optional(),
+  gap: z.number().min(0).max(50).default(8),
+  cornerRadius: z.number().min(0).max(30).default(0),
+  backgroundColor: z.string().default("#FFFFFF"),
+  aspectRatio: z.string().default("free"),
+  outputFormat: z.enum(["png", "jpeg", "webp"]).default("png"),
+  quality: z.number().min(1).max(100).default(90),
+});
+
+// ── Grid math ─────────────���─────────────────────────────────────────
+
+function parseFrValues(template: string): number[] {
+  return template
+    .trim()
+    .split(/\s+/)
+    .map((s) => {
+      const m = s.match(/^(\d+(?:\.\d+)?)fr$/);
+      return m ? Number(m[1]) : 1;
+    });
 }
+
+function parseGridRange(value: string, trackCount: number): [number, number] {
+  const parts = value.split("/").map((s) => s.trim());
+  const start = Number(parts[0]) - 1;
+  const end = parts.length > 1 ? Number(parts[1]) - 1 : start + 1;
+  return [Math.max(0, start), Math.min(trackCount, end)];
+}
+
+interface CellRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function computeCellRects(
+  tmpl: Template,
+  canvasW: number,
+  canvasH: number,
+  gapPx: number,
+): CellRect[] {
+  const cols = parseFrValues(tmpl.gridTemplateColumns);
+  const rows = parseFrValues(tmpl.gridTemplateRows);
+
+  const totalColGaps = (cols.length + 1) * gapPx;
+  const totalRowGaps = (rows.length + 1) * gapPx;
+  const availW = canvasW - totalColGaps;
+  const availH = canvasH - totalRowGaps;
+
+  const colFrTotal = cols.reduce((s, v) => s + v, 0);
+  const rowFrTotal = rows.reduce((s, v) => s + v, 0);
+
+  const colWidths = cols.map((fr) => Math.round((fr / colFrTotal) * availW));
+  const rowHeights = rows.map((fr) => Math.round((fr / rowFrTotal) * availH));
+
+  const colStarts: number[] = [gapPx];
+  for (let i = 1; i < cols.length; i++) {
+    colStarts.push(colStarts[i - 1] + colWidths[i - 1] + gapPx);
+  }
+  const rowStarts: number[] = [gapPx];
+  for (let i = 1; i < rows.length; i++) {
+    rowStarts.push(rowStarts[i - 1] + rowHeights[i - 1] + gapPx);
+  }
+
+  return tmpl.cells.map((cell) => {
+    const [cs, ce] = parseGridRange(cell.gridColumn, cols.length);
+    const [rs, re] = parseGridRange(cell.gridRow, rows.length);
+
+    const x = colStarts[cs];
+    const y = rowStarts[rs];
+    const w = colStarts[ce - 1] + colWidths[ce - 1] - colStarts[cs];
+    const h = rowStarts[re - 1] + rowHeights[re - 1] - rowStarts[rs];
+
+    return { x, y, w, h };
+  });
+}
+
+function getAspectMultiplier(ar: string): number | null {
+  const map: Record<string, number> = {
+    "1:1": 1,
+    "4:3": 3 / 4,
+    "3:2": 2 / 3,
+    "16:9": 9 / 16,
+    "9:16": 16 / 9,
+    "4:5": 5 / 4,
+  };
+  return map[ar] ?? null;
+}
+
+// ── Route registration ────────────���─────────────────────────────────
 
 export function registerCollage(app: FastifyInstance) {
   app.post("/api/v1/tools/collage", async (request, reply) => {
@@ -82,54 +475,143 @@ export function registerCollage(app: FastifyInstance) {
     }
 
     try {
-      const { cols, rows } = parseLayout(settings.layout);
-      const totalSlots = cols * rows;
-
-      // Determine cell size based on first image
-      const firstMeta = await sharp(files[0].buffer).metadata();
-      const cellW = firstMeta.width ?? 400;
-      const cellH = firstMeta.height ?? 400;
-
-      // Canvas dimensions
-      const canvasW = cellW * cols + settings.gap * (cols + 1);
-      const canvasH = cellH * rows + settings.gap * (rows + 1);
-
-      // Parse background color
-      const bgR = parseInt(settings.backgroundColor.slice(1, 3), 16);
-      const bgG = parseInt(settings.backgroundColor.slice(3, 5), 16);
-      const bgB = parseInt(settings.backgroundColor.slice(5, 7), 16);
-
-      // Create canvas
-      const composites: sharp.OverlayOptions[] = [];
-
-      for (let i = 0; i < Math.min(files.length, totalSlots); i++) {
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        const x = settings.gap + col * (cellW + settings.gap);
-        const y = settings.gap + row * (cellH + settings.gap);
-
-        const resized = await sharp(files[i].buffer)
-          .resize(cellW, cellH, { fit: "cover" })
-          .toBuffer();
-
-        composites.push({ input: resized, top: y, left: x });
+      // Find the template
+      const template = TEMPLATES.find((t) => t.id === settings.templateId);
+      if (!template) {
+        return reply.status(400).send({ error: `Unknown template: ${settings.templateId}` });
       }
 
-      const result = await sharp({
+      // Determine output canvas size
+      const BASE_SIZE = 2400;
+      const arMultiplier = getAspectMultiplier(settings.aspectRatio);
+      let canvasW: number;
+      let canvasH: number;
+      if (arMultiplier) {
+        if (arMultiplier > 1) {
+          canvasH = BASE_SIZE;
+          canvasW = Math.round(BASE_SIZE / arMultiplier);
+        } else {
+          canvasW = BASE_SIZE;
+          canvasH = Math.round(BASE_SIZE * arMultiplier);
+        }
+      } else {
+        // "free" - use 4:3 default
+        canvasW = BASE_SIZE;
+        canvasH = Math.round(BASE_SIZE * 0.75);
+      }
+
+      const gapPx = settings.gap;
+      const cellRects = computeCellRects(template, canvasW, canvasH, gapPx);
+
+      // Parse background color
+      const bgIsTransparent = settings.backgroundColor === "transparent";
+      let bgColor: { r: number; g: number; b: number };
+      if (bgIsTransparent) {
+        bgColor = { r: 0, g: 0, b: 0 };
+      } else {
+        const hex = settings.backgroundColor.replace("#", "");
+        bgColor = {
+          r: parseInt(hex.slice(0, 2), 16),
+          g: parseInt(hex.slice(2, 4), 16),
+          b: parseInt(hex.slice(4, 6), 16),
+        };
+      }
+
+      const channels = bgIsTransparent ? 4 : 3;
+      const composites: sharp.OverlayOptions[] = [];
+      const cellSettings = settings.cells ?? [];
+
+      for (let i = 0; i < cellRects.length && i < files.length; i++) {
+        const rect = cellRects[i];
+        const cellW = Math.max(1, Math.round(rect.w));
+        const cellH = Math.max(1, Math.round(rect.h));
+        const cellSetting = cellSettings[i] ?? { panX: 0, panY: 0, zoom: 1 };
+
+        // Get image metadata for proper crop calculation
+        const meta = await sharp(files[i].buffer).metadata();
+        const imgW = meta.width ?? cellW;
+        const imgH = meta.height ?? cellH;
+
+        const zoom = Math.max(1, cellSetting.zoom);
+
+        // Calculate the size we need to resize to before extracting
+        // With zoom=1 and cover fit, we resize so the image fully covers the cell
+        const scaleToFit = Math.max(cellW / imgW, cellH / imgH);
+        const resizedW = Math.round(imgW * scaleToFit * zoom);
+        const resizedH = Math.round(imgH * scaleToFit * zoom);
+
+        // Pan offset: percentage of the available overflow
+        const overflowX = Math.max(0, resizedW - cellW);
+        const overflowY = Math.max(0, resizedH - cellH);
+        // Center by default, then apply pan (-100..100 maps to full overflow range)
+        const extractLeft = Math.round(overflowX / 2 - (cellSetting.panX / 100) * (overflowX / 2));
+        const extractTop = Math.round(overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2));
+
+        let cellBuffer = await sharp(files[i].buffer)
+          .resize(resizedW, resizedH, { fit: "fill" })
+          .extract({
+            left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
+            top: Math.max(0, Math.min(extractTop, resizedH - cellH)),
+            width: cellW,
+            height: cellH,
+          })
+          .toBuffer();
+
+        // Apply corner radius via SVG mask if needed
+        if (settings.cornerRadius > 0) {
+          const r = settings.cornerRadius;
+          const mask = Buffer.from(
+            `<svg width="${cellW}" height="${cellH}">
+              <rect x="0" y="0" width="${cellW}" height="${cellH}" rx="${r}" ry="${r}" fill="white"/>
+            </svg>`,
+          );
+          cellBuffer = await sharp(cellBuffer)
+            .ensureAlpha()
+            .composite([{ input: mask, blend: "dest-in" }])
+            .toBuffer();
+        }
+
+        composites.push({
+          input: cellBuffer,
+          top: Math.round(rect.y),
+          left: Math.round(rect.x),
+        });
+      }
+
+      // Create canvas and composite
+      let pipeline = sharp({
         create: {
           width: canvasW,
           height: canvasH,
-          channels: 3,
-          background: { r: bgR, g: bgG, b: bgB },
+          channels: channels as 3 | 4,
+          background: bgIsTransparent
+            ? { r: 0, g: 0, b: 0, alpha: 0 }
+            : { r: bgColor.r, g: bgColor.g, b: bgColor.b },
         },
-      })
-        .composite(composites)
-        .png()
-        .toBuffer();
+      }).composite(composites);
+
+      // Output format
+      let outputExt: string;
+      switch (settings.outputFormat) {
+        case "jpeg":
+          pipeline = pipeline.jpeg({ quality: settings.quality });
+          outputExt = "jpg";
+          break;
+        case "webp":
+          pipeline = pipeline.webp({ quality: settings.quality });
+          outputExt = "webp";
+          break;
+        default:
+          pipeline = pipeline.png();
+          outputExt = "png";
+          break;
+      }
+
+      const result = await pipeline.toBuffer();
 
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
-      const filename = "collage.png";
+      const filename = `collage.${outputExt}`;
       const outputPath = join(workspacePath, "output", filename);
       await writeFile(outputPath, result);
 
