@@ -253,7 +253,7 @@ def download_ddcolor_model():
 
 
 
-def download_codeformer_model():
+def download_codeformer_onnx_model():
     """Download CodeFormer ONNX model for AI face restoration.
 
     Uses the pre-converted ONNX model from HuggingFace (facefusion repo)
@@ -594,7 +594,7 @@ def main():
     download_gfpgan_model()
     download_codeformer_model()
     download_ddcolor_model()
-    download_codeformer_model()
+    download_codeformer_onnx_model()
     download_paddleocr_models()
     download_paddleocr_vl_model()
     download_scunet_model()
