@@ -172,3 +172,12 @@ export interface CorrectionParams {
   /** Denoise strength. 0 = off, 1-5 = median kernel size. */
   denoise: number;
 }
+
+export interface OptimizeForWebOptions {
+  format: "webp" | "jpeg" | "avif" | "png";
+  quality: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  progressive?: boolean;
+  stripMetadata?: boolean;
+}
