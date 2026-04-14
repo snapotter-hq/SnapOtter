@@ -28,6 +28,7 @@ import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
+import { registerOptimizeForWeb } from "./optimize-for-web.js";
 import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerQrGenerate } from "./qr-generate.js";
@@ -125,6 +126,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "bulk-rename", register: registerBulkRename },
     { id: "favicon", register: registerFavicon },
     { id: "image-to-pdf", register: registerImageToPdf },
+    { id: "optimize-for-web", register: registerOptimizeForWeb },
 
     // Adjustments extra
     { id: "replace-color", register: registerReplaceColor },
