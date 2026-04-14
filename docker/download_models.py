@@ -66,8 +66,8 @@ NAFNET_MODEL_PATH = os.path.join(NAFNET_MODEL_DIR, "NAFNet-SIDD-width64.pth")
 NAFNET_MIN_SIZE = 60_000_000  # ~67 MB
 
 MEDIAPIPE_MODEL_DIR = "/opt/models/mediapipe"
-FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.task"
-FACE_DETECT_MODEL_PATH = os.path.join(MEDIAPIPE_MODEL_DIR, "blaze_face_short_range.task")
+FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+FACE_DETECT_MODEL_PATH = os.path.join(MEDIAPIPE_MODEL_DIR, "blaze_face_short_range.tflite")
 FACE_DETECT_MIN_SIZE = 100_000  # ~200 KB
 FACE_LANDMARKER_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 FACE_LANDMARKER_MODEL_PATH = os.path.join(MEDIAPIPE_MODEL_DIR, "face_landmarker.task")

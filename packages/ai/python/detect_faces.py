@@ -11,10 +11,10 @@ def emit_progress(percent, stage):
 
 # ── Model path for new mp.tasks API ─────────────────────────────────
 
-_FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.task"
-_DOCKER_MODEL_PATH = "/opt/models/mediapipe/blaze_face_short_range.task"
+_FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+_DOCKER_MODEL_PATH = "/opt/models/mediapipe/blaze_face_short_range.tflite"
 _LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
-_LOCAL_MODEL_PATH = os.path.join(_LOCAL_MODEL_DIR, "blaze_face_short_range.task")
+_LOCAL_MODEL_PATH = os.path.join(_LOCAL_MODEL_DIR, "blaze_face_short_range.tflite")
 
 
 def _ensure_face_detect_model():
