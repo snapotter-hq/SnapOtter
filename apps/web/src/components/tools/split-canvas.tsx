@@ -54,6 +54,7 @@ export function SplitCanvas() {
   }, [setImageDimensions, updateDisplaySize]);
 
   // Reset error when blob URL changes (e.g., HEIC decoded preview ready)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: src is a prop that triggers state reset
   useEffect(() => {
     setLoadError(false);
     setDisplaySize(null);
@@ -67,6 +68,7 @@ export function SplitCanvas() {
   }, [updateDisplaySize]);
 
   // Re-measure when grid changes (in case image dimensions affect tile-size calculation)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: grid.columns and grid.rows trigger re-measurement of display
   useEffect(() => {
     updateDisplaySize();
   }, [grid.columns, grid.rows, updateDisplaySize]);
@@ -188,10 +190,11 @@ export function SplitCanvas() {
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
           >
+            <title>Split grid overlay</title>
             {/* Vertical lines */}
-            {colPositions.map((x, i) => (
+            {colPositions.map((x) => (
               <line
-                key={`v-${i}`}
+                key={`v-${x}`}
                 x1={x}
                 y1={0}
                 x2={x}
@@ -202,9 +205,9 @@ export function SplitCanvas() {
               />
             ))}
             {/* Horizontal lines */}
-            {rowPositions.map((y, i) => (
+            {rowPositions.map((y) => (
               <line
-                key={`h-${i}`}
+                key={`h-${y}`}
                 x1={0}
                 y1={y}
                 x2={100}

@@ -46,7 +46,10 @@ export function MultiImageViewer() {
   const hasNext = selectedIndex < entries.length - 1;
 
   const hasProcessed = !!currentEntry.processedUrl;
-  const isPreviewable = hasProcessed && canBrowserPreview(currentEntry.processedUrl!);
+  const isPreviewable =
+    hasProcessed && currentEntry.processedUrl
+      ? canBrowserPreview(currentEntry.processedUrl)
+      : false;
   const displayUrl = currentEntry.processedPreviewUrl ?? currentEntry.processedUrl;
 
   const processedFilename = currentEntry.processedUrl

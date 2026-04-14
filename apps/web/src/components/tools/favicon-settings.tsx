@@ -45,6 +45,7 @@ export function FaviconSettings() {
     setProcessing(false);
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cleanup uses only stable refs and state setters
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
 

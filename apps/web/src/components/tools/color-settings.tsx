@@ -14,7 +14,7 @@ interface ColorControlsProps {
 }
 
 export function ColorControls({
-  toolId,
+  toolId: _toolId,
   settings: initialSettings,
   onChange,
   onPreviewFilter,
@@ -117,8 +117,6 @@ export function ColorControls({
     contrast,
     exposure,
     saturation,
-    temperature,
-    tint,
     hue,
     sharpness,
     hasChannelChanges,
@@ -150,6 +148,7 @@ export function ColorControls({
       {/* Hidden SVG filters for live preview */}
       {hasTempTint && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>Temperature and tint color filter</title>
           <filter id="ashim-temp-tint-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -160,6 +159,7 @@ export function ColorControls({
       )}
       {hasChannelChanges && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>Color channel filter</title>
           <filter id="ashim-channel-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -170,6 +170,7 @@ export function ColorControls({
       )}
       {sharpness > 0 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>Sharpen filter</title>
           <filter id="ashim-sharpen-filter" colorInterpolationFilters="sRGB">
             <feConvolveMatrix
               order="3"

@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import type { CompressOptions, OutputFormat, Sharp } from "../types.js";
+import type { CompressOptions, Sharp } from "../types.js";
 
 const FORMAT_MAP: Record<string, string> = {
   jpg: "jpeg",

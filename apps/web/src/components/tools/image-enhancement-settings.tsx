@@ -127,7 +127,7 @@ interface ImageEnhancementControlsProps {
 }
 
 export function ImageEnhancementControls({
-  settings: initialSettings,
+  settings: _initialSettings,
   onChange,
   onPreviewFilter,
 }: ImageEnhancementControlsProps) {
@@ -245,6 +245,7 @@ export function ImageEnhancementControls({
       {/* Hidden SVG filters for preview */}
       {toggles.whiteBalance && Math.abs(tempAdj) > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>White balance temperature filter</title>
           <filter id="ashim-enhance-temp-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -255,6 +256,7 @@ export function ImageEnhancementControls({
       )}
       {toggles.sharpness && sharpAdj > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>Sharpen filter</title>
           <filter id="ashim-enhance-sharpen-filter" colorInterpolationFilters="sRGB">
             <feConvolveMatrix
               order="3"

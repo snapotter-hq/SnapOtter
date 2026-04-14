@@ -160,7 +160,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
           const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = filename.slice(0, -ext.length) + ".png";
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         }
 
         // Auto-orient to fix EXIF rotation

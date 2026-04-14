@@ -147,7 +147,6 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     width,
     height,
     percentage,
-    lockAspect,
     colors,
     dither,
     effort,

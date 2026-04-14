@@ -65,7 +65,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
           const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = filename.slice(0, -ext.length) + ".png";
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC/HEIF file",

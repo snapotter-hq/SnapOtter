@@ -1,4 +1,4 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { formatHeaders } from "@/lib/api";
 
 /**

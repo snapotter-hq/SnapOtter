@@ -536,8 +536,14 @@ export function EditMetadataSettings() {
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">Direction</label>
+                    <label
+                      htmlFor="em-date-shift-direction"
+                      className="text-xs font-medium text-foreground"
+                    >
+                      Direction
+                    </label>
                     <select
+                      id="em-date-shift-direction"
                       value={form.dateShiftDirection}
                       onChange={(e) => setField("dateShiftDirection", e.target.value as "+" | "-")}
                       className="px-2.5 py-1.5 rounded-md border border-input bg-background text-sm"

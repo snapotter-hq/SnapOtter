@@ -30,6 +30,7 @@ export function FindDuplicatesSettings() {
   const [error, setError] = useState<string | null>(null);
 
   // Reset scan results when files change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: files is a store value that triggers reset when changed
   useEffect(() => {
     resetDuplicates();
     setError(null);

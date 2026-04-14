@@ -106,7 +106,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         fileBuffer = await decodeHeic(fileBuffer);
         // Update filename extension to match the decoded format
         const ext = filename.match(/\.[^.]+$/)?.[0];
-        if (ext) filename = filename.slice(0, -ext.length) + ".png";
+        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
       } catch (err) {
         return reply.status(422).send({
           error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -513,7 +513,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             if (validation.format === "heif") {
               currentBuffer = await decodeHeic(currentBuffer);
               const ext = currentFilename.match(/\.[^.]+$/)?.[0];
-              if (ext) currentFilename = currentFilename.slice(0, -ext.length) + ".png";
+              if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
             }
 
             // Normalize EXIF orientation

@@ -153,7 +153,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 processBuffer = await decodeHeic(processBuffer);
                 // Update extension to match decoded format (HEIC/HEIF → PNG)
                 const ext = processFilename.match(/\.[^.]+$/)?.[0];
-                if (ext) processFilename = processFilename.slice(0, -ext.length) + ".png";
+                if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
               }
               if (!skipPreprocess) {
                 processBuffer = await autoOrient(processBuffer);

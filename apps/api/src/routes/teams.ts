@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
-import { requireAdmin, requireAuth } from "../plugins/auth.js";
+import { requireAdmin } from "../plugins/auth.js";
 
 function validateTeamName(name: unknown): string | null {
   if (typeof name !== "string") return "Team name is required";

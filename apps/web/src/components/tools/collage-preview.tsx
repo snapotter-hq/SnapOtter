@@ -149,7 +149,7 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
   return (
     <div
       className="flex-1 flex items-center justify-center p-4 min-h-0 overflow-auto"
-      role="presentation"
+      role="none"
       onClick={() => store.setSelectedCell(null)}
       onKeyDown={(e) => e.key === "Escape" && store.setSelectedCell(null)}
     >
@@ -178,7 +178,7 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
 
             return (
               <CollageCell
-                key={`${template.id}-${i}`}
+                key={`${template.id}-${cell.gridColumn}-${cell.gridRow}`}
                 cellIndex={i}
                 image={img}
                 transform={transform}
@@ -290,6 +290,7 @@ function CollageCell({
   );
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: cell requires drag/zoom interactions incompatible with button element
     <div
       ref={cellRef}
       role="button"

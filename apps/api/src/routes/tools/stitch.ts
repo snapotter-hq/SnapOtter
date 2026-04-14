@@ -205,8 +205,9 @@ export function registerStitch(app: FastifyInstance) {
 
       if (settings.cornerRadius > 0) {
         const meta = await sharp(result).metadata();
-        const w = meta.width!;
-        const h = meta.height!;
+        if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
+        const w = meta.width;
+        const h = meta.height;
         const r = Math.min(settings.cornerRadius, Math.floor(Math.min(w, h) / 2));
 
         const mask = Buffer.from(

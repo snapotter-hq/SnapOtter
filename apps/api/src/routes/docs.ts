@@ -81,7 +81,7 @@ function generateLlmsFullTxt(spec: OpenAPISpec): string {
     for (const [method, op] of Object.entries(methods)) {
       const tag = op.tags?.[0] || "Other";
       if (!tagGroups.has(tag)) tagGroups.set(tag, []);
-      tagGroups.get(tag)!.push({ method: method.toUpperCase(), path, op });
+      tagGroups.get(tag)?.push({ method: method.toUpperCase(), path, op });
     }
   }
 

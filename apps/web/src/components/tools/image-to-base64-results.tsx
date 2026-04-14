@@ -90,7 +90,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 
 function FileResult({ result }: { result: Base64Result }) {
   const [activeTab, setActiveTab] = useState<TabId>("datauri");
-  const tab = TABS.find((t) => t.id === activeTab)!;
+  const tab = TABS.find((t) => t.id === activeTab) ?? TABS[0];
   const output = tab.generate(result);
 
   const handleDownload = useCallback(() => {

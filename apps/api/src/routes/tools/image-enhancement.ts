@@ -4,7 +4,6 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";

@@ -77,6 +77,7 @@ export function SplitSettings() {
       ? `Tiles will be very small (${tileDims.width}x${tileDims.height}px)`
       : null;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: files is a store value that triggers reset when changed
   useEffect(() => {
     setTiles([]);
     setZipBlobUrl(null);

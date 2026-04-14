@@ -188,7 +188,7 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
 }
 
 export function UpscaleSettings() {
-  const { files, entries } = useFileStore();
+  const { files } = useFileStore();
   const {
     processFiles,
     processAllFiles,

@@ -74,7 +74,7 @@ export function ImageToBase64Settings() {
     <div className="space-y-4">
       {/* Output Format */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Output Image Format</label>
+        <span className="text-xs font-medium text-muted-foreground">Output Image Format</span>
         <p className="text-[10px] text-muted-foreground/70 mb-1.5">
           Convert before encoding to control MIME type and size
         </p>
@@ -100,10 +100,13 @@ export function ImageToBase64Settings() {
       {showQuality && (
         <div>
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Quality</label>
+            <label htmlFor="b64-quality" className="text-xs font-medium text-muted-foreground">
+              Quality
+            </label>
             <span className="text-xs font-mono text-foreground">{quality}%</span>
           </div>
           <input
+            id="b64-quality"
             type="range"
             min={1}
             max={100}
@@ -119,8 +122,11 @@ export function ImageToBase64Settings() {
 
       {/* Max Width */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Max Width (px)</label>
+        <label htmlFor="b64-max-width" className="text-xs font-medium text-muted-foreground">
+          Max Width (px)
+        </label>
         <input
+          id="b64-max-width"
           type="number"
           min={0}
           value={maxWidth}
@@ -132,8 +138,11 @@ export function ImageToBase64Settings() {
 
       {/* Max Height */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Max Height (px)</label>
+        <label htmlFor="b64-max-height" className="text-xs font-medium text-muted-foreground">
+          Max Height (px)
+        </label>
         <input
+          id="b64-max-height"
           type="number"
           min={0}
           value={maxHeight}

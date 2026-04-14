@@ -90,6 +90,7 @@ export function ImageViewer({
   }, []);
 
   // Reset state on src change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: src is a prop that triggers state reset
   useEffect(() => {
     setZoom(DEFAULT_ZOOM);
     setFitMode("fit");

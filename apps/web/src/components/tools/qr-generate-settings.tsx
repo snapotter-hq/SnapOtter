@@ -80,8 +80,11 @@ function UrlForm() {
   const { textData, setTextData } = useQrStore();
   return (
     <div>
-      <label className="text-xs text-muted-foreground">URL</label>
+      <label htmlFor="qr-url" className="text-xs text-muted-foreground">
+        URL
+      </label>
       <input
+        id="qr-url"
         type="url"
         value={textData}
         onChange={(e) => setTextData(e.target.value)}
@@ -97,8 +100,11 @@ function TextForm() {
   const { textData, setTextData } = useQrStore();
   return (
     <div>
-      <label className="text-xs text-muted-foreground">Text</label>
+      <label htmlFor="qr-text" className="text-xs text-muted-foreground">
+        Text
+      </label>
       <textarea
+        id="qr-text"
         value={textData}
         onChange={(e) => setTextData(e.target.value)}
         placeholder="Enter any text..."
@@ -115,8 +121,11 @@ function WifiForm() {
   return (
     <div className="space-y-2">
       <div>
-        <label className="text-xs text-muted-foreground">Network Name (SSID)</label>
+        <label htmlFor="qr-wifi-ssid" className="text-xs text-muted-foreground">
+          Network Name (SSID)
+        </label>
         <input
+          id="qr-wifi-ssid"
           type="text"
           value={wifiData.ssid}
           onChange={(e) => setWifiData({ ssid: e.target.value })}
@@ -125,8 +134,11 @@ function WifiForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Password</label>
+        <label htmlFor="qr-wifi-password" className="text-xs text-muted-foreground">
+          Password
+        </label>
         <input
+          id="qr-wifi-password"
           type="text"
           value={wifiData.password}
           onChange={(e) => setWifiData({ password: e.target.value })}
@@ -135,8 +147,11 @@ function WifiForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Encryption</label>
+        <label htmlFor="qr-wifi-encryption" className="text-xs text-muted-foreground">
+          Encryption
+        </label>
         <select
+          id="qr-wifi-encryption"
           value={wifiData.encryption}
           onChange={(e) => setWifiData({ encryption: e.target.value as "WPA" | "WEP" | "nopass" })}
           className={INPUT_CLASS}
@@ -163,8 +178,11 @@ function VCardForm() {
   const { vcardData, setVcardData } = useQrStore();
   const field = (label: string, key: keyof typeof vcardData, placeholder: string) => (
     <div key={key}>
-      <label className="text-xs text-muted-foreground">{label}</label>
+      <label htmlFor={`qr-vcard-${key}`} className="text-xs text-muted-foreground">
+        {label}
+      </label>
       <input
+        id={`qr-vcard-${key}`}
         type="text"
         value={vcardData[key]}
         onChange={(e) => setVcardData({ [key]: e.target.value })}
@@ -193,8 +211,11 @@ function EmailForm() {
   return (
     <div className="space-y-2">
       <div>
-        <label className="text-xs text-muted-foreground">To</label>
+        <label htmlFor="qr-email-to" className="text-xs text-muted-foreground">
+          To
+        </label>
         <input
+          id="qr-email-to"
           type="email"
           value={emailData.to}
           onChange={(e) => setEmailData({ to: e.target.value })}
@@ -203,8 +224,11 @@ function EmailForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Subject</label>
+        <label htmlFor="qr-email-subject" className="text-xs text-muted-foreground">
+          Subject
+        </label>
         <input
+          id="qr-email-subject"
           type="text"
           value={emailData.subject}
           onChange={(e) => setEmailData({ subject: e.target.value })}
@@ -213,8 +237,11 @@ function EmailForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Body</label>
+        <label htmlFor="qr-email-body" className="text-xs text-muted-foreground">
+          Body
+        </label>
         <textarea
+          id="qr-email-body"
           value={emailData.body}
           onChange={(e) => setEmailData({ body: e.target.value })}
           placeholder="Email body..."
@@ -230,8 +257,11 @@ function PhoneForm() {
   const { phoneData, setPhoneData } = useQrStore();
   return (
     <div>
-      <label className="text-xs text-muted-foreground">Phone Number</label>
+      <label htmlFor="qr-phone" className="text-xs text-muted-foreground">
+        Phone Number
+      </label>
       <input
+        id="qr-phone"
         type="tel"
         value={phoneData}
         onChange={(e) => setPhoneData(e.target.value)}
@@ -247,8 +277,11 @@ function SmsForm() {
   return (
     <div className="space-y-2">
       <div>
-        <label className="text-xs text-muted-foreground">Phone Number</label>
+        <label htmlFor="qr-sms-phone" className="text-xs text-muted-foreground">
+          Phone Number
+        </label>
         <input
+          id="qr-sms-phone"
           type="tel"
           value={smsData.phone}
           onChange={(e) => setSmsData({ phone: e.target.value })}
@@ -257,8 +290,11 @@ function SmsForm() {
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Message</label>
+        <label htmlFor="qr-sms-message" className="text-xs text-muted-foreground">
+          Message
+        </label>
         <textarea
+          id="qr-sms-message"
           value={smsData.message}
           onChange={(e) => setSmsData({ message: e.target.value })}
           placeholder="Your message..."
@@ -405,7 +441,7 @@ export function QrGenerateSettings() {
       <CollapsibleSection title="Style" defaultOpen>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">Dot Pattern</label>
+            <span className="text-xs text-muted-foreground mb-1.5 block">Dot Pattern</span>
             <div className="grid grid-cols-3 gap-1.5">
               {DOT_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -419,7 +455,7 @@ export function QrGenerateSettings() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">Corner Square</label>
+            <span className="text-xs text-muted-foreground mb-1.5 block">Corner Square</span>
             <div className="grid grid-cols-2 gap-1.5">
               {CORNER_SQUARE_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -433,7 +469,7 @@ export function QrGenerateSettings() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">Corner Dot</label>
+            <span className="text-xs text-muted-foreground mb-1.5 block">Corner Dot</span>
             <div className="grid grid-cols-3 gap-1.5">
               {CORNER_DOT_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -453,7 +489,7 @@ export function QrGenerateSettings() {
       <CollapsibleSection title="Colors">
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-muted-foreground">Dot Color</label>
+            <span className="text-xs text-muted-foreground">Dot Color</span>
             <div className="flex items-center gap-2 mt-0.5">
               <input
                 type="color"
@@ -487,8 +523,11 @@ export function QrGenerateSettings() {
             <div className="space-y-2 pl-2 border-l-2 border-primary/20 ml-1">
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">From</label>
+                  <label htmlFor="qr-gradient-from" className="text-[10px] text-muted-foreground">
+                    From
+                  </label>
                   <input
+                    id="qr-gradient-from"
                     type="color"
                     value={store.dotGradientColor1}
                     onChange={(e) => store.setDotGradientColor1(e.target.value)}
@@ -496,8 +535,11 @@ export function QrGenerateSettings() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">To</label>
+                  <label htmlFor="qr-gradient-to" className="text-[10px] text-muted-foreground">
+                    To
+                  </label>
                   <input
+                    id="qr-gradient-to"
                     type="color"
                     value={store.dotGradientColor2}
                     onChange={(e) => store.setDotGradientColor2(e.target.value)}
@@ -522,12 +564,18 @@ export function QrGenerateSettings() {
               {store.dotGradientType === "linear" && (
                 <div>
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-muted-foreground">Rotation</label>
+                    <label
+                      htmlFor="qr-gradient-rotation"
+                      className="text-[10px] text-muted-foreground"
+                    >
+                      Rotation
+                    </label>
                     <span className="text-[10px] font-mono text-foreground">
                       {store.dotGradientRotation}&deg;
                     </span>
                   </div>
                   <input
+                    id="qr-gradient-rotation"
                     type="range"
                     min={0}
                     max={360}
@@ -543,7 +591,7 @@ export function QrGenerateSettings() {
 
           <div>
             <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground">Background</label>
+              <span className="text-xs text-muted-foreground">Background</span>
               <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
@@ -586,8 +634,14 @@ export function QrGenerateSettings() {
           {store.useCustomCornerColors && (
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-[10px] text-muted-foreground">Corner Square</label>
+                <label
+                  htmlFor="qr-corner-square-color"
+                  className="text-[10px] text-muted-foreground"
+                >
+                  Corner Square
+                </label>
                 <input
+                  id="qr-corner-square-color"
                   type="color"
                   value={store.cornerSquareColor}
                   onChange={(e) => store.setCornerSquareColor(e.target.value)}
@@ -595,8 +649,11 @@ export function QrGenerateSettings() {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-muted-foreground">Corner Dot</label>
+                <label htmlFor="qr-corner-dot-color" className="text-[10px] text-muted-foreground">
+                  Corner Dot
+                </label>
                 <input
+                  id="qr-corner-dot-color"
                   type="color"
                   value={store.cornerDotColor}
                   onChange={(e) => store.setCornerDotColor(e.target.value)}
@@ -651,12 +708,15 @@ export function QrGenerateSettings() {
             <>
               <div>
                 <div className="flex justify-between items-center">
-                  <label className="text-xs text-muted-foreground">Logo Size</label>
+                  <label htmlFor="qr-logo-size" className="text-xs text-muted-foreground">
+                    Logo Size
+                  </label>
                   <span className="text-xs font-mono text-foreground">
                     {Math.round(store.logoSize * 100)}%
                   </span>
                 </div>
                 <input
+                  id="qr-logo-size"
                   type="range"
                   min={0.1}
                   max={0.5}
@@ -668,10 +728,13 @@ export function QrGenerateSettings() {
               </div>
               <div>
                 <div className="flex justify-between items-center">
-                  <label className="text-xs text-muted-foreground">Logo Margin</label>
+                  <label htmlFor="qr-logo-margin" className="text-xs text-muted-foreground">
+                    Logo Margin
+                  </label>
                   <span className="text-xs font-mono text-foreground">{store.logoMargin}px</span>
                 </div>
                 <input
+                  id="qr-logo-margin"
                   type="range"
                   min={0}
                   max={20}
@@ -699,7 +762,7 @@ export function QrGenerateSettings() {
       <CollapsibleSection title="Download" defaultOpen>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">Format</label>
+            <span className="text-xs text-muted-foreground mb-1.5 block">Format</span>
             <div className="grid grid-cols-2 gap-1.5">
               {DOWNLOAD_FORMATS.map(({ value, label, desc }) => (
                 <button
@@ -729,10 +792,13 @@ export function QrGenerateSettings() {
 
           <div>
             <div className="flex justify-between items-center">
-              <label className="text-xs text-muted-foreground">Size</label>
+              <label htmlFor="qr-size" className="text-xs text-muted-foreground">
+                Size
+              </label>
               <span className="text-xs font-mono text-foreground">{store.size}px</span>
             </div>
             <input
+              id="qr-size"
               type="range"
               min={200}
               max={2000}
@@ -744,8 +810,11 @@ export function QrGenerateSettings() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Error Correction</label>
+            <label htmlFor="qr-error-correction" className="text-xs text-muted-foreground">
+              Error Correction
+            </label>
             <select
+              id="qr-error-correction"
               value={store.errorCorrection}
               onChange={(e) => store.setErrorCorrection(e.target.value as "L" | "M" | "Q" | "H")}
               className={INPUT_CLASS}

@@ -406,9 +406,9 @@ function TemplateDiagram({ template, size }: { template: CollageTemplate; size: 
       role="img"
       aria-label={template.label}
     >
-      {rects.map((r, i) => (
+      {rects.map((r) => (
         <rect
-          key={`${template.id}-${i}`}
+          key={`${template.id}-${r.x}-${r.y}-${r.w}-${r.h}`}
           x={padding + r.x}
           y={padding + r.y}
           width={r.w}

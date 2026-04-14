@@ -44,8 +44,8 @@ export async function blurBackground(
  */
 export async function addDropShadow(subjectBuffer: Buffer, opacity: number): Promise<Buffer> {
   const meta = await sharp(subjectBuffer).metadata();
-  const width = meta.width!;
-  const height = meta.height!;
+  if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
+  const { width, height } = meta;
   const normalizedOpacity = Math.max(0, Math.min(100, opacity)) / 100;
 
   // Shadow parameters
@@ -121,6 +121,7 @@ export async function createGradientBackground(
  */
 export async function compositeOnColor(subjectBuffer: Buffer, hexColor: string): Promise<Buffer> {
   const meta = await sharp(subjectBuffer).metadata();
+  if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
   const hex = hexColor.replace("#", "");
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
@@ -128,8 +129,8 @@ export async function compositeOnColor(subjectBuffer: Buffer, hexColor: string):
 
   return sharp({
     create: {
-      width: meta.width!,
-      height: meta.height!,
+      width: meta.width,
+      height: meta.height,
       channels: 4,
       background: { r, g, b, alpha: 255 },
     },
@@ -148,8 +149,8 @@ export async function compositeOnImage(
   backgroundBuffer: Buffer,
 ): Promise<Buffer> {
   const meta = await sharp(subjectBuffer).metadata();
-  const width = meta.width!;
-  const height = meta.height!;
+  if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
+  const { width, height } = meta;
 
   const resizedBg = await sharp(backgroundBuffer)
     .resize(width, height, { fit: "cover" })
@@ -184,8 +185,8 @@ export async function applyEffects(
   },
 ): Promise<Buffer> {
   const meta = await sharp(subjectBuffer).metadata();
-  const width = meta.width!;
-  const height = meta.height!;
+  if (!meta.width || !meta.height) throw new Error("Cannot read image dimensions");
+  const { width, height } = meta;
   const bgType = settings.backgroundType || "transparent";
 
   // Step 1: Add shadow to the subject (before background compositing)

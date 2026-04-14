@@ -27,20 +27,21 @@ export async function sharpenAdvanced(
   const { method, denoise } = options;
 
   // Optional noise reduction pre-pass
+  let pipeline = image;
   if (denoise && denoise !== "off") {
     const kernelSize = DENOISE_KERNEL[denoise];
     if (kernelSize) {
-      image = image.median(kernelSize);
+      pipeline = pipeline.median(kernelSize);
     }
   }
 
   switch (method) {
     case "adaptive":
-      return sharpenAdaptive(image, options);
+      return sharpenAdaptive(pipeline, options);
     case "unsharp-mask":
-      return sharpenUnsharpMask(image, options);
+      return sharpenUnsharpMask(pipeline, options);
     case "high-pass":
-      return sharpenHighPass(image, options);
+      return sharpenHighPass(pipeline, options);
     default:
       throw new Error(`Unknown sharpening method: ${method}`);
   }

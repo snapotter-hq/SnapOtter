@@ -92,6 +92,7 @@ export function QrGeneratePreview() {
   ]);
 
   // Create QR instance on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: options is intentionally excluded to only create QR instance once on mount
   useEffect(() => {
     const qr = new QRCodeStyling(options as never);
     qrRef.current = qr;
@@ -99,7 +100,7 @@ export function QrGeneratePreview() {
       clearChildren(containerRef.current);
       qr.append(containerRef.current);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update QR on state changes (debounced)
   useEffect(() => {

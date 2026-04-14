@@ -82,7 +82,7 @@ export interface RemoveBgControlsProps {
   onChange: (settings: Record<string, unknown>) => void;
 }
 
-export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) {
+export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgControlsProps) {
   const [subject, setSubject] = useState<SubjectType>("people");
   const [quality, setQuality] = useState<Quality>("balanced");
   const [isPassport, setIsPassport] = useState(true);
@@ -543,7 +543,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const [bgJobId, setBgJobId] = useState<string | null>(null);
   const [bgFilename, setBgFilename] = useState<string | null>(null);
   const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(null);
-  const [effectsDownloadUrl, setEffectsDownloadUrl] = useState<string | null>(null);
+  const [_effectsDownloadUrl, setEffectsDownloadUrl] = useState<string | null>(null);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
 

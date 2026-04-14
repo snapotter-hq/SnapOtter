@@ -70,19 +70,12 @@ export function PdfToImageSettings() {
     <div className="space-y-4">
       {/* PDF upload area */}
       {!store.file ? (
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors w-full"
         >
           <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Drop a PDF here or click to select</p>
@@ -93,7 +86,7 @@ export function PdfToImageSettings() {
             className="hidden"
             onChange={(e) => handleFileChange(e.target.files)}
           />
-        </div>
+        </button>
       ) : (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
           <div className="flex-1 min-w-0">

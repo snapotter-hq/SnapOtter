@@ -156,7 +156,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         try {
           fileBuffer = await decodeHeic(fileBuffer);
           const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = filename.slice(0, -ext.length) + ".png";
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",

@@ -1,4 +1,4 @@
-import type { ConvertOptions, OutputFormat, Sharp } from "../types.js";
+import type { ConvertOptions, Sharp } from "../types.js";
 
 /**
  * Maps user-facing format names to Sharp format strings.

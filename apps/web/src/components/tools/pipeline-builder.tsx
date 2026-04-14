@@ -95,15 +95,18 @@ function SortableStep({
         className="flex items-center gap-2 p-3 w-full text-left"
       >
         {/* Drag handle */}
-        <span
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted text-muted-foreground"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-4 w-4" />
-        </span>
+        {
+          // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit drag handle spreads its own event handlers
+          <span
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted text-muted-foreground"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
+        }
 
         {/* Step number badge */}
         <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
@@ -122,27 +125,18 @@ function SortableStep({
         <span className="flex-1" />
 
         {/* Remove button */}
-        <span
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              onRemove();
-            }
           }}
           title="Remove"
           className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
         >
           <X className="h-4 w-4" />
-        </span>
+        </button>
       </button>
-
-      {/* Inline settings panel */}
       <div className={isExpanded ? "border-t border-border p-3 bg-muted/10 space-y-3" : "hidden"}>
         <PipelineStepSettings
           toolId={step.toolId}
@@ -150,6 +144,7 @@ function SortableStep({
           onChange={onUpdateSettings}
         />
       </div>
+      ;
     </div>
   );
 }

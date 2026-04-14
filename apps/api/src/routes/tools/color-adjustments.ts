@@ -1,7 +1,6 @@
 import {
   brightness as adjustBrightness,
   contrast as adjustContrast,
-  saturation as adjustSaturation,
   sharpen as adjustSharpen,
   colorChannels,
   grayscale,
