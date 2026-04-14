@@ -65,6 +65,14 @@ NAFNET_MODEL_URL = (
 NAFNET_MODEL_PATH = os.path.join(NAFNET_MODEL_DIR, "NAFNet-SIDD-width64.pth")
 NAFNET_MIN_SIZE = 60_000_000  # ~67 MB
 
+MEDIAPIPE_MODEL_DIR = "/opt/models/mediapipe"
+FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.task"
+FACE_DETECT_MODEL_PATH = os.path.join(MEDIAPIPE_MODEL_DIR, "blaze_face_short_range.task")
+FACE_DETECT_MIN_SIZE = 100_000  # ~200 KB
+FACE_LANDMARKER_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+FACE_LANDMARKER_MODEL_PATH = os.path.join(MEDIAPIPE_MODEL_DIR, "face_landmarker.task")
+FACE_LANDMARKER_MIN_SIZE = 1_000_000  # ~7 MB
+
 REMBG_MODELS = [
     "u2net",
     "isnet-general-use",
@@ -310,19 +318,60 @@ def download_nafnet_model():
     print(f"  NAFNet model downloaded: {size:,} bytes")
 
 
+def download_mediapipe_task_models():
+    """Download MediaPipe tasks API model files for face detection and landmarks.
+
+    These models are used by the mp.tasks fallback when mp.solutions is
+    unavailable (mediapipe >= 0.10.30). Pre-downloading ensures the Docker
+    image works fully airgapped.
+    """
+    print("=== Downloading MediaPipe task models ===")
+    os.makedirs(MEDIAPIPE_MODEL_DIR, exist_ok=True)
+
+    for url, path, name, min_size in [
+        (FACE_DETECT_MODEL_URL, FACE_DETECT_MODEL_PATH,
+         "blaze_face_short_range", FACE_DETECT_MIN_SIZE),
+        (FACE_LANDMARKER_MODEL_URL, FACE_LANDMARKER_MODEL_PATH,
+         "face_landmarker", FACE_LANDMARKER_MIN_SIZE),
+    ]:
+        print(f"  Downloading {name}...")
+        urllib.request.urlretrieve(url, path)
+        size = os.path.getsize(path)
+        assert size > min_size, (
+            f"{name} model too small: {size} bytes (expected > {min_size})"
+        )
+        print(f"  {name} downloaded ({size / 1_000_000:.1f} MB)")
+    print("MediaPipe task models downloaded.\n")
+
+
 def verify_mediapipe():
     """Verify MediaPipe face detection models are bundled in the wheel."""
     print("=== Verifying MediaPipe models ===")
     import mediapipe as mp
 
-    for selection in [0, 1]:
-        label = "short-range" if selection == 0 else "full-range"
-        print(f"  Verifying {label} model (selection={selection})...")
-        detector = mp.solutions.face_detection.FaceDetection(
-            model_selection=selection, min_detection_confidence=0.5
+    try:
+        for selection in [0, 1]:
+            label = "short-range" if selection == 0 else "full-range"
+            print(f"  Verifying {label} model (selection={selection})...")
+            detector = mp.solutions.face_detection.FaceDetection(
+                model_selection=selection, min_detection_confidence=0.5
+            )
+            detector.close()
+            print(f"  {label} model OK")
+    except AttributeError:
+        # mediapipe >= 0.10.30 removed mp.solutions; verify tasks API instead
+        print("  mp.solutions unavailable, verifying mp.tasks API...")
+        options = mp.tasks.vision.FaceDetectorOptions(
+            base_options=mp.tasks.BaseOptions(
+                model_asset_path=FACE_DETECT_MODEL_PATH
+            ),
+            running_mode=mp.tasks.vision.RunningMode.IMAGE,
+            min_detection_confidence=0.5,
         )
+        detector = mp.tasks.vision.FaceDetector.create_from_options(options)
         detector.close()
-        print(f"  {label} model OK")
+        print("  mp.tasks FaceDetector OK")
+
     print("MediaPipe models verified.\n")
 
 
@@ -423,6 +472,19 @@ def smoke_test():
     assert os.path.isdir(vl_dir), f"PaddleOCR-VL model missing: {vl_dir}"
     print("  PaddleOCR-VL model verified")
 
+    # MediaPipe task models must exist (for mp.tasks fallback)
+    assert os.path.exists(FACE_DETECT_MODEL_PATH), (
+        f"MediaPipe face detector model missing: {FACE_DETECT_MODEL_PATH}"
+    )
+    assert os.path.getsize(FACE_DETECT_MODEL_PATH) > FACE_DETECT_MIN_SIZE
+    print("  MediaPipe face detector model verified")
+
+    assert os.path.exists(FACE_LANDMARKER_MODEL_PATH), (
+        f"MediaPipe face landmarker model missing: {FACE_LANDMARKER_MODEL_PATH}"
+    )
+    assert os.path.getsize(FACE_LANDMARKER_MODEL_PATH) > FACE_LANDMARKER_MIN_SIZE
+    print("  MediaPipe face landmarker model verified")
+
     print("Smoke test passed.\n")
 
 
@@ -439,6 +501,7 @@ def main():
     download_paddleocr_vl_model()
     download_scunet_model()
     download_nafnet_model()
+    download_mediapipe_task_models()
     verify_mediapipe()
     smoke_test()
     print("All models downloaded and verified.")

@@ -12,19 +12,22 @@ def emit_progress(percent, stage):
 # ── Model path for new mp.tasks API ─────────────────────────────────
 
 _FACE_MESH_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
-_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
-_FACE_MESH_MODEL_PATH = os.path.join(_MODEL_DIR, "face_landmarker.task")
+_DOCKER_MODEL_PATH = "/opt/models/mediapipe/face_landmarker.task"
+_LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
+_LOCAL_MODEL_PATH = os.path.join(_LOCAL_MODEL_DIR, "face_landmarker.task")
 
 
 def _ensure_face_mesh_model():
-    """Download the face landmarker model if not present."""
-    if os.path.exists(_FACE_MESH_MODEL_PATH):
-        return _FACE_MESH_MODEL_PATH
-    os.makedirs(_MODEL_DIR, exist_ok=True)
+    """Resolve face landmarker model. Docker path first, then local dev."""
+    if os.path.exists(_DOCKER_MODEL_PATH):
+        return _DOCKER_MODEL_PATH
+    if os.path.exists(_LOCAL_MODEL_PATH):
+        return _LOCAL_MODEL_PATH
+    os.makedirs(_LOCAL_MODEL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face mesh model")
-    urllib.request.urlretrieve(_FACE_MESH_MODEL_URL, _FACE_MESH_MODEL_PATH)
-    return _FACE_MESH_MODEL_PATH
+    urllib.request.urlretrieve(_FACE_MESH_MODEL_URL, _LOCAL_MODEL_PATH)
+    return _LOCAL_MODEL_PATH
 
 
 def _mesh_with_solutions(img_array, max_faces=10, min_confidence=0.5):

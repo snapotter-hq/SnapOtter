@@ -12,19 +12,22 @@ def emit_progress(percent, stage):
 # ── Model path for new mp.tasks API ─────────────────────────────────
 
 _FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.task"
-_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
-_FACE_DETECT_MODEL_PATH = os.path.join(_MODEL_DIR, "blaze_face_short_range.task")
+_DOCKER_MODEL_PATH = "/opt/models/mediapipe/blaze_face_short_range.task"
+_LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
+_LOCAL_MODEL_PATH = os.path.join(_LOCAL_MODEL_DIR, "blaze_face_short_range.task")
 
 
 def _ensure_face_detect_model():
-    """Download the face detector model if not present."""
-    if os.path.exists(_FACE_DETECT_MODEL_PATH):
-        return _FACE_DETECT_MODEL_PATH
-    os.makedirs(_MODEL_DIR, exist_ok=True)
+    """Resolve face detector model. Docker path first, then local dev."""
+    if os.path.exists(_DOCKER_MODEL_PATH):
+        return _DOCKER_MODEL_PATH
+    if os.path.exists(_LOCAL_MODEL_PATH):
+        return _LOCAL_MODEL_PATH
+    os.makedirs(_LOCAL_MODEL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face detection model")
-    urllib.request.urlretrieve(_FACE_DETECT_MODEL_URL, _FACE_DETECT_MODEL_PATH)
-    return _FACE_DETECT_MODEL_PATH
+    urllib.request.urlretrieve(_FACE_DETECT_MODEL_URL, _LOCAL_MODEL_PATH)
+    return _LOCAL_MODEL_PATH
 
 
 def _detect_with_solutions(img_array, min_confidence):

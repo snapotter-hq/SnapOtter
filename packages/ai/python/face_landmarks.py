@@ -79,12 +79,15 @@ def detect_with_solutions(img_array):
 # ── New API: mp.tasks (mediapipe >= 0.10.30) ───────────────────────
 
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+_DOCKER_MODEL_PATH = "/opt/models/mediapipe/face_landmarker.task"
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
 MODEL_PATH = os.path.join(MODEL_DIR, "face_landmarker.task")
 
 
 def ensure_model():
-    """Download the face landmarker model if not present."""
+    """Resolve face landmarker model. Docker path first, then local dev."""
+    if os.path.exists(_DOCKER_MODEL_PATH):
+        return _DOCKER_MODEL_PATH
     if os.path.exists(MODEL_PATH):
         return MODEL_PATH
     os.makedirs(MODEL_DIR, exist_ok=True)
