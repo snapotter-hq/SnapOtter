@@ -356,7 +356,15 @@ export function runPythonWithProgress(
   // Try persistent dispatcher first
   const dispatcherPromise = dispatcherRun(scriptName, args, options);
   if (dispatcherPromise) {
-    return dispatcherPromise;
+    return dispatcherPromise.catch((err: Error) => {
+      // Dispatcher crashed mid-request (e.g. OOM when loading a large model).
+      // Retry in an isolated per-request process which starts clean and has
+      // more available memory than the warm dispatcher.
+      if (err.message === "Python dispatcher exited unexpectedly") {
+        return runPythonPerRequest(scriptName, args, options);
+      }
+      throw err;
+    });
   }
 
   // Fall back to per-request spawning

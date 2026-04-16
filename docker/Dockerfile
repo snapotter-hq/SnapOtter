@@ -205,6 +205,11 @@ RUN /opt/venv/bin/pip install --no-deps codeformer-pip==0.0.4 lpips
 # Re-pin numpy to 1.26.4 in case any transitive dep upgraded it
 RUN /opt/venv/bin/pip install numpy==1.26.4
 
+# Pin rembg model storage to a fixed path so models downloaded at build time
+# (as root) are found at runtime (as the non-root ashim user, home=/app).
+# Without this, rembg defaults to ~/.u2net which differs between users.
+ENV U2NET_HOME=/opt/models/rembg
+
 # Pre-download and verify all ML models
 # Note: on amd64, paddlepaddle-gpu can't import without the CUDA driver (only
 # available at runtime). The download script gracefully skips PaddleOCR model
@@ -216,7 +221,14 @@ RUN if [ "$SKIP_MODEL_DOWNLOADS" = "true" ]; then \
         echo "Skipping model downloads (CI build)"; \
     else \
         /opt/venv/bin/python3 /tmp/download_models.py; \
-    fi && rm -f /tmp/download_models.py
+    fi && rm -f /tmp/download_models.py && \
+    # Symlink PaddleX model dir into both possible HOME locations so models are
+    # found regardless of whether HOME=/root (build/root context) or HOME=/app
+    # (runtime ashim user via gosu). Without this PaddleX re-downloads on every
+    # fresh container start.
+    mkdir -p /opt/models/paddlex/official_models /root/.paddlex /app/.paddlex && \
+    ln -sf /opt/models/paddlex/official_models /root/.paddlex/official_models && \
+    ln -sf /opt/models/paddlex/official_models /app/.paddlex/official_models
 
 WORKDIR /app
 

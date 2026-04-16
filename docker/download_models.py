@@ -174,7 +174,7 @@ PADDLEOCR_MODELS = [
 PADDLEOCR_VL_MODEL = "PaddlePaddle/PaddleOCR-VL-1.5"
 
 # PaddleX stores models here by default
-PADDLEX_MODEL_DIR = os.path.expanduser("~/.paddlex/official_models")
+PADDLEX_MODEL_DIR = "/opt/models/paddlex/official_models"
 
 
 def _register_birefnet_matting():

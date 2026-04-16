@@ -11,7 +11,7 @@ export DEFAULT_PASSWORD="${DEFAULT_PASSWORD:-admin}"
 # This runs as root, fixes permissions, then drops to ashim via gosu.
 if [ "$(id -u)" = "0" ]; then
   chown -R ashim:ashim /data /tmp/workspace 2>&1 || \
-    echo "WARNING: Could not fix volume permissions. If processing fails, check your volume mount permissions." >&2
+    echo "WARNING: Could not fix volume permissions. Use named volumes (not Windows bind mounts) to avoid this. See docs for details." >&2
   exec gosu ashim "$@"
 fi
 
