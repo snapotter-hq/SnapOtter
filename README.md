@@ -4,11 +4,11 @@
 
 <h1 align="center">ashim</h1>
 
-<p align="center">ashim but for images. 30+ tools and local AI in a single Docker container.</p>
+<p align="center">A Self Hosted Image Manipulator</p>
 
 <p align="center">
   <a href="https://hub.docker.com/r/ashimhq/ashim"><img src="https://img.shields.io/docker/v/ashimhq/ashim?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
-  <a href="https://github.com/ashim-hq/ashim/pkgs/container/ashim"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fashim--hq%2Fashim-blue?logo=github" alt="GHCR"></a>
+  <a href="https://github.com/orgs/ashim-hq/packages/container/package/ashim"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fashim--hq%2Fashim-blue?logo=github" alt="GHCR"></a>
   <a href="https://github.com/ashim-hq/ashim/actions"><img src="https://img.shields.io/github/actions/workflow/status/ashim-hq/ashim/ci.yml?label=CI" alt="CI"></a>
   <a href="https://github.com/ashim-hq/ashim/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-blue" alt="License"></a>
   <a href="https://github.com/ashim-hq/ashim/stargazers"><img src="https://img.shields.io/github/stars/ashim-hq/ashim?style=social" alt="Stars"></a>
@@ -18,10 +18,10 @@
 
 ## Key Features
 
-- **30+ image tools** - Resize, crop, compress, convert, watermark, color adjust, and more
-- **Local AI** - Remove backgrounds, upscale images, erase objects, blur faces, extract text (OCR). All running on your hardware with pre-downloaded models, no internet required
+- **45+ image tools** - Resize, crop, compress, convert, watermark, color adjust, vectorize, create GIFs, find duplicates, generate passport photos, and more
+- **Local AI** - Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR). All on your hardware - no internet required
 - **Pipelines** - Chain tools into reusable workflows. Batch process up to 200 images at once
-- **REST API** - Every tool available via API. Interactive docs included at `/api/docs`
+- **REST API** - Every tool available via API with API key auth. Interactive docs at `/api/docs`
 - **Single container** - One `docker run`, no Redis, no Postgres, no external services
 - **Multi-arch** - Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
 - **Your data stays yours** - No telemetry, no tracking, no external calls. Images never leave your machine
@@ -55,7 +55,7 @@ docker run -d -p 1349:1349 --gpus all -v ashim-data:/data ashimhq/ashim:latest
 | Username | `admin` |
 | Password | `admin` |
 
-You will be asked to change your password on first login. This is enforced for all new accounts and cannot be skipped in production.
+You will be asked to change your password on first login.
 
 For Docker Compose, persistent storage, and other setup options, see the [Getting Started Guide](https://ashim-hq.github.io/ashim/guide/getting-started). For GPU acceleration and tag details, see [Docker Tags](https://ashim-hq.github.io/ashim/guide/docker-tags).
 
@@ -79,4 +79,4 @@ Found a bug or have a feature idea? Open a [GitHub Issue](https://github.com/ash
 This project is dual-licensed under the [AGPLv3](LICENSE) and a commercial license.
 
 - **AGPLv3 (free):** You may use, modify, and distribute this software under the AGPLv3. If you run a modified version as a network service, you must make your source code available under the AGPLv3. This applies to personal use, open-source projects, and any use that complies with AGPLv3 terms.
-- **Commercial license (paid):** If you want to use ashim in proprietary software or SaaS without the AGPLv3 source-disclosure requirement, a commercial license is available. Contact me for pricing and terms.
+- **Commercial license (paid):** For use in proprietary software or SaaS products where AGPLv3 source-disclosure is not suitable, a commercial license is available. [Contact us](mailto:ashim.hq@gmail.com) for pricing and terms.
