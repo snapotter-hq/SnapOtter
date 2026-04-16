@@ -75,6 +75,7 @@ export default defineConfig({
           { text: "Docker tags", link: "/guide/docker-tags" },
           { text: "Developer guide", link: "/guide/developer" },
           { text: "Translation guide", link: "/guide/translations" },
+          { text: "Contributing", link: "/guide/contributing" },
         ],
       },
       {
