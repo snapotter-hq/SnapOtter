@@ -1,6 +1,6 @@
 {
   "name": "@ashim/shared",
-  "version": "1.15.8",
+  "version": "1.15.9",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",

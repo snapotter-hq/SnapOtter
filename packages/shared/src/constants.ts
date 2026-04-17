@@ -1180,7 +1180,7 @@ export const PRINT_LAYOUTS: PrintLayout[] = [
   { id: "none", label: "None", width: 0, height: 0 },
 ];
 
-export const APP_VERSION = "1.15.8";
+export const APP_VERSION = "1.15.9";
 
 /**
  * Tool IDs that require the Python sidecar (AI/ML tools).
