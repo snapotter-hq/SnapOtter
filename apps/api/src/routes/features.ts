@@ -129,8 +129,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
 
       const jobId = crypto.randomUUID();
       const scriptPath = join(process.cwd(), "packages/ai/python/install_feature.py");
+      const manifestPath = getManifestPath();
+      const modelsDir = getModelsDir();
 
-      const child = spawn(pythonPath, [scriptPath, bundleId], {
+      const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
         stdio: ["ignore", "ignore", "pipe"],
         env: {
           ...process.env,
