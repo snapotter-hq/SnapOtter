@@ -1,0 +1,329 @@
+{
+  "manifestVersion": 1,
+  "imageVersion": "2.0.0",
+  "pythonVersion": "3.12",
+  "basePackages": ["numpy==1.26.4", "Pillow==11.1.0", "opencv-python-headless==4.10.0.84"],
+  "bundles": {
+    "background-removal": {
+      "name": "Background Removal",
+      "description": "Remove image backgrounds with AI",
+      "estimatedSize": "700 MB - 1 GB",
+      "packages": {
+        "common": ["rembg==2.0.62"],
+        "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe==0.10.21"],
+        "arm64": ["onnxruntime==1.20.1", "mediapipe==0.10.18"]
+      },
+      "pipFlags": {},
+      "postInstall": [],
+      "models": [
+        { "id": "rembg-u2net", "downloadFn": "rembg_session", "args": ["u2net"] },
+        {
+          "id": "rembg-isnet-general-use",
+          "downloadFn": "rembg_session",
+          "args": ["isnet-general-use"]
+        },
+        { "id": "rembg-bria-rmbg", "downloadFn": "rembg_session", "args": ["bria-rmbg"] },
+        {
+          "id": "rembg-birefnet-general-lite",
+          "downloadFn": "rembg_session",
+          "args": ["birefnet-general-lite"]
+        },
+        {
+          "id": "rembg-birefnet-portrait",
+          "downloadFn": "rembg_session",
+          "args": ["birefnet-portrait"]
+        },
+        {
+          "id": "rembg-birefnet-general",
+          "downloadFn": "rembg_session",
+          "args": ["birefnet-general"]
+        },
+        {
+          "id": "rembg-birefnet-matting",
+          "downloadFn": "rembg_session",
+          "args": ["birefnet-matting"]
+        }
+      ],
+      "enablesTools": ["remove-background", "passport-photo"]
+    },
+    "face-detection": {
+      "name": "Face Detection",
+      "description": "Detect and blur faces, fix red-eye, smart crop",
+      "estimatedSize": "200-300 MB",
+      "packages": {
+        "common": [],
+        "amd64": ["mediapipe==0.10.21"],
+        "arm64": ["mediapipe==0.10.18"]
+      },
+      "pipFlags": {},
+      "postInstall": [],
+      "models": [
+        {
+          "id": "mediapipe-face-detector",
+          "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite",
+          "path": "mediapipe/blaze_face_short_range.tflite",
+          "minSize": 100000
+        },
+        {
+          "id": "mediapipe-face-landmarker",
+          "url": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+          "path": "mediapipe/face_landmarker.task",
+          "minSize": 1000000
+        }
+      ],
+      "enablesTools": ["blur-faces", "red-eye-removal", "smart-crop"]
+    },
+    "object-eraser-colorize": {
+      "name": "Object Eraser & Colorize",
+      "description": "Erase objects from photos and colorize B&W images",
+      "estimatedSize": "600-800 MB",
+      "packages": {
+        "common": [],
+        "amd64": ["onnxruntime-gpu==1.20.1"],
+        "arm64": ["onnxruntime==1.20.1"]
+      },
+      "pipFlags": {},
+      "postInstall": [],
+      "models": [
+        {
+          "id": "lama-onnx",
+          "downloadFn": "hf_snapshot",
+          "args": ["Carve/LaMa-ONNX", "lama"],
+          "file": "lama_fp32.onnx",
+          "path": "lama/lama_fp32.onnx",
+          "minSize": 100000000
+        },
+        {
+          "id": "ddcolor-onnx",
+          "downloadFn": "hf_snapshot",
+          "args": ["facefusion/models-3.0.0", "ddcolor"],
+          "file": "ddcolor.onnx",
+          "path": "ddcolor/ddcolor.onnx",
+          "minSize": 50000000
+        },
+        {
+          "id": "opencv-colorize-prototxt",
+          "url": "https://raw.githubusercontent.com/richzhang/colorization/caffe/colorization/models/colorization_deploy_v2.prototxt",
+          "path": "colorize-opencv/colorization_deploy_v2.prototxt",
+          "minSize": 0
+        },
+        {
+          "id": "opencv-colorize-caffemodel",
+          "downloadFn": "hf_snapshot",
+          "args": ["BilalSardar/Black-N-White-To-Color", "colorize-opencv"],
+          "file": "colorization_release_v2.caffemodel",
+          "path": "colorize-opencv/colorization_release_v2.caffemodel",
+          "minSize": 100000000,
+          "repoType": "space"
+        },
+        {
+          "id": "opencv-colorize-points",
+          "url": "https://raw.githubusercontent.com/richzhang/colorization/caffe/colorization/resources/pts_in_hull.npy",
+          "path": "colorize-opencv/pts_in_hull.npy",
+          "minSize": 0
+        }
+      ],
+      "enablesTools": ["erase-object", "colorize"]
+    },
+    "upscale-enhance": {
+      "name": "Upscale & Enhance",
+      "description": "AI upscaling, face enhancement, and noise removal",
+      "estimatedSize": "4-5 GB",
+      "packages": {
+        "common": ["codeformer-pip==0.0.4", "lpips"],
+        "amd64": ["realesrgan==0.3.0 --extra-index-url https://download.pytorch.org/whl/cu126"],
+        "arm64": ["realesrgan==0.3.0"]
+      },
+      "pipFlags": {
+        "codeformer-pip==0.0.4": "--no-deps"
+      },
+      "postInstall": ["numpy==1.26.4"],
+      "models": [
+        {
+          "id": "realesrgan-x4plus",
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+          "path": "realesrgan/RealESRGAN_x4plus.pth",
+          "minSize": 60000000
+        },
+        {
+          "id": "gfpgan-v1.3",
+          "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
+          "path": "gfpgan/GFPGANv1.3.pth",
+          "minSize": 300000000
+        },
+        {
+          "id": "codeformer-pth",
+          "url": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
+          "path": "codeformer/codeformer.pth",
+          "minSize": 350000000
+        },
+        {
+          "id": "codeformer-onnx",
+          "downloadFn": "hf_snapshot",
+          "args": ["facefusion/models-3.0.0", "codeformer"],
+          "file": "codeformer.onnx",
+          "path": "codeformer/codeformer.onnx",
+          "minSize": 100000000
+        },
+        {
+          "id": "facexlib-detection",
+          "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+          "path": "gfpgan/facelib/detection_Resnet50_Final.pth",
+          "minSize": 100000000
+        },
+        {
+          "id": "facexlib-parsing",
+          "url": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+          "path": "gfpgan/facelib/parsing_parsenet.pth",
+          "minSize": 80000000
+        },
+        {
+          "id": "scunet-color-real",
+          "url": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
+          "path": "scunet/scunet_color_real_psnr.pth",
+          "minSize": 3000000
+        },
+        {
+          "id": "nafnet-sidd",
+          "downloadFn": "hf_snapshot",
+          "args": ["mikestealth/nafnet-models", "nafnet"],
+          "file": "NAFNet-SIDD-width64.pth",
+          "path": "nafnet/NAFNet-SIDD-width64.pth",
+          "minSize": 60000000
+        }
+      ],
+      "enablesTools": ["upscale", "enhance-faces", "noise-removal"]
+    },
+    "photo-restoration": {
+      "name": "Photo Restoration",
+      "description": "Restore old or damaged photos",
+      "estimatedSize": "800 MB - 1 GB",
+      "packages": {
+        "common": ["codeformer-pip==0.0.4", "lpips"],
+        "amd64": [
+          "onnxruntime-gpu==1.20.1",
+          "mediapipe==0.10.21",
+          "realesrgan==0.3.0 --extra-index-url https://download.pytorch.org/whl/cu126"
+        ],
+        "arm64": ["onnxruntime==1.20.1", "mediapipe==0.10.18", "realesrgan==0.3.0"]
+      },
+      "pipFlags": {
+        "codeformer-pip==0.0.4": "--no-deps"
+      },
+      "postInstall": ["numpy==1.26.4"],
+      "models": [
+        {
+          "id": "lama-onnx",
+          "downloadFn": "hf_snapshot",
+          "args": ["Carve/LaMa-ONNX", "lama"],
+          "file": "lama_fp32.onnx",
+          "path": "lama/lama_fp32.onnx",
+          "minSize": 100000000
+        },
+        {
+          "id": "codeformer-onnx",
+          "downloadFn": "hf_snapshot",
+          "args": ["facefusion/models-3.0.0", "codeformer"],
+          "file": "codeformer.onnx",
+          "path": "codeformer/codeformer.onnx",
+          "minSize": 100000000
+        },
+        {
+          "id": "realesrgan-x4plus",
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+          "path": "realesrgan/RealESRGAN_x4plus.pth",
+          "minSize": 60000000
+        },
+        {
+          "id": "facexlib-detection",
+          "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+          "path": "gfpgan/facelib/detection_Resnet50_Final.pth",
+          "minSize": 100000000
+        },
+        {
+          "id": "facexlib-parsing",
+          "url": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+          "path": "gfpgan/facelib/parsing_parsenet.pth",
+          "minSize": 80000000
+        },
+        {
+          "id": "mediapipe-face-detector",
+          "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite",
+          "path": "mediapipe/blaze_face_short_range.tflite",
+          "minSize": 100000
+        },
+        {
+          "id": "mediapipe-face-landmarker",
+          "url": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+          "path": "mediapipe/face_landmarker.task",
+          "minSize": 1000000
+        },
+        {
+          "id": "scunet-color-real",
+          "url": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
+          "path": "scunet/scunet_color_real_psnr.pth",
+          "minSize": 3000000
+        }
+      ],
+      "enablesTools": ["restore-photo"]
+    },
+    "ocr": {
+      "name": "OCR",
+      "description": "Extract text from images",
+      "estimatedSize": "3-4 GB",
+      "packages": {
+        "common": [],
+        "amd64": [
+          "paddlepaddle-gpu>=3.2.1 --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/",
+          "paddleocr[doc-parser]>=3.4.0,<3.5.0"
+        ],
+        "arm64": ["paddlepaddle==3.0.0", "paddleocr[doc-parser]>=3.4.0,<3.5.0"]
+      },
+      "pipFlags": {},
+      "postInstall": [],
+      "models": [
+        {
+          "id": "paddleocr-server-det",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PP-OCRv5_server_det", "PP-OCRv5_server_det"]
+        },
+        {
+          "id": "paddleocr-server-rec",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PP-OCRv5_server_rec", "PP-OCRv5_server_rec"]
+        },
+        {
+          "id": "paddleocr-mobile-det",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PP-OCRv5_mobile_det", "PP-OCRv5_mobile_det"]
+        },
+        {
+          "id": "paddleocr-mobile-rec",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PP-OCRv5_mobile_rec", "PP-OCRv5_mobile_rec"]
+        },
+        {
+          "id": "paddleocr-latin-rec",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/latin_PP-OCRv5_mobile_rec", "latin_PP-OCRv5_mobile_rec"]
+        },
+        {
+          "id": "paddleocr-korean-rec",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/korean_PP-OCRv5_mobile_rec", "korean_PP-OCRv5_mobile_rec"]
+        },
+        {
+          "id": "paddleocr-textline-ori",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PP-LCNet_x1_0_textline_ori", "PP-LCNet_x1_0_textline_ori"]
+        },
+        {
+          "id": "paddleocr-vl",
+          "downloadFn": "hf_snapshot",
+          "args": ["PaddlePaddle/PaddleOCR-VL-1.5", "PaddleOCR-VL-1.5"]
+        }
+      ],
+      "enablesTools": ["ocr"]
+    }
+  }
+}
