@@ -24,6 +24,7 @@ export default defineConfig({
     },
     exclude: [
       "tests/e2e/**",
+      "tests/e2e-docker/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/.{idea,git,cache,output,temp}/**",
