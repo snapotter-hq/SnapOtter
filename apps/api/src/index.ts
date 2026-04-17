@@ -7,6 +7,7 @@ import { env } from "./config.js";
 import { db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { startCleanupCron } from "./lib/cleanup.js";
+import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { shutdownWorkerPool } from "./lib/worker-pool.js";
 import { authMiddleware, authRoutes, ensureDefaultAdmin, requireAdmin } from "./plugins/auth.js";
 import { registerStatic } from "./plugins/static.js";
@@ -15,6 +16,7 @@ import { apiKeyRoutes } from "./routes/api-keys.js";
 import { registerBatchRoutes } from "./routes/batch.js";
 import { brandingRoutes } from "./routes/branding.js";
 import { docsRoutes } from "./routes/docs.js";
+import { registerFeatureRoutes } from "./routes/features.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { recoverStaleJobs, registerProgressRoutes } from "./routes/progress.js";
@@ -32,6 +34,10 @@ await ensureDefaultAdmin();
 
 // Mark any jobs left in processing/queued from a previous unclean shutdown
 recoverStaleJobs();
+
+// Set up AI feature directories and recover from interrupted installs
+ensureAiDirs();
+recoverInterruptedInstalls();
 
 const app = Fastify({
   logger: { level: env.LOG_LEVEL },
@@ -112,6 +118,9 @@ await apiKeyRoutes(app);
 
 // Settings routes
 await settingsRoutes(app);
+
+// Feature management routes (AI feature bundle install/uninstall)
+await registerFeatureRoutes(app);
 
 // Branding routes (logo upload/serve/delete)
 await brandingRoutes(app);
