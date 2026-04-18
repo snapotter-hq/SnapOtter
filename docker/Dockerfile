@@ -134,6 +134,14 @@ ARG GPU_BACKEND=cpu
 ARG BAKE_MODELS=false
 # Set to "true" in CI to skip model operations entirely (just test image structure).
 ARG SKIP_MODEL_DOWNLOADS=false
+# NVIDIA Container Toolkit: when these env vars are present in the image and the
+# NVIDIA Container Runtime is configured as the default Docker runtime on the host,
+# GPUs are made available automatically without --gpus on the docker run command.
+# Only set for latest-cuda builds via build-arg; empty string on cpu/rocm images.
+ARG NVIDIA_VISIBLE_DEVICES_VAL=""
+ARG NVIDIA_DRIVER_CAPABILITIES_VAL=""
+ENV NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES_VAL}
+ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES_VAL}
 
 # Pin corepack's cache to a system-wide path so all users share the same pnpm
 # binary without downloading it on each container start.
@@ -332,10 +340,6 @@ ENV PORT=1349 \
     MAX_MEGAPIXELS=100 \
     RATE_LIMIT_PER_MIN=100 \
     LOG_LEVEL=debug
-
-# NVIDIA Container Toolkit env vars (harmless on non-GPU systems)
-ENV NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Suppress noisy ML library output in docker logs
 ENV PYTHONWARNINGS=default \

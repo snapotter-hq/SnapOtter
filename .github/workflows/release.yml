@@ -74,6 +74,8 @@ jobs:
           - platform: linux/amd64
             gpu: cuda
             runner: ubuntu-latest
+            nvidia_visible_devices: all
+            nvidia_driver_capabilities: compute,utility
           - platform: linux/amd64
             gpu: rocm
             runner: ubuntu-latest
@@ -128,7 +130,10 @@ jobs:
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: GPU_BACKEND=${{ matrix.gpu }}
+          build-args: |
+            GPU_BACKEND=${{ matrix.gpu }}
+            NVIDIA_VISIBLE_DEVICES_VAL=${{ matrix.nvidia_visible_devices || '' }}
+            NVIDIA_DRIVER_CAPABILITIES_VAL=${{ matrix.nvidia_driver_capabilities || '' }}
           outputs: type=image,"name=ashimhq/ashim,ghcr.io/${{ github.repository }}",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }},mode=max
