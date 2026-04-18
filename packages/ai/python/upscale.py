@@ -26,14 +26,16 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+
 REALESRGAN_MODEL_PATH = os.environ.get(
     "REALESRGAN_MODEL_PATH",
-    "/opt/models/realesrgan/RealESRGAN_x4plus.pth",
+    os.path.join(_MODELS_BASE, "realesrgan", "RealESRGAN_x4plus.pth"),
 )
 
 GFPGAN_MODEL_PATH = os.environ.get(
     "GFPGAN_MODEL_PATH",
-    "/opt/models/gfpgan/GFPGANv1.3.pth",
+    os.path.join(_MODELS_BASE, "gfpgan", "GFPGANv1.3.pth"),
 )
 
 

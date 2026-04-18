@@ -22,12 +22,14 @@ def emit_progress(percent, stage):
 
 # ── Model paths ───────────────────────────────────────────────────────
 
-LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", "/opt/models/lama")
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+
+LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", os.path.join(_MODELS_BASE, "lama"))
 LAMA_MODEL_PATH = os.path.join(LAMA_MODEL_DIR, "lama_fp32.onnx")
 LAMA_LOCAL_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "ashim", "lama")
 LAMA_LOCAL_PATH = os.path.join(LAMA_LOCAL_CACHE, "lama_fp32.onnx")
 
-CODEFORMER_MODEL_DIR = os.environ.get("CODEFORMER_MODEL_DIR", "/opt/models/codeformer")
+CODEFORMER_MODEL_DIR = os.environ.get("CODEFORMER_MODEL_DIR", os.path.join(_MODELS_BASE, "codeformer"))
 CODEFORMER_MODEL_PATH = os.path.join(CODEFORMER_MODEL_DIR, "codeformer.onnx")
 CODEFORMER_LOCAL_CACHE = os.path.join(
     os.path.expanduser("~"), ".cache", "ashim", "codeformer"
@@ -35,7 +37,7 @@ CODEFORMER_LOCAL_CACHE = os.path.join(
 CODEFORMER_LOCAL_PATH = os.path.join(CODEFORMER_LOCAL_CACHE, "codeformer.onnx")
 
 DDCOLOR_MODEL_PATH = os.environ.get(
-    "DDCOLOR_MODEL_PATH", "/opt/models/ddcolor/ddcolor.onnx"
+    "DDCOLOR_MODEL_PATH", os.path.join(_MODELS_BASE, "ddcolor", "ddcolor.onnx")
 )
 
 LAMA_MODEL_SIZE = 512
@@ -220,7 +222,7 @@ def _get_codeformer_path():
 # ── Model path for new mp.tasks API ─────────────────────────────────
 
 _FACE_DETECT_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
-_FACE_DETECT_DOCKER_PATH = "/opt/models/mediapipe/blaze_face_short_range.tflite"
+_FACE_DETECT_DOCKER_PATH = os.path.join(_MODELS_BASE, "mediapipe", "blaze_face_short_range.tflite")
 _FACE_DETECT_LOCAL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
 _FACE_DETECT_LOCAL_PATH = os.path.join(_FACE_DETECT_LOCAL_DIR, "blaze_face_short_range.tflite")
 

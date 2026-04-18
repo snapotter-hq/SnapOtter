@@ -17,23 +17,25 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+
 DDCOLOR_MODEL_PATH = os.environ.get(
     "DDCOLOR_MODEL_PATH",
-    "/opt/models/ddcolor/ddcolor.onnx",
+    os.path.join(_MODELS_BASE, "ddcolor", "ddcolor.onnx"),
 )
 
 # OpenCV DNN fallback model paths (lightweight ~17 MB)
 OPENCV_PROTO_PATH = os.environ.get(
     "OPENCV_COLORIZE_PROTO",
-    "/opt/models/colorize-opencv/colorization_deploy_v2.prototxt",
+    os.path.join(_MODELS_BASE, "colorize-opencv", "colorization_deploy_v2.prototxt"),
 )
 OPENCV_MODEL_PATH = os.environ.get(
     "OPENCV_COLORIZE_MODEL",
-    "/opt/models/colorize-opencv/colorization_release_v2.caffemodel",
+    os.path.join(_MODELS_BASE, "colorize-opencv", "colorization_release_v2.caffemodel"),
 )
 OPENCV_POINTS_PATH = os.environ.get(
     "OPENCV_COLORIZE_POINTS",
-    "/opt/models/colorize-opencv/pts_in_hull.npy",
+    os.path.join(_MODELS_BASE, "colorize-opencv", "pts_in_hull.npy"),
 )
 
 

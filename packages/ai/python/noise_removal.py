@@ -9,15 +9,17 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+
 # Model paths - Docker locations as defaults, with env var overrides
 SCUNET_MODEL_PATH = os.environ.get(
     "SCUNET_MODEL_PATH",
-    "/opt/models/scunet/scunet_color_real_psnr.pth",
+    os.path.join(_MODELS_BASE, "scunet", "scunet_color_real_psnr.pth"),
 )
 
 NAFNET_MODEL_PATH = os.environ.get(
     "NAFNET_MODEL_PATH",
-    "/opt/models/nafnet/NAFNet-SIDD-width64.pth",
+    os.path.join(_MODELS_BASE, "nafnet", "NAFNet-SIDD-width64.pth"),
 )
 
 # Local cache for dev installs

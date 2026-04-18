@@ -12,7 +12,8 @@ def emit_progress(percent, stage):
 # Resolve the LaMa ONNX model path.
 # Docker places it at /opt/models/lama/lama_fp32.onnx.
 # For local dev, check a user-writable cache dir.
-LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", "/opt/models/lama")
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", os.path.join(_MODELS_BASE, "lama"))
 LAMA_MODEL_PATH = os.path.join(LAMA_MODEL_DIR, "lama_fp32.onnx")
 LAMA_LOCAL_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "ashim", "lama")
 LAMA_LOCAL_PATH = os.path.join(LAMA_LOCAL_CACHE, "lama_fp32.onnx")

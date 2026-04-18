@@ -11,8 +11,10 @@ def emit_progress(percent, stage):
 
 # ── Model path for new mp.tasks API ─────────────────────────────────
 
+_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+
 _FACE_MESH_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
-_DOCKER_MODEL_PATH = "/opt/models/mediapipe/face_landmarker.task"
+_DOCKER_MODEL_PATH = os.path.join(_MODELS_BASE, "mediapipe", "face_landmarker.task")
 _LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".models")
 _LOCAL_MODEL_PATH = os.path.join(_LOCAL_MODEL_DIR, "face_landmarker.task")
 
