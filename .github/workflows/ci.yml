@@ -18,6 +18,10 @@ on:
       - "apps/docs/**"
       - "docs/**"
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -104,7 +108,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -113,5 +117,5 @@ jobs:
           push: false
           tags: ashim:ci
           build-args: SKIP_MODEL_DOWNLOADS=true
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-linux-amd64
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-linux-amd64-cpu
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-ci,mode=max

@@ -1,6 +1,12 @@
 # Docker Image
 
-ashim ships as a single Docker image that works on all platforms.
+ashim ships three image tags, each optimised for a different hardware target.
+
+| Tag | Platform | GPU |
+|---|---|---|
+| `latest` | amd64 + arm64 | CPU only |
+| `latest-cuda` | amd64 | NVIDIA (CUDA wheels baked in) |
+| `latest-rocm` | amd64 | AMD (ROCm wheels baked in) |
 
 ## Quick start
 
@@ -12,13 +18,31 @@ The app is available at `http://localhost:1349`.
 
 ## GPU acceleration
 
-The image includes CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
+### NVIDIA
+
+Pull `latest-cuda`. It has CUDA wheels baked in and sets `NVIDIA_VISIBLE_DEVICES=all` + `NVIDIA_DRIVER_CAPABILITIES=compute,utility` in the image env layer.
+
+If the [NVIDIA Container Runtime](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is configured as your **default** Docker runtime, GPUs are injected automatically — no flag needed:
 
 ```bash
-docker run -d --name ashim --gpus all -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest
+docker run -d --name ashim -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest-cuda
 ```
 
-The image auto-detects your GPU at runtime. Without `--gpus all`, it runs on CPU. Same image either way.
+Otherwise pass `--gpus all` explicitly:
+
+```bash
+docker run -d --name ashim --gpus all -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest-cuda
+```
+
+### AMD
+
+Pull `latest-rocm`. ROCm requires device passthrough — this is always needed regardless of runtime configuration:
+
+```bash
+docker run -d --name ashim \
+  --device=/dev/kfd --device=/dev/dri \
+  -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest-rocm
+```
 
 ### Benchmarks
 
@@ -75,49 +99,90 @@ volumes:
   ashim-workspace:
 ```
 
-For GPU acceleration via Docker Compose, add the deploy section:
+For NVIDIA GPU acceleration via Docker Compose, use `latest-cuda` and add the deploy section (if the NVIDIA Container Runtime is not configured as your default runtime):
 
 ```yaml
 services:
   ashim:
-    image: ashimhq/ashim:latest
+    image: ashimhq/ashim:latest-cuda
     ports:
       - "1349:1349"
     volumes:
       - ashim-data:/data
       - ashim-workspace:/tmp/workspace
+      - ashim-models:/opt/models
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
     restart: unless-stopped
 
 volumes:
   ashim-data:
   ashim-workspace:
+  ashim-models:
+```
+
+For AMD GPU acceleration, use `latest-rocm` with device passthrough:
+
+```yaml
+services:
+  ashim:
+    image: ashimhq/ashim:latest-rocm
+    ports:
+      - "1349:1349"
+    volumes:
+      - ashim-data:/data
+      - ashim-workspace:/tmp/workspace
+      - ashim-models:/opt/models
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    restart: unless-stopped
+
+volumes:
+  ashim-data:
+  ashim-workspace:
+  ashim-models:
 ```
 
 ## Version pinning
 
 | Tag | Description |
 |-----|------------|
-| `latest` | Latest release |
-| `1.11.0` | Exact version |
-| `1.11` | Latest patch in 1.11.x |
-| `1` | Latest minor in 1.x |
+| `latest` | Latest release (CPU, multi-arch) |
+| `latest-cuda` | Latest release (NVIDIA CUDA, amd64) |
+| `latest-rocm` | Latest release (AMD ROCm, amd64) |
+| `1.16.0` | Exact version (CPU) |
+| `1.16.0-cuda` | Exact version (NVIDIA) |
+| `1.16.0-rocm` | Exact version (AMD) |
 
 ## Platforms
 
-| Architecture | GPU support | Notes |
+| Tag | Architecture | GPU |
 |---|---|---|
-| linux/amd64 | NVIDIA CUDA | Full GPU acceleration for AI tools |
-| linux/arm64 | CPU only | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
+| `latest` | amd64 + arm64 | CPU only |
+| `latest-cuda` | amd64 | NVIDIA CUDA |
+| `latest-rocm` | amd64 | AMD ROCm |
 
-## Migration from previous tags
+ARM64 (Raspberry Pi 4/5, Apple Silicon) always uses `latest` — CUDA and ROCm wheels have no aarch64 builds.
 
-If you were using the `:cuda` tag, switch to `:latest` and keep `--gpus all`. Same GPU support, unified image.
+## Model downloads
 
-Your data and settings are preserved in the volumes.
+AI models are **not** baked into the image. On first container start, models are downloaded into the `/opt/models` volume (about 400 MB). Subsequent starts are instant.
+
+Mount a named volume to persist models across container updates:
+
+```bash
+docker run -d --name ashim -p 1349:1349 \
+  -v ashim-data:/data \
+  -v ashim-models:/opt/models \
+  ashimhq/ashim:latest
+```
+
+## Migration from v1.15 and earlier
+
+Previous releases used `nvidia/cuda` as the base image and included `--gpus all` with the `latest` tag. As of v1.16, `latest` is CPU-only. Switch to `latest-cuda` for NVIDIA GPU acceleration. Your data and settings in volumes are unaffected.

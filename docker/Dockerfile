@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 # ============================================
 # ashim - Unified Production Dockerfile
-# Single image: GPU auto-detected on amd64, CPU on arm64
+# Tags: latest (cpu, amd64+arm64)  |  latest-cuda (NVIDIA)  |  latest-rocm (AMD)
+# Build arg GPU_BACKEND=cpu|cuda|rocm controls GPU acceleration package set.
+# Models are NOT baked in by default — downloaded on first container start.
 # ============================================
 
 # ============================================
@@ -108,9 +110,12 @@ RUN set -e; \
 # Stage 3: Platform-specific base images
 # ============================================
 FROM node:22-bookworm AS base-linux-arm64
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS base-linux-amd64
+# amd64 uses a plain Ubuntu base for all variants (cpu/cuda/rocm).
+# GPU libs are injected at runtime by the NVIDIA Container Toolkit or ROCm
+# device plugin — no CUDA/ROCm base image required.
+FROM ubuntu:24.04 AS base-linux-amd64
 
-# Node.js donor: provides Node binaries for the CUDA amd64 image without
+# Node.js donor: provides Node binaries for the amd64 image without
 # relying on NodeSource apt repos or Ubuntu mirrors (which are flaky on CI).
 FROM node:22-bookworm AS node-bins
 
@@ -122,8 +127,21 @@ ARG TARGETARCH
 FROM base-${TARGETOS}-${TARGETARCH} AS production
 
 ARG TARGETARCH
-# Set to "true" to skip model downloads (for CI builds that just test the image structure)
+# GPU acceleration backend: cpu (default) | cuda (NVIDIA) | rocm (AMD)
+ARG GPU_BACKEND=cpu
+# Set to "true" to bake models into the image at build time (large image, instant start).
+# Default false: models download on first container start into a persistent volume.
+ARG BAKE_MODELS=false
+# Set to "true" in CI to skip model operations entirely (just test image structure).
 ARG SKIP_MODEL_DOWNLOADS=false
+# NVIDIA Container Toolkit: when these env vars are present in the image and the
+# NVIDIA Container Runtime is configured as the default Docker runtime on the host,
+# GPUs are made available automatically without --gpus on the docker run command.
+# Only set for latest-cuda builds via build-arg; empty string on cpu/rocm images.
+ARG NVIDIA_VISIBLE_DEVICES_VAL=""
+ARG NVIDIA_DRIVER_CAPABILITIES_VAL=""
+ENV NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES_VAL}
+ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES_VAL}
 
 # Pin corepack's cache to a system-wide path so all users share the same pnpm
 # binary without downloading it on each container start.
@@ -173,28 +191,35 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84
 
-# Platform-conditional ONNX runtime
+# GPU-backend-conditional ONNX runtime
 RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "$TARGETARCH" = "amd64" ]; then \
-    /opt/venv/bin/pip install onnxruntime-gpu==1.20.1 \
-; else \
-    /opt/venv/bin/pip install onnxruntime==1.20.1 \
-; fi
+    if [ "$GPU_BACKEND" = "cuda" ]; then \
+        /opt/venv/bin/pip install onnxruntime-gpu==1.20.1; \
+    elif [ "$GPU_BACKEND" = "rocm" ]; then \
+        /opt/venv/bin/pip install onnxruntime-rocm==1.20.0; \
+    else \
+        /opt/venv/bin/pip install onnxruntime==1.20.1; \
+    fi
 
-# Python venv - Layer 2: Tool packages (change occasionally, ~2 GB)
+# GPU-backend-conditional tool packages (~2 GB)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "$TARGETARCH" = "amd64" ]; then \
-    /opt/venv/bin/pip install rembg==2.0.62 && \
-    /opt/venv/bin/pip install realesrgan==0.3.0 \
-        --extra-index-url https://download.pytorch.org/whl/cu126 && \
-    /opt/venv/bin/pip install paddlepaddle-gpu>=3.2.1 \
-        --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ && \
-    /opt/venv/bin/pip install "paddleocr[doc-parser]>=3.4.0,<3.5.0" \
-; else \
-    /opt/venv/bin/pip install "rembg[cpu]==2.0.62" && \
-    /opt/venv/bin/pip install realesrgan==0.3.0 && \
-    /opt/venv/bin/pip install paddlepaddle==3.0.0 "paddleocr[doc-parser]>=3.4.0,<3.5.0" \
-; fi
+    if [ "$GPU_BACKEND" = "cuda" ]; then \
+        /opt/venv/bin/pip install rembg==2.0.62 && \
+        /opt/venv/bin/pip install realesrgan==0.3.0 \
+            --extra-index-url https://download.pytorch.org/whl/cu126 && \
+        /opt/venv/bin/pip install "paddlepaddle-gpu>=3.2.1" \
+            --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ && \
+        /opt/venv/bin/pip install "paddleocr[doc-parser]>=3.4.0,<3.5.0"; \
+    elif [ "$GPU_BACKEND" = "rocm" ]; then \
+        /opt/venv/bin/pip install rembg==2.0.62 && \
+        /opt/venv/bin/pip install realesrgan==0.3.0 \
+            --extra-index-url https://download.pytorch.org/whl/rocm6.3 && \
+        /opt/venv/bin/pip install paddlepaddle==3.0.0 "paddleocr[doc-parser]>=3.4.0,<3.5.0"; \
+    else \
+        /opt/venv/bin/pip install "rembg[cpu]==2.0.62" && \
+        /opt/venv/bin/pip install realesrgan==0.3.0 && \
+        /opt/venv/bin/pip install paddlepaddle==3.0.0 "paddleocr[doc-parser]>=3.4.0,<3.5.0"; \
+    fi
 
 # mediapipe 0.10.21 only has amd64 wheels; arm64 maxes out at 0.10.18
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -212,17 +237,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install numpy==1.26.4
 
-# Re-align NCCL to match torch's requirement.  paddlepaddle-gpu pins an older
-# nvidia-nccl-cu12 which silently downgrades the version installed by torch,
-# causing "undefined symbol: ncclCommShrink" at import time.  NCCL is ABI-
-# backwards-compatible, so the newer version satisfies both packages.
+# Re-align NCCL to match torch's requirement (CUDA only). paddlepaddle-gpu pins
+# an older nvidia-nccl-cu12 which silently downgrades the version installed by
+# torch, causing "undefined symbol: ncclCommShrink" at import time.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "$TARGETARCH" = "amd64" ]; then \
-    /opt/venv/bin/pip install $(/opt/venv/bin/python3 -c \
-        "from importlib.metadata import requires; \
-         print([r.split(';')[0].strip() for r in requires('torch') \
-                if 'nccl' in r][0])") \
-    ; fi
+    if [ "$GPU_BACKEND" = "cuda" ]; then \
+        /opt/venv/bin/pip install $(/opt/venv/bin/python3 -c \
+            "from importlib.metadata import requires; \
+             print([r.split(';')[0].strip() for r in requires('torch') \
+                    if 'nccl' in r][0])"); \
+    fi
 
 # Pin rembg model storage to a fixed path so models downloaded at build time
 # (as root) are found at runtime (as the non-root ashim user, home=/app).
@@ -235,12 +259,17 @@ ENV U2NET_HOME=/opt/models/rembg
 # pre-download in this case; models download on first use at runtime instead.
 # In CI (SKIP_MODEL_DOWNLOADS=true), skip downloads — the image structure is
 # what matters for the build test; models are verified in integration tests.
-COPY docker/download_models.py /tmp/download_models.py
+# Keep download script in the image — used here when BAKE_MODELS=true and
+# by entrypoint.sh on first container start when BAKE_MODELS=false (default).
+COPY docker/download_models.py /opt/ashim/download_models.py
 RUN if [ "$SKIP_MODEL_DOWNLOADS" = "true" ]; then \
         echo "Skipping model downloads (CI build)"; \
+    elif [ "$BAKE_MODELS" = "true" ]; then \
+        CUDA_VISIBLE_DEVICES="" /opt/venv/bin/python3 /opt/ashim/download_models.py && \
+        touch /opt/models/.complete; \
     else \
-        CUDA_VISIBLE_DEVICES="" /opt/venv/bin/python3 /tmp/download_models.py; \
-    fi && rm -f /tmp/download_models.py && \
+        echo "BAKE_MODELS=false: models will download on first container start."; \
+    fi && \
     # Symlink PaddleX model dir into both possible HOME locations so models are
     # found regardless of whether HOME=/root (build/root context) or HOME=/app
     # (runtime ashim user via gosu). Without this PaddleX re-downloads on every
@@ -311,10 +340,6 @@ ENV PORT=1349 \
     MAX_MEGAPIXELS=100 \
     RATE_LIMIT_PER_MIN=100 \
     LOG_LEVEL=debug
-
-# NVIDIA Container Toolkit env vars (harmless on non-GPU systems)
-ENV NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Suppress noisy ML library output in docker logs
 ENV PYTHONWARNINGS=default \

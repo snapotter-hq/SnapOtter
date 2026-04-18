@@ -1,3 +1,19 @@
+# GPU USAGE:
+#
+# CPU (default):
+#   image: ashimhq/ashim:latest
+#   No extra flags needed.
+#
+# NVIDIA GPU:
+#   image: ashimhq/ashim:latest-cuda
+#   If NVIDIA Container Runtime is your default Docker runtime, GPUs are
+#   available automatically (the image sets NVIDIA_VISIBLE_DEVICES=all).
+#   Otherwise add:  deploy: (see commented block below) or run with --gpus all
+#
+# AMD GPU:
+#   image: ashimhq/ashim:latest-rocm
+#   Always requires device passthrough — add the deploy block below.
+
 services:
   ashim:
     build:
@@ -10,11 +26,24 @@ services:
     volumes:
       - ashim-data:/data
       - ashim-workspace:/tmp/workspace
+      - ashim-models:/opt/models
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
     restart: unless-stopped
+    # Uncomment for NVIDIA GPU (if not using nvidia-container-runtime as default):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    # Uncomment for AMD GPU (always required):
+    # devices:
+    #   - /dev/kfd:/dev/kfd
+    #   - /dev/dri:/dev/dri
     logging:
       driver: json-file
       options:
@@ -24,3 +53,4 @@ services:
 volumes:
   ashim-data:
   ashim-workspace:
+  ashim-models:

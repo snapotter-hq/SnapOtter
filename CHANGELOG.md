@@ -1,3 +1,17 @@
+# [1.16.0](https://github.com/wheetazlab/ashim/compare/v1.15.9...v1.16.0) (2026-04-18)
+
+
+### Bug Fixes
+
+* **ci:** make GHCR login optional so forks without GHCR_TOKEN secret can still build ([f2cd39f](https://github.com/wheetazlab/ashim/commit/f2cd39f8c4c0973d776529930fda7715aafbc3c3))
+* **ci:** remove conditional cache logic, simplify GHCR login ([2afea3b](https://github.com/wheetazlab/ashim/commit/2afea3bd219df9fb7f7a63d0e8a732e7cf4aadcd))
+* **ci:** replace GHCR_TOKEN with built-in GITHUB_TOKEN for GHCR auth ([53e69b8](https://github.com/wheetazlab/ashim/commit/53e69b8861b6ff78e723630b09027b757c9138a1))
+
+
+### Features
+
+* multi-GPU support, lazy model downloads, and Helm chart ([246c3d3](https://github.com/wheetazlab/ashim/commit/246c3d3c73fa29753e61181e1f30a0b631d67c5d)), closes [#pages](https://github.com/wheetazlab/ashim/issues/pages) [#pages](https://github.com/wheetazlab/ashim/issues/pages)
+
 ## [1.15.8](https://github.com/ashim-hq/ashim/compare/v1.15.7...v1.15.8) (2026-04-17)
 
 

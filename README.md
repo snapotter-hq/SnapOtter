@@ -33,13 +33,28 @@ Open http://localhost:1349 in your browser.
 <summary><sub>Have an NVIDIA GPU? Click here for GPU acceleration.</sub></summary>
 <br>
 
-Add `--gpus all` for GPU-accelerated background removal, upscaling, and OCR:
+Use the `latest-cuda` tag for GPU-accelerated background removal, upscaling, and OCR:
 
 ```bash
-docker run -d --name ashim -p 1349:1349 --gpus all -v ashim-data:/data ghcr.io/ashim-hq/ashim:latest
+docker run -d --name ashim -p 1349:1349 --gpus all \
+  -v ashim-data:/data ghcr.io/ashim-hq/ashim:latest-cuda
 ```
 
-> Requires an NVIDIA GPU and [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU if no GPU is found. See [Docker Tags](https://ashim-hq.github.io/ashim/guide/docker-tags) for benchmarks and Docker Compose examples.
+> Requires an NVIDIA GPU and [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). If the NVIDIA Container Runtime is your default Docker runtime, `--gpus all` is optional. See [Docker Tags](https://ashim-hq.github.io/ashim/guide/docker-tags) for benchmarks and Docker Compose examples.
+
+</details>
+
+<details>
+<summary><sub>Have an AMD GPU? Click here for GPU acceleration.</sub></summary>
+<br>
+
+Use the `latest-rocm` tag with device passthrough:
+
+```bash
+docker run -d --name ashim -p 1349:1349 \
+  --device=/dev/kfd --device=/dev/dri \
+  -v ashim-data:/data ghcr.io/ashim-hq/ashim:latest-rocm
+```
 
 </details>
 

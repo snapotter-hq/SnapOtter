@@ -59,16 +59,26 @@ jobs:
           fi
 
   docker:
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.platform }}, ${{ matrix.gpu }})
     needs: release
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux/amd64
+            gpu: cpu
             runner: ubuntu-latest
           - platform: linux/arm64
+            gpu: cpu
             runner: ubuntu-24.04-arm
+          - platform: linux/amd64
+            gpu: cuda
+            runner: ubuntu-latest
+            nvidia_visible_devices: all
+            nvidia_driver_capabilities: compute,utility
+          - platform: linux/amd64
+            gpu: rocm
+            runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Free disk space
@@ -81,7 +91,7 @@ jobs:
       - name: Prepare
         run: |
           platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          echo "PLATFORM_PAIR=${platform//\//-}-${{ matrix.gpu }}" >> $GITHUB_ENV
 
       - name: Checkout release tag
         uses: actions/checkout@v4
@@ -102,7 +112,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -120,6 +130,10 @@ jobs:
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GPU_BACKEND=${{ matrix.gpu }}
+            NVIDIA_VISIBLE_DEVICES_VAL=${{ matrix.nvidia_visible_devices || '' }}
+            NVIDIA_DRIVER_CAPABILITIES_VAL=${{ matrix.nvidia_driver_capabilities || '' }}
           outputs: type=image,"name=ashimhq/ashim,ghcr.io/${{ github.repository }}",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }},mode=max
@@ -141,14 +155,41 @@ jobs:
   manifest:
     name: Create Multi-Arch Manifests
     needs: [release, docker]
+    # Run even if some GPU builds fail so that `latest` (cpu) is always published
+    # as long as both cpu builds succeeded.
+    if: always() && needs.release.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Download digests
+      - name: Download cpu digests (amd64 + arm64 → latest)
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
-          path: /tmp/digests
-          pattern: digests-*
+          path: /tmp/digests/cpu
+          pattern: digests-*-cpu
           merge-multiple: true
+
+      - name: Download cuda digests (amd64 → latest-cuda)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: /tmp/digests/cuda
+          pattern: digests-linux-amd64-cuda
+          merge-multiple: true
+
+      - name: Download rocm digests (amd64 → latest-rocm)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: /tmp/digests/rocm
+          pattern: digests-linux-amd64-rocm
+          merge-multiple: true
+
+      - name: Check available digests
+        id: check
+        run: |
+          [ -n "$(ls -A /tmp/digests/cpu 2>/dev/null)" ] && echo "has_cpu=true" >> "$GITHUB_OUTPUT" || echo "has_cpu=false" >> "$GITHUB_OUTPUT"
+          [ -n "$(ls -A /tmp/digests/cuda 2>/dev/null)" ] && echo "has_cuda=true" >> "$GITHUB_OUTPUT" || echo "has_cuda=false" >> "$GITHUB_OUTPUT"
+          [ -n "$(ls -A /tmp/digests/rocm 2>/dev/null)" ] && echo "has_rocm=true" >> "$GITHUB_OUTPUT" || echo "has_rocm=false" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -161,10 +202,12 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
+      # ---- latest (cpu, multi-arch) ----
+      - name: Extract metadata (latest)
+        id: meta-cpu
+        if: steps.check.outputs.has_cpu == 'true'
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -176,16 +219,88 @@ jobs:
             type=semver,pattern={{major}},value=v${{ needs.release.outputs.new_version }}
             type=raw,value=latest
 
-      - name: Create Docker Hub manifest
-        working-directory: /tmp/digests
+      - name: Create Docker Hub manifest (latest)
+        if: steps.check.outputs.has_cpu == 'true'
+        working-directory: /tmp/digests/cpu
+        env:
+          META_JSON: ${{ steps.meta-cpu.outputs.json }}
         run: |
           docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("ashimhq/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(jq -cr '.tags | map(select(startswith("ashimhq/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
             $(printf 'ashimhq/ashim@sha256:%s ' *)
 
-      - name: Create GHCR manifest
-        working-directory: /tmp/digests
+      - name: Create GHCR manifest (latest)
+        if: steps.check.outputs.has_cpu == 'true'
+        working-directory: /tmp/digests/cpu
+        env:
+          META_JSON: ${{ steps.meta-cpu.outputs.json }}
         run: |
           docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("ghcr.io/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(jq -cr '.tags | map(select(startswith("ghcr.io/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
+            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+
+      # ---- latest-cuda (NVIDIA, amd64 only) ----
+      - name: Extract metadata (cuda)
+        id: meta-cuda
+        if: steps.check.outputs.has_cuda == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ashimhq/ashim
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}-cuda,value=v${{ needs.release.outputs.new_version }}
+            type=raw,value=latest-cuda
+
+      - name: Create Docker Hub manifest (cuda)
+        if: steps.check.outputs.has_cuda == 'true'
+        working-directory: /tmp/digests/cuda
+        env:
+          META_JSON: ${{ steps.meta-cuda.outputs.json }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(startswith("ashimhq/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
+            $(printf 'ashimhq/ashim@sha256:%s ' *)
+
+      - name: Create GHCR manifest (cuda)
+        if: steps.check.outputs.has_cuda == 'true'
+        working-directory: /tmp/digests/cuda
+        env:
+          META_JSON: ${{ steps.meta-cuda.outputs.json }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(startswith("ghcr.io/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
+            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+
+      # ---- latest-rocm (AMD, amd64 only) ----
+      - name: Extract metadata (rocm)
+        id: meta-rocm
+        if: steps.check.outputs.has_rocm == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ashimhq/ashim
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}-rocm,value=v${{ needs.release.outputs.new_version }}
+            type=raw,value=latest-rocm
+
+      - name: Create Docker Hub manifest (rocm)
+        if: steps.check.outputs.has_rocm == 'true'
+        working-directory: /tmp/digests/rocm
+        env:
+          META_JSON: ${{ steps.meta-rocm.outputs.json }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(startswith("ashimhq/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
+            $(printf 'ashimhq/ashim@sha256:%s ' *)
+
+      - name: Create GHCR manifest (rocm)
+        if: steps.check.outputs.has_rocm == 'true'
+        working-directory: /tmp/digests/rocm
+        env:
+          META_JSON: ${{ steps.meta-rocm.outputs.json }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(startswith("ghcr.io/")) | "-t " + .) | join(" ")' <<< "$META_JSON") \
             $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)

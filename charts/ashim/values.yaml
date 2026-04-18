@@ -1,0 +1,91 @@
+# Override the chart name used in resource names and labels.
+nameOverride: ""
+# Override the fully qualified app name used in resource names.
+fullnameOverride: ""
+
+# -------------------------------------------------------------------
+# Image settings
+# -------------------------------------------------------------------
+image:
+  registry: ghcr.io
+  repository: ashim-hq/ashim
+  # tag defaults to the chart's appVersion when left empty.
+  # Use "latest-cuda" for NVIDIA GPU or "latest-rocm" for AMD GPU.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# -------------------------------------------------------------------
+# Namespace
+# -------------------------------------------------------------------
+namespaceOverride: ""
+
+# -------------------------------------------------------------------
+# Service
+# -------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 1349
+
+# -------------------------------------------------------------------
+# Ingress
+# -------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: ashim.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# -------------------------------------------------------------------
+# Persistent storage
+# -------------------------------------------------------------------
+# Both PVCs are always created — models (~6 GB) must persist across restarts.
+persistence:
+  models:
+    size: 10Gi
+    # storageClass: "" uses the cluster default. Set explicitly if needed.
+    storageClass: ""
+  data:
+    size: 5Gi
+    storageClass: ""
+
+# -------------------------------------------------------------------
+# Application environment
+# -------------------------------------------------------------------
+env:
+  AUTH_ENABLED: "true"
+  DEFAULT_USERNAME: "admin"
+  DEFAULT_PASSWORD: "admin"
+  LOG_LEVEL: "info"
+  MAX_UPLOAD_SIZE_MB: "100"
+  CONCURRENT_JOBS: "3"
+  MAX_MEGAPIXELS: "100"
+  RATE_LIMIT_PER_MIN: "100"
+  FILE_MAX_AGE_HOURS: "24"
+  CLEANUP_INTERVAL_MINUTES: "30"
+
+# -------------------------------------------------------------------
+# Resource requests/limits
+# -------------------------------------------------------------------
+resources: {}
+# For GPU nodes, add nodeSelector and tolerations matching your node labels:
+# nodeSelector:
+#   nvidia.com/gpu: "true"
+# tolerations:
+#   - key: nvidia.com/gpu
+#     operator: Exists
+#     effect: NoSchedule
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
