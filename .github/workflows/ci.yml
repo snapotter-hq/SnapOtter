@@ -18,6 +18,10 @@ on:
       - "apps/docs/**"
       - "docs/**"
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -106,7 +110,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/build-push-action@v6
         with:
