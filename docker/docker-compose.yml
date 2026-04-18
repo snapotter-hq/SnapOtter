@@ -10,6 +10,7 @@ services:
     volumes:
       - ashim-data:/data
       - ashim-workspace:/tmp/workspace
+      - ashim-models:/opt/models
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
@@ -24,3 +25,4 @@ services:
 volumes:
   ashim-data:
   ashim-workspace:
+  ashim-models:

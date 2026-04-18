@@ -113,5 +113,5 @@ jobs:
           push: false
           tags: ashim:ci
           build-args: SKIP_MODEL_DOWNLOADS=true
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-linux-amd64
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-linux-amd64-cpu
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-ci,mode=max

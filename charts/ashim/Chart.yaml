@@ -1,0 +1,20 @@
+apiVersion: v2
+name: ashim
+description: >
+  Self-hosted image processing application with ML-powered features including
+  background removal, inpainting, upscaling, face enhancement, colorization,
+  and OCR. GPU acceleration available via -cuda (NVIDIA) and -rocm (AMD) image tags.
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - image-processing
+  - ai
+  - ml
+  - self-hosted
+home: https://github.com/ashim-hq/ashim
+sources:
+  - https://github.com/ashim-hq/ashim
+maintainers:
+  - name: ashim-hq
+    url: https://github.com/ashim-hq

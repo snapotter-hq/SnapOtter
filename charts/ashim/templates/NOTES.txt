@@ -1,0 +1,20 @@
+ashim has been deployed!
+
+Access the UI:
+{{- if .Values.ingress.enabled }}
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+  kubectl port-forward svc/{{ include "ashim.fullname" . }} 1349:1349 -n {{ include "ashim.namespace" . }}
+  Then open: http://localhost:1349
+{{- end }}
+
+Default credentials: {{ .Values.env.DEFAULT_USERNAME }} / {{ .Values.env.DEFAULT_PASSWORD }}
+Change via: --set env.DEFAULT_USERNAME=... --set env.DEFAULT_PASSWORD=...
+
+ML models (~6 GB) will download on first container start into the persistent volume.
+This happens once and is skipped on all subsequent restarts.
+
+For GPU acceleration:
+  NVIDIA:  --set image.tag=latest-cuda
+  AMD:     --set image.tag=latest-rocm
+  (also configure nodeSelector/tolerations to target GPU nodes)

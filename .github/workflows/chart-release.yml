@@ -1,0 +1,91 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Bootstrap gh-pages branch if missing
+        run: |
+          if ! git ls-remote --exit-code origin gh-pages; then
+            git checkout --orphan gh-pages
+            git rm -rf .
+            {
+              echo "theme: jekyll-theme-tactile"
+              echo "title: ashim"
+              echo "description: Helm chart repository for ashim — self-hosted ML image processing"
+            } > _config.yml
+            {
+              echo "## ashim Helm Chart"
+              echo ""
+              echo "Self-hosted image processing with background removal, inpainting, upscaling,"
+              echo "face enhancement, colorization, and OCR."
+              echo ""
+              echo "### Install"
+              echo ""
+              echo '```bash'
+              echo "helm repo add ashim https://ashim-hq.github.io/ashim"
+              echo "helm repo update"
+              echo "helm install ashim ashim/ashim --namespace ashim --create-namespace"
+              echo '```'
+              echo ""
+              echo "### GPU variants"
+              echo ""
+              echo '```bash'
+              echo "# NVIDIA"
+              echo "helm install ashim ashim/ashim --set image.tag=latest-cuda"
+              echo "# AMD"
+              echo "helm install ashim ashim/ashim --set image.tag=latest-rocm"
+              echo '```'
+              echo ""
+              echo "### Source"
+              echo ""
+              echo "[github.com/ashim-hq/ashim](https://github.com/ashim-hq/ashim)"
+            } > index.md
+            git add _config.yml index.md
+            git commit -m "chore: init gh-pages for Helm chart repo"
+            git push origin gh-pages
+            git checkout main
+          fi
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Ensure Tactile theme and landing page on gh-pages
+        run: |
+          git fetch origin gh-pages
+          git checkout gh-pages
+          {
+            echo "theme: jekyll-theme-tactile"
+            echo "title: ashim"
+            echo "description: Helm chart repository for ashim — self-hosted ML image processing"
+          } > _config.yml
+          git add _config.yml
+          git diff --cached --quiet || git commit -m "chore: refresh gh-pages theme config"
+          git push origin gh-pages || true
+          git checkout main
