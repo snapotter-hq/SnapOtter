@@ -83,7 +83,7 @@ export function BeforeAfterSlider({
       : null;
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-2xl mx-auto">
+    <div className="flex flex-col items-center gap-3 w-full max-w-2xl mx-auto h-full min-h-0">
       {/* Slider container */}
       <div
         ref={containerRef}
@@ -105,7 +105,12 @@ export function BeforeAfterSlider({
         }}
       >
         {/* Before image (full width, bottom layer) */}
-        <img src={beforeSrc} alt="Original" className="block w-full h-auto" draggable={false} />
+        <img
+          src={beforeSrc}
+          alt="Original"
+          className="block w-full max-h-[70vh] object-contain"
+          draggable={false}
+        />
 
         {/* After image (clipped, top layer) */}
         <div

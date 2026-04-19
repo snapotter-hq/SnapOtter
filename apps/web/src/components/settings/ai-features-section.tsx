@@ -1,13 +1,8 @@
 import type { FeatureBundleState } from "@ashim/shared";
-import { Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import { useFeaturesStore } from "@/stores/features-store";
-
-interface BundleProgress {
-  percent: number;
-  stage: string;
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -16,187 +11,90 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-export function AiFeaturesSection() {
-  const { bundles, fetch, refresh } = useFeaturesStore();
-  const [installing, setInstalling] = useState<Record<string, BundleProgress>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [diskUsage, setDiskUsage] = useState<number | null>(null);
-  const [installAllActive, setInstallAllActive] = useState(false);
-  const esRefs = useRef<Record<string, EventSource>>({});
-  const pollRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+function formatTimeRemaining(ms: number): string {
+  if (ms < 60000) return "Less than a minute left";
+  const mins = Math.ceil(ms / 60000);
+  if (mins === 1) return "~1 minute left";
+  return `~${mins} minutes left`;
+}
 
-  useEffect(() => {
-    fetch();
-    loadDiskUsage();
-    return () => {
-      for (const es of Object.values(esRefs.current)) es.close();
-      for (const id of Object.values(pollRefs.current)) clearInterval(id);
-    };
-  }, [fetch]);
+const PROGRESS_MESSAGES = [
+  "Almost there... probably...",
+  "Good things take time...",
+  "Still faster than watching paint dry...",
+  "Your patience is truly inspiring...",
+  "Working harder than it looks...",
+  "This is the exciting part, trust me...",
+  "Doing important behind-the-scenes stuff...",
+  "If you're reading this, it's working...",
+  "Preparing something awesome...",
+  "Worth every second, pinky promise...",
+  "The suspense is part of the experience...",
+  "Teaching your computer new tricks...",
+  "Setting up your superpowers...",
+  "Your images will thank you later...",
+  "Loading... but make it fancy...",
+  "This would be a great time for coffee...",
+  "Rome wasn't built in a day either...",
+  "Shhh... genius at work...",
+  "Making your photos jealous of what's coming...",
+  "Assembling the dream team...",
+  "Unpacking awesomeness...",
+  "Almost done thinking about starting... just kidding...",
+  "Plot twist: this is actually doing something...",
+  "Warming up the creative engines...",
+  "Imagination loading...",
+  "Not a screensaver, we promise...",
+  "Great art takes time to install...",
+  "Your future self will thank you...",
+  "Grabbing some really smart files...",
+  "Hang tight, the best is yet to come...",
+];
+
+export function AiFeaturesSection() {
+  const {
+    bundles,
+    fetch,
+    installing,
+    errors,
+    queued,
+    installAllActive,
+    startTimes,
+    installBundle,
+    uninstallBundle,
+    reinstallBundle,
+    installAll,
+  } = useFeaturesStore();
+  const [diskUsage, setDiskUsage] = useState<number | null>(null);
 
   const loadDiskUsage = useCallback(async () => {
     try {
       const data = await apiGet<{ totalBytes: number }>("/v1/admin/features/disk-usage");
       setDiskUsage(data.totalBytes);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }, []);
 
-  const startPolling = useCallback(
-    (bundleId: string) => {
-      if (pollRefs.current[bundleId]) return;
-      pollRefs.current[bundleId] = setInterval(async () => {
-        try {
-          await refresh();
-          const updated = useFeaturesStore.getState().bundles.find((b) => b.id === bundleId);
-          if (!updated || updated.status !== "installing") {
-            clearInterval(pollRefs.current[bundleId]);
-            delete pollRefs.current[bundleId];
-            setInstalling((prev) => {
-              const next = { ...prev };
-              delete next[bundleId];
-              return next;
-            });
-            if (updated?.status === "error") {
-              setErrors((prev) => ({
-                ...prev,
-                [bundleId]: updated.error ?? "Installation failed",
-              }));
-            }
-            loadDiskUsage();
-          } else if (updated.progress) {
-            setInstalling((prev) => ({ ...prev, [bundleId]: updated.progress! }));
-          }
-        } catch {
-          /* ignore */
-        }
-      }, 3000);
-    },
-    [refresh, loadDiskUsage],
-  );
+  useEffect(() => {
+    fetch();
+    loadDiskUsage();
+  }, [fetch, loadDiskUsage]);
 
-  const listenToProgress = useCallback(
-    (bundleId: string, jobId: string) => {
-      const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
-      esRefs.current[bundleId] = es;
-
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as {
-            phase: string;
-            percent: number;
-            stage: string;
-            error?: string;
-          };
-          if (data.phase === "complete") {
-            es.close();
-            delete esRefs.current[bundleId];
-            setInstalling((prev) => {
-              const next = { ...prev };
-              delete next[bundleId];
-              return next;
-            });
-            refresh();
-            loadDiskUsage();
-            return;
-          }
-          if (data.phase === "failed") {
-            es.close();
-            delete esRefs.current[bundleId];
-            setInstalling((prev) => {
-              const next = { ...prev };
-              delete next[bundleId];
-              return next;
-            });
-            setErrors((prev) => ({ ...prev, [bundleId]: data.error ?? "Installation failed" }));
-            return;
-          }
-          setInstalling((prev) => ({
-            ...prev,
-            [bundleId]: { percent: data.percent, stage: data.stage },
-          }));
-        } catch {
-          /* ignore */
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        delete esRefs.current[bundleId];
-        startPolling(bundleId);
-      };
-    },
-    [refresh, loadDiskUsage, startPolling],
-  );
-
-  const installBundle = useCallback(
-    async (bundleId: string) => {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[bundleId];
-        return next;
-      });
-      setInstalling((prev) => ({ ...prev, [bundleId]: { percent: 0, stage: "Starting..." } }));
-
-      try {
-        const result = await apiPost<{ jobId: string }>(`/v1/admin/features/${bundleId}/install`);
-        listenToProgress(bundleId, result.jobId);
-      } catch (err) {
-        setInstalling((prev) => {
-          const next = { ...prev };
-          delete next[bundleId];
-          return next;
-        });
-        setErrors((prev) => ({
-          ...prev,
-          [bundleId]: err instanceof Error ? err.message : "Failed to start installation",
-        }));
-      }
-    },
-    [listenToProgress],
-  );
-
-  const uninstallBundle = useCallback(
-    async (bundleId: string) => {
-      try {
-        await apiPost(`/v1/admin/features/${bundleId}/uninstall`);
-        await refresh();
+  const prevInstallingKeys = useRef(new Set(Object.keys(installing)));
+  useEffect(() => {
+    const currentKeys = new Set(Object.keys(installing));
+    for (const key of prevInstallingKeys.current) {
+      if (!currentKeys.has(key)) {
         loadDiskUsage();
-      } catch (err) {
-        setErrors((prev) => ({
-          ...prev,
-          [bundleId]: err instanceof Error ? err.message : "Uninstall failed",
-        }));
+        break;
       }
-    },
-    [refresh, loadDiskUsage],
-  );
-
-  const handleInstallAll = useCallback(async () => {
-    setInstallAllActive(true);
-    const notInstalled = bundles.filter((b) => b.status === "not_installed");
-    for (const bundle of notInstalled) {
-      await installBundle(bundle.id);
-      // Wait for this bundle to finish before starting next
-      await new Promise<void>((resolve) => {
-        const check = setInterval(() => {
-          const current = useFeaturesStore.getState().bundles.find((b) => b.id === bundle.id);
-          if (!current || current.status !== "installing") {
-            clearInterval(check);
-            resolve();
-          }
-        }, 2000);
-      });
     }
-    setInstallAllActive(false);
-  }, [bundles, installBundle]);
+    prevInstallingKeys.current = currentKeys;
+  }, [installing, loadDiskUsage]);
 
   const anyInstalling = Object.keys(installing).length > 0;
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">AI Features</h3>
@@ -206,7 +104,7 @@ export function AiFeaturesSection() {
         </div>
         <button
           type="button"
-          onClick={handleInstallAll}
+          onClick={installAll}
           disabled={
             anyInstalling || installAllActive || bundles.every((b) => b.status === "installed")
           }
@@ -217,7 +115,6 @@ export function AiFeaturesSection() {
         </button>
       </div>
 
-      {/* Bundle cards */}
       <div className="space-y-3">
         {bundles.map((bundle) => (
           <BundleCard
@@ -227,12 +124,14 @@ export function AiFeaturesSection() {
             error={errors[bundle.id] ?? null}
             onInstall={() => installBundle(bundle.id)}
             onUninstall={() => uninstallBundle(bundle.id)}
+            onReinstall={() => reinstallBundle(bundle.id)}
             isInstalling={!!installing[bundle.id]}
+            isQueued={queued.includes(bundle.id)}
+            startTime={startTimes[bundle.id] ?? null}
           />
         ))}
       </div>
 
-      {/* Disk usage footer */}
       {diskUsage !== null && (
         <p className="text-xs text-muted-foreground pt-2 border-t border-border">
           Disk usage: {formatBytes(diskUsage)}
@@ -242,22 +141,56 @@ export function AiFeaturesSection() {
   );
 }
 
+interface BundleProgress {
+  percent: number;
+  stage: string;
+}
+
 function BundleCard({
   bundle,
   progress,
   error,
   onInstall,
   onUninstall,
+  onReinstall,
   isInstalling,
+  isQueued,
+  startTime,
 }: {
   bundle: FeatureBundleState;
   progress: BundleProgress | null;
   error: string | null;
   onInstall: () => void;
   onUninstall: () => void;
+  onReinstall: () => void;
   isInstalling: boolean;
+  isQueued: boolean;
+  startTime: number | null;
 }) {
-  const status = isInstalling ? "installing" : bundle.status;
+  const [confirming, setConfirming] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(() =>
+    Math.floor(Math.random() * PROGRESS_MESSAGES.length),
+  );
+  const [now, setNow] = useState(Date.now());
+  const status = isQueued ? "queued" : isInstalling ? "installing" : bundle.status;
+
+  useEffect(() => {
+    if (!isInstalling) return;
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      setNow(Date.now());
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isInstalling]);
+
+  const eta = (() => {
+    if (!progress || !startTime || progress.percent <= 2) return null;
+    const elapsed = now - startTime;
+    const rate = progress.percent / elapsed;
+    if (rate <= 0) return null;
+    const remaining = (100 - progress.percent) / rate;
+    return formatTimeRemaining(remaining);
+  })();
 
   return (
     <div className="rounded-lg border border-border p-4">
@@ -269,7 +202,6 @@ function BundleCard({
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-4">
-          {/* Status indicator */}
           <div className="flex items-center gap-1.5">
             {status === "installed" && (
               <>
@@ -281,6 +213,12 @@ function BundleCard({
               <>
                 <span className="bg-muted-foreground rounded-full h-2 w-2" />
                 <span className="text-xs text-muted-foreground">Not installed</span>
+              </>
+            )}
+            {status === "queued" && (
+              <>
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Queued</span>
               </>
             )}
             {status === "installing" && progress && (
@@ -299,7 +237,6 @@ function BundleCard({
             )}
           </div>
 
-          {/* Action button */}
           {status === "not_installed" && !error && (
             <button
               type="button"
@@ -310,15 +247,47 @@ function BundleCard({
               Install
             </button>
           )}
-          {status === "installed" && (
-            <button
-              type="button"
-              onClick={onUninstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Uninstall
-            </button>
+          {status === "installed" && !confirming && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onReinstall}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Repair
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Uninstall
+              </button>
+            </div>
+          )}
+          {status === "installed" && confirming && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirming(false);
+                  onUninstall();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           )}
           {status === "installing" && (
             <button
@@ -330,7 +299,7 @@ function BundleCard({
               Installing...
             </button>
           )}
-          {(status === "error" || error) && !isInstalling && (
+          {(status === "error" || error) && !isInstalling && !isQueued && (
             <button
               type="button"
               onClick={onInstall}
@@ -342,6 +311,22 @@ function BundleCard({
           )}
         </div>
       </div>
+      {status === "installing" && progress && (
+        <div className="mt-3 space-y-1.5">
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground italic">
+              {PROGRESS_MESSAGES[messageIndex]}
+            </p>
+            {eta && <p className="text-xs text-muted-foreground shrink-0 ml-2">{eta}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

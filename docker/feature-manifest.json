@@ -7,7 +7,7 @@
     "background-removal": {
       "name": "Background Removal",
       "description": "Remove image backgrounds with AI",
-      "estimatedSize": "700 MB - 1 GB",
+      "estimatedSize": "3-4 GB",
       "packages": {
         "common": ["rembg==2.0.62"],
         "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe==0.10.21"],
@@ -76,9 +76,9 @@
     "object-eraser-colorize": {
       "name": "Object Eraser & Colorize",
       "description": "Erase objects from photos and colorize B&W images",
-      "estimatedSize": "600-800 MB",
+      "estimatedSize": "1-2 GB",
       "packages": {
-        "common": [],
+        "common": ["huggingface-hub"],
         "amd64": ["onnxruntime-gpu==1.20.1"],
         "arm64": ["onnxruntime==1.20.1"]
       },
@@ -130,7 +130,7 @@
       "description": "AI upscaling, face enhancement, and noise removal",
       "estimatedSize": "4-5 GB",
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "lpips"],
+        "common": ["codeformer-pip==0.0.4", "lpips", "huggingface-hub"],
         "amd64": ["realesrgan==0.3.0 --extra-index-url https://download.pytorch.org/whl/cu126"],
         "arm64": ["realesrgan==0.3.0"]
       },
@@ -199,7 +199,7 @@
       "description": "Restore old or damaged photos",
       "estimatedSize": "800 MB - 1 GB",
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "lpips"],
+        "common": ["codeformer-pip==0.0.4", "lpips", "huggingface-hub"],
         "amd64": [
           "onnxruntime-gpu==1.20.1",
           "mediapipe==0.10.21",
@@ -272,7 +272,7 @@
       "description": "Extract text from images",
       "estimatedSize": "3-4 GB",
       "packages": {
-        "common": [],
+        "common": ["huggingface-hub"],
         "amd64": [
           "paddlepaddle-gpu>=3.2.1 --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/",
           "paddleocr[doc-parser]>=3.4.0,<3.5.0"

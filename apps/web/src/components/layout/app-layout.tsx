@@ -8,6 +8,7 @@ import { Dropzone } from "../common/dropzone";
 import { GemLogo } from "../common/gem-logo";
 import { HelpDialog } from "../help/help-dialog";
 import { SettingsDialog } from "../settings/settings-dialog";
+import { AiInstallIndicator } from "./ai-install-indicator";
 import { Footer } from "./footer";
 import { Sidebar } from "./sidebar";
 import { ToolPanel } from "./tool-panel";
@@ -155,6 +156,9 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
 
       {/* Help dialog */}
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Global AI install progress */}
+      <AiInstallIndicator />
     </div>
   );
 }

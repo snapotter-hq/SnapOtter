@@ -252,7 +252,12 @@ def download_hf_snapshot(model: dict, models_dir: str) -> None:
                 return
 
     from huggingface_hub import snapshot_download
-    snapshot_download(repo_id=repo_id, local_dir=local_dir, repo_type=repo_type)
+
+    kwargs: dict = {"repo_id": repo_id, "local_dir": local_dir, "repo_type": repo_type}
+    if target_file:
+        kwargs["allow_patterns"] = [target_file]
+
+    snapshot_download(**kwargs)
 
     # Verify file size if applicable
     if target_file and min_size > 0:

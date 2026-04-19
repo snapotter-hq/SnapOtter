@@ -25,7 +25,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "background-removal",
     name: "Background Removal",
     description: "Remove image backgrounds with AI",
-    estimatedSize: "700 MB - 1 GB",
+    estimatedSize: "3-4 GB",
     enablesTools: ["remove-background", "passport-photo"],
   },
   "face-detection": {
@@ -39,7 +39,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "object-eraser-colorize",
     name: "Object Eraser & Colorize",
     description: "Erase objects from photos and colorize B&W images",
-    estimatedSize: "600-800 MB",
+    estimatedSize: "1-2 GB",
     enablesTools: ["erase-object", "colorize"],
   },
   "upscale-enhance": {
