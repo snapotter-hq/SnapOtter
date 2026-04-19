@@ -12,10 +12,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ashim/shared": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@ashim/shared": "workspace:*",
+    "@use-gesture/react": "^10.3.1",
     "clsx": "^2.1.0",
     "fflate": "^0.8.2",
     "jszip": "^3.10.1",

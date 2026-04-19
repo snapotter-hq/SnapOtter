@@ -81,6 +81,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@ashim/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@ashim/image-engine':
+        specifier: workspace:*
+        version: link:../../packages/image-engine
+      '@ashim/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.2.0
@@ -99,15 +108,6 @@ importers:
       '@scalar/fastify-api-reference':
         specifier: ^1.49.5
         version: 1.49.5
-      '@ashim/ai':
-        specifier: workspace:*
-        version: link:../../packages/ai
-      '@ashim/image-engine':
-        specifier: workspace:*
-        version: link:../../packages/image-engine
-      '@ashim/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -205,6 +205,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ashim/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -214,9 +217,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
-      '@ashim/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
+      '@use-gesture/react':
+        specifier: ^10.3.1
+        version: 10.3.1(react@19.2.4)
       clsx:
         specifier: ^2.1.0
         version: 2.1.1
@@ -2698,6 +2701,14 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+
+  '@use-gesture/core@10.3.1':
+    resolution: {integrity: sha512-WcINiDt8WjqBdUXye25anHiNxPc0VOrlT8F6LLkU6cycrOGUDyY/yyFmsg3k8i5OLvv25llc0QC45GhR/C8llw==}
+
+  '@use-gesture/react@10.3.1':
+    resolution: {integrity: sha512-Yy19y6O2GJq8f7CHf7L0nxL8bf4PZCPaVOCgJrusOeFHY1LvHgYXnmnXg6N5iwAnbgbZCDjo60SiM6IPJi9C5g==}
+    peerDependencies:
+      react: '>= 16.8.0'
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -8219,6 +8230,13 @@ snapshots:
   '@types/web-bluetooth@0.0.21': {}
 
   '@ungap/structured-clone@1.3.0': {}
+
+  '@use-gesture/core@10.3.1': {}
+
+  '@use-gesture/react@10.3.1(react@19.2.4)':
+    dependencies:
+      '@use-gesture/core': 10.3.1
+      react: 19.2.4
 
   '@vitejs/plugin-react@4.7.0(vite@6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))':
     dependencies:
