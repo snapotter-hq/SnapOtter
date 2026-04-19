@@ -15,7 +15,7 @@ import { Download, GripVertical, ImagePlus, Loader2, RotateCcw, Upload, X } from
 import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import { type CollageTemplate, getTemplateById } from "@/lib/collage-templates";
 import { cn } from "@/lib/utils";
-import type { CollageImage } from "@/stores/collage-store";
+import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
 
 // Checkerboard pattern for transparent background
@@ -154,7 +154,6 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
     selectedCell,
   } = store;
 
-  const containerRef = useRef<HTMLDivElement>(null);
   const arMultiplier = getAspectMultiplier(aspectRatio);
   const aspectStyle: React.CSSProperties = arMultiplier
     ? { aspectRatio: `1 / ${arMultiplier}` }
@@ -211,11 +210,7 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
       onClick={() => store.setSelectedCell(null)}
       onKeyDown={(e) => e.key === "Escape" && store.setSelectedCell(null)}
     >
-      <div
-        ref={containerRef}
-        className="relative w-full max-w-[800px] max-h-full"
-        style={aspectStyle}
-      >
+      <div className="relative w-full max-w-[800px] max-h-full" style={aspectStyle}>
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div
             className="w-full h-full rounded-lg overflow-hidden shadow-lg"
@@ -281,7 +276,7 @@ function CollageCell({
 }: {
   cellIndex: number;
   image: CollageImage | null;
-  transform: { panX: number; panY: number; zoom: number };
+  transform: CellTransform;
   cornerRadius: number;
   isSelected: boolean;
   isDragSource: boolean;
@@ -401,7 +396,7 @@ function CollageCell({
 
   const mergedRef = useCallback(
     (node: HTMLDivElement | null) => {
-      (cellRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      cellRef.current = node;
       setDropRef(node);
     },
     [setDropRef],
@@ -410,6 +405,7 @@ function CollageCell({
   const isLoading = image?.previewLoading ?? false;
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: cell requires drag/zoom interactions incompatible with button element
     <div
       ref={mergedRef}
       role="button"
@@ -466,10 +462,11 @@ function CollageCell({
           ref={setDragRef}
           {...listeners}
           {...attributes}
+          role="group"
+          aria-label="Drag to reorder"
           className="absolute top-1 right-1 bg-black/50 backdrop-blur-sm text-white rounded p-1 cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </div>
@@ -478,6 +475,8 @@ function CollageCell({
       {/* Zoom controls overlay — bottom of selected cells */}
       {isSelected && image && !isLoading && (
         <div
+          role="toolbar"
+          aria-label="Zoom controls"
           className={cn(
             "absolute bottom-0 left-0 right-0 flex items-center gap-2 px-2 py-1.5 bg-black/50 backdrop-blur-sm transition-opacity duration-300",
             controlsVisible ? "opacity-100" : "opacity-0",
