@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { formatHeaders } from "@/lib/api";
+import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
 
 export interface FileEntry {
   file: File;
@@ -75,34 +75,6 @@ function deriveFiles(entries: FileEntry[]): File[] {
   }
   prevFiles = entries.map((e) => e.file);
   return prevFiles;
-}
-
-// ---------------------------------------------------------------------------
-// HEIC/HEIF preview helpers
-// ---------------------------------------------------------------------------
-
-const HEIF_EXTENSIONS = new Set(["heic", "heif", "hif"]);
-
-function needsServerPreview(file: File): boolean {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return HEIF_EXTENSIONS.has(ext);
-}
-
-async function fetchDecodedPreview(file: File): Promise<string | null> {
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/v1/preview", {
-      method: "POST",
-      headers: formatHeaders(),
-      body: formData,
-    });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
-  } catch {
-    return null;
-  }
 }
 
 // ---------------------------------------------------------------------------
