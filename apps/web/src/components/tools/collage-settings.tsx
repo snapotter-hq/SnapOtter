@@ -94,6 +94,7 @@ export function CollageSettings() {
         }),
       );
 
+      const startTime = Date.now();
       const result = await new Promise<{
         downloadUrl: string;
         processedSize: number;
@@ -138,6 +139,8 @@ export function CollageSettings() {
         store.setProgress(5);
       });
 
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
       store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
     } catch (err) {
       store.setError(err instanceof Error ? err.message : "Collage failed");
