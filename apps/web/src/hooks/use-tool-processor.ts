@@ -11,6 +11,7 @@ interface ProcessResult {
   originalSize: number;
   processedSize: number;
   savedFileId?: string;
+  warning?: string;
 }
 
 export interface ToolProgress {
@@ -39,6 +40,7 @@ export function useToolProcessor(toolId: string) {
     useFileStore();
 
   const [progress, setProgress] = useState<ToolProgress>(IDLE_PROGRESS);
+  const [warning, setWarning] = useState<string | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -69,6 +71,7 @@ export function useToolProcessor(toolId: string) {
       const capturedIndex = useFileStore.getState().selectedIndex;
 
       setError(null);
+      setWarning(null);
       // Mark the target entry as processing and clear any old result
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: null,
@@ -216,6 +219,7 @@ export function useToolProcessor(toolId: string) {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result: ProcessResult = JSON.parse(xhr.responseText);
+            setWarning(result.warning ?? null);
             // Write result to the entry that was being processed (captured at
             // request time), not whatever entry happens to be selected now.
             useFileStore.getState().updateEntry(capturedIndex, {
@@ -429,6 +433,7 @@ export function useToolProcessor(toolId: string) {
     processAllFiles,
     processing,
     error,
+    warning,
     downloadUrl: processedUrl,
     originalSize,
     processedSize,

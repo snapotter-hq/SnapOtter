@@ -1,6 +1,7 @@
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import sharp from "sharp";
 import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
 
 export interface BlurFacesOptions {
@@ -39,7 +40,8 @@ export async function blurFaces(
   const inputPath = join(outputDir, "input_faces.png");
   const outputPath = join(outputDir, "output_faces.png");
 
-  await writeFile(inputPath, inputBuffer);
+  const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+  await writeFile(inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "detect_faces.py",
     [inputPath, outputPath, JSON.stringify(options)],
@@ -67,7 +69,8 @@ export async function detectFaces(
   const inputPath = join(tmpdir(), `detect_faces_${Date.now()}.png`);
 
   try {
-    await writeFile(inputPath, inputBuffer);
+    const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+    await writeFile(inputPath, pngBuffer);
     const { stdout } = await runPythonWithProgress(
       "detect_faces.py",
       [inputPath, "unused", JSON.stringify({ ...options, detectOnly: true })],

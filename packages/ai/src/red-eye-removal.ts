@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import sharp from "sharp";
 import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
 
 export interface RedEyeRemovalOptions {
@@ -27,7 +28,8 @@ export async function removeRedEye(
   const inputPath = join(outputDir, "input_redeye.png");
   const outputPath = join(outputDir, "output_redeye.png");
 
-  await writeFile(inputPath, inputBuffer);
+  const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+  await writeFile(inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "red_eye_removal.py",
     [inputPath, outputPath, JSON.stringify(options)],

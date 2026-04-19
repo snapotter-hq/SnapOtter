@@ -75,7 +75,7 @@ export function BlurFacesControls({ settings: initialSettings, onChange }: BlurF
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
           <span>More faces</span>
-          <span>Fewer false positives</span>
+          <span>Fewer faces</span>
         </div>
       </div>
     </div>
@@ -89,6 +89,7 @@ export function BlurFacesSettings() {
     processAllFiles,
     processing,
     error,
+    warning,
     downloadUrl,
     originalSize,
     processedSize,
@@ -110,8 +111,9 @@ export function BlurFacesSettings() {
     <div className="space-y-4">
       <BlurFacesControls onChange={setSettings} />
 
-      {/* Error */}
       {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {warning && <p className="text-xs text-amber-600 dark:text-amber-400">{warning}</p>}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && (

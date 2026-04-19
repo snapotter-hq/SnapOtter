@@ -8,6 +8,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -68,6 +69,11 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
 
       try {
         const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+
+        if (validation.format === "heif") {
+          fileBuffer = await decodeHeic(fileBuffer);
+        }
+
         request.log.info(
           {
             toolId: "red-eye-removal",
@@ -78,7 +84,6 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           "Starting red eye removal",
         );
 
-        // Auto-orient to fix EXIF rotation before face detection
         fileBuffer = await autoOrient(fileBuffer);
 
         const jobId = randomUUID();
@@ -162,7 +167,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
         format?: string;
         quality?: number;
       };
-      const orientedBuffer = await autoOrient(inputBuffer);
+      const orientedBuffer = await autoOrient(await ensureSharpCompat(inputBuffer));
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
       const result = await removeRedEye(orientedBuffer, join(workspacePath, "output"), {

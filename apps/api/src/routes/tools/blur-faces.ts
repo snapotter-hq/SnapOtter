@@ -8,6 +8,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -66,6 +67,11 @@ export function registerBlurFaces(app: FastifyInstance) {
 
     try {
       const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+
+      if (validation.format === "heif") {
+        fileBuffer = await decodeHeic(fileBuffer);
+      }
+
       request.log.info(
         {
           toolId: "blur-faces",
@@ -76,7 +82,6 @@ export function registerBlurFaces(app: FastifyInstance) {
         "Starting face blur",
       );
 
-      // Auto-orient to fix EXIF rotation before face detection
       fileBuffer = await autoOrient(fileBuffer);
 
       const jobId = randomUUID();
@@ -129,6 +134,9 @@ export function registerBlurFaces(app: FastifyInstance) {
         processedSize: result.buffer.length,
         facesDetected: result.facesDetected,
         faces: result.faces,
+        ...(result.facesDetected === 0 && {
+          warning: "No faces detected in this image. Try increasing detection sensitivity.",
+        }),
       });
     } catch (err) {
       request.log.error({ err, toolId: "blur-faces" }, "Face blur failed");
@@ -149,7 +157,7 @@ export function registerBlurFaces(app: FastifyInstance) {
     }),
     process: async (inputBuffer, settings, filename) => {
       const s = settings as { blurRadius?: number; sensitivity?: number };
-      const orientedBuffer = await autoOrient(inputBuffer);
+      const orientedBuffer = await autoOrient(await ensureSharpCompat(inputBuffer));
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
       const result = await blurFaces(orientedBuffer, join(workspacePath, "output"), {
