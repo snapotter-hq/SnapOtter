@@ -81,6 +81,24 @@ describe("connection-store", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("checkHealth transitions connected → disconnected on fetch failure", async () => {
+    fetchMock.mockImplementation(failHealth);
+    expect(useConnectionStore.getState().status).toBe("connected");
+    await useConnectionStore.getState().checkHealth();
+    expect(useConnectionStore.getState().status).toBe("disconnected");
+    expect(useConnectionStore.getState().failedSince).toBeTypeOf("number");
+  });
+
+  it("checkHealth transitions offline → reconnected on success", async () => {
+    fetchMock.mockImplementation(okHealth);
+    useConnectionStore.getState().setOffline();
+    expect(useConnectionStore.getState().status).toBe("offline");
+    await useConnectionStore.getState().checkHealth();
+    expect(useConnectionStore.getState().status).toBe("reconnected");
+    expect(useConnectionStore.getState().failedSince).toBeNull();
+    expect(useConnectionStore.getState().lastHealthCheck).toBeTypeOf("number");
+  });
+
   it("startPolling is idempotent", () => {
     useConnectionStore.getState().setDisconnected();
     useConnectionStore.getState().startPolling();

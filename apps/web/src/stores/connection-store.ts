@@ -51,6 +51,10 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         } else {
           set({ lastHealthCheck: Date.now() });
         }
+      } else {
+        if (get().status === "connected") {
+          get().setDisconnected();
+        }
       }
     } catch {
       if (get().status === "connected") {
