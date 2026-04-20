@@ -165,7 +165,6 @@ export const en = {
       description: "Convert images to base64 strings for embedding in HTML, CSS, and more",
     },
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
-    batch: { name: "Batch Processing", description: "Apply any tool to multiple images" },
   },
   settings: {
     title: "Settings",

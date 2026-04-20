@@ -38,6 +38,7 @@ export function getManifestPath(): string {
 // ── Directory setup ─────────────────────────────────────────────────────
 
 export function ensureAiDirs(): void {
+  if (!isDockerEnvironment()) return;
   mkdirSync(join(AI_DIR, "venv"), { recursive: true });
   mkdirSync(MODELS_DIR, { recursive: true });
   mkdirSync(join(AI_DIR, "pip-cache"), { recursive: true });

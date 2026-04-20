@@ -132,7 +132,7 @@
       "packages": {
         "common": ["codeformer-pip==0.0.4", "huggingface-hub", "einops"],
         "amd64": [
-          "torch==2.6.0+cu126 torchvision==0.21.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
+          "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
           "realesrgan==0.3.0"
         ],
@@ -207,7 +207,7 @@
         "amd64": [
           "onnxruntime-gpu==1.20.1",
           "mediapipe==0.10.21",
-          "torch==2.6.0+cu126 torchvision==0.21.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
+          "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
           "realesrgan==0.3.0"
         ],

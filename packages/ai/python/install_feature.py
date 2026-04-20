@@ -72,7 +72,7 @@ def cpu_fallback_packages(packages: list[str]) -> list[str]:
     result = []
     for pkg in packages:
         # Handle multi-package CUDA torch entries like:
-        # "torch==2.6.0+cu126 torchvision==0.21.0+cu126 --index-url ..."
+        # "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url ..."
         first_token = pkg.split()[0] if pkg.strip() else ""
         if first_token.startswith("torch==") and "+cu" in first_token:
             # Extract torch and torchvision versions, strip CUDA suffix
@@ -423,6 +423,11 @@ def write_installed_atomic(ai_dir: str, data: dict) -> None:
 
 
 def main() -> None:
+    if sys.version_info >= (3, 14):
+        print(f"[WARN] Python {sys.version_info.major}.{sys.version_info.minor} detected. "
+              f"Some packages may not have pre-built wheels. Build from source may be attempted.",
+              file=sys.stderr, flush=True)
+
     if len(sys.argv) < 4:
         fail(
             f"Usage: {sys.argv[0]} <bundleId> <manifestPath> <modelsDir>\n"

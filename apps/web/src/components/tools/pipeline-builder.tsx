@@ -27,7 +27,7 @@ import { getSettingsSummary } from "./pipeline-step-summary";
 
 /** Tools that can be used as pipeline steps (excludes pipeline/batch/multi-file tools). */
 const PIPELINE_TOOLS_BASE = TOOLS.filter(
-  (t) => !["pipeline", "batch", "compare", "find-duplicates", "collage", "compose"].includes(t.id),
+  (t) => !["pipeline", "compare", "find-duplicates", "collage", "compose"].includes(t.id),
 );
 
 interface PipelineBuilderProps {
