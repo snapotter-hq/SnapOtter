@@ -111,7 +111,7 @@ def main():
         model_path = _get_model_path()
 
         from gpu import safe_onnx_session
-        session = safe_onnx_session(model_path)
+        session, _device = safe_onnx_session(model_path)
 
         emit_progress(20, "Loading images")
         img = Image.open(input_path).convert("RGB")

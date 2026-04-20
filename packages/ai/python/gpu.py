@@ -1,8 +1,14 @@
 """Runtime GPU/CUDA detection utility."""
 import functools
+import json
 import os
 import subprocess
 import sys
+
+
+def emit_info(msg):
+    """Emit an informational JSON message to stderr for the bridge to capture."""
+    print(json.dumps({"info": msg}), file=sys.stderr, flush=True)
 
 
 @functools.lru_cache(maxsize=1)
@@ -51,24 +57,34 @@ def gpu_available():
 
 
 def onnx_providers():
-    """Return ONNX Runtime execution providers in priority order."""
+    """Return (providers, device) tuple.
+
+    providers: ONNX Runtime execution providers in priority order.
+    device: "cuda" or "cpu" — reflects which hardware will actually be used.
+    """
     if gpu_available():
-        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    return ["CPUExecutionProvider"]
+        return (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
+    emit_info("No GPU detected, processing on CPU")
+    return (["CPUExecutionProvider"], "cpu")
 
 
 def safe_onnx_session(model_path, providers=None):
-    """Create an ONNX Runtime InferenceSession with graceful CUDA EP fallback."""
+    """Create an ONNX Runtime InferenceSession with graceful CUDA EP fallback.
+
+    Returns (session, device) where device is "cuda" or "cpu".
+    """
     import onnxruntime as ort
 
+    device = "cpu"
     if providers is None:
-        providers = onnx_providers()
+        providers, device = onnx_providers()
 
     try:
-        return ort.InferenceSession(model_path, providers=providers)
+        session = ort.InferenceSession(model_path, providers=providers)
+        return session, device
     except Exception as e:
         if "CUDAExecutionProvider" in providers:
-            print(f"[gpu] CUDA EP init failed ({e}), falling back to CPU",
-                  file=sys.stderr, flush=True)
-            return ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+            emit_info(f"CUDA init failed ({e}), falling back to CPU")
+            session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+            return session, "cpu"
         raise

@@ -126,32 +126,30 @@ def main():
                     result = Image.fromarray(output_array)
                     method = "realesrgan"
 
-                    # Face enhancement with GFPGAN
                     if face_enhance:
                         emit_progress(82, "Enhancing faces")
-                        try:
-                            from gfpgan import GFPGANer
+                        from gfpgan import GFPGANer
 
-                            if os.path.exists(GFPGAN_MODEL_PATH):
-                                face_enhancer = GFPGANer(
-                                    model_path=GFPGAN_MODEL_PATH,
-                                    upscale=scale,
-                                    arch="clean",
-                                    channel_multiplier=2,
-                                    bg_upsampler=upsampler,
-                                )
-                                _, _, face_output = face_enhancer.enhance(
-                                    img_array,
-                                    has_aligned=False,
-                                    only_center_face=False,
-                                    paste_back=True,
-                                )
-                                result = Image.fromarray(face_output)
-                                emit_progress(88, "Face enhancement complete")
-                            else:
-                                emit_progress(88, "Face model not found, skipping")
-                        except (ImportError, RuntimeError, OSError):
-                            emit_progress(88, "Face enhancement unavailable, skipping")
+                        if not os.path.exists(GFPGAN_MODEL_PATH):
+                            raise FileNotFoundError(
+                                f"GFPGAN model not found at {GFPGAN_MODEL_PATH}. "
+                                "Install the upscale-enhance feature or disable faceEnhance."
+                            )
+                        face_enhancer = GFPGANer(
+                            model_path=GFPGAN_MODEL_PATH,
+                            upscale=scale,
+                            arch="clean",
+                            channel_multiplier=2,
+                            bg_upsampler=upsampler,
+                        )
+                        _, _, face_output = face_enhancer.enhance(
+                            img_array,
+                            has_aligned=False,
+                            only_center_face=False,
+                            paste_back=True,
+                        )
+                        result = Image.fromarray(face_output)
+                        emit_progress(88, "Face enhancement complete")
 
                 finally:
                     # Restore stdout after ALL AI processing
@@ -164,18 +162,22 @@ def main():
                 import traceback
                 print(f"[upscale] Real-ESRGAN failed: {e}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
-                if model_choice == "realesrgan":
-                    # User explicitly requested realesrgan — fail, don't degrade
-                    raise RuntimeError(f"Real-ESRGAN unavailable: {e}") from e
-                result = None
+                print(json.dumps({
+                    "success": False,
+                    "error": (
+                        f"Real-ESRGAN is not available: {e}. "
+                        "Install the upscale-enhance feature or use model=lanczos for basic upscaling."
+                    ),
+                }))
+                sys.exit(1)
 
-        # Lanczos path: used when explicitly requested or as auto fallback
-        if result is None:
-            if model_choice not in ("auto", "lanczos"):
-                raise RuntimeError(f"Requested model '{model_choice}' is not available")
+        if result is None and model_choice == "lanczos":
             emit_progress(50, "Upscaling with Lanczos")
             result = img.resize(new_size, Image.LANCZOS)
             method = "lanczos"
+
+        if result is None:
+            raise RuntimeError(f"Requested model '{model_choice}' is not available")
 
         # Denoise
         if denoise_strength > 0:

@@ -76,14 +76,15 @@ def main():
 
         emit_progress(10, "Loading model")
 
-        providers = onnx_providers()
+        providers, device = onnx_providers()
         try:
             session = new_session(model, providers=providers)
         except Exception as e:
             if "CUDAExecutionProvider" in providers:
-                print(f"[remove-bg] GPU session failed ({e}), falling back to CPU",
-                      file=sys.stderr, flush=True)
+                from gpu import emit_info
+                emit_info(f"GPU session failed ({e}), falling back to CPU")
                 session = new_session(model, providers=["CPUExecutionProvider"])
+                device = "cpu"
             else:
                 raise
 
@@ -92,7 +93,6 @@ def main():
         with open(input_path, "rb") as f:
             input_data = f.read()
 
-        # Try with alpha matting for better edges, fall back without
         emit_progress(30, "Analyzing image")
         try:
             output_data = remove(
@@ -103,8 +103,9 @@ def main():
                 alpha_matting_background_threshold=10,
             )
         except Exception as e:
-            print(f"[remove-bg] Alpha matting failed ({e}), using standard removal", file=sys.stderr, flush=True)
-            output_data = remove(input_data, session=session)
+            raise RuntimeError(
+                f"Alpha matting failed: {e}. Try again without alpha matting or with a different model."
+            ) from e
 
         emit_progress(80, "Background removed")
 
@@ -115,7 +116,7 @@ def main():
         with open(output_path, "wb") as f:
             f.write(output_data)
 
-        result = json.dumps({"success": True, "model": model})
+        result = json.dumps({"success": True, "model": model, "device": device})
 
     except ImportError as e:
         print(f"[remove-bg] Import failed: {e}", file=sys.stderr, flush=True)

@@ -270,19 +270,18 @@ def main():
                 model_used = "codeformer"
 
             elif model_choice == "auto":
-                # Try CodeFormer first, fall back to GFPGAN.
-                # Catch broad Exception because codeformer-pip can fail in
-                # unexpected ways (AttributeError, TypeError, etc.)
                 try:
                     fidelity_weight = 1.0 - strength
                     enhanced = enhance_with_codeformer(img_array, fidelity_weight)
                     model_used = "codeformer"
                 except Exception as e:
                     import traceback
-                    print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {e}", file=sys.stderr, flush=True)
+                    print(f"[enhance-faces] CodeFormer failed: {e}", file=sys.stderr, flush=True)
                     traceback.print_exc(file=sys.stderr)
-                    enhanced = enhance_with_gfpgan(img_array, only_center_face)
-                    model_used = "gfpgan"
+                    raise RuntimeError(
+                        f"CodeFormer is not available: {e}. "
+                        "Install the face-enhance feature or use model=gfpgan."
+                    ) from e
 
         finally:
             # Restore stdout after ALL AI processing

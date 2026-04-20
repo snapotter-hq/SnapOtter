@@ -245,19 +245,23 @@ def main():
                 text = run_paddleocr_v5(input_path, language)
                 engine_used = "paddleocr-v5"
             except ImportError as e:
-                print(json.dumps({"success": False, "error": f"PaddleOCR is not installed: {e}"}))
+                print(json.dumps({
+                    "success": False,
+                    "error": (
+                        f"PaddleOCR is not installed: {e}. "
+                        "Install the OCR feature or use quality=fast for Tesseract."
+                    ),
+                }))
                 sys.exit(1)
             except Exception as e:
                 print(json.dumps({
-                    "warning": f"PaddleOCR PP-OCRv5 failed ({type(e).__name__}: {e}), falling back to Tesseract"
-                }), file=sys.stderr, flush=True)
-                emit_progress(25, "PaddleOCR failed, falling back to Tesseract")
-                try:
-                    text = run_tesseract(input_path, language, is_auto=was_auto)
-                    engine_used = "tesseract (fallback from balanced)"
-                except FileNotFoundError:
-                    print(json.dumps({"success": False, "error": "OCR engines unavailable: PaddleOCR failed and Tesseract is not installed"}))
-                    sys.exit(1)
+                    "success": False,
+                    "error": (
+                        f"PaddleOCR PP-OCRv5 failed: {type(e).__name__}: {e}. "
+                        "Install the OCR feature or use quality=fast for Tesseract."
+                    ),
+                }))
+                sys.exit(1)
 
         elif quality == "best":
             try:
@@ -265,34 +269,22 @@ def main():
                 engine_used = "paddleocr-vl"
             except ImportError as e:
                 print(json.dumps({
-                    "warning": f"PaddleOCR-VL not available ({e}), trying PP-OCRv5"
-                }), file=sys.stderr, flush=True)
-                emit_progress(20, "VL model unavailable, trying PP-OCRv5")
-                try:
-                    text = run_paddleocr_v5(input_path, language)
-                    engine_used = "paddleocr-v5 (fallback from best)"
-                except Exception as e2:
-                    print(json.dumps({
-                        "warning": f"PP-OCRv5 also failed ({type(e2).__name__}: {e2}), falling back to Tesseract"
-                    }), file=sys.stderr, flush=True)
-                    emit_progress(25, "PP-OCRv5 failed, falling back to Tesseract")
-                    text = run_tesseract(input_path, language, is_auto=was_auto)
-                    engine_used = "tesseract (fallback from best)"
+                    "success": False,
+                    "error": (
+                        f"PaddleOCR-VL is not available: {e}. "
+                        "Install the OCR feature or use quality=balanced for PP-OCRv5."
+                    ),
+                }))
+                sys.exit(1)
             except Exception as e:
                 print(json.dumps({
-                    "warning": f"PaddleOCR-VL failed ({type(e).__name__}: {e}), trying PP-OCRv5"
-                }), file=sys.stderr, flush=True)
-                emit_progress(20, "VL model failed, trying PP-OCRv5")
-                try:
-                    text = run_paddleocr_v5(input_path, language)
-                    engine_used = "paddleocr-v5 (fallback from best)"
-                except Exception as e2:
-                    print(json.dumps({
-                        "warning": f"PP-OCRv5 also failed ({type(e2).__name__}: {e2}), falling back to Tesseract"
-                    }), file=sys.stderr, flush=True)
-                    emit_progress(25, "PP-OCRv5 failed, falling back to Tesseract")
-                    text = run_tesseract(input_path, language, is_auto=was_auto)
-                    engine_used = "tesseract (fallback from best)"
+                    "success": False,
+                    "error": (
+                        f"PaddleOCR-VL failed: {type(e).__name__}: {e}. "
+                        "Install the OCR feature or use quality=balanced for PP-OCRv5."
+                    ),
+                }))
+                sys.exit(1)
 
         else:
             print(json.dumps({"success": False, "error": f"Unknown quality: {quality}"}))

@@ -54,14 +54,14 @@ def extract_key_points(lms):
 
 # ── Old API: mp.solutions (mediapipe < 0.10.30) ───────────────────
 
-def detect_with_solutions(img_array):
+def detect_with_solutions(img_array, max_faces=1):
     """Use the legacy mp.solutions.face_mesh API."""
     import mediapipe as mp
 
     mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(
         static_image_mode=True,
-        max_num_faces=1,
+        max_num_faces=max_faces,
         refine_landmarks=True,
         min_detection_confidence=0.5,
     )
@@ -99,7 +99,7 @@ def ensure_model():
     return MODEL_PATH
 
 
-def detect_with_tasks(img_path):
+def detect_with_tasks(img_path, max_faces=1):
     """Use the new mp.tasks.vision.FaceLandmarker API."""
     import mediapipe as mp
 
@@ -108,7 +108,7 @@ def detect_with_tasks(img_path):
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
-        num_faces=1,
+        num_faces=max_faces,
         min_face_detection_confidence=0.5,
         output_face_blendshapes=False,
         output_facial_transformation_matrixes=False,
@@ -133,6 +133,8 @@ def main():
     output_path = sys.argv[2]  # unused but kept for bridge.ts compatibility
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 
+    max_faces = settings.get("max_num_faces", 1)
+
     try:
         emit_progress(10, "Loading image")
         from PIL import Image
@@ -146,16 +148,14 @@ def main():
 
             emit_progress(20, "Initializing face mesh")
 
-            # Try the legacy solutions API first (Docker / older mediapipe),
-            # fall back to the tasks API (newer mediapipe versions).
             landmarks_list = None
             try:
                 img_array = np.array(img)
                 emit_progress(30, "Detecting face landmarks")
-                landmarks_list = detect_with_solutions(img_array)
+                landmarks_list = detect_with_solutions(img_array, max_faces)
             except AttributeError:
                 emit_progress(30, "Detecting face landmarks")
-                landmarks_list = detect_with_tasks(input_path)
+                landmarks_list = detect_with_tasks(input_path, max_faces)
 
             if landmarks_list is None:
                 print(json.dumps({

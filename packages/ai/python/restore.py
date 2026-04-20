@@ -155,7 +155,7 @@ def inpaint_damage(img_bgr, mask):
     from gpu import safe_onnx_session
 
     model_path = _get_lama_path()
-    session = safe_onnx_session(model_path)
+    session, _device = safe_onnx_session(model_path)
 
     orig_h, orig_w = img_bgr.shape[:2]
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
@@ -317,7 +317,7 @@ def enhance_faces(img_bgr, fidelity=0.7):
 
     # Load CodeFormer model
     model_path = _get_codeformer_path()
-    session = safe_onnx_session(model_path)
+    session, _device = safe_onnx_session(model_path)
     input_names = [inp.name for inp in session.get_inputs()]
 
     result = img_bgr.copy()
@@ -329,8 +329,7 @@ def enhance_faces(img_bgr, fidelity=0.7):
         w = face_box["w"]
         h = face_box["h"]
 
-        # Skip very small faces (under 48px) - enhancement won't help
-        if w < 48 or h < 48:
+        if w < 24 or h < 24:
             continue
 
         # Expand bounding box by ~80% for hair, forehead, chin
@@ -473,7 +472,7 @@ def colorize_bw(img_bgr, intensity=0.85):
     if not os.path.exists(DDCOLOR_MODEL_PATH):
         return img_bgr, False
 
-    session = safe_onnx_session(DDCOLOR_MODEL_PATH)
+    session, _device = safe_onnx_session(DDCOLOR_MODEL_PATH)
     input_name = session.get_inputs()[0].name
     input_shape = session.get_inputs()[0].shape
     model_size = (
@@ -545,6 +544,9 @@ def main():
         scratch_sensitivity = "medium"
 
     try:
+        from gpu import gpu_available
+        device = "cuda" if gpu_available() else "cpu"
+
         emit_progress(5, "Opening image")
         img_bgr = cv2.imread(input_path, cv2.IMREAD_COLOR)
         if img_bgr is None:
@@ -633,6 +635,7 @@ def main():
             "facesEnhanced": faces_found,
             "isGrayscale": bw_detected,
             "colorized": colorized,
+            "device": device,
             "output_path": output_path,
         }))
 

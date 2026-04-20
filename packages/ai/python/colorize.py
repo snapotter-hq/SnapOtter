@@ -50,7 +50,7 @@ def colorize_ddcolor(img_bgr, intensity):
 
     emit_progress(15, "Loading DDColor model")
 
-    session = safe_onnx_session(DDCOLOR_MODEL_PATH)
+    session, _device = safe_onnx_session(DDCOLOR_MODEL_PATH)
     input_name = session.get_inputs()[0].name
     input_shape = session.get_inputs()[0].shape
     # Dynamic dims are strings ('w', 'h'), so default to 512 if not int
@@ -181,41 +181,39 @@ def main():
         result_bgr = None
         method = "unknown"
 
-        # Try DDColor first
         if model_choice in ("auto", "ddcolor"):
             try:
-                if os.path.exists(DDCOLOR_MODEL_PATH):
-                    result_bgr, method = colorize_ddcolor(img_bgr, intensity)
-                elif model_choice == "ddcolor":
+                if not os.path.exists(DDCOLOR_MODEL_PATH):
                     raise FileNotFoundError(f"DDColor model not found: {DDCOLOR_MODEL_PATH}")
+                result_bgr, method = colorize_ddcolor(img_bgr, intensity)
             except Exception as e:
                 import traceback
                 print(f"[colorize] DDColor failed: {e}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
-                if model_choice == "ddcolor":
-                    # User explicitly requested ddcolor — fail, don't degrade
-                    raise
-                result_bgr = None
+                print(json.dumps({
+                    "success": False,
+                    "error": (
+                        f"DDColor is not available: {e}. "
+                        "Install the colorize feature or use model=opencv for basic colorization."
+                    ),
+                }))
+                sys.exit(1)
 
-        # Try OpenCV fallback only in auto mode
-        if result_bgr is None and model_choice in ("auto", "opencv"):
+        elif model_choice == "opencv":
             try:
-                if os.path.exists(OPENCV_PROTO_PATH) and os.path.exists(OPENCV_MODEL_PATH):
-                    result_bgr, method = colorize_opencv(img_bgr, intensity)
-                elif model_choice == "opencv":
+                if not (os.path.exists(OPENCV_PROTO_PATH) and os.path.exists(OPENCV_MODEL_PATH)):
                     raise FileNotFoundError(f"OpenCV colorize models not found: {OPENCV_PROTO_PATH}")
+                result_bgr, method = colorize_opencv(img_bgr, intensity)
             except Exception as e:
                 import traceback
-                print(f"[colorize] OpenCV fallback failed: {e}", file=sys.stderr, flush=True)
+                print(f"[colorize] OpenCV failed: {e}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
-                if model_choice == "opencv":
-                    raise
-                result_bgr = None
+                raise
 
-        if result_bgr is None:
+        else:
             print(json.dumps({
                 "success": False,
-                "error": "No colorization model available. Install DDColor or OpenCV models.",
+                "error": f"Unknown model '{model_choice}'. Use 'auto', 'ddcolor', or 'opencv'.",
             }))
             sys.exit(1)
 
