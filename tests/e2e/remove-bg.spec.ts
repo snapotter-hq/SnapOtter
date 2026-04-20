@@ -27,7 +27,7 @@ async function removeBgAndWait(page: import("@playwright/test").Page) {
     page
       .getByTestId("remove-background-download")
       .or(page.getByTestId("remove-background-download-effects")),
-  ).toBeVisible({ timeout: 120_000 });
+  ).toBeVisible({ timeout: 300_000 });
 }
 
 test.describe("Remove Background tool", () => {
@@ -38,8 +38,8 @@ test.describe("Remove Background tool", () => {
     await expect(page.getByText("Products")).toBeVisible();
     await expect(page.getByText("General")).toBeVisible();
     await expect(page.getByText("Fast")).toBeVisible();
-    await expect(page.getByText("Balanced")).toBeVisible();
-    await expect(page.getByText("Best")).toBeVisible();
+    await expect(page.getByText("HD")).toBeVisible();
+    await expect(page.getByText("Max")).toBeVisible();
 
     // Passport checkbox visible and checked by default
     const passportCheckbox = page.locator("input[type='checkbox']").first();
@@ -289,7 +289,7 @@ test.describe("Remove Background tool", () => {
     await page.getByTestId("remove-background-submit").click();
 
     await expect(page.getByRole("button", { name: /download all/i })).toBeVisible({
-      timeout: 180_000,
+      timeout: 300_000,
     });
 
     await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({

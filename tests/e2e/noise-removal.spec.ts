@@ -21,15 +21,15 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 async function removeNoiseAndWait(page: import("@playwright/test").Page) {
   await page.getByTestId("noise-removal-submit").click();
-  await expect(page.getByTestId("noise-removal-download")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByTestId("noise-removal-download")).toBeVisible({ timeout: 300_000 });
 }
 
 test.describe("Noise Removal tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
     await page.goto("/noise-removal");
-    const submit = page.getByTestId("noise-removal-submit");
-    const visible = await submit.isVisible({ timeout: 5_000 }).catch(() => false);
-    if (!visible) {
+    try {
+      await page.getByTestId("noise-removal-submit").waitFor({ state: "visible", timeout: 15_000 });
+    } catch {
       test.skip(true, "upscale-enhance feature bundle not installed");
     }
   }

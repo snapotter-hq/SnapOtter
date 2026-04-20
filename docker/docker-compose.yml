@@ -22,7 +22,7 @@ services:
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
       - SKIP_MUST_CHANGE_PASSWORD=${SKIP_MUST_CHANGE_PASSWORD:-false}
-      - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-100}
+      - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-50000}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]

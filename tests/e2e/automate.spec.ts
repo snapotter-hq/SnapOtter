@@ -183,6 +183,25 @@ test.describe("Automate Page", () => {
   });
 
   test("can save a pipeline and see it as a chip", async ({ loggedInPage: page }) => {
+    // Clean up stale E2E pipelines from previous runs to avoid overflow hiding new ones
+    const apiUrl = process.env.API_URL || "http://localhost:13490";
+    const loginRes = await fetch(`${apiUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: "admin" }),
+    });
+    const { token } = await loginRes.json();
+    const listRes = await fetch(`${apiUrl}/api/v1/pipeline/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const { pipelines } = await listRes.json();
+    for (const p of pipelines.filter((p: { name: string }) => p.name.startsWith("E2E Pipeline"))) {
+      await fetch(`${apiUrl}/api/v1/pipeline/${p.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+
     await gotoAutomate(page);
     await addToolStep(page, "Resize", 1);
     await addToolStep(page, "Compress", 2);

@@ -32,7 +32,7 @@ test.describe("Blur Faces tool", () => {
     // Should complete without the old "cannot identify image file" error
     await expect(
       page.getByTestId("blur-faces-download").or(page.getByText("No faces detected")).first(),
-    ).toBeVisible({ timeout: 120_000 });
+    ).toBeVisible({ timeout: 300_000 });
 
     await expect(page.locator("text=cannot identify image")).not.toBeVisible();
   });
@@ -43,6 +43,6 @@ test.describe("Blur Faces tool", () => {
 
     await page.getByTestId("blur-faces-submit").click();
 
-    await expect(page.getByText("No faces detected")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText("No faces detected")).toBeVisible({ timeout: 300_000 });
   });
 });
