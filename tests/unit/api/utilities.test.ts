@@ -821,6 +821,46 @@ function sanitizeFilename(raw: string): string {
   if (!name || name === "." || name === "..") {
     name = "upload";
   }
+
+  // Guard against double-extension attacks (e.g. "image.png.php").
+  const dotIndex = name.indexOf(".");
+  if (dotIndex !== -1) {
+    const parts = name.split(".");
+    const SAFE_IMAGE_EXTENSIONS = new Set([
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".tif",
+      ".avif",
+      ".svg",
+      ".pdf",
+    ]);
+    for (let i = 1; i < parts.length; i++) {
+      const ext = `.${parts[i].toLowerCase()}`;
+      if (SAFE_IMAGE_EXTENSIONS.has(ext)) {
+        name = parts.slice(0, i + 1).join(".");
+        break;
+      }
+    }
+  }
+
+  // Truncate to filesystem-safe length (255 byte NAME_MAX minus margin for _toolId suffix)
+  const MAX_NAME_BYTES = 200;
+  const enc = new TextEncoder();
+  if (enc.encode(name).length > MAX_NAME_BYTES) {
+    const dotIdx = name.lastIndexOf(".");
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+    let base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    while (enc.encode(base + ext).length > MAX_NAME_BYTES) {
+      base = base.slice(0, -1);
+    }
+    name = base + ext;
+  }
+
   return name;
 }
 
@@ -961,9 +1001,18 @@ describe("sanitizeFilename", () => {
     expect(sanitizeFilename("my..file..name.png")).toBe("myfilename.png");
   });
 
-  it("handles very long filenames", () => {
+  it("handles very long filenames by truncating to filesystem-safe length", () => {
     const longName = "a".repeat(500) + ".png";
-    expect(sanitizeFilename(longName)).toBe(longName);
+    const result = sanitizeFilename(longName);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(200);
+    expect(result).toMatch(/\.png$/);
+  });
+
+  it("truncates very long filenames to filesystem-safe length", () => {
+    const longName = "a".repeat(300) + ".jpg";
+    const result = sanitizeFilename(longName);
+    expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(200);
+    expect(result).toMatch(/\.jpg$/);
   });
 
   it("handles filename with only extension", () => {

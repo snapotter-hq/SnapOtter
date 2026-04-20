@@ -17,6 +17,7 @@ const FORMAT_MAP: Record<
   gif: { format: "gif", extension: "gif", contentType: "image/gif" },
   tiff: { format: "tiff", extension: "tiff", contentType: "image/tiff" },
   avif: { format: "avif", extension: "avif", contentType: "image/avif" },
+  heif: { format: "avif", extension: "avif", contentType: "image/avif" },
 };
 
 const DEFAULT_QUALITY = 95;

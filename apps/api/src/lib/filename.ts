@@ -45,5 +45,18 @@ export function sanitizeFilename(raw: string): string {
     }
   }
 
+  // Truncate to filesystem-safe length (255 byte NAME_MAX minus margin for _toolId suffix)
+  const MAX_NAME_BYTES = 200;
+  const enc = new TextEncoder();
+  if (enc.encode(name).length > MAX_NAME_BYTES) {
+    const dotIdx = name.lastIndexOf(".");
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+    let base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    while (enc.encode(base + ext).length > MAX_NAME_BYTES) {
+      base = base.slice(0, -1);
+    }
+    name = base + ext;
+  }
+
   return name;
 }

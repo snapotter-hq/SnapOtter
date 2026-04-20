@@ -2,6 +2,7 @@ import { compress } from "@ashim/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -16,6 +17,7 @@ export function registerCompress(app: FastifyInstance) {
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const image = sharp(inputBuffer);
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
 
       const compressOptions: {
         quality?: number;
@@ -31,7 +33,7 @@ export function registerCompress(app: FastifyInstance) {
 
       const result = await compress(image, compressOptions);
       const buffer = await result.toBuffer();
-      return { buffer, filename, contentType: "image/jpeg" };
+      return { buffer, filename, contentType: outputFormat.contentType };
     },
   });
 }

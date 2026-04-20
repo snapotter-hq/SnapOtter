@@ -6,6 +6,7 @@ const FORMAT_MAP: Record<string, string> = {
   png: "png",
   webp: "webp",
   avif: "avif",
+  heif: "avif",
   tiff: "tiff",
   gif: "gif",
 };

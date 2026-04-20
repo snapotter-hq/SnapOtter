@@ -297,6 +297,9 @@ export const useFileStore = create<FileState>((set, get) => ({
     }));
     set({
       entries: resetEntries,
+      batchZipBlob: null,
+      batchZipFilename: null,
+      processing: false,
       error: null,
       files: deriveFiles(resetEntries),
       ...deriveSelected(resetEntries, selectedIndex),

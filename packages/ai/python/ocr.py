@@ -3,6 +3,17 @@ import sys
 import json
 import os
 
+# Prevent PaddlePaddle C++ runtime from probing for CUDA on CPU-only systems.
+# Without these, paddlepaddle-gpu can segfault during import on machines without
+# a GPU, because the C++ layer attempts GPU initialization before Python-level
+# device routing takes effect.  Must run before any PaddleOCR import.
+from gpu import gpu_available as _gpu_available
+if not _gpu_available():
+    if not os.environ.get("FLAGS_use_cuda"):
+        os.environ["FLAGS_use_cuda"] = "0"
+    if not os.environ.get("FLAGS_use_cudnn"):
+        os.environ["FLAGS_use_cudnn"] = "0"
+
 # Lazy-loaded VLM instance (stays resident in dispatcher process)
 _paddleocr_vl_instance = None
 
