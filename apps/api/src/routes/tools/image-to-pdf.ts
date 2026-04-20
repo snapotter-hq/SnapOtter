@@ -13,7 +13,7 @@ import { createWorkspace } from "../../lib/workspace.js";
 const settingsSchema = z.object({
   pageSize: z.enum(["A4", "Letter", "A3", "A5"]).default("A4"),
   orientation: z.enum(["portrait", "landscape"]).default("portrait"),
-  margin: z.number().min(0).max(100).default(20),
+  margin: z.number().min(0).max(500).default(20),
 });
 
 const PAGE_SIZES: Record<string, [number, number]> = {

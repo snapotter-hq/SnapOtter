@@ -9,8 +9,8 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 const settingsSchema = z.object({
-  columns: z.number().min(1).max(20).default(3),
-  rows: z.number().min(1).max(20).default(3),
+  columns: z.number().min(1).max(100).default(3),
+  rows: z.number().min(1).max(100).default(3),
   tileWidth: z.number().min(10).optional(),
   tileHeight: z.number().min(10).optional(),
   outputFormat: z.enum(["original", "png", "jpg", "webp"]).default("original"),
@@ -89,8 +89,8 @@ export function registerSplit(app: FastifyInstance) {
         cols = Math.max(1, Math.ceil(fullW / settings.tileWidth));
         rows = Math.max(1, Math.ceil(fullH / settings.tileHeight));
       }
-      cols = Math.min(cols, 20);
-      rows = Math.min(rows, 20);
+      cols = Math.min(cols, 100);
+      rows = Math.min(rows, 100);
 
       const cellW = Math.floor(fullW / cols);
       const cellH = Math.floor(fullH / rows);

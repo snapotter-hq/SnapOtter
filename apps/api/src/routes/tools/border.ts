@@ -6,13 +6,13 @@ import { createToolRoute } from "../tool-factory.js";
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 const settingsSchema = z.object({
-  borderWidth: z.number().min(0).max(200).default(10),
+  borderWidth: z.number().min(0).max(2000).default(10),
   borderColor: hexColor.default("#000000"),
   padding: z.number().min(0).max(200).default(0),
   paddingColor: hexColor.default("#FFFFFF"),
-  cornerRadius: z.number().min(0).max(500).default(0),
+  cornerRadius: z.number().min(0).max(2000).default(0),
   shadow: z.boolean().default(false),
-  shadowBlur: z.number().min(1).max(50).default(15),
+  shadowBlur: z.number().min(1).max(200).default(15),
   shadowOffsetX: z.number().min(-50).max(50).default(0),
   shadowOffsetY: z.number().min(-50).max(50).default(5),
   shadowColor: hexColor.default("#000000"),

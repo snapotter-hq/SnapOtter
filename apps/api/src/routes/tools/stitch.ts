@@ -14,12 +14,12 @@ const MAX_CANVAS_PIXELS = 100_000_000;
 
 const settingsSchema = z.object({
   direction: z.enum(["horizontal", "vertical", "grid"]).default("horizontal"),
-  gridColumns: z.number().int().min(2).max(10).default(2),
+  gridColumns: z.number().int().min(2).max(100).default(2),
   resizeMode: z.enum(["fit", "original", "stretch", "crop"]).default("fit"),
   alignment: z.enum(["start", "center", "end"]).default("center"),
-  gap: z.number().min(0).max(200).default(0),
-  border: z.number().min(0).max(50).default(0),
-  cornerRadius: z.number().min(0).max(50).default(0),
+  gap: z.number().min(0).max(1000).default(0),
+  border: z.number().min(0).max(500).default(0),
+  cornerRadius: z.number().min(0).max(500).default(0),
   backgroundColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)

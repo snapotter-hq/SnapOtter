@@ -6,7 +6,7 @@ import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
 
 const settingsSchema = z.object({
-  pattern: z.string().min(1).max(200).default("image-{{index}}"),
+  pattern: z.string().min(1).max(1000).default("image-{{index}}"),
   startIndex: z.number().min(0).default(1),
 });
 

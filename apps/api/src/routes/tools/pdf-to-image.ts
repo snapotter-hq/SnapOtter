@@ -14,7 +14,7 @@ import { createWorkspace } from "../../lib/workspace.js";
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
   format: z.enum(["png", "jpg", "webp", "avif", "tiff", "gif", "heic", "heif"]).default("png"),
-  dpi: z.number().min(36).max(1200).default(150),
+  dpi: z.number().min(36).max(2400).default(150),
   quality: z.number().min(1).max(100).default(85),
   colorMode: z.enum(["color", "grayscale", "bw"]).default("color"),
   pages: z.string().default("all"),

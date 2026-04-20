@@ -36,7 +36,7 @@ const generateSettingsSchema = z.object({
   bgColor: z.string().default("#FFFFFF"),
   printLayout: z.string().default("none"),
   maxFileSizeKb: z.number().default(0),
-  dpi: z.number().min(72).max(600).default(300),
+  dpi: z.number().min(72).max(1200).default(300),
   customWidthMm: z.number().optional(),
   customHeightMm: z.number().optional(),
   zoom: z.number().min(0.5).max(3).default(1),

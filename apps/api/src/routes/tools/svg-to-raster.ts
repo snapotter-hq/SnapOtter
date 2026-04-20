@@ -17,9 +17,9 @@ import { updateJobProgress } from "../progress.js";
 const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
 
 const settingsSchema = z.object({
-  width: z.number().min(1).max(16384).optional(),
-  height: z.number().min(1).max(16384).optional(),
-  dpi: z.number().min(36).max(1200).default(300),
+  width: z.number().min(1).max(65536).optional(),
+  height: z.number().min(1).max(65536).optional(),
+  dpi: z.number().min(36).max(2400).default(300),
   quality: z.number().min(1).max(100).default(90),
   backgroundColor: z
     .string()

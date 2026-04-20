@@ -14,9 +14,9 @@ import { createWorkspace } from "../../lib/workspace.js";
 const settingsSchema = z.object({
   colorMode: z.enum(["bw", "color"]).default("bw"),
   threshold: z.number().min(0).max(255).default(128),
-  colorPrecision: z.number().min(1).max(8).default(6),
-  layerDifference: z.number().min(1).max(64).default(6),
-  filterSpeckle: z.number().min(1).max(128).default(4),
+  colorPrecision: z.number().min(1).max(16).default(6),
+  layerDifference: z.number().min(1).max(128).default(6),
+  filterSpeckle: z.number().min(1).max(256).default(4),
   pathMode: z.enum(["none", "polygon", "spline"]).default("spline"),
   cornerThreshold: z.number().min(0).max(180).default(60),
   invert: z.boolean().default(false),

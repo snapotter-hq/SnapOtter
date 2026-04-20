@@ -65,8 +65,8 @@ const settingsSchema = z.object({
   mode: z.enum(["resize", "optimize", "speed", "reverse", "extract", "rotate"]).default("resize"),
 
   // Resize
-  width: z.number().min(1).max(4096).optional(),
-  height: z.number().min(1).max(4096).optional(),
+  width: z.number().min(1).max(16384).optional(),
+  height: z.number().min(1).max(16384).optional(),
   percentage: z.number().min(1).max(500).optional(),
 
   // Optimize

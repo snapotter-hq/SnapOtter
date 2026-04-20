@@ -5,7 +5,7 @@ import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   text: z.string().min(1).max(500),
-  fontSize: z.number().min(8).max(200).default(48),
+  fontSize: z.number().min(8).max(1000).default(48),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)

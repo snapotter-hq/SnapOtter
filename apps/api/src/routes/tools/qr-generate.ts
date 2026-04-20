@@ -9,7 +9,7 @@ import { createWorkspace } from "../../lib/workspace.js";
 
 const settingsSchema = z.object({
   text: z.string().min(1).max(2000),
-  size: z.number().min(100).max(2000).default(400),
+  size: z.number().min(100).max(10000).default(400),
   errorCorrection: z.enum(["L", "M", "Q", "H"]).default("M"),
   foreground: z
     .string()

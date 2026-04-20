@@ -44,8 +44,8 @@ const pipelineDefinitionSchema = z.object({
 
 /** Schema for saving a pipeline. */
 const savePipelineSchema = z.object({
-  name: z.string().min(1, "Pipeline name is required").max(100),
-  description: z.string().max(500).optional(),
+  name: z.string().min(1, "Pipeline name is required").max(255),
+  description: z.string().max(2000).optional(),
   steps: z
     .array(pipelineStepSchema)
     .min(1, "Pipeline must have at least one step")

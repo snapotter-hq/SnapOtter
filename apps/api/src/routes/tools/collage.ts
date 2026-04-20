@@ -321,15 +321,15 @@ const cellSchema = z.object({
   imageIndex: z.number().int().min(0),
   panX: z.number().min(-100).max(100).default(0),
   panY: z.number().min(-100).max(100).default(0),
-  zoom: z.number().min(1).max(3).default(1),
+  zoom: z.number().min(1).max(10).default(1),
   objectFit: z.enum(["cover", "contain"]).default("cover"),
 });
 
 const settingsSchema = z.object({
   templateId: z.string(),
   cells: z.array(cellSchema).optional(),
-  gap: z.number().min(0).max(50).default(8),
-  cornerRadius: z.number().min(0).max(30).default(0),
+  gap: z.number().min(0).max(500).default(8),
+  cornerRadius: z.number().min(0).max(500).default(0),
   backgroundColor: z.string().default("#FFFFFF"),
   aspectRatio: z.string().default("free"),
   outputFormat: z.enum(["png", "jpeg", "webp"]).default("png"),
