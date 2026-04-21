@@ -28,8 +28,46 @@ fi
 # Fix ownership of mounted volumes so the non-root ashim user can write.
 # This runs as root, fixes permissions, then drops to ashim via gosu.
 if [ "$(id -u)" = "0" ]; then
+  # PUID/PGID support: remap the ashim user/group to match host UID/GID.
+  # This prevents permission conflicts when using bind mounts.
+  PUID="${PUID:-$(id -u ashim)}"
+  PGID="${PGID:-$(id -g ashim)}"
+
+  if [ "$PUID" = "0" ] || [ "$PGID" = "0" ]; then
+    echo "WARNING: PUID=0 or PGID=0 would run the app as root. Ignoring — using default ashim UID/GID." >&2
+    PUID=$(id -u ashim)
+    PGID=$(id -g ashim)
+  fi
+
+  CUR_UID=$(id -u ashim)
+  CUR_GID=$(id -g ashim)
+
+  if [ "$CUR_UID" != "$PUID" ] || [ "$CUR_GID" != "$PGID" ]; then
+    # Evict any conflicting user/group that holds the target UID/GID.
+    # Delete user first (may cascade-delete its primary group).
+    if [ "$CUR_UID" != "$PUID" ]; then
+      EXISTING_USER=$(getent passwd "$PUID" 2>/dev/null | cut -d: -f1 || true)
+      if [ -n "$EXISTING_USER" ] && [ "$EXISTING_USER" != "ashim" ]; then
+        deluser "$EXISTING_USER" 2>/dev/null || userdel "$EXISTING_USER" 2>/dev/null || true
+      fi
+    fi
+    if [ "$CUR_GID" != "$PGID" ]; then
+      EXISTING_GROUP=$(getent group "$PGID" 2>/dev/null | cut -d: -f1 || true)
+      if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "ashim" ]; then
+        delgroup "$EXISTING_GROUP" 2>/dev/null || groupdel "$EXISTING_GROUP" 2>/dev/null || true
+      fi
+      groupmod -g "$PGID" ashim 2>/dev/null || true
+    fi
+    if [ "$CUR_UID" != "$PUID" ]; then
+      usermod -u "$PUID" ashim 2>/dev/null || true
+    fi
+  fi
+
+  # Chown writable directories (/data is the persistent volume, /tmp/workspace is ephemeral).
+  # /app and /opt/venv are read-only at runtime — no chown needed.
   chown -R ashim:ashim /data /tmp/workspace 2>&1 || \
     echo "WARNING: Could not fix volume permissions. Use named volumes (not Windows bind mounts) to avoid this. See docs for details." >&2
+
   exec gosu ashim "$@"
 fi
 

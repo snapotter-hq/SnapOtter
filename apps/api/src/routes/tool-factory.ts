@@ -110,6 +110,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let filename = "image";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
+      let fileCount = 0;
 
       // Parse multipart parts
       try {
@@ -117,6 +118,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         for await (const part of parts) {
           if (part.type === "file") {
+            fileCount++;
+            if (fileCount > 1) {
+              // Drain remaining parts to avoid hanging the connection
+              for await (const _ of part.file) {
+                /* drain */
+              }
+              continue;
+            }
             // Consume the file stream into a buffer
             const chunks: Buffer[] = [];
             for await (const chunk of part.file) {
@@ -138,6 +147,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         return reply.status(400).send({
           error: "Failed to parse multipart request",
           details: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      if (fileCount > 1) {
+        return reply.status(400).send({
+          error: `This endpoint processes one image at a time. Use /api/v1/tools/${config.toolId}/batch for multiple files.`,
         });
       }
 

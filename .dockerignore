@@ -1,23 +1,44 @@
 node_modules
 .git
+.gitignore
 .turbo
+.worktrees
 dist
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 .env
-.env.local
+.env.*
+!.env.example
 .DS_Store
+.mcp.json
+.superpowers
+docs/superpowers
+
+# Test artifacts
 test-results
 playwright-report
 blob-report
 tests
-docs
 coverage
-.superpowers
 *.tsbuildinfo
+MASTER_TEST_MATRIX.md
+
+# Docs (not needed in production image)
+docs
 *.md
 !README.md
+
+# CI/release/scripts
+.github
+.husky
+.releaserc.json
+scripts
+
+# IDE
+.vscode
+.idea
+
+# Test images
 test-*.png
-audit_report.md

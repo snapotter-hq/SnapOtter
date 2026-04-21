@@ -42,7 +42,8 @@ recoverInterruptedInstalls();
 const app = Fastify({
   logger: { level: env.LOG_LEVEL },
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,
-  maxParamLength: 500,
+  trustProxy: env.TRUST_PROXY,
+  routerOptions: { maxParamLength: 500 },
 });
 
 app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
@@ -51,9 +52,11 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
     { err: error, url: request.url, method: request.method },
     "Unhandled request error",
   );
+  const isProduction = process.env.NODE_ENV === "production";
   reply.status(statusCode).send({
     error: statusCode >= 500 ? "Internal server error" : error.message,
-    details: error.stack ?? error.message,
+    ...(statusCode < 500 && { details: error.message }),
+    ...(!isProduction && statusCode >= 500 && { details: error.stack ?? error.message }),
   });
 });
 
@@ -80,13 +83,14 @@ app.addHook("onSend", async (_request, reply) => {
   }
 });
 
-if (env.RATE_LIMIT_PER_MIN > 0) {
-  await app.register(rateLimit, {
-    max: env.RATE_LIMIT_PER_MIN,
-    timeWindow: "1 minute",
-    allowList: (request) => !request.url.startsWith("/api/"),
-  });
-}
+// Always register rate-limit plugin so per-route limits (login brute-force protection) work.
+// When RATE_LIMIT_PER_MIN=0, the global limit is set high enough to be effectively unlimited
+// while still enabling per-route overrides like the login endpoint.
+await app.register(rateLimit, {
+  max: env.RATE_LIMIT_PER_MIN > 0 ? env.RATE_LIMIT_PER_MIN : 50000,
+  timeWindow: "1 minute",
+  allowList: (request) => !request.url.startsWith("/api/"),
+});
 
 // Multipart upload support
 await registerUpload(app);
@@ -190,7 +194,18 @@ const cleanupCron = startCleanupCron();
 // Start
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  console.log(`ashim API running on port ${env.PORT}`);
+  const gpu = isGpuAvailable();
+  console.log(
+    [
+      `ashim v${APP_VERSION} running on port ${env.PORT}`,
+      gpu
+        ? "[INFO] GPU detected — AI tools will use CUDA acceleration"
+        : "[WARN] No GPU detected — AI tools will use CPU (slower)",
+      `[INFO] Rate limit: ${env.RATE_LIMIT_PER_MIN > 0 ? `${env.RATE_LIMIT_PER_MIN}/min` : "disabled"}`,
+      `[INFO] Upload limit: ${env.MAX_UPLOAD_SIZE_MB > 0 ? `${env.MAX_UPLOAD_SIZE_MB} MB` : "unlimited"}`,
+      `[INFO] Trust proxy: ${env.TRUST_PROXY}`,
+    ].join("\n"),
+  );
 } catch (err) {
   app.log.error(err);
   process.exit(1);

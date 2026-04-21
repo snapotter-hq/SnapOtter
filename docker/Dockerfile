@@ -31,8 +31,10 @@ COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
     pnpm install --frozen-lockfile
 
-# Copy source code
-COPY . .
+# Copy only frontend-relevant source (API/Python changes don't bust this cache)
+COPY packages/shared/src ./packages/shared/src
+COPY apps/web/src ./apps/web/src
+COPY apps/web/public ./apps/web/public
 
 # Build only the web frontend (API runs from TS source via tsx)
 RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
@@ -106,6 +108,7 @@ RUN set -e; \
 
 # ============================================
 # Stage 3: Platform-specific base images
+# Pin tags to specific major.minor for reproducible builds.
 # ============================================
 FROM node:22-bookworm AS base-linux-arm64
 FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS base-linux-amd64
@@ -139,6 +142,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
     chmod -R a+rX /usr/local/share/corepack
 
 # System dependencies (all platforms)
+# Split into runtime deps and build deps to minimize final image size.
 # Retry apt-get update with backoff — Ubuntu mirrors can be flaky on CI runners
 RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done && \
     apt-get install -y --no-install-recommends \
@@ -153,7 +157,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
-    build-essential \
+    gcc g++ \
     libgl1 libglib2.0-0 \
     libegl1 libwayland-egl1 libwayland-client0 libwayland-cursor0 \
     libxkbcommon-x11-0 libxkbcommon0 libxcursor1 \
@@ -168,7 +172,8 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
 # Caire binary (content-aware seam carving)
 COPY --from=caire-builder /tmp/caire /usr/local/bin/caire
 
-# Python venv - Layer 1: Base packages (rarely change, ~3 GB)
+# Python venv - Base packages (rarely change, cached aggressively)
+# Uses pre-built manylinux wheels where available; gcc/g++ above covers the rest.
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
@@ -246,7 +251,8 @@ ENV PORT=1349 \
     MAX_PDF_PAGES=0 \
     SESSION_DURATION_HOURS=168 \
     LOGIN_ATTEMPT_LIMIT=10 \
-    LOG_LEVEL=debug
+    LOG_LEVEL=info \
+    TRUST_PROXY=true
 
 # NVIDIA Container Toolkit env vars (harmless on non-GPU systems)
 ENV NVIDIA_VISIBLE_DEVICES=all \

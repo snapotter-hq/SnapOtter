@@ -1,8 +1,9 @@
 name: ashim
 
-# NVIDIA GPU version
+# NVIDIA GPU deployment — requires nvidia-container-toolkit.
+# Install: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 # Usage: docker compose -f docker-compose-gpu.yml up -d
-# Requires: NVIDIA GPU + nvidia-container-toolkit (Linux/Windows WSL2 only)
+# Verify: docker logs ashim 2>&1 | grep GPU
 
 services:
   ashim:
@@ -14,8 +15,8 @@ services:
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data
-      - ashim-workspace:/tmp/workspace
+      - ashim-data:/data           # Database, AI models, user files
+      - ashim-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
@@ -31,6 +32,7 @@ services:
       - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-0}
       - MAX_USERS=${MAX_USERS:-0}
       - SESSION_DURATION_HOURS=${SESSION_DURATION_HOURS:-168}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
@@ -38,12 +40,7 @@ services:
       timeout: 5s
       start_period: 60s
       retries: 3
-    shm_size: '2gb'
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
+    shm_size: "2gb"                # Required for PyTorch CUDA shared memory
     deploy:
       resources:
         reservations:
@@ -51,6 +48,11 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 volumes:
   ashim-data:

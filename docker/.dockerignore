@@ -1,14 +1,44 @@
 node_modules
 .git
+.gitignore
 .turbo
+.worktrees
 dist
 *.db
 *.db-journal
 *.db-wal
+*.db-shm
 .env
-.env.local
+.env.*
+!.env.example
 .DS_Store
 .playwright-mcp
-*.png
-*.jpg
-*.jpeg
+.mcp.json
+.superpowers
+docs/superpowers
+
+# Test artifacts
+test-results
+playwright-report
+blob-report
+tests
+coverage
+*.tsbuildinfo
+MASTER_TEST_MATRIX.md
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# CI/release files not needed in image
+.github
+.husky
+.releaserc.json
+scripts
+
+# Large test images (favicons/logos in apps/web/public are fine)
+test-*.png
+*.heic
+*.heif

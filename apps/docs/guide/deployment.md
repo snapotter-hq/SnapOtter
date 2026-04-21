@@ -4,9 +4,71 @@ ashim ships as a single Docker container. The image supports **linux/amd64** (wi
 
 See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
-## Docker Compose (recommended)
+## Quick Start (CPU)
 
 ```yaml
+# docker-compose.yml — Copy this file and run: docker compose up -d
+services:
+  ashim:
+    image: ashimhq/ashim:latest    # or ghcr.io/ashim-hq/ashim:latest
+    container_name: ashim
+    ports:
+      - "1349:1349"                # Web UI + API
+    volumes:
+      - ashim-data:/data           # Database, AI models, user files (PERSISTENT)
+      - ashim-workspace:/tmp/workspace  # Temp processing files (can be tmpfs)
+    environment:
+      # --- Authentication ---
+      - AUTH_ENABLED=true          # Set to false to disable login entirely
+      - DEFAULT_USERNAME=admin     # First-run admin username
+      - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
+
+      # --- Limits (0 = unlimited) ---
+      # - MAX_UPLOAD_SIZE_MB=0     # Per-file upload limit in MB
+      # - MAX_BATCH_SIZE=0         # Max files per batch request
+      # - RATE_LIMIT_PER_MIN=0     # API rate limit (0 = disabled, 100 = recommended for public)
+      # - MAX_USERS=0              # Max user accounts
+
+      # --- Networking ---
+      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+
+      # --- Bind mount permissions ---
+      # - PUID=1000                # Match your host user's UID (run: id -u)
+      # - PGID=1000                # Match your host user's GID (run: id -g)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    shm_size: "2gb"            # Needed for Python ML shared memory
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ashim-data:       # Named volume — Docker manages permissions automatically
+  ashim-workspace:
+```
+
+```bash
+docker compose up -d
+```
+
+The app is then available at `http://localhost:1349`.
+
+> **Docker Hub rate limits?** Replace `ashimhq/ashim:latest` with `ghcr.io/ashim-hq/ashim:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
+
+## Quick Start (GPU)
+
+For NVIDIA GPU acceleration on AI tools (background removal, upscaling, face enhancement, OCR):
+
+```yaml
+# docker-compose-gpu.yml — Requires: NVIDIA GPU + nvidia-container-toolkit
+# Install toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 services:
   ashim:
     image: ashimhq/ashim:latest
@@ -21,6 +83,25 @@ services:
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    shm_size: "2gb"                # Required for PyTorch CUDA shared memory
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all           # Or set to 1 for a specific GPU
+              capabilities: [gpu]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   ashim-data:
@@ -28,74 +109,128 @@ volumes:
 ```
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose-gpu.yml up -d
 ```
 
-The app is then available at `http://localhost:1349`.
+Check GPU detection in the logs:
 
-> **Docker Hub rate limits?** Replace `ashimhq/ashim:latest` with `ghcr.io/ashim-hq/ashim:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
+```bash
+docker logs ashim 2>&1 | head -20
+# Look for: [INFO] GPU detected — AI tools will use CUDA acceleration
+```
 
-## What's inside the container
+## Hardware Requirements
 
-The Docker image uses a multi-stage build:
+### Minimum (basic image tools only)
 
-1. **Build stage** -- Installs Node.js dependencies and builds the React frontend with Vite.
-2. **Production stage** -- Copies the built frontend and API source into a Node 22 image, installs system dependencies (Python 3, ImageMagick, Tesseract, potrace), sets up a Python virtual environment with all ML packages, and pre-downloads model weights.
+| Resource | Requirement |
+|---|---|
+| CPU | 2 cores |
+| RAM | 1 GB |
+| Disk | 3 GB (image) + 1 GB (data volume) |
+| GPU | Not required |
 
-Everything runs from a single process. The Fastify server handles API requests and serves the frontend SPA.
+Basic tools (resize, crop, rotate, convert, watermark, border, etc.) work on any hardware. They use Sharp (libvips) and complete in milliseconds.
 
-### System dependencies installed in the image
+### Recommended (AI tools)
 
-- Python 3 with pip
-- ImageMagick
-- Tesseract OCR
-- libraw (RAW image support)
-- potrace (bitmap to vector conversion)
+| Resource | Requirement |
+|---|---|
+| CPU | 4+ cores |
+| RAM | 4 GB minimum, 8 GB recommended |
+| Disk | 3 GB (image) + 10-25 GB (AI models, downloaded on first use) |
+| GPU | NVIDIA with 4+ GB VRAM (optional but 5-20x faster) |
 
-### Python packages
+AI tools (background removal, upscaling, face enhancement, OCR, object erasing) download models on first use. Model sizes:
 
-- rembg with BiRefNet-Lite (background removal)
-- RealESRGAN (upscaling)
-- PaddleOCR (text recognition)
-- MediaPipe (face detection)
-- OpenCV (inpainting/object removal)
-- onnxruntime, opencv-python, Pillow, numpy
+| Feature | Model Size | VRAM Usage |
+|---|---|---|
+| Background removal | ~200 MB | ~1 GB |
+| Face detection | ~10 MB | ~500 MB |
+| Upscale + Face enhance | ~1.5 GB | ~4 GB |
+| OCR | ~200 MB | ~1 GB |
+| Object eraser + Colorize | ~500 MB | ~2 GB |
 
-Model weights are downloaded at build time, so the container works fully offline.
+### Heavy workloads (upscale + GFPGAN)
 
-### Architecture notes
+| Resource | Requirement |
+|---|---|
+| CPU | 8+ cores |
+| RAM | 16 GB |
+| GPU | NVIDIA with 8+ GB VRAM (RTX 3070 or better) |
+| Disk | 30 GB total |
 
-All tools work on both amd64 and arm64. AI tools (background removal, upscaling, OCR, face detection) use CUDA-accelerated packages on amd64 and CPU packages on arm64. GPU acceleration is auto-detected at runtime when `--gpus all` is passed.
+Upscaling a 4K image with face enhancement at 4x scale uses ~6 GB VRAM peak. Without a GPU, the same operation takes 5-10 minutes on CPU vs. 10-30 seconds on GPU.
 
 ## Volumes
 
-Mount these to persist data:
+| Mount | Purpose | Required? |
+|---|---|---|
+| `/data` | SQLite database, AI models, Python venv, user files | **Yes** — data loss without it |
+| `/tmp/workspace` | Temporary processing files (auto-cleaned) | Recommended |
 
-| Mount point | Purpose |
-|---|---|
-| `/data` | SQLite database (users, API keys, pipelines, settings) |
-| `/tmp/workspace` | Temporary image processing files |
+### Bind mounts vs. named volumes
 
-The `/data` volume is the important one. Without it, you lose all user accounts and saved pipelines on container restart. The workspace volume is optional but prevents the container's writable layer from growing.
-
-## Health check
-
-The container includes a health check that hits `GET /api/v1/health`. Docker uses this to report container status:
-
-```bash
-docker inspect --format='{{.State.Health.Status}}' ashim
+**Named volumes** (recommended) — Docker manages permissions automatically:
+```yaml
+volumes:
+  - ashim-data:/data
 ```
 
-## Reverse proxy
+**Bind mounts** — You manage permissions. Set `PUID`/`PGID` to match your host user:
+```yaml
+volumes:
+  - ./ashim-data:/data
+environment:
+  - PUID=1000    # Your host UID (run: id -u)
+  - PGID=1000    # Your host GID (run: id -g)
+```
 
-If you're running ashim behind nginx or Caddy, point it at port 1349. Example nginx config:
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTH_ENABLED` | `true` | Enable/disable login requirement |
+| `DEFAULT_USERNAME` | `admin` | Initial admin username |
+| `DEFAULT_PASSWORD` | `admin` | Initial admin password (forced change on first login) |
+| `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Per-file upload limit |
+| `MAX_BATCH_SIZE` | `0` (unlimited) | Max files per batch request |
+| `RATE_LIMIT_PER_MIN` | `0` (disabled) | API requests per minute per IP |
+| `MAX_USERS` | `0` (unlimited) | Maximum user accounts |
+| `TRUST_PROXY` | `true` | Trust X-Forwarded-For headers from reverse proxy |
+| `PUID` | `999` | Run as this UID (for bind mount permissions) |
+| `PGID` | `999` | Run as this GID (for bind mount permissions) |
+| `LOG_LEVEL` | `info` | Log verbosity: fatal, error, warn, info, debug, trace |
+| `CONCURRENT_JOBS` | `0` (auto) | Max parallel AI processing jobs |
+| `SESSION_DURATION_HOURS` | `168` | Login session lifetime (7 days) |
+| `CORS_ORIGIN` | (empty) | Comma-separated allowed origins, or empty for same-origin |
+
+## Health Check
+
+The container includes a built-in health check:
+
+```bash
+# Check container health status
+docker inspect --format='{{.State.Health.Status}}' ashim
+
+# Manual health check
+curl http://localhost:1349/api/v1/health
+# {"status":"healthy","version":"1.15.9"}
+```
+
+## Reverse Proxy
+
+ashim sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
+
+### Nginx
 
 ```nginx
 server {
     listen 80;
     server_name images.example.com;
 
-    client_max_body_size 200M;
+    # Match MAX_UPLOAD_SIZE_MB (0 = nginx default 1M, so set high for unlimited)
+    client_max_body_size 500M;
 
     location / {
         proxy_pass http://localhost:1349;
@@ -104,11 +239,46 @@ server {
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE support (batch progress, feature install progress)
+        proxy_buffering off;
+        proxy_read_timeout 300s;
     }
 }
 ```
 
-Set `client_max_body_size` to match your `MAX_UPLOAD_SIZE_MB` value.
+### Nginx Proxy Manager
+
+1. Add a new Proxy Host
+2. Set Domain Name to your domain
+3. Set Scheme to `http`, Forward Hostname to `ashim` (or your container IP), Forward Port to `1349`
+4. Enable WebSocket support
+5. Under Advanced, add: `client_max_body_size 500M;` and `proxy_buffering off;`
+
+### Traefik
+
+```yaml
+# Add these labels to the ashim service in docker-compose.yml
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.ashim.rule=Host(`images.example.com`)"
+  - "traefik.http.routers.ashim.entrypoints=websecure"
+  - "traefik.http.routers.ashim.tls.certresolver=letsencrypt"
+  - "traefik.http.services.ashim.loadbalancer.server.port=1349"
+  # Increase upload limit (default 2MB is too low)
+  - "traefik.http.middlewares.ashim-body.buffering.maxRequestBodyBytes=524288000"
+  - "traefik.http.routers.ashim.middlewares=ashim-body"
+```
+
+### Cloudflare Tunnels
+
+```bash
+cloudflared tunnel --url http://localhost:1349
+```
+
+Note: Cloudflare has a 100 MB upload limit on free plans. Set `MAX_UPLOAD_SIZE_MB=100` to match.
 
 ## CI/CD
 
