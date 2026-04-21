@@ -344,7 +344,15 @@ function CollageCell({
   }, [isSelected, image]);
 
   const bindDrag = useDrag(
-    ({ movement: [mx, my], first, memo }) => {
+    ({
+      movement: [mx, my],
+      first,
+      memo,
+    }: {
+      movement: [number, number];
+      first: boolean;
+      memo?: { panX: number; panY: number };
+    }) => {
       if (!image || !isSelected) return memo;
       if (first) memo = { panX: transform.panX, panY: transform.panY };
       const rect = cellRef.current?.getBoundingClientRect();
@@ -358,7 +366,7 @@ function CollageCell({
   );
 
   const bindPinch = usePinch(
-    ({ offset: [scale] }) => {
+    ({ offset: [scale] }: { offset: [number, number] }) => {
       if (!image || !isSelected) return;
       const zoom = Math.max(1, Math.min(10, scale));
       store.setCellTransform(cellIndex, { zoom });
