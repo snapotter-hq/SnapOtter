@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronUp,
   Download,
+  FolderOpen,
   Layers,
   Play,
   Plus,
@@ -13,9 +14,11 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { Dropzone } from "@/components/common/dropzone";
+import { FileLibraryModal } from "@/components/common/file-library-modal";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
@@ -24,7 +27,7 @@ import { PipelineBuilder } from "@/components/tools/pipeline-builder";
 import { ToolPalette } from "@/components/tools/tool-palette";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
-import { formatHeaders } from "@/lib/api";
+import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -67,7 +70,11 @@ export function AutomatePage() {
 
   const { processSingle, processAll, processing, error, progress } = usePipelineProcessor();
   const isMobile = useMobile();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const libraryImportHandled = useRef(false);
 
+  const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveDescription, setSaveDescription] = useState("");
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -97,6 +104,49 @@ export function AutomatePage() {
       }
     })();
   }, [setSavedPipelines]);
+
+  useEffect(() => {
+    const state = location.state as { libraryFileIds?: string[] } | null;
+    if (!state?.libraryFileIds || libraryImportHandled.current) return;
+    const fileIds = state.libraryFileIds;
+    libraryImportHandled.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+
+    (async () => {
+      const downloaded = await Promise.all(
+        fileIds.map(async (id) => {
+          try {
+            const res = await fetch(getFileDownloadUrl(id), { headers: formatHeaders() });
+            if (!res.ok) return null;
+            const blob = await res.blob();
+            const name =
+              res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
+              `file-${id}`;
+            return new File([blob], name, { type: blob.type });
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const valid = downloaded.filter((f): f is File => f !== null);
+      if (valid.length > 0) {
+        resetFiles();
+        setFiles(valid);
+      }
+    })();
+  }, [location.state, location.pathname, navigate, resetFiles, setFiles]);
+
+  const handleLibraryImport = useCallback(
+    (imported: File[]) => {
+      if (files.length === 0) {
+        resetFiles();
+        setFiles(imported);
+      } else {
+        addFiles(imported);
+      }
+    },
+    [files.length, resetFiles, setFiles, addFiles],
+  );
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
@@ -239,8 +289,16 @@ export function AutomatePage() {
           {/* Mobile pipeline steps */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {!hasFile && (
-              <div className="mb-4">
+              <div className="mb-4 space-y-2">
                 <Dropzone onFiles={handleFiles} accept="image/*" multiple currentFiles={files} />
+                <button
+                  type="button"
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Import from Library
+                </button>
               </div>
             )}
 
@@ -256,6 +314,13 @@ export function AutomatePage() {
                   className="text-xs text-primary hover:text-primary/80"
                 >
                   + Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="text-xs text-primary hover:text-primary/80"
+                >
+                  Library
                 </button>
                 <button
                   type="button"
@@ -405,6 +470,11 @@ export function AutomatePage() {
               </div>
             </>
           )}
+          <FileLibraryModal
+            open={libraryModalOpen}
+            onClose={() => setLibraryModalOpen(false)}
+            onImport={handleLibraryImport}
+          />
         </div>
       </AppLayout>
     );
@@ -534,6 +604,14 @@ export function AutomatePage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  Library
+                </button>
+                <button
+                  type="button"
                   onClick={() => resetFiles()}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
@@ -541,7 +619,17 @@ export function AutomatePage() {
                 </button>
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground italic shrink-0">No files loaded</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground italic">No files loaded</span>
+                <button
+                  type="button"
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  Import from Library
+                </button>
+              </div>
             )}
           </div>
 
@@ -722,12 +810,22 @@ export function AutomatePage() {
                     )}
 
                     {!hasFile && (
-                      <Dropzone
-                        onFiles={handleFiles}
-                        accept="image/*"
-                        multiple
-                        currentFiles={files}
-                      />
+                      <div className="flex flex-col items-center gap-3 w-full max-w-md">
+                        <Dropzone
+                          onFiles={handleFiles}
+                          accept="image/*"
+                          multiple
+                          currentFiles={files}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setLibraryModalOpen(true)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Import from Library
+                        </button>
+                      </div>
                     )}
 
                     {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
@@ -772,6 +870,11 @@ export function AutomatePage() {
           </div>
         </div>
       </div>
+      <FileLibraryModal
+        open={libraryModalOpen}
+        onClose={() => setLibraryModalOpen(false)}
+        onImport={handleLibraryImport}
+      />
     </AppLayout>
   );
 }

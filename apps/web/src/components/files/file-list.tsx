@@ -1,5 +1,6 @@
-import { Download, Search, Trash2 } from "lucide-react";
+import { Download, Search, Trash2, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getFileDownloadUrl } from "@/lib/api";
 import { useFilesPageStore } from "@/stores/files-page-store";
 import { FileListItem } from "./file-list-item";
@@ -16,6 +17,7 @@ export function FileList() {
     setSearchQuery,
   } = useFilesPageStore();
 
+  const navigate = useNavigate();
   const [inputValue, setInputValue] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,6 +44,10 @@ export function FileList() {
       a.click();
       document.body.removeChild(a);
     }
+  }
+
+  function handleSendToPipeline() {
+    navigate("/automate", { state: { libraryFileIds: Array.from(checkedIds) } });
   }
 
   const allChecked = files.length > 0 && checkedIds.size === files.length;
@@ -83,6 +89,14 @@ export function FileList() {
             >
               <Trash2 className="h-3.5 w-3.5" />
               Delete
+            </button>
+            <button
+              type="button"
+              onClick={handleSendToPipeline}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            >
+              <Workflow className="h-3.5 w-3.5" />
+              Pipeline
             </button>
             <button
               type="button"

@@ -1,5 +1,5 @@
 import { TOOLS } from "@ashim/shared";
-import { FileImage } from "lucide-react";
+import { FileImage, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -165,14 +165,26 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
         </div>
       </div>
 
-      {/* Open File button */}
-      <div className={cn("border-t border-border", mobile ? "pt-3" : "pt-4")}>
+      {/* Action buttons */}
+      <div className={cn("border-t border-border flex flex-col gap-2", mobile ? "pt-3" : "pt-4")}>
         <button
           type="button"
           onClick={handleOpenFile}
           className="w-full px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
         >
           Open File
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const { checkedIds } = useFilesPageStore.getState();
+            const ids = checkedIds.size > 1 ? Array.from(checkedIds) : [details.id];
+            navigate("/automate", { state: { libraryFileIds: ids } });
+          }}
+          className="w-full px-4 py-2 border border-primary text-primary text-sm font-medium rounded-lg hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+        >
+          <Workflow className="h-4 w-4" />
+          Open in Pipeline
         </button>
       </div>
     </div>
