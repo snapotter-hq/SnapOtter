@@ -1,10 +1,18 @@
 import { formatHeaders } from "@/lib/api";
 
-const HEIF_EXTENSIONS = new Set(["heic", "heif", "hif"]);
+const SERVER_PREVIEW_EXTENSIONS = new Set([
+  "heic", "heif", "hif",                       // HEIF
+  "jxl",                                         // JPEG XL (Chrome dropped support)
+  "dng", "cr2", "nef", "arw", "orf", "rw2",     // Camera RAW
+  "tga",                                         // Targa
+  "psd",                                         // Photoshop
+  "exr",                                         // OpenEXR
+  "hdr",                                         // Radiance HDR
+]);
 
 export function needsServerPreview(file: File): boolean {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return HEIF_EXTENSIONS.has(ext);
+  return SERVER_PREVIEW_EXTENSIONS.has(ext);
 }
 
 export async function fetchDecodedPreview(file: File): Promise<string | null> {

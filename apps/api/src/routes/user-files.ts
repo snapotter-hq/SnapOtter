@@ -176,7 +176,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       if (buffer.length === 0) continue;
 
       // Validate image
-      const validation = await validateImageBuffer(buffer);
+      const validation = await validateImageBuffer(buffer, part.filename);
       if (!validation.valid) {
         return reply.status(400).send({
           error: `Invalid file "${part.filename}": ${validation.reason}`,
@@ -503,7 +503,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Validate the image
-    const validation = await validateImageBuffer(fileBuffer);
+    const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
       return reply.status(400).send({
         error: `Invalid file: ${validation.reason}`,

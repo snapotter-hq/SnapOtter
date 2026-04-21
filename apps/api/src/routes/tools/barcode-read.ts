@@ -104,7 +104,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
     }
 
     // --- Validate ---
-    const validation = await validateImageBuffer(fileBuffer);
+    const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
       return reply.status(400).send({
         error: `Invalid image: ${validation.reason}`,

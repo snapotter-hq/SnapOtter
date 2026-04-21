@@ -20,6 +20,7 @@ import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { type JobProgress, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
@@ -144,7 +145,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             updateJobProgress({ ...progress });
 
             // Validate the image
-            const validation = await validateImageBuffer(file.buffer);
+            const validation = await validateImageBuffer(file.buffer, file.filename);
             if (!validation.valid) {
               progress.failedFiles++;
               progress.errors.push({
@@ -164,6 +165,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               if (!skipPreprocess && validation.format === "heif") {
                 processBuffer = await decodeHeic(processBuffer);
                 // Update extension to match decoded format (HEIC/HEIF → PNG)
+                const ext = processFilename.match(/\.[^.]+$/)?.[0];
+                if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+              }
+              if (!skipPreprocess && needsCliDecode(validation.format)) {
+                processBuffer = await decodeToSharpCompat(processBuffer, validation.format);
                 const ext = processFilename.match(/\.[^.]+$/)?.[0];
                 if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
               }

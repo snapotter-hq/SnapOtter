@@ -251,7 +251,7 @@ export function ToolPage() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "image/*,.heic,.heif,.hif";
+    input.accept = "image/*,.heic,.heif,.hif,.jxl,.dng,.cr2,.nef,.arw,.orf,.rw2,.tga,.psd,.exr,.hdr";
     input.onchange = (e) => {
       const newFiles = Array.from((e.target as HTMLInputElement).files || []);
       if (newFiles.length > 0) addFiles(newFiles);

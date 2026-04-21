@@ -4,8 +4,8 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
-const OUTPUT_FORMATS = ["jpg", "png", "webp", "avif", "tiff", "gif", "heic", "heif"] as const;
-const LOSSY_FORMATS = ["jpg", "jpeg", "webp", "avif", "heic", "heif"];
+const OUTPUT_FORMATS = ["jpg", "png", "webp", "avif", "tiff", "gif", "heic", "heif", "jxl"] as const;
+const LOSSY_FORMATS = ["jpg", "jpeg", "webp", "avif", "heic", "heif", "jxl"];
 
 export interface ConvertControlsProps {
   settings?: Record<string, unknown>;

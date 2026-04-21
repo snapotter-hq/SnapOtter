@@ -455,7 +455,7 @@ export function registerCollage(app: FastifyInstance) {
 
     // Validate all files and decode HEIC/HEIF
     for (const file of files) {
-      const validation = await validateImageBuffer(file.buffer);
+      const validation = await validateImageBuffer(file.buffer, file.filename);
       if (!validation.valid) {
         return reply
           .status(400)

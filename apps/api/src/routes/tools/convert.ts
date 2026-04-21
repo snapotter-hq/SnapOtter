@@ -16,10 +16,11 @@ const FORMAT_CONTENT_TYPES: Record<string, string> = {
   gif: "image/gif",
   heic: "image/heic",
   heif: "image/heif",
+  jxl: "image/jxl",
 };
 
 const settingsSchema = z.object({
-  format: z.enum(["jpg", "png", "webp", "avif", "tiff", "gif", "heic", "heif"]),
+  format: z.enum(["jpg", "png", "webp", "avif", "tiff", "gif", "heic", "heif", "jxl"]),
   quality: z.number().min(1).max(100).optional(),
 });
 

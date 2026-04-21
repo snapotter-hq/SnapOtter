@@ -8,6 +8,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
@@ -62,7 +63,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer);
+      const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -72,6 +73,11 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
 
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
+        }
+
+        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+        if (needsCliDecode(validation.format)) {
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
         }
 
         request.log.info(

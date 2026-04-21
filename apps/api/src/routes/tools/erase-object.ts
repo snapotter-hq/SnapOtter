@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
@@ -90,11 +91,11 @@ export function registerEraseObject(app: FastifyInstance) {
       });
     }
 
-    const imageValidation = await validateImageBuffer(imageBuffer);
+    const imageValidation = await validateImageBuffer(imageBuffer, filename);
     if (!imageValidation.valid) {
       return reply.status(400).send({ error: `Invalid image: ${imageValidation.reason}` });
     }
-    const maskValidation = await validateImageBuffer(maskBuffer);
+    const maskValidation = await validateImageBuffer(maskBuffer, "mask.png");
     if (!maskValidation.valid) {
       return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
     }
@@ -113,6 +114,11 @@ export function registerEraseObject(app: FastifyInstance) {
       // Decode HEIC/HEIF input via system decoder
       if (imageValidation.format === "heif") {
         imageBuffer = await decodeHeic(imageBuffer);
+      }
+
+      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+      if (needsCliDecode(imageValidation.format)) {
+        imageBuffer = await decodeToSharpCompat(imageBuffer, imageValidation.format);
       }
 
       // Auto-orient to fix EXIF rotation

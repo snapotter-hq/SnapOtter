@@ -9,6 +9,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { applyEffects } from "../../lib/bg-effects.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace, getWorkspacePath } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
@@ -85,7 +86,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer);
+      const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -96,6 +97,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
         // Decode HEIC/HEIF before processing
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
+          const ext = filename.match(/\.[^.]+$/)?.[0];
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        }
+
+        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+        if (needsCliDecode(validation.format)) {
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
           const ext = filename.match(/\.[^.]+$/)?.[0];
           if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         }
@@ -177,6 +185,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       let settingsRaw: string | null = null;
       let bgImageBuffer: Buffer | null = null;
+      let bgFilename = "background";
 
       try {
         const parts = request.parts();
@@ -185,6 +194,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
             const chunks: Buffer[] = [];
             for await (const chunk of part.file) chunks.push(chunk);
             bgImageBuffer = Buffer.concat(chunks);
+            bgFilename = part.filename ?? "background";
           } else if (part.type === "field" && part.fieldname === "settings") {
             settingsRaw = part.value as string;
           }
@@ -221,9 +231,12 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         // Decode HEIC/HEIF background image if needed
         if (bgImageBuffer) {
-          const bgValidation = await validateImageBuffer(bgImageBuffer);
+          const bgValidation = await validateImageBuffer(bgImageBuffer, bgFilename);
           if (bgValidation.valid && bgValidation.format === "heif") {
             bgImageBuffer = await decodeHeic(bgImageBuffer);
+          }
+          if (bgValidation.valid && needsCliDecode(bgValidation.format)) {
+            bgImageBuffer = await decodeToSharpCompat(bgImageBuffer, bgValidation.format);
           }
         }
 

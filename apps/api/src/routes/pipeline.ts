@@ -23,6 +23,7 @@ import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { createWorkspace } from "../lib/workspace.js";
 import { requireAuth } from "../plugins/auth.js";
@@ -101,7 +102,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     }
 
     // Validate the initial image
-    const validation = await validateImageBuffer(fileBuffer);
+    const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
       return reply.status(400).send({
         error: `Invalid image: ${validation.reason}`,
@@ -118,6 +119,20 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       } catch (err) {
         return reply.status(422).send({
           error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+          details: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+    if (needsCliDecode(validation.format)) {
+      try {
+        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+        const ext = filename.match(/\.[^.]+$/)?.[0];
+        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+      } catch (err) {
+        return reply.status(422).send({
+          error: `Failed to decode ${validation.format} file`,
           details: err instanceof Error ? err.message : String(err),
         });
       }
@@ -517,7 +532,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           updateJobProgress({ ...progress });
 
           // Validate the image
-          const validation = await validateImageBuffer(file.buffer);
+          const validation = await validateImageBuffer(file.buffer, file.filename);
           if (!validation.valid) {
             progress.failedFiles++;
             progress.errors.push({
@@ -536,6 +551,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // Decode HEIC/HEIF if needed
             if (validation.format === "heif") {
               currentBuffer = await decodeHeic(currentBuffer);
+              const ext = currentFilename.match(/\.[^.]+$/)?.[0];
+              if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
+            }
+
+            // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+            if (needsCliDecode(validation.format)) {
+              currentBuffer = await decodeToSharpCompat(currentBuffer, validation.format);
               const ext = currentFilename.match(/\.[^.]+$/)?.[0];
               if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
             }

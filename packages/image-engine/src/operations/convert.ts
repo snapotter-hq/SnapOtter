@@ -12,6 +12,7 @@ const FORMAT_MAP: Record<string, string> = {
   avif: "avif",
   tiff: "tiff",
   gif: "gif",
+  jxl: "jxl" as const,
 };
 
 export async function convert(image: Sharp, options: ConvertOptions): Promise<Sharp> {

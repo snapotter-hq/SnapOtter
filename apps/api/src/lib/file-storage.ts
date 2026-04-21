@@ -15,6 +15,20 @@ const SAFE_STORAGE_EXTENSIONS = new Set([
   ".avif",
   ".svg",
   ".pdf",
+  ".heic",
+  ".heif",
+  ".jxl",
+  ".ico",
+  ".dng",
+  ".cr2",
+  ".nef",
+  ".arw",
+  ".orf",
+  ".rw2",
+  ".tga",
+  ".psd",
+  ".exr",
+  ".hdr",
 ]);
 
 let storageReady = false;

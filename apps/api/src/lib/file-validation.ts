@@ -13,6 +13,13 @@ const SUPPORTED_INPUT_FORMATS = new Set([
   "avif",
   "heif",
   "svg",
+  "jxl",
+  "ico",
+  "raw",
+  "tga",
+  "psd",
+  "exr",
+  "hdr",
 ]);
 
 interface MagicEntry {
@@ -31,6 +38,17 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x4d, 0x4d, 0x00, 0x2a], offset: 0, format: "tiff" },
   { bytes: [0x66, 0x74, 0x79, 0x70], offset: 4, format: "avif" }, // ftyp box; verified below
   { bytes: [0x66, 0x74, 0x79, 0x70], offset: 4, format: "heif" }, // ftyp box; verified below
+  // JXL ISOBMFF container
+  { bytes: [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], offset: 0, format: "jxl" },
+  // JXL raw codestream
+  { bytes: [0xff, 0x0a], offset: 0, format: "jxl" },
+  // ICO
+  { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0, format: "ico" },
+  // PSD ("8BPS")
+  { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, format: "psd" },
+  // OpenEXR
+  { bytes: [0x76, 0x2f, 0x31, 0x01], offset: 0, format: "exr" },
+  // TGA has no reliable magic bytes — detected by extension only
 ];
 
 export interface ValidationResult {
@@ -45,6 +63,19 @@ export interface ValidationError {
   reason: string;
 }
 
+/** Camera RAW extensions that share TIFF magic bytes. */
+const RAW_EXTENSIONS = new Set(["dng", "cr2", "nef", "arw", "orf", "rw2"]);
+
+/** Formats that Sharp cannot decode natively — skip dimension check. */
+const CLI_DECODED_FORMATS = new Set(["raw", "tga", "psd", "exr", "hdr"]);
+
+/**
+ * Check whether a file extension corresponds to a Camera RAW format.
+ */
+export function isRawExtension(ext: string): boolean {
+  return RAW_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, ""));
+}
+
 /**
  * Validate an uploaded image buffer.
  *
@@ -53,9 +84,14 @@ export interface ValidationError {
  * 2. Magic bytes match a known image format
  * 3. Format is in the supported input formats list
  * 4. Image dimensions do not exceed MAX_MEGAPIXELS
+ *
+ * @param buffer - The image file buffer
+ * @param filename - Optional original filename, used for extension-based
+ *   format detection (Camera RAW, TGA)
  */
 export async function validateImageBuffer(
   buffer: Buffer,
+  filename?: string,
 ): Promise<ValidationResult | ValidationError> {
   // 1. Empty / null-byte check
   if (!buffer || buffer.length === 0) {
@@ -68,8 +104,23 @@ export async function validateImageBuffer(
     return { valid: false, reason: "File contains no image data" };
   }
 
-  // 2. Format detection (magic bytes for raster, text check for SVG)
-  const detectedFormat = detectMagicBytes(buffer) || (isSvgBuffer(buffer) ? "svg" : null);
+  // Extract extension from filename for extension-based detection
+  const ext = filename ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
+
+  // 2. Format detection (magic bytes for raster, text check for SVG, text check for HDR)
+  let detectedFormat =
+    detectMagicBytes(buffer) || (isSvgBuffer(buffer) ? "svg" : null) || detectHdrText(buffer);
+
+  // RAW formats share TIFF magic bytes — differentiate by extension
+  if (detectedFormat === "tiff" && ext && isRawExtension(ext)) {
+    detectedFormat = "raw";
+  }
+
+  // TGA has no magic bytes — detect by extension only
+  if (!detectedFormat && ext === "tga") {
+    detectedFormat = "tga";
+  }
+
   if (!detectedFormat) {
     return { valid: false, reason: "Unrecognized image format" };
   }
@@ -83,6 +134,12 @@ export async function validateImageBuffer(
   }
 
   // 4. Dimensions check via sharp metadata
+  // For formats Sharp can't decode natively, skip the dimension check.
+  // The actual decoding happens later in the tool pipeline.
+  if (CLI_DECODED_FORMATS.has(detectedFormat)) {
+    return { valid: true, format: detectedFormat, width: 0, height: 0 };
+  }
+
   try {
     const sharpOpts = detectedFormat === "svg" ? { density: 72 } : undefined;
     const metadata = await sharp(buffer, sharpOpts).metadata();
@@ -99,7 +156,9 @@ export async function validateImageBuffer(
 
     return { valid: true, format: detectedFormat, width, height };
   } catch {
-    return { valid: false, reason: "Failed to read image metadata" };
+    // Sharp failed but we already confirmed valid magic bytes / extension.
+    // This can happen for JXL, ICO, or other formats Sharp partially supports.
+    return { valid: true, format: detectedFormat, width: 0, height: 0 };
   }
 }
 
@@ -166,5 +225,18 @@ function detectMagicBytes(buffer: Buffer): string | null {
     }
   }
 
+  return null;
+}
+
+/**
+ * Detect Radiance HDR format by text header.
+ * HDR files start with "#?RADIANCE" or "#?RGBE".
+ */
+function detectHdrText(buffer: Buffer): string | null {
+  if (buffer.length < 10) return null;
+  const header = buffer.slice(0, 11).toString("ascii");
+  if (header.startsWith("#?RADIANCE") || header.startsWith("#?RGBE")) {
+    return "hdr";
+  }
   return null;
 }

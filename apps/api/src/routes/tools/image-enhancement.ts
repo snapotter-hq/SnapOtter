@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -60,6 +61,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
     "/api/v1/tools/image-enhancement/analyze",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
+      let filename = "image";
 
       try {
         const parts = request.parts();
@@ -70,6 +72,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
+            filename = part.filename ?? "image";
             break;
           }
         }
@@ -84,7 +87,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer);
+      const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -95,6 +98,18 @@ export function registerImageEnhancement(app: FastifyInstance) {
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC file",
+            details: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+      if (needsCliDecode(validation.format)) {
+        try {
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+        } catch (err) {
+          return reply.status(422).send({
+            error: `Failed to decode ${validation.format} file`,
             details: err instanceof Error ? err.message : String(err),
           });
         }

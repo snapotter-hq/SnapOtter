@@ -7,6 +7,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -56,7 +57,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer);
+      const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -70,6 +71,20 @@ export function registerContentAwareResize(app: FastifyInstance) {
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC/HEIF file",
+            details: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+      if (needsCliDecode(validation.format)) {
+        try {
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+          const ext = filename.match(/\.[^.]+$/)?.[0];
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        } catch (err) {
+          return reply.status(422).send({
+            error: `Failed to decode ${validation.format} file`,
             details: err instanceof Error ? err.message : String(err),
           });
         }
@@ -161,6 +176,11 @@ export function registerContentAwareResize(app: FastifyInstance) {
       let buf = inputBuffer;
       if (["heic", "heif", "hif"].includes(ext)) {
         buf = await decodeHeic(buf);
+      }
+      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR) for pipeline/batch mode
+      const cliCheck = await validateImageBuffer(inputBuffer, filename);
+      if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
+        buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
       }
       const orientedBuffer = await autoOrient(buf);
       const jobId = randomUUID();

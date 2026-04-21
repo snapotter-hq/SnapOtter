@@ -10,6 +10,8 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libheif-examples \
     libimage-exiftool-perl \
+    imagemagick \
+    libraw-dev \
     && if apt-cache show libheif-plugin-x265 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libheif-plugin-x265; \
        fi \

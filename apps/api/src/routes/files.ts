@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { createWorkspace, getWorkspacePath } from "../lib/workspace.js";
 
@@ -49,8 +50,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // Skip empty parts (e.g. empty file field)
       if (buffer.length === 0) continue;
 
-      // Validate the image
-      const validation = await validateImageBuffer(buffer);
+      // Validate the image (pass filename for extension-based format detection)
+      const validation = await validateImageBuffer(buffer, part.filename);
       if (!validation.valid) {
         return reply.status(400).send({
           error: `Invalid file "${part.filename}": ${validation.reason}`,
@@ -132,7 +133,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     }
     let buffer = await data.toBuffer();
 
-    const validation = await validateImageBuffer(buffer);
+    const validation = await validateImageBuffer(buffer, data.filename);
     if (!validation.valid) {
       return reply.status(400).send({ error: validation.reason });
     }
@@ -143,6 +144,17 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         buffer = await decodeHeic(buffer);
       } catch {
         return reply.status(422).send({ error: "Failed to decode HEIC/HEIF file" });
+      }
+    }
+
+    // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools
+    if (needsCliDecode(validation.format)) {
+      try {
+        buffer = await decodeToSharpCompat(buffer, validation.format);
+      } catch {
+        return reply.status(422).send({
+          error: `Failed to decode ${validation.format.toUpperCase()} file`,
+        });
       }
     }
 
@@ -170,6 +182,19 @@ function getContentType(ext: string): string {
     zip: "application/zip",
     ico: "image/x-icon",
     json: "application/json",
+    jxl: "image/jxl",
+    dng: "image/x-adobe-dng",
+    cr2: "image/x-canon-cr2",
+    nef: "image/x-nikon-nef",
+    arw: "image/x-sony-arw",
+    orf: "image/x-olympus-orf",
+    rw2: "image/x-panasonic-rw2",
+    tga: "image/x-tga",
+    psd: "image/vnd.adobe.photoshop",
+    exr: "image/x-exr",
+    hdr: "image/vnd.radiance",
+    heic: "image/heic",
+    heif: "image/heif",
   };
   return map[ext] ?? "application/octet-stream";
 }

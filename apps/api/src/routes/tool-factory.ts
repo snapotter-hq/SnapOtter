@@ -12,6 +12,7 @@ import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import type { WorkerInput, WorkerOutput } from "../lib/image-worker.js";
 import { sanitizeSvg } from "../lib/svg-sanitize.js";
@@ -147,7 +148,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       }
 
       // Validate the uploaded image
-      const validation = await validateImageBuffer(fileBuffer);
+      const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -164,6 +165,21 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+            details: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools.
+      // The decoded buffer is PNG, so update the filename extension to match.
+      if (needsCliDecode(validation.format)) {
+        try {
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+          const ext = filename.match(/\.[^.]+$/)?.[0];
+          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        } catch (err) {
+          return reply.status(422).send({
+            error: `Failed to decode ${validation.format.toUpperCase()} file`,
             details: err instanceof Error ? err.message : String(err),
           });
         }
@@ -279,6 +295,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           "image/svg+xml",
           "image/bmp",
           "image/avif",
+          "image/x-icon",
         ]);
         let previewUrl: string | undefined;
         if (!BROWSER_PREVIEWABLE.has(result.contentType)) {

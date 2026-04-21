@@ -12,6 +12,17 @@ const EXT_TO_MIME: Record<string, string> = {
   ico: "image/x-icon",
   heif: "image/heif",
   heic: "image/heic",
+  jxl: "image/jxl",
+  dng: "image/x-adobe-dng",
+  cr2: "image/x-canon-cr2",
+  nef: "image/x-nikon-nef",
+  arw: "image/x-sony-arw",
+  orf: "image/x-olympus-orf",
+  rw2: "image/x-panasonic-rw2",
+  tga: "image/x-tga",
+  psd: "image/vnd.adobe.photoshop",
+  exr: "image/x-exr",
+  hdr: "image/vnd.radiance",
 };
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -26,6 +37,17 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/x-icon": "ico",
   "image/heif": "heif",
   "image/heic": "heic",
+  "image/jxl": "jxl",
+  "image/x-adobe-dng": "dng",
+  "image/x-canon-cr2": "cr2",
+  "image/x-nikon-nef": "nef",
+  "image/x-sony-arw": "arw",
+  "image/x-olympus-orf": "orf",
+  "image/x-panasonic-rw2": "rw2",
+  "image/x-tga": "tga",
+  "image/vnd.adobe.photoshop": "psd",
+  "image/x-exr": "exr",
+  "image/vnd.radiance": "hdr",
 };
 
 /**

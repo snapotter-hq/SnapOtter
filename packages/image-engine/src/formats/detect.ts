@@ -8,6 +8,18 @@ const MAGIC_BYTES: Array<{ bytes: number[]; offset: number; format: string }> = 
   { bytes: [0x49, 0x49, 0x2a, 0x00], offset: 0, format: "tiff" }, // Little-endian TIFF
   { bytes: [0x4d, 0x4d, 0x00, 0x2a], offset: 0, format: "tiff" }, // Big-endian TIFF
   { bytes: [0x42, 0x4d], offset: 0, format: "bmp" },
+  // AVIF (ftyp box at offset 4, brand verified in detectByMagicBytes)
+  { bytes: [0x66, 0x74, 0x79, 0x70], offset: 4, format: "avif" },
+  // JXL ISOBMFF container
+  { bytes: [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], offset: 0, format: "jxl" },
+  // JXL raw codestream
+  { bytes: [0xff, 0x0a], offset: 0, format: "jxl" },
+  // ICO
+  { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0, format: "ico" },
+  // PSD ("8BPS")
+  { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, format: "psd" },
+  // OpenEXR
+  { bytes: [0x76, 0x2f, 0x31, 0x01], offset: 0, format: "exr" },
 ];
 
 /**
@@ -48,6 +60,12 @@ function detectByMagicBytes(buffer: Buffer): string {
         if (webpSignature !== "WEBP") {
           continue;
         }
+      }
+      // For ftyp, verify AVIF brand at bytes 8-11
+      if (entry.format === "avif") {
+        if (buffer.length < 12) continue;
+        const brand = buffer.slice(8, 12).toString("ascii");
+        if (brand !== "avif" && brand !== "avis") continue;
       }
       return entry.format;
     }

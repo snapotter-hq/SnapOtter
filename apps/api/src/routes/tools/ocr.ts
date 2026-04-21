@@ -68,7 +68,7 @@ export function registerOcr(app: FastifyInstance) {
       return reply.status(400).send({ error: "No image file provided" });
     }
 
-    const validation = await validateImageBuffer(fileBuffer);
+    const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }

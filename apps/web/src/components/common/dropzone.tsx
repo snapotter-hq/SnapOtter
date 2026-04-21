@@ -10,11 +10,11 @@ interface DropzoneProps {
   currentFiles?: File[];
 }
 
-// Browsers may not map .heic/.heif to image/* in file pickers.
+// Browsers may not map certain formats (HEIC, JXL, RAW, etc.) to image/* in file pickers.
 // Append explicit extensions so they are selectable.
 function expandAccept(accept?: string): string | undefined {
   if (!accept?.includes("image/*")) return accept;
-  return `${accept},.heic,.heif,.hif`;
+  return `${accept},.heic,.heif,.hif,.jxl,.ico,.dng,.cr2,.nef,.arw,.orf,.rw2,.tga,.psd,.exr,.hdr`;
 }
 
 export function Dropzone({ onFiles, accept, multiple = true, currentFiles = [] }: DropzoneProps) {
