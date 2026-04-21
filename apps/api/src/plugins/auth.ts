@@ -659,16 +659,14 @@ function isPublicRoute(url: string): boolean {
 
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
-    // When auth is disabled, attach the first admin user so requireAuth/requireAdmin pass
+    // When auth is disabled, attach a synthetic non-admin user so tools work
+    // but admin-only routes (user management, settings write, etc.) stay locked
     if (!env.AUTH_ENABLED) {
-      const adminUser = db.select().from(schema.users).where(eq(schema.users.role, "admin")).get();
-      if (adminUser) {
-        (request as FastifyRequest & { user?: AuthUser }).user = {
-          id: adminUser.id,
-          username: adminUser.username,
-          role: "admin",
-        };
-      }
+      (request as FastifyRequest & { user?: AuthUser }).user = {
+        id: "anonymous",
+        username: "anonymous",
+        role: "user",
+      };
       return;
     }
 

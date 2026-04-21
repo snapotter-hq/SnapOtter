@@ -11,19 +11,12 @@ interface AuthState {
   permissions: string[];
 }
 
-const ALL_PERMISSIONS = [
+const USER_PERMISSIONS = [
   "tools:use",
   "files:own",
-  "files:all",
   "apikeys:own",
-  "apikeys:all",
   "pipelines:own",
-  "pipelines:all",
   "settings:read",
-  "settings:write",
-  "users:manage",
-  "teams:manage",
-  "branding:manage",
 ];
 
 export function useAuth() {
@@ -51,8 +44,8 @@ export function useAuth() {
               authEnabled: false,
               isAuthenticated: true,
               mustChangePassword: false,
-              role: "admin",
-              permissions: ALL_PERMISSIONS,
+              role: "user",
+              permissions: USER_PERMISSIONS,
             });
           return;
         }
