@@ -7,8 +7,11 @@ export function useConnectionMonitor() {
 
     const handleOffline = () => store.getState().setOffline();
     const handleOnline = () => {
+      const prev = store.getState().status;
       store.getState().setOnline();
-      store.getState().startPolling();
+      if (prev === "offline") {
+        store.getState().startPolling();
+      }
     };
 
     window.addEventListener("offline", handleOffline);
