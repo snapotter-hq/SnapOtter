@@ -261,7 +261,7 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        setError("Network error - check your connection");
+        setError("Processing was interrupted \u2014 retry when reconnected");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
       };

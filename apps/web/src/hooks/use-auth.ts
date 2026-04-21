@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatHeaders } from "@/lib/api";
+import { useConnectionStore } from "@/stores/connection-store";
 
 interface AuthState {
   loading: boolean;
@@ -36,35 +37,37 @@ export function useAuth() {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
     async function checkAuth() {
       try {
-        // Check if auth is enabled
         const configRes = await fetch("/api/v1/config/auth");
         const config = await configRes.json();
 
         if (!config.authEnabled) {
-          setState({
-            loading: false,
-            authEnabled: false,
-            isAuthenticated: true,
-            mustChangePassword: false,
-            role: "admin",
-            permissions: ALL_PERMISSIONS,
-          });
+          if (!cancelled)
+            setState({
+              loading: false,
+              authEnabled: false,
+              isAuthenticated: true,
+              mustChangePassword: false,
+              role: "admin",
+              permissions: ALL_PERMISSIONS,
+            });
           return;
         }
 
-        // Auth is enabled — check if we have a valid session
         const token = localStorage.getItem("ashim-token");
         if (!token) {
-          setState({
-            loading: false,
-            authEnabled: true,
-            isAuthenticated: false,
-            mustChangePassword: false,
-            role: null,
-            permissions: [],
-          });
+          if (!cancelled)
+            setState({
+              loading: false,
+              authEnabled: true,
+              isAuthenticated: false,
+              mustChangePassword: false,
+              role: null,
+              permissions: [],
+            });
           return;
         }
 
@@ -75,39 +78,45 @@ export function useAuth() {
         if (sessionRes.ok) {
           const session = await sessionRes.json();
           const mustChange = session.user?.mustChangePassword === true;
-          setState({
-            loading: false,
-            authEnabled: true,
-            isAuthenticated: true,
-            mustChangePassword: mustChange,
-            role: session.user?.role ?? null,
-            permissions: session.user?.permissions ?? [],
-          });
+          if (!cancelled)
+            setState({
+              loading: false,
+              authEnabled: true,
+              isAuthenticated: true,
+              mustChangePassword: mustChange,
+              role: session.user?.role ?? null,
+              permissions: session.user?.permissions ?? [],
+            });
         } else {
           localStorage.removeItem("ashim-token");
-          setState({
-            loading: false,
-            authEnabled: true,
-            isAuthenticated: false,
-            mustChangePassword: false,
-            role: null,
-            permissions: [],
-          });
+          if (!cancelled)
+            setState({
+              loading: false,
+              authEnabled: true,
+              isAuthenticated: false,
+              mustChangePassword: false,
+              role: null,
+              permissions: [],
+            });
         }
       } catch {
-        // Can't reach API — assume no auth needed (dev mode)
-        setState({
-          loading: false,
-          authEnabled: false,
-          isAuthenticated: true,
-          mustChangePassword: false,
-          role: "admin",
-          permissions: ALL_PERMISSIONS,
-        });
+        // API unreachable — stay in loading state.
+        // ConnectionBanner explains the outage. AuthGuard shows spinner.
       }
     }
 
     checkAuth();
+
+    const unsubscribe = useConnectionStore.subscribe((curr, prev) => {
+      if (prev.status !== "reconnected" && curr.status === "reconnected") {
+        checkAuth();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const hasPermission = (permission: string) => state.permissions.includes(permission);

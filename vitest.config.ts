@@ -6,6 +6,9 @@ import { defineConfig } from "vitest/config";
 // Resolve api-workspace packages that pnpm only exposes under apps/api/node_modules.
 const apiNodeModules = path.resolve(__dirname, "apps/api/node_modules");
 
+// Resolve web-workspace packages that pnpm only exposes under apps/web/node_modules.
+const webNodeModules = path.resolve(__dirname, "apps/web/node_modules");
+
 // Temp dir for integration test DB + workspace (set BEFORE any app code loads)
 const testDir = path.join(os.tmpdir(), `ashim-test-${crypto.randomUUID().slice(0, 8)}`);
 
@@ -88,6 +91,10 @@ export default defineConfig({
       jsqr: path.join(apiNodeModules, "jsqr"),
       pdfkit: path.join(apiNodeModules, "pdfkit"),
       sharp: path.join(apiNodeModules, "sharp"),
+      // Map web-only dependencies so component tests can resolve them
+      // from the root vitest runner.
+      react: path.join(webNodeModules, "react"),
+      "react-dom": path.join(webNodeModules, "react-dom"),
     },
   },
 });

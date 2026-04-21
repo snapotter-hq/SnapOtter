@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useMobile } from "@/hooks/use-mobile";
 import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useConnectionStore } from "@/stores/connection-store";
 import { Dropzone } from "../common/dropzone";
 import { GemLogo } from "../common/gem-logo";
 import { HelpDialog } from "../help/help-dialog";
@@ -25,6 +26,8 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useMobile();
   const [customLogo, setCustomLogo] = useState(false);
+  const connectionStatus = useConnectionStore((s) => s.status);
+  const bannerVisible = connectionStatus !== "connected";
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
@@ -33,7 +36,12 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
   }, []);
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div
+      className={cn(
+        "flex h-screen bg-background text-foreground overflow-hidden",
+        bannerVisible && "pt-9",
+      )}
+    >
       {/* Desktop sidebar */}
       {!isMobile && (
         <Sidebar
@@ -92,7 +100,12 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
 
       {/* Mobile top bar */}
       {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border px-3 py-2 flex items-center gap-3">
+        <div
+          className={cn(
+            "fixed left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border px-3 py-2 flex items-center gap-3",
+            bannerVisible ? "top-9" : "top-0",
+          )}
+        >
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(true)}
