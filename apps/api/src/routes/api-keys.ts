@@ -6,7 +6,6 @@
  * DELETE /api/v1/api-keys/:id  — Delete an API key
  */
 import { randomBytes, randomUUID } from "node:crypto";
-import type { Role } from "@ashim/shared";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
@@ -32,7 +31,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
     let scopedPermissions: string[] | null = null;
     if (Array.isArray(body?.permissions) && body.permissions.length > 0) {
-      const userPerms = getPermissions(user.role as Role);
+      const userPerms = getPermissions(user.role);
       const invalid = body.permissions.filter((p: string) => !userPerms.includes(p as any));
       if (invalid.length > 0) {
         return reply.status(400).send({

@@ -40,6 +40,7 @@ import { docsRoutes } from "../../apps/api/src/routes/docs.js";
 import { fileRoutes } from "../../apps/api/src/routes/files.js";
 import { registerPipelineRoutes } from "../../apps/api/src/routes/pipeline.js";
 import { registerProgressRoutes } from "../../apps/api/src/routes/progress.js";
+import { rolesRoutes } from "../../apps/api/src/routes/roles.js";
 import { settingsRoutes } from "../../apps/api/src/routes/settings.js";
 import { teamsRoutes } from "../../apps/api/src/routes/teams.js";
 import { registerToolRoutes } from "../../apps/api/src/routes/tools/index.js";
@@ -115,6 +116,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // Audit log routes
   await auditLogRoutes(app);
+
+  // Roles management routes
+  await rolesRoutes(app);
 
   // API docs (Scalar)
   await docsRoutes(app);

@@ -4,9 +4,7 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role", { enum: ["admin", "editor", "user"] })
-    .notNull()
-    .default("user"),
+  role: text("role").notNull().default("user"),
   team: text("team").notNull().default("Default"),
   mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -97,6 +95,21 @@ export const auditLog = sqliteTable("audit_log", {
   details: text("details"),
   ipAddress: text("ip_address"),
   createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const roles = sqliteTable("roles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description").notNull().default(""),
+  permissions: text("permissions").notNull(),
+  isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
 });

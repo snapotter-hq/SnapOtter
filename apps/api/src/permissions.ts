@@ -1,5 +1,7 @@
 import type { Permission, Role } from "@ashim/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { db, schema } from "./db/index.js";
 import { type AuthUser, getAuthUser } from "./plugins/auth.js";
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -32,16 +34,31 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   user: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
 };
 
-export function getPermissions(role: Role): Permission[] {
-  return ROLE_PERMISSIONS[role] ?? [];
+export function getPermissions(role: Role | string): Permission[] {
+  if (role in ROLE_PERMISSIONS) {
+    return ROLE_PERMISSIONS[role as Role];
+  }
+  try {
+    const customRole = db
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.name, role as string))
+      .get();
+    if (customRole) {
+      return JSON.parse(customRole.permissions) as Permission[];
+    }
+  } catch {
+    // DB not yet available during early startup
+  }
+  return [];
 }
 
-export function hasPermission(role: Role, permission: Permission): boolean {
+export function hasPermission(role: Role | string, permission: Permission): boolean {
   return getPermissions(role).includes(permission);
 }
 
 export function hasEffectivePermission(user: AuthUser, permission: Permission): boolean {
-  if (!hasPermission(user.role as Role, permission)) return false;
+  if (!hasPermission(user.role, permission)) return false;
   if (user.apiKeyPermissions) {
     return user.apiKeyPermissions.includes(permission);
   }

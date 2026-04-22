@@ -22,6 +22,7 @@ import { registerFeatureRoutes } from "./routes/features.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { recoverStaleJobs, registerProgressRoutes } from "./routes/progress.js";
+import { rolesRoutes } from "./routes/roles.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
@@ -138,6 +139,9 @@ await teamsRoutes(app);
 
 // Audit log routes
 await auditLogRoutes(app);
+
+// Roles management routes
+await rolesRoutes(app);
 
 // API docs (Scalar)
 await docsRoutes(app);
