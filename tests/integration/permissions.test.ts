@@ -515,6 +515,88 @@ describe("file ownership scoping", () => {
   });
 });
 
+describe("escalation prevention", () => {
+  it("editor cannot create admin users", async () => {
+    // First create an editor
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: "esceditor", password: "EscEditor1", role: "editor" },
+    });
+    db.update(schema.users)
+      .set({ mustChangePassword: false })
+      .where(eq(schema.users.username, "esceditor"))
+      .run();
+
+    const editorLogin = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "esceditor", password: "EscEditor1" },
+    });
+    const editorToken = JSON.parse(editorLogin.body).token;
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${editorToken}` },
+      payload: { username: "escalated", password: "Escalated1", role: "admin" },
+    });
+    // Editor doesn't have users:manage, so gets 403
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("cannot demote the last admin", async () => {
+    const listRes = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/users",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const users = JSON.parse(listRes.body).users;
+    const adminUser = users.find((u: any) => u.username === "admin");
+
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${adminUser.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { role: "user" },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.code).toMatch(/SELF_DEMOTE|LAST_ADMIN/);
+  });
+
+  it("admin can demote another admin when multiple admins exist", async () => {
+    // Create a second admin
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: "admin2esc", password: "Admin2Esc1", role: "admin" },
+    });
+    db.update(schema.users)
+      .set({ mustChangePassword: false })
+      .where(eq(schema.users.username, "admin2esc"))
+      .run();
+
+    const listRes = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/users",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const users = JSON.parse(listRes.body).users;
+    const secondAdmin = users.find((u: any) => u.username === "admin2esc");
+
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${secondAdmin.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { role: "editor" },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
 describe("pipeline ownership scoping", () => {
   let userToken: string;
 

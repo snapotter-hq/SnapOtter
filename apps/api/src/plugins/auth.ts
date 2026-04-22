@@ -1,11 +1,11 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
-import { getPermissions } from "../permissions.js";
+import { getPermissions, requirePermission } from "../permissions.js";
 
 const scryptAsync = promisify(scrypt);
 
@@ -14,7 +14,8 @@ const scryptAsync = promisify(scrypt);
 export interface AuthUser {
   id: string;
   username: string;
-  role: "admin" | "user";
+  role: string;
+  apiKeyPermissions?: string[];
 }
 
 const MAX_USERS = env.MAX_USERS;
@@ -205,7 +206,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: user.username,
           role: user.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-          permissions: getPermissions(user.role as "admin" | "user"),
+          permissions: getPermissions(user.role),
           teamName: teamRow?.name ?? user.team,
         },
         expiresAt: expiresAt.toISOString(),
@@ -253,7 +254,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         username: user.username,
         role: user.role,
         mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-        permissions: getPermissions(user.role as "admin" | "user"),
+        permissions: getPermissions(user.role),
       },
       expiresAt: session.expiresAt.toISOString(),
     });
@@ -327,7 +328,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /api/auth/users (admin only)
   app.get("/api/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requireAdmin(request, reply);
+    const admin = requirePermission("users:manage")(request, reply);
     if (!admin) return;
 
     const users = db
@@ -357,7 +358,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /api/auth/register (admin only)
   app.post("/api/auth/register", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requireAdmin(request, reply);
+    const admin = requirePermission("users:manage")(request, reply);
     if (!admin) return;
 
     const body = request.body as {
@@ -389,7 +390,33 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const role = body.role === "admin" ? "admin" : "user";
+    const validBuiltinRoles = ["admin", "editor", "user"];
+    let role: string = "user";
+    if (body.role) {
+      if (validBuiltinRoles.includes(body.role)) {
+        role = body.role;
+      } else {
+        const customRole = db
+          .select()
+          .from(schema.roles)
+          .where(eq(schema.roles.name, body.role))
+          .get();
+        if (customRole) {
+          role = body.role;
+        }
+      }
+    }
+
+    // Escalation prevention
+    const roleHierarchy: Record<string, number> = { admin: 3, editor: 2, user: 1 };
+    const actorLevel = roleHierarchy[admin.role] ?? 0;
+    const targetLevel = roleHierarchy[role] ?? 0;
+    if (targetLevel > actorLevel) {
+      return reply.status(403).send({
+        error: "Cannot create a user with a higher role than your own",
+        code: "ESCALATION_DENIED",
+      });
+    }
 
     // Resolve team — frontend sends team name (e.g. "Default"), not ID
     const requestedTeam = (body as { team?: string }).team;
@@ -477,7 +504,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.put(
     "/api/auth/users/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -489,19 +516,54 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
       }
 
-      const updates: { role?: "admin" | "user"; team?: string; updatedAt: Date } = {
+      const updates: { role?: string; team?: string; updatedAt: Date } = {
         updatedAt: new Date(),
       };
 
-      if (body?.role === "admin" || body?.role === "user") {
-        // Prevent removing your own admin role
-        if (id === admin.id && body.role !== "admin") {
-          return reply.status(400).send({
-            error: "Cannot remove your own admin role",
-            code: "SELF_DEMOTE",
+      // Escalation prevention
+      if (body?.role) {
+        const roleHierarchy: Record<string, number> = { admin: 3, editor: 2, user: 1 };
+        const actorLevel = roleHierarchy[admin.role] ?? 0;
+        const targetLevel = roleHierarchy[body.role] ?? 0;
+        if (targetLevel > actorLevel) {
+          return reply.status(403).send({
+            error: "Cannot assign a role higher than your own",
+            code: "ESCALATION_DENIED",
           });
         }
-        updates.role = body.role;
+      }
+
+      if (body?.role) {
+        const validBuiltinRoles = ["admin", "editor", "user"];
+        const isValid =
+          validBuiltinRoles.includes(body.role) ||
+          db.select().from(schema.roles).where(eq(schema.roles.name, body.role)).get();
+        if (isValid) {
+          // Prevent removing your own admin role
+          if (id === admin.id && body.role !== "admin") {
+            return reply.status(400).send({
+              error: "Cannot remove your own admin role",
+              code: "SELF_DEMOTE",
+            });
+          }
+
+          // Last admin protection
+          if (user.role === "admin" && body.role !== "admin") {
+            const adminCount = db
+              .select({ count: sql<number>`COUNT(*)` })
+              .from(schema.users)
+              .where(eq(schema.users.role, "admin"))
+              .get();
+            if (adminCount && adminCount.count <= 1) {
+              return reply.status(400).send({
+                error: "Cannot demote the last admin",
+                code: "LAST_ADMIN",
+              });
+            }
+          }
+
+          updates.role = body.role;
+        }
       }
 
       if (typeof body?.team === "string" && body.team.trim()) {
@@ -537,7 +599,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/users/:id/reset-password",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -591,7 +653,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     "/api/auth/users/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -707,6 +769,11 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
         for (const key of keysToCheck) {
           const matches = await verifyPassword(token, key.keyHash);
           if (matches) {
+            // Check expiration
+            if (key.expiresAt && key.expiresAt < new Date()) {
+              // Key expired — skip it
+              continue;
+            }
             // Backfill prefix for legacy keys
             if (!key.keyPrefix) {
               db.update(schema.apiKeys)
@@ -726,10 +793,14 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
               .where(eq(schema.users.id, key.userId))
               .get();
             if (apiUser) {
+              const keyPermissions = key.permissions
+                ? JSON.parse(key.permissions as string)
+                : undefined;
               (request as FastifyRequest & { user?: AuthUser }).user = {
                 id: apiUser.id,
                 username: apiUser.username,
-                role: apiUser.role as "admin" | "user",
+                role: apiUser.role,
+                apiKeyPermissions: keyPermissions,
               };
               return;
             }
@@ -754,7 +825,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     (request as FastifyRequest & { user?: AuthUser }).user = {
       id: user.id,
       username: user.username,
-      role: user.role as "admin" | "user",
+      role: user.role,
     };
 
     // Enforce mustChangePassword — block non-auth API calls

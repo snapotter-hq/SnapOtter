@@ -14,7 +14,7 @@ import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { ensureSharpCompat } from "../lib/heic-converter.js";
-import { requireAdmin } from "../plugins/auth.js";
+import { requirePermission } from "../permissions.js";
 
 const BRANDING_DIR = join(process.cwd(), "data", "branding");
 const LOGO_PATH = join(BRANDING_DIR, "logo.png");
@@ -35,7 +35,7 @@ function upsertSetting(key: string, value: string): void {
 export async function brandingRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/settings/logo — Upload logo (admin only)
   app.post("/api/v1/settings/logo", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requireAdmin(request, reply);
+    const admin = requirePermission("branding:manage")(request, reply);
     if (!admin) return;
 
     const file = await request.file();
@@ -90,7 +90,7 @@ export async function brandingRoutes(app: FastifyInstance): Promise<void> {
 
   // DELETE /api/v1/settings/logo — Remove logo (admin only)
   app.delete("/api/v1/settings/logo", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requireAdmin(request, reply);
+    const admin = requirePermission("branding:manage")(request, reply);
     if (!admin) return;
 
     if (existsSync(LOGO_PATH)) {

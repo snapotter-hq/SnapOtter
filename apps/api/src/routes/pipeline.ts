@@ -26,6 +26,7 @@ import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { createWorkspace } from "../lib/workspace.js";
+import { hasEffectivePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import { type JobProgress, updateJobProgress } from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
@@ -335,10 +336,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
     // Admins see all pipelines; regular users see their own + legacy (no owner)
     const allRows = db.select().from(schema.pipelines).all();
-    const rows =
-      user.role === "admin"
-        ? allRows
-        : allRows.filter((row) => !row.userId || row.userId === user.id);
+    const rows = hasEffectivePermission(user, "pipelines:all")
+      ? allRows
+      : allRows.filter((row) => !row.userId || row.userId === user.id);
 
     const pipelines = rows.map((row) => ({
       id: row.id,
@@ -371,7 +371,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       }
 
       // Only the owner (or admin) can delete; legacy pipelines (no owner) can be deleted by anyone
-      if (existing.userId && existing.userId !== user.id && user.role !== "admin") {
+      if (
+        existing.userId &&
+        existing.userId !== user.id &&
+        !hasEffectivePermission(user, "pipelines:all")
+      ) {
         return reply.status(403).send({ error: "Not authorized to delete this pipeline" });
       }
 

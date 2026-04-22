@@ -27,7 +27,8 @@ import {
   releaseInstallLock,
   setInstallProgress,
 } from "../lib/feature-status.js";
-import { requireAdmin, requireAuth } from "../plugins/auth.js";
+import { requirePermission } from "../permissions.js";
+import { requireAuth } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
 
 const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
@@ -110,7 +111,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.post(
     "/api/v1/admin/features/:bundleId/install",
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const { bundleId } = request.params;
@@ -215,7 +216,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.post(
     "/api/v1/admin/features/:bundleId/uninstall",
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const { bundleId } = request.params;
@@ -271,7 +272,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.get(
     "/api/v1/admin/features/disk-usage",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const admin = requireAdmin(request, reply);
+      const admin = requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const totalBytes = getDirSize(getAiDir());

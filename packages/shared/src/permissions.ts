@@ -10,6 +10,9 @@ export type Permission =
   | "settings:write"
   | "users:manage"
   | "teams:manage"
-  | "branding:manage";
+  | "branding:manage"
+  | "features:manage"
+  | "system:health"
+  | "audit:read";
 
-export type Role = "admin" | "user";
+export type Role = "admin" | "editor" | "user";

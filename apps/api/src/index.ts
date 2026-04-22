@@ -9,10 +9,12 @@ import { runMigrations } from "./db/migrate.js";
 import { startCleanupCron } from "./lib/cleanup.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { shutdownWorkerPool } from "./lib/worker-pool.js";
-import { authMiddleware, authRoutes, ensureDefaultAdmin, requireAdmin } from "./plugins/auth.js";
+import { requirePermission } from "./permissions.js";
+import { authMiddleware, authRoutes, ensureDefaultAdmin } from "./plugins/auth.js";
 import { registerStatic } from "./plugins/static.js";
 import { registerUpload } from "./plugins/upload.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
+import { auditLogRoutes } from "./routes/audit-log.js";
 import { registerBatchRoutes } from "./routes/batch.js";
 import { brandingRoutes } from "./routes/branding.js";
 import { docsRoutes } from "./routes/docs.js";
@@ -20,6 +22,7 @@ import { registerFeatureRoutes } from "./routes/features.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { recoverStaleJobs, registerProgressRoutes } from "./routes/progress.js";
+import { rolesRoutes } from "./routes/roles.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
@@ -134,6 +137,12 @@ await brandingRoutes(app);
 // Teams routes
 await teamsRoutes(app);
 
+// Audit log routes
+await auditLogRoutes(app);
+
+// Roles management routes
+await rolesRoutes(app);
+
 // API docs (Scalar)
 await docsRoutes(app);
 
@@ -157,7 +166,7 @@ app.get("/api/v1/health", async (_request, reply) => {
 
 // Admin health check (full diagnostics)
 app.get("/api/v1/admin/health", async (request, reply) => {
-  const admin = requireAdmin(request, reply);
+  const admin = requirePermission("system:health")(request, reply);
   if (!admin) return;
 
   let dbOk = false;

@@ -9,7 +9,8 @@
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
-import { requireAdmin, requireAuth } from "../plugins/auth.js";
+import { requirePermission } from "../permissions.js";
+import { requireAuth } from "../plugins/auth.js";
 
 const HTML_TAG_PATTERN = /<[a-z/!][^>]*>/i;
 
@@ -31,7 +32,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   // PUT /api/v1/settings — Save settings (admin only)
   app.put("/api/v1/settings", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requireAdmin(request, reply);
+    const admin = requirePermission("settings:write")(request, reply);
     if (!admin) return;
 
     const body = request.body as Record<string, unknown> | null;

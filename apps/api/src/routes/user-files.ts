@@ -29,6 +29,7 @@ import {
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { ensureSharpCompat } from "../lib/heic-converter.js";
+import { hasEffectivePermission } from "../permissions.js";
 import { getAuthUser, requireAuth } from "../plugins/auth.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -115,8 +116,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       // Build the where clauses
       const conditions = [latestCondition];
 
-      // Non-admin users only see their own files; admins see all
-      if (user.role !== "admin") {
+      // Users without files:all only see their own files
+      if (!hasEffectivePermission(user, "files:all")) {
         conditions.push(eq(schema.userFiles.userId, user.id));
       }
 
@@ -241,7 +242,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
 
-      if (!file || (user.role !== "admin" && file.userId !== user.id)) {
+      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
         return reply.status(404).send({ error: "File not found" });
       }
 
@@ -321,7 +322,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
 
-      if (!file || (user.role !== "admin" && file.userId !== user.id)) {
+      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
         return reply.status(404).send({ error: "File not found" });
       }
 
@@ -422,7 +423,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     for (const id of ids) {
       // Ownership check: non-admin users can only delete their own files
       const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
-      if (!file || (user.role !== "admin" && file.userId !== user.id)) continue;
+      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all")))
+        continue;
       // Collect all files in the chain using a recursive CTE
       const chainRows = sqlite
         .prepare(`

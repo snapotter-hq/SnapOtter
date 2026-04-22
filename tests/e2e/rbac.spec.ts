@@ -138,6 +138,9 @@ base.describe("RBAC - User sees restricted tabs", () => {
     await expect(page.getByRole("button", { name: /system settings/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /people/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
+
+    // Should NOT see editor-only tabs (requires settings:write)
+    await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
   });
 
   base.test("user role gets 403 on admin API endpoints", async ({ page }) => {
@@ -158,6 +161,99 @@ base.describe("RBAC - User sees restricted tabs", () => {
     const settingsRes = await fetch(`${API}/api/v1/settings`, {
       method: "PUT",
       headers: authJson(bearerToken),
+      body: JSON.stringify({ appName: "hacked" }),
+    });
+    expect(settingsRes.status).toBe(403);
+  });
+});
+
+// ── Editor sees collaborative tabs ─────────────────────────────────
+
+base.describe("RBAC - Editor sees collaborative tabs", () => {
+  let adminToken: string;
+
+  base.beforeAll(async () => {
+    adminToken = await getAdminToken();
+    // Create editor user
+    const createRes = await fetch(`${API}/api/auth/register`, {
+      method: "POST",
+      headers: authJson(adminToken),
+      body: JSON.stringify({
+        username: "editortest",
+        password: "EditorTest1",
+        role: "editor",
+      }),
+    });
+    if (createRes.status !== 201 && createRes.status !== 409) {
+      throw new Error(`Failed to create editor user: ${createRes.status}`);
+    }
+
+    // Clear mustChangePassword
+    const loginRes = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "editortest", password: "EditorTest1" }),
+    });
+    if (!loginRes.ok) throw new Error(`Editor login failed: ${loginRes.status}`);
+    const loginData = await loginRes.json();
+    await fetch(`${API}/api/auth/change-password`, {
+      method: "POST",
+      headers: authJson(loginData.token),
+      body: JSON.stringify({
+        currentPassword: "EditorTest1",
+        newPassword: "EditorTest1",
+      }),
+    });
+  });
+
+  base.afterAll(async () => {
+    const listRes = await fetch(`${API}/api/auth/users`, {
+      headers: authOnly(adminToken),
+    });
+    if (!listRes.ok) return;
+    const { users } = await listRes.json();
+    const editor = users.find((u: { username: string }) => u.username === "editortest");
+    if (editor) {
+      await fetch(`${API}/api/auth/users/${editor.id}`, {
+        method: "DELETE",
+        headers: authOnly(adminToken),
+      });
+    }
+  });
+
+  base.test(
+    "editor sees general, security, api-keys, tools, about but not admin tabs",
+    async ({ page }) => {
+      await login(page, "editortest", "EditorTest1");
+      await page.locator("aside").getByText("Settings").click();
+
+      // Should see these
+      await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
+
+      // Should NOT see admin tabs
+      await expect(page.getByRole("button", { name: /system settings/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /people/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
+    },
+  );
+
+  base.test("editor gets 403 on admin API endpoints", async ({ page }) => {
+    await login(page, "editortest", "EditorTest1");
+    const token = await page.evaluate(() => localStorage.getItem("ashim-token"));
+    expect(token).toBeTruthy();
+
+    const usersRes = await fetch(`${API}/api/auth/users`, {
+      headers: authOnly(token as string),
+    });
+    expect(usersRes.status).toBe(403);
+
+    const settingsRes = await fetch(`${API}/api/v1/settings`, {
+      method: "PUT",
+      headers: authJson(token as string),
       body: JSON.stringify({ appName: "hacked" }),
     });
     expect(settingsRes.status).toBe(403);
