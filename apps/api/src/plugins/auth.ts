@@ -208,6 +208,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
           permissions: getPermissions(user.role),
           teamName: teamRow?.name ?? user.team,
+          analyticsEnabled: user.analyticsEnabled ?? null,
+          analyticsConsentShownAt: user.analyticsConsentShownAt?.getTime() ?? null,
+          analyticsConsentRemindAt: user.analyticsConsentRemindAt?.getTime() ?? null,
         },
         expiresAt: expiresAt.toISOString(),
       });
@@ -255,6 +258,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         role: user.role,
         mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
         permissions: getPermissions(user.role),
+        analyticsEnabled: user.analyticsEnabled ?? null,
+        analyticsConsentShownAt: user.analyticsConsentShownAt?.getTime() ?? null,
+        analyticsConsentRemindAt: user.analyticsConsentRemindAt?.getTime() ?? null,
       },
       expiresAt: session.expiresAt.toISOString(),
     });

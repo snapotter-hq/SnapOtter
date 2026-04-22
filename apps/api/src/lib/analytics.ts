@@ -1,0 +1,75 @@
+import { eq } from "drizzle-orm";
+import type { FastifyRequest } from "fastify";
+import { env } from "../config.js";
+import { db, schema } from "../db/index.js";
+import { getAuthUser } from "../plugins/auth.js";
+
+let posthogClient: import("posthog-node").PostHog | null = null;
+
+export function initAnalytics(): void {
+  if (!env.ANALYTICS_ENABLED || !env.POSTHOG_API_KEY) return;
+
+  try {
+    const { PostHog } = require("posthog-node") as typeof import("posthog-node");
+    posthogClient = new PostHog(env.POSTHOG_API_KEY, {
+      host: env.POSTHOG_HOST,
+      flushAt: 20,
+      flushInterval: 30000,
+    });
+  } catch {
+    // posthog-node not available — analytics disabled
+  }
+}
+
+export async function shutdownAnalytics(): Promise<void> {
+  if (posthogClient) {
+    await posthogClient.shutdown();
+    posthogClient = null;
+  }
+}
+
+function getInstanceId(): string {
+  const row = db.select().from(schema.settings).where(eq(schema.settings.key, "instance_id")).get();
+  return row?.value ?? "unknown";
+}
+
+function isUserOptedIn(userId: string): boolean {
+  if (!env.ANALYTICS_ENABLED) return false;
+  if (userId === "anonymous") return false;
+  const user = db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
+  return user?.analyticsEnabled === true;
+}
+
+function isRequestOptedIn(request: FastifyRequest): boolean {
+  if (!env.ANALYTICS_ENABLED) return false;
+  const user = getAuthUser(request);
+  if (!user) return false;
+  if (user.id === "anonymous") {
+    const header = request.headers["x-analytics-consent"];
+    return header === "true";
+  }
+  return isUserOptedIn(user.id);
+}
+
+function shouldSample(): boolean {
+  if (env.ANALYTICS_SAMPLE_RATE >= 1.0) return true;
+  if (env.ANALYTICS_SAMPLE_RATE <= 0.0) return false;
+  return Math.random() < env.ANALYTICS_SAMPLE_RATE;
+}
+
+export function trackEvent(
+  request: FastifyRequest,
+  event: string,
+  properties: Record<string, unknown>,
+): void {
+  if (!posthogClient || !isRequestOptedIn(request) || !shouldSample()) return;
+  try {
+    posthogClient.capture({
+      distinctId: getInstanceId(),
+      event,
+      properties,
+    });
+  } catch {
+    // never throw from analytics
+  }
+}
