@@ -36,7 +36,8 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     let scopedPermissions: string[] | null = null;
     if (Array.isArray(body?.permissions) && body.permissions.length > 0) {
       const userPerms = getPermissions(user.role);
-      const invalid = body.permissions.filter((p: string) => !userPerms.includes(p as any));
+      const permSet = new Set<string>(userPerms);
+      const invalid = body.permissions.filter((p: string) => !permSet.has(p));
       if (invalid.length > 0) {
         return reply.status(400).send({
           error: `Cannot scope key with permissions you don't have: ${invalid.join(", ")}`,
