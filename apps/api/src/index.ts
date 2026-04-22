@@ -73,6 +73,12 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
     { err: error, url: request.url, method: request.method },
     "Unhandled request error",
   );
+  try {
+    const Sentry = require("@sentry/node") as typeof import("@sentry/node");
+    Sentry.captureException(error);
+  } catch {
+    // Sentry not available
+  }
   const isProduction = process.env.NODE_ENV === "production";
   reply.status(statusCode).send({
     error: statusCode >= 500 ? "Internal server error" : error.message,

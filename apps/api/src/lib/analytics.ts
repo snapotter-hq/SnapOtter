@@ -4,6 +4,10 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { getAuthUser } from "../plugins/auth.js";
 
+const FILE_EXT_PATTERN =
+  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|he[ic]f?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
+const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai)\//g;
+
 let posthogClient: import("posthog-node").PostHog | null = null;
 
 export function initAnalytics(): void {
@@ -19,12 +23,64 @@ export function initAnalytics(): void {
   } catch {
     // posthog-node not available — analytics disabled
   }
+
+  if (env.SENTRY_DSN) {
+    try {
+      const Sentry = require("@sentry/node") as typeof import("@sentry/node");
+      Sentry.init({
+        dsn: env.SENTRY_DSN,
+        sendDefaultPii: false,
+        beforeSend(event) {
+          if (event.user) {
+            delete event.user.email;
+            delete event.user.username;
+          }
+          if (event.exception?.values) {
+            for (const ex of event.exception.values) {
+              if (ex.value) {
+                ex.value = ex.value
+                  .replace(FILE_EXT_PATTERN, ".[REDACTED]")
+                  .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
+              }
+              if (ex.stacktrace?.frames) {
+                for (const frame of ex.stacktrace.frames) {
+                  if (frame.filename) {
+                    frame.filename = frame.filename
+                      .replace(FILE_EXT_PATTERN, ".[REDACTED]")
+                      .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
+                  }
+                }
+              }
+            }
+          }
+          return event;
+        },
+        beforeBreadcrumb(breadcrumb) {
+          if (breadcrumb.message) {
+            breadcrumb.message = breadcrumb.message
+              .replace(FILE_EXT_PATTERN, ".[REDACTED]")
+              .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
+          }
+          return breadcrumb;
+        },
+      });
+    } catch {
+      // @sentry/node not available
+    }
+  }
 }
 
 export async function shutdownAnalytics(): Promise<void> {
   if (posthogClient) {
     await posthogClient.shutdown();
     posthogClient = null;
+  }
+
+  try {
+    const Sentry = require("@sentry/node") as typeof import("@sentry/node");
+    await Sentry.close(2000);
+  } catch {
+    // @sentry/node not available
   }
 }
 
