@@ -50,12 +50,6 @@ export function Navbar() {
             <span>Star</span>
           </a>
           <a
-            href="https://demo.snapotter.com"
-            className="rounded-lg border border-accent px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-          >
-            Try Demo
-          </a>
-          <a
             href="/contact"
             className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
           >
@@ -95,12 +89,6 @@ export function Navbar() {
               <Github size={16} />
               <Star size={12} className="text-accent" />
               Star on GitHub
-            </a>
-            <a
-              href="https://demo.snapotter.com"
-              className="block rounded-lg border border-accent px-4 py-2 text-center text-sm font-medium text-accent"
-            >
-              Try Demo
             </a>
             <a
               href="/contact"

@@ -5,7 +5,7 @@ const columns = [
     title: "Product",
     links: [
       { label: "Features", href: "#features" },
-      { label: "Demo", href: "https://demo.snapotter.com" },
+      { label: "Pricing", href: "#pricing" },
       { label: "Enterprise", href: "/contact" },
     ],
   },
