@@ -18,7 +18,7 @@ export function HowItWorks() {
   }
 
   return (
-    <section id="how-it-works" className="bg-background-alt px-6 py-20 md:py-28">
+    <section id="how-it-works" className="bg-background-alt px-6 py-14 md:py-20">
       <div className="mx-auto max-w-3xl text-center">
         <FadeIn>
           <p className="text-sm font-medium text-accent">Get started in seconds</p>
