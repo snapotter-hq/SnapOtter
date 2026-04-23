@@ -7,7 +7,7 @@ import { HowItWorks } from "@/components/how-it-works";
 import { Navbar } from "@/components/navbar";
 import { OpenSource } from "@/components/open-source";
 import { ThreeWays } from "@/components/three-ways";
-import { UseCases } from "@/components/use-cases";
+
 import { WhyChoose } from "@/components/why-choose";
 
 export default function Home() {
@@ -20,7 +20,6 @@ export default function Home() {
         <BentoGrid />
         <ThreeWays />
         <Enterprise />
-        <UseCases />
         <HowItWorks />
         <ApiCallout />
         <OpenSource />
