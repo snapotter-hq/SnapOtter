@@ -2359,14 +2359,14 @@ describe("Pipeline", () => {
       expect(body.steps).toHaveLength(5);
     });
 
-    it("rejects pipeline exceeding 20 steps", async () => {
+    it("accepts pipeline with more than 20 steps when limit is unlimited", async () => {
       const steps = Array.from({ length: 21 }, () => ({
         toolId: "resize",
         settings: { width: 100 },
       }));
 
       const { body: payload, contentType } = createMultipartPayload([
-        { name: "file", filename: "too-many.png", contentType: "image/png", content: PNG_1x1 },
+        { name: "file", filename: "many-steps.png", contentType: "image/png", content: PNG_1x1 },
         { name: "pipeline", content: JSON.stringify({ steps }) },
       ]);
 
@@ -2379,7 +2379,7 @@ describe("Pipeline", () => {
         },
         payload,
       });
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(200);
     });
 
     it("processes result file is downloadable", async () => {
@@ -2618,7 +2618,7 @@ describe("Pipeline", () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it("rejects saving pipeline with more than 20 steps", async () => {
+    it("accepts saving pipeline with more than 20 steps when limit is unlimited", async () => {
       const steps = Array.from({ length: 21 }, () => ({
         toolId: "resize",
         settings: { width: 100 },
@@ -2628,9 +2628,9 @@ describe("Pipeline", () => {
         method: "POST",
         url: "/api/v1/pipeline/save",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { name: "Too Many Steps", steps },
+        payload: { name: "Many Steps", steps },
       });
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(201);
     });
 
     it("can save and delete multiple pipelines", async () => {

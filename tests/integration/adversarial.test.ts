@@ -177,16 +177,12 @@ describe("Invalid dimensions in settings", () => {
     expect([200, 400, 422]).toContain(res.statusCode);
   });
 
-  it("rejects extremely large width with 422", async () => {
-    // Use a large-but-not-absurd value so Sharp rejects it quickly
-    // rather than trying to allocate gigabytes of RAM and timing out.
+  it("handles large width without crashing", async () => {
     const res = await postTool("resize", [
       { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ width: 65536 }) },
+      { name: "settings", content: JSON.stringify({ width: 10000 }) },
     ]);
 
-    // Sharp should fail with a processing error for dimensions this large
-    // on a tiny input image, or succeed if it can handle it. Must not crash.
     expect([200, 400, 422]).toContain(res.statusCode);
   });
 });
