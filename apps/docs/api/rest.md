@@ -25,7 +25,7 @@ curl http://localhost:1349/api/v1/tools/resize \
   -H "Authorization: Bearer <session-token>"
 ```
 
-Sessions expire after 24 hours.
+Sessions expire after 7 days (configurable via `SESSION_DURATION_HOURS`).
 
 ### API Keys
 
@@ -68,6 +68,13 @@ Keys are prefixed `si_` and stored as SHA-256 hashes - the raw key is shown once
 | Write settings | ✓ | - |
 | Manage users & teams | ✓ | - |
 | Manage branding | ✓ | - |
+
+## Health Check
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/v1/health` | Public | Basic health check. Returns `{"status":"healthy","version":"..."}` with 200, or `{"status":"unhealthy"}` with 503 if the database is unreachable. |
+| `GET` | `/api/v1/admin/health` | Admin (`system:health`) | Detailed diagnostics including uptime, storage mode, database status, queue state, and GPU availability. |
 
 ## Using Tools
 
@@ -120,7 +127,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<toolId>/batch \
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
-| `color-adjustments` | Adjust Colors | `brightness`, `contrast`, `exposure`, `saturation`, `temperature`, `sharpness`, `vibrance`, effects (grayscale/sepia/invert/vignette) |
+| `adjust-colors` | Adjust Colors | `brightness`, `contrast`, `exposure`, `saturation`, `temperature`, `sharpness`, `vibrance`, effects (grayscale/sepia/invert/vignette) |
 | `sharpening` | Sharpening | `mode` (adaptive/unsharp/highpass), `amount`, `radius`, `threshold` |
 | `replace-color` | Replace Color | `targetColor`, `replacementColor`, `tolerance`, `invert` |
 
@@ -197,7 +204,7 @@ curl -X POST http://localhost:1349/api/v1/tools/compress/batch \
   -F 'settings={"quality":80}'
 ```
 
-Limits: up to **200 files** per batch. Concurrency controlled by `CONCURRENT_JOBS` (default: 3).
+Concurrency is controlled by `CONCURRENT_JOBS` (default: auto-detected from CPU cores). Set `MAX_BATCH_SIZE` to limit the number of files per batch (default: unlimited).
 
 ## Pipelines
 
@@ -299,6 +306,55 @@ Runtime key-value configuration (read by any authenticated user, write by admin 
 | `PUT` | `/api/v1/settings/:key` | Set a value |
 
 Known keys: `disabledTools` (JSON array of tool IDs), `enableExperimentalTools` (bool string), `loginAttemptLimit` (number), `customLogo` (managed via branding endpoint).
+
+## Roles
+
+Custom role management with granular permissions.
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/v1/roles` | Admin (`audit:read`) | List all roles with user counts |
+| `POST` | `/api/v1/roles` | Admin (`users:manage`) | Create a custom role (`name`, `description`, `permissions`) |
+| `PUT` | `/api/v1/roles/:id` | Admin (`users:manage`) | Update a custom role (cannot modify built-in roles) |
+| `DELETE` | `/api/v1/roles/:id` | Admin (`users:manage`) | Delete a custom role (cannot delete built-in roles; affected users revert to `user` role) |
+
+Available permissions: `tools:use`, `files:own`, `files:all`, `apikeys:own`, `apikeys:all`, `pipelines:own`, `pipelines:all`, `settings:read`, `settings:write`, `users:manage`, `teams:manage`, `branding:manage`, `features:manage`, `system:health`, `audit:read`.
+
+## Audit Log
+
+Admin-only endpoint for reviewing security-relevant actions.
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/v1/audit-log` | Admin (`audit:read`) | Paginated audit log with optional filters |
+
+Query parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `page` | Page number (default: 1) |
+| `limit` | Entries per page (default: 50, max: 100) |
+| `action` | Filter by action type (e.g. `ROLE_CREATED`, `ROLE_DELETED`) |
+| `from` | Filter entries after this ISO 8601 date |
+| `to` | Filter entries before this ISO 8601 date |
+
+## Analytics
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/v1/config/analytics` | Public | Get analytics configuration (PostHog key, Sentry DSN, sample rate). Returns empty values if `ANALYTICS_ENABLED=false`. |
+| `PUT` | `/api/v1/user/analytics` | Auth | Set the current user's analytics consent (`enabled: true/false`) or defer with `remindLater: true`. |
+
+## Features / AI Bundles
+
+Manage AI feature bundles (install/uninstall AI model packages in the Docker environment).
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/v1/features` | Auth | List all feature bundles and their install status |
+| `POST` | `/api/v1/admin/features/:bundleId/install` | Admin (`features:manage`) | Install a feature bundle (async, returns `jobId` for progress tracking) |
+| `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Uninstall a feature bundle and clean up model files |
+| `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Get total disk usage of AI models |
 
 ## Error Responses
 

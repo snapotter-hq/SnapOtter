@@ -3,11 +3,17 @@ import { writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { z } from "zod";
 import { readBarcodes } from "zxing-wasm/reader";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
+
+const settingsSchema = z.object({
+  tryHarder: z.boolean().default(true),
+});
 
 /**
  * Color palette for bounding-box overlays.
@@ -111,9 +117,23 @@ export function registerBarcodeRead(app: FastifyInstance) {
       });
     }
 
+    // Parse and validate settings
+    let settings: z.infer<typeof settingsSchema>;
     try {
-      const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const tryHarder = settings.tryHarder !== false; // default true
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+      }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    try {
+      const tryHarder = settings.tryHarder;
 
       // Decode HEIC/HEIF if needed, then auto-orient
       fileBuffer = await ensureSharpCompat(fileBuffer);

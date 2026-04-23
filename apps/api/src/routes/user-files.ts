@@ -16,6 +16,7 @@ import { extname } from "node:path";
 import { and, desc, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { z } from "zod";
 import { db, schema, sqlite } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
 import {
@@ -402,16 +403,16 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const user = requireAuth(request, reply);
     if (!user) return;
 
-    const body = request.body as { ids?: unknown } | null;
-
-    if (!Array.isArray(body?.ids) || body.ids.length === 0) {
-      return reply.status(400).send({ error: "ids must be a non-empty array" });
+    const deleteSchema = z.object({
+      ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
+    });
+    const parsed = deleteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.issues.map((i) => i.message).join("; "),
+      });
     }
-
-    const ids = body.ids.filter((id): id is string => typeof id === "string");
-    if (ids.length === 0) {
-      return reply.status(400).send({ error: "ids must contain string values" });
-    }
+    const { ids } = parsed.data;
 
     let deletedCount = 0;
 

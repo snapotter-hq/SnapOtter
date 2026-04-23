@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { formatZodErrors } from "../../lib/errors.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 const settingsSchema = z.object({
@@ -89,7 +90,7 @@ export function registerImageToBase64(app: FastifyInstance) {
       if (!parsed.success) {
         return reply.status(400).send({
           error: "Invalid settings",
-          details: parsed.error.flatten().fieldErrors,
+          details: formatZodErrors(parsed.error.issues),
         });
       }
       const opts = parsed.data;

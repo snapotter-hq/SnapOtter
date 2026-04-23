@@ -6,6 +6,7 @@ import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -13,6 +14,13 @@ import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  sensitivity: z.number().min(0).max(100).default(50),
+  strength: z.number().min(0).max(100).default(70),
+  format: z.string().optional(),
+  quality: z.number().min(1).max(100).default(90),
+});
 
 /** Red eye detection and removal route. */
 export function registerRedEyeRemoval(app: FastifyInstance) {
@@ -69,7 +77,19 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
       }
 
       try {
-        const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
 
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
@@ -80,12 +100,13 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
         }
 
+        const { sensitivity, strength, format: outputFormat, quality } = settings;
         request.log.info(
           {
             toolId: "red-eye-removal",
             imageSize: fileBuffer.length,
-            sensitivity: settings.sensitivity,
-            strength: settings.strength,
+            sensitivity,
+            strength,
           },
           "Starting red eye removal",
         );
@@ -116,10 +137,10 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           fileBuffer,
           join(workspacePath, "output"),
           {
-            sensitivity: settings.sensitivity ?? 50,
-            strength: settings.strength ?? 70,
-            format: settings.format,
-            quality: settings.quality ?? 90,
+            sensitivity,
+            strength,
+            format: outputFormat,
+            quality,
           },
           onProgress,
         );

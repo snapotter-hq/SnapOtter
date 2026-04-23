@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -15,6 +16,11 @@ import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  intensity: z.number().min(0).max(1).default(1.0),
+  model: z.enum(["auto", "ddcolor", "opencv"]).default("auto"),
+});
 
 /**
  * AI photo colorization route.
@@ -73,9 +79,21 @@ export function registerColorize(app: FastifyInstance) {
     }
 
     try {
-      const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const intensity = Math.min(1, Math.max(0, Number(settings.intensity) || 1.0));
-      const model = settings.model || "auto";
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      const { intensity, model } = settings;
 
       request.log.info(
         { toolId: "colorize", imageSize: fileBuffer.length, intensity, model },

@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { applyEffects } from "../../lib/bg-effects.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -92,7 +93,19 @@ export function registerRemoveBackground(app: FastifyInstance) {
       }
 
       try {
-        const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
 
         // Decode HEIC/HEIF before processing
         if (validation.format === "heif") {
@@ -210,13 +223,37 @@ export function registerRemoveBackground(app: FastifyInstance) {
         return reply.status(400).send({ error: "No settings provided" });
       }
 
-      try {
-        const settings = JSON.parse(settingsRaw);
-        const { jobId, filename } = settings;
+      const effectsSchema = z.object({
+        jobId: z.string().min(1),
+        filename: z.string().min(1),
+        backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
+        backgroundColor: z.string().optional(),
+        gradientColor1: z.string().optional(),
+        gradientColor2: z.string().optional(),
+        gradientAngle: z.number().optional(),
+        blurEnabled: z.boolean().optional(),
+        blurIntensity: z.number().min(0).max(100).optional(),
+        shadowEnabled: z.boolean().optional(),
+        shadowOpacity: z.number().min(0).max(100).optional(),
+      });
 
-        if (!jobId || !filename) {
-          return reply.status(400).send({ error: "jobId and filename are required" });
+      try {
+        let settings: z.infer<typeof effectsSchema>;
+        try {
+          const parsed = JSON.parse(settingsRaw);
+          const result = effectsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply.status(400).send({
+              error: "Invalid settings",
+              details: formatZodErrors(result.error.issues),
+            });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
         }
+
+        const { jobId, filename } = settings;
 
         const workspacePath = getWorkspacePath(jobId);
 

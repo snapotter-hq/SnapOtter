@@ -58,16 +58,20 @@ For Docker Compose, persistent storage, and other setup options, see the [Gettin
 
 - [Getting Started](https://ashim-hq.github.io/ashim/guide/getting-started)
 - [Configuration](https://ashim-hq.github.io/ashim/guide/configuration)
+- [Deployment](https://ashim-hq.github.io/ashim/guide/deployment)
+- [Docker Tags](https://ashim-hq.github.io/ashim/guide/docker-tags)
 - [REST API](https://ashim-hq.github.io/ashim/api/rest)
+- [AI Engine](https://ashim-hq.github.io/ashim/api/ai)
+- [Image Engine](https://ashim-hq.github.io/ashim/api/image-engine)
 - [Architecture](https://ashim-hq.github.io/ashim/guide/architecture)
+- [Database](https://ashim-hq.github.io/ashim/guide/database)
 - [Developer Guide](https://ashim-hq.github.io/ashim/guide/developer)
+- [Contributing](https://ashim-hq.github.io/ashim/guide/contributing)
 - [Translation Guide](https://ashim-hq.github.io/ashim/guide/translations)
 
 ## Feedback
 
 Found a bug or have a feature idea? Open a [GitHub Issue](https://github.com/ashim-hq/ashim/issues). We don't accept pull requests, but your feedback directly shapes the project. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-<!-- TODO: Add sponsorship links once Ko-fi and GitHub Sponsors are set up -->
 
 ## License
 

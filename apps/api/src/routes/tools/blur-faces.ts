@@ -6,6 +6,7 @@ import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -13,6 +14,11 @@ import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  blurRadius: z.number().min(1).max(100).default(30),
+  sensitivity: z.number().min(0).max(1).default(0.5),
+});
 
 /** Face detection and blurring route. */
 export function registerBlurFaces(app: FastifyInstance) {
@@ -67,7 +73,19 @@ export function registerBlurFaces(app: FastifyInstance) {
     }
 
     try {
-      const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
 
       if (validation.format === "heif") {
         fileBuffer = await decodeHeic(fileBuffer);
@@ -78,12 +96,13 @@ export function registerBlurFaces(app: FastifyInstance) {
         fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
       }
 
+      const { blurRadius, sensitivity } = settings;
       request.log.info(
         {
           toolId: "blur-faces",
           imageSize: fileBuffer.length,
-          blurRadius: settings.blurRadius,
-          sensitivity: settings.sensitivity,
+          blurRadius,
+          sensitivity,
         },
         "Starting face blur",
       );
@@ -114,8 +133,8 @@ export function registerBlurFaces(app: FastifyInstance) {
         fileBuffer,
         join(workspacePath, "output"),
         {
-          blurRadius: settings.blurRadius ?? 30,
-          sensitivity: settings.sensitivity ?? 0.5,
+          blurRadius,
+          sensitivity,
         },
         onProgress,
       );

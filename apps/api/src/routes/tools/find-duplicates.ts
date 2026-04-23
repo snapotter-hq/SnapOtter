@@ -1,10 +1,15 @@
 import { basename } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
+import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
-const DEFAULT_THRESHOLD = 8;
+const settingsSchema = z.object({
+  threshold: z.number().min(0).max(20).default(8),
+});
+
 const THUMBNAIL_WIDTH = 200;
 
 /**
@@ -89,7 +94,7 @@ async function extractFileInfo(file: FileData): Promise<FileInfo> {
 export function registerFindDuplicates(app: FastifyInstance) {
   app.post("/api/v1/tools/find-duplicates", async (request, reply) => {
     const files: FileData[] = [];
-    let threshold = DEFAULT_THRESHOLD;
+    let settingsRaw: string | null = null;
 
     try {
       const parts = request.parts();
@@ -107,11 +112,11 @@ export function registerFindDuplicates(app: FastifyInstance) {
               originalSize: buf.length,
             });
           }
+        } else if (part.type === "field" && part.fieldname === "settings") {
+          settingsRaw = part.value as string;
         } else if (part.type === "field" && part.fieldname === "threshold") {
-          const val = Number(part.value);
-          if (!Number.isNaN(val) && val >= 0 && val <= 20) {
-            threshold = val;
-          }
+          // Legacy: accept bare threshold field as settings
+          settingsRaw = JSON.stringify({ threshold: Number(part.value) });
         }
       }
     } catch (err) {
@@ -120,6 +125,23 @@ export function registerFindDuplicates(app: FastifyInstance) {
         details: err instanceof Error ? err.message : String(err),
       });
     }
+
+    // Parse and validate settings
+    let settings: z.infer<typeof settingsSchema>;
+    try {
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+      }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    const threshold = settings.threshold;
 
     if (files.length < 2) {
       return reply

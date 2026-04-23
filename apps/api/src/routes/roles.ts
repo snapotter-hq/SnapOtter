@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Permission } from "@ashim/shared";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
 import { requirePermission } from "../permissions.js";
@@ -23,6 +24,32 @@ const ALL_PERMISSIONS: Permission[] = [
   "system:health",
   "audit:read",
 ];
+
+const roleNameField = z
+  .string()
+  .transform((v) => v.trim().toLowerCase())
+  .pipe(
+    z
+      .string()
+      .min(2, "Role name must be 2-30 characters")
+      .max(30, "Role name must be 2-30 characters")
+      .regex(
+        /^[a-z0-9_-]+$/,
+        "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
+      ),
+  );
+
+const createRoleSchema = z.object({
+  name: roleNameField,
+  description: z.string().max(500).optional(),
+  permissions: z.array(z.string()).min(1, "At least one permission is required"),
+});
+
+const updateRoleSchema = z.object({
+  name: roleNameField.optional(),
+  description: z.string().max(500).optional(),
+  permissions: z.array(z.string()).optional(),
+});
 
 export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/roles — List all roles (requires audit:read to view)
@@ -60,31 +87,16 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     const user = requirePermission("users:manage")(request, reply);
     if (!user) return;
 
-    const body = request.body as {
-      name?: string;
-      description?: string;
-      permissions?: string[];
-    } | null;
-    if (!body?.name || !Array.isArray(body?.permissions)) {
-      return reply
-        .status(400)
-        .send({ error: "Name and permissions are required", code: "VALIDATION_ERROR" });
-    }
-
-    const name = body.name.trim().toLowerCase();
-    if (name.length < 2 || name.length > 30) {
-      return reply
-        .status(400)
-        .send({ error: "Role name must be 2-30 characters", code: "VALIDATION_ERROR" });
-    }
-    if (!/^[a-z0-9_-]+$/.test(name)) {
+    const parsed = createRoleSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.status(400).send({
-        error: "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
+        error: parsed.error.issues.map((i) => i.message).join("; "),
         code: "VALIDATION_ERROR",
       });
     }
+    const { name, description, permissions } = parsed.data;
 
-    const invalid = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+    const invalid = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
     if (invalid.length > 0) {
       return reply
         .status(400)
@@ -101,8 +113,8 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       .values({
         id,
         name,
-        description: body.description?.trim() ?? "",
-        permissions: JSON.stringify(body.permissions),
+        description: description?.trim() ?? "",
+        permissions: JSON.stringify(permissions),
         isBuiltin: false,
         createdBy: user.id,
       })
@@ -113,8 +125,8 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(201).send({
       id,
       name,
-      description: body.description?.trim() ?? "",
-      permissions: body.permissions,
+      description: description?.trim() ?? "",
+      permissions,
       isBuiltin: false,
     });
   });
@@ -137,32 +149,32 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: "Cannot modify built-in roles", code: "VALIDATION_ERROR" });
       }
 
-      const body = request.body as {
-        name?: string;
-        description?: string;
-        permissions?: string[];
-      } | null;
+      const parsed = updateRoleSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.issues.map((i) => i.message).join("; "),
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const body = parsed.data;
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
-      if (body?.name) {
-        const name = body.name.trim().toLowerCase();
-        if (name.length < 2 || name.length > 30) {
-          return reply
-            .status(400)
-            .send({ error: "Role name must be 2-30 characters", code: "VALIDATION_ERROR" });
-        }
-        const dup = db.select().from(schema.roles).where(eq(schema.roles.name, name)).get();
+      if (body.name) {
+        const dup = db.select().from(schema.roles).where(eq(schema.roles.name, body.name)).get();
         if (dup && dup.id !== id) {
           return reply.status(409).send({ error: "Role name already exists", code: "CONFLICT" });
         }
         // Update users on old role name to new name
-        db.update(schema.users).set({ role: name }).where(eq(schema.users.role, role.name)).run();
-        updates.name = name;
+        db.update(schema.users)
+          .set({ role: body.name })
+          .where(eq(schema.users.role, role.name))
+          .run();
+        updates.name = body.name;
       }
-      if (body?.description !== undefined) {
+      if (body.description !== undefined) {
         updates.description = body.description.trim();
       }
-      if (Array.isArray(body?.permissions)) {
+      if (body.permissions) {
         const invalid = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
         if (invalid.length > 0) {
           return reply.status(400).send({

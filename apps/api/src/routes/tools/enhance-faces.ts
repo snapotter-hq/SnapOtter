@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -14,6 +15,13 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  model: z.enum(["auto", "gfpgan", "codeformer"]).default("auto"),
+  strength: z.number().min(0).max(1).default(0.8),
+  onlyCenterFace: z.boolean().default(false),
+  sensitivity: z.number().min(0).max(1).default(0.5),
+});
 
 /** Face enhancement route using GFPGAN/CodeFormer. */
 export function registerEnhanceFaces(app: FastifyInstance) {
@@ -68,11 +76,21 @@ export function registerEnhanceFaces(app: FastifyInstance) {
     }
 
     try {
-      const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const model = settings.model || "auto";
-      const strength = Number(settings.strength) || 0.8;
-      const onlyCenterFace = Boolean(settings.onlyCenterFace);
-      const sensitivity = Number(settings.sensitivity) || 0.5;
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      const { model, strength, onlyCenterFace, sensitivity } = settings;
       request.log.info(
         { toolId: "enhance-faces", imageSize: fileBuffer.length, model, strength },
         "Starting face enhancement",

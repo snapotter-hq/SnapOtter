@@ -214,5 +214,5 @@ See the [Configuration guide](/guide/configuration) for the full list. Key ones 
 | `DEFAULT_USERNAME`          | `admin`   | Default admin username                         |
 | `DEFAULT_PASSWORD`          | `admin`   | Default admin password                         |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false`   | Skip forced password change (CI/dev only)      |
-| `RATE_LIMIT_PER_MIN`       | `100`     | API rate limit per minute                      |
-| `MAX_UPLOAD_SIZE_MB`       | `100`     | Maximum upload size in MB                      |
+| `RATE_LIMIT_PER_MIN`       | `0`       | API rate limit per minute (0 = disabled)       |
+| `MAX_UPLOAD_SIZE_MB`       | `0`       | Maximum upload size in MB (0 = unlimited)      |

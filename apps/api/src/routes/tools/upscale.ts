@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -14,6 +15,15 @@ import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  scale: z.union([z.number(), z.string()]).transform(Number).default(2),
+  model: z.string().default("auto"),
+  faceEnhance: z.boolean().default(false),
+  denoise: z.union([z.number(), z.string()]).transform(Number).default(0),
+  format: z.string().default("png"),
+  quality: z.union([z.number(), z.string()]).transform(Number).default(95),
+});
 
 /**
  * AI image upscaling route.
@@ -71,13 +81,26 @@ export function registerUpscale(app: FastifyInstance) {
     }
 
     try {
-      const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const scale = Number(settings.scale) || 2;
-      const model = settings.model || "auto";
-      const faceEnhance = Boolean(settings.faceEnhance);
-      const denoise = Number(settings.denoise) || 0;
-      const format = settings.format || "png";
-      const outputQuality = Number(settings.quality) || 95;
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      const scale = settings.scale;
+      const model = settings.model;
+      const faceEnhance = settings.faceEnhance;
+      const denoise = settings.denoise;
+      const format = settings.format;
+      const outputQuality = settings.quality;
       request.log.info(
         { toolId: "upscale", imageSize: fileBuffer.length, scale, model, format },
         "Starting upscale",

@@ -2,7 +2,7 @@
 
 The `@ashim/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
 
-13 AI tool routes. All models run locally - no internet required after initial model download.
+14 AI tool routes. All models run locally - no internet required after initial model download.
 
 ## Architecture
 
@@ -215,6 +215,27 @@ GPU-accelerated when an NVIDIA GPU is available.
 | `head-and-shoulders` | 2.8× face | Profile photos |
 | `upper-body` | 4.5× face | LinkedIn / formal |
 | `half-body` | 7.0× face | Full upper body |
+
+## Image Enhancement
+
+**Function:** `analyzeImage` + `applyCorrections`  
+**Tool route:** `image-enhancement`  
+**Engine:** Analysis-based (Sharp histogram and statistics)
+
+Analyzes the image and applies automatic corrections for exposure, contrast, white balance, saturation, sharpness, and noise. Supports scene-specific modes.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `auto` \| `portrait` \| `landscape` \| `low-light` \| `food` \| `document` | `auto` | Scene mode for tuning corrections |
+| `intensity` | number (0-100) | 50 | Overall correction strength |
+| `corrections.exposure` | boolean | true | Apply exposure correction |
+| `corrections.contrast` | boolean | true | Apply contrast correction |
+| `corrections.whiteBalance` | boolean | true | Apply white balance correction |
+| `corrections.saturation` | boolean | true | Apply saturation correction |
+| `corrections.sharpness` | boolean | true | Apply sharpness correction |
+| `corrections.denoise` | boolean | true | Apply denoising |
+
+An additional analysis endpoint is available at `POST /api/v1/tools/image-enhancement/analyze` which returns the detected corrections without applying them.
 
 ## Content-Aware Resize (Seam Carving)
 

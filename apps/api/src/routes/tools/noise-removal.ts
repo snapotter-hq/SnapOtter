@@ -6,6 +6,7 @@ import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -79,7 +80,20 @@ export function registerNoiseRemoval(app: FastifyInstance) {
     }
 
     try {
-      const parsed = settingsSchema.parse(settingsRaw ? JSON.parse(settingsRaw) : {});
+      let parsed: z.infer<typeof settingsSchema>;
+      try {
+        const raw = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(raw);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        parsed = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
       request.log.info(
         { toolId: "noise-removal", imageSize: fileBuffer.length, tier: parsed.tier },
         "Starting noise removal",

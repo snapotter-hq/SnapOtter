@@ -5,6 +5,7 @@ import { inpaint } from "@ashim/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -26,6 +27,13 @@ const EXT_MAP: Record<string, string> = {
 };
 
 const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
+
+const settingsSchema = z.object({
+  format: z
+    .enum(["png", "jpg", "jpeg", "webp", "tiff", "gif", "avif", "heic", "heif"])
+    .default("png"),
+  quality: z.number().int().min(1).max(100).default(95),
+});
 
 /**
  * Object eraser / inpainting route.
@@ -101,6 +109,19 @@ export function registerEraseObject(app: FastifyInstance) {
     }
 
     try {
+      // Validate format and quality via Zod
+      const settingsResult = settingsSchema.safeParse({ format, quality });
+      if (!settingsResult.success) {
+        return reply.status(400).send({
+          error: "Invalid settings",
+          details: settingsResult.error.issues
+            .map((i) => (i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message))
+            .join("; "),
+        });
+      }
+      format = settingsResult.data.format;
+      quality = settingsResult.data.quality;
+
       request.log.info(
         {
           toolId: "erase-object",

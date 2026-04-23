@@ -3,8 +3,13 @@ import { basename, extname } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
+import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { formatZodErrors } from "../../lib/errors.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
+
+const settingsSchema = z.object({}).passthrough();
 
 const FAVICON_SIZES = [
   { name: "favicon-16x16.png", size: 16, format: "png" as const },
@@ -23,6 +28,7 @@ interface UploadedFile {
 export function registerFavicon(app: FastifyInstance) {
   app.post("/api/v1/tools/favicon", async (request, reply) => {
     const uploadedFiles: UploadedFile[] = [];
+    let settingsRaw: string | null = null;
 
     try {
       const parts = request.parts();
@@ -35,6 +41,8 @@ export function registerFavicon(app: FastifyInstance) {
           const buffer = Buffer.concat(chunks);
           const filename = basename(part.filename ?? `image-${uploadedFiles.length + 1}`);
           uploadedFiles.push({ buffer, filename });
+        } else if (part.fieldname === "settings") {
+          settingsRaw = part.value as string;
         }
       }
     } catch (err) {
@@ -46,6 +54,30 @@ export function registerFavicon(app: FastifyInstance) {
 
     if (uploadedFiles.length === 0) {
       return reply.status(400).send({ error: "No image file provided" });
+    }
+
+    // Validate all uploaded files
+    for (const file of uploadedFiles) {
+      const validation = await validateImageBuffer(file.buffer, file.filename);
+      if (!validation.valid) {
+        return reply
+          .status(400)
+          .send({ error: `Invalid file "${file.filename}": ${validation.reason}` });
+      }
+    }
+
+    if (settingsRaw) {
+      try {
+        const parsed = JSON.parse(settingsRaw);
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
     }
 
     try {

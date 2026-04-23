@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ashim API
-  version: 0.9.0
+  version: 1.15.9
   description: |
     REST API for ashim, a self-hosted image processing platform with 30+ tools.
 
@@ -41,6 +41,16 @@ tags:
     description: Organize users into teams.
   - name: Branding
     description: Custom logo management.
+  - name: Roles
+    description: Custom role management with fine-grained permissions.
+  - name: Audit
+    description: Audit log for tracking administrative actions.
+  - name: Analytics
+    description: Analytics configuration and user consent.
+  - name: Features
+    description: AI feature bundle installation and management.
+  - name: Admin
+    description: Administrative health diagnostics.
   - name: System
     description: Health checks, configuration, and job progress.
 
@@ -82,6 +92,64 @@ components:
           type: integer
           description: Processed file size in bytes
 
+    UnauthorizedError:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 401
+        error:
+          type: string
+          example: Unauthorized
+        message:
+          type: string
+          example: Authentication required
+
+    ForbiddenError:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 403
+        error:
+          type: string
+          example: Forbidden
+        message:
+          type: string
+          example: Insufficient permissions
+
+    ConflictError:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: Conflict
+        message:
+          type: string
+          example: Resource already exists
+
+    FeatureNotInstalledError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Feature not installed
+        code:
+          type: string
+          example: FEATURE_NOT_INSTALLED
+        feature:
+          type: string
+          description: Feature bundle identifier
+        featureName:
+          type: string
+          description: Human-readable feature name
+        estimatedSize:
+          type: string
+          description: Estimated download size
+
     HealthResponse:
       type: object
       properties:
@@ -95,6 +163,39 @@ components:
         database:
           type: string
           enum: [ok, error]
+
+    AdminHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        version:
+          type: string
+        uptime:
+          type: string
+        storage:
+          type: object
+          properties:
+            mode:
+              type: string
+            available:
+              type: string
+        database:
+          type: string
+          enum: [ok, error]
+        queue:
+          type: object
+          properties:
+            active:
+              type: integer
+            pending:
+              type: integer
+        ai:
+          type: object
+          properties:
+            gpu:
+              type: boolean
 
 security:
   - bearerAuth: []
@@ -157,6 +258,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/content-aware-resize:
     post:
@@ -211,6 +316,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/crop:
     post:
@@ -254,6 +363,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/rotate:
     post:
@@ -296,6 +409,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/convert:
     post:
@@ -337,6 +454,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/compress:
     post:
@@ -379,6 +500,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/strip-metadata:
     post:
@@ -423,6 +548,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/border:
     post:
@@ -468,12 +597,76 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/adjust-colors:
+    post:
+      tags: [Tools]
+      summary: Color adjustments
+      description: |
+        Consolidated color adjustment tool. Adjusts brightness, contrast, exposure,
+        saturation, temperature, tint, hue, sharpness, color channels, and effects
+        in a single pass. This is the primary color adjustment endpoint; the
+        brightness-contrast, saturation, color-channels, and color-effects endpoints
+        are aliases that accept the same settings schema.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -100 to 100, default 0) - Brightness adjustment
+                    - `contrast` (number -100 to 100, default 0) - Contrast adjustment
+                    - `exposure` (number -100 to 100, default 0) - Exposure adjustment (gamma)
+                    - `saturation` (number -100 to 100, default 0) - Color saturation
+                    - `temperature` (number -100 to 100, default 0) - Color temperature (cool to warm)
+                    - `tint` (number -100 to 100, default 0) - Tint shift (green to magenta)
+                    - `hue` (number -180 to 180, default 0) - Hue rotation in degrees
+                    - `sharpness` (number 0 to 100, default 0) - Sharpness enhancement
+                    - `red` (number 0-200, default 100) - Red channel multiplier
+                    - `green` (number 0-200, default 100) - Green channel multiplier
+                    - `blue` (number 0-200, default 100) - Blue channel multiplier
+                    - `effect` (string, default "none") - One of: none, grayscale, sepia, invert
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/brightness-contrast:
     post:
       tags: [Tools]
       summary: Brightness and contrast
-      description: Adjust brightness, contrast, saturation, color channels, and effects.
+      description: Adjust brightness, contrast, saturation, color channels, and effects. Alias for adjust-colors.
       security:
         - bearerAuth: []
       requestBody:
@@ -514,6 +707,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/saturation:
     post:
@@ -560,6 +757,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/color-channels:
     post:
@@ -606,6 +807,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/color-effects:
     post:
@@ -652,6 +857,1027 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/sharpening:
+    post:
+      tags: [Tools]
+      summary: Sharpening
+      description: Sharpen an image using adaptive, unsharp mask, or high-pass methods with optional noise reduction.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `method` (string, default "adaptive") - One of: adaptive, unsharp-mask, high-pass
+                    - `sigma` (number 0.5-10, default 1.0) - Gaussian sigma (adaptive)
+                    - `m1` (number 0-10, default 1.0) - Flat area sharpening (adaptive)
+                    - `m2` (number 0-20, default 3.0) - Jagged area sharpening (adaptive)
+                    - `x1` (number 0-10, default 2.0) - Flat/jagged threshold (adaptive)
+                    - `y2` (number 0-50, default 12) - Maximum brightening (adaptive)
+                    - `y3` (number 0-50, default 20) - Maximum darkening (adaptive)
+                    - `amount` (number 0-1000, default 100) - Sharpen amount (unsharp-mask)
+                    - `radius` (number 0.1-5, default 1.0) - Blur radius (unsharp-mask)
+                    - `threshold` (number 0-255, default 0) - Luminance threshold (unsharp-mask)
+                    - `strength` (number 0-100, default 50) - Blend strength (high-pass)
+                    - `kernelSize` (integer, default 3) - One of: 3, 5 (high-pass)
+                    - `denoise` (string, default "off") - One of: off, light, medium, strong
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/optimize-for-web:
+    post:
+      tags: [Tools]
+      summary: Optimize for web
+      description: Optimize an image for web delivery by converting to modern formats, adjusting quality, and optionally resizing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "webp") - One of: webp, jpeg, avif, png
+                    - `quality` (number 1-100, default 80) - Output quality
+                    - `maxWidth` (number, optional) - Maximum width in pixels
+                    - `maxHeight` (number, optional) - Maximum height in pixels
+                    - `progressive` (boolean, default true) - Enable progressive encoding
+                    - `stripMetadata` (boolean, default true) - Remove metadata
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/optimize-for-web/preview:
+    post:
+      tags: [Tools]
+      summary: Optimize for web (preview)
+      description: |
+        Lightweight preview endpoint for live parameter tuning. Returns the
+        optimized image binary directly (not JSON). Size information is in
+        response headers. Does not create a workspace or persist results.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to preview
+                settings:
+                  type: string
+                  description: Same settings as the main optimize-for-web endpoint
+      responses:
+        "200":
+          description: Optimized image binary
+          headers:
+            X-Original-Size:
+              schema:
+                type: string
+              description: Original file size in bytes
+            X-Processed-Size:
+              schema:
+                type: string
+              description: Processed file size in bytes
+            X-Output-Filename:
+              schema:
+                type: string
+              description: Suggested output filename
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image-enhancement:
+    post:
+      tags: [Tools]
+      summary: Image enhancement
+      description: |
+        AI-powered automatic image enhancement. Analyzes the image and applies
+        corrections for exposure, contrast, white balance, saturation, sharpness,
+        and noise based on the selected scene mode.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, settings]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "auto") - One of: auto, portrait, landscape, low-light, food, document
+                    - `intensity` (number 0-100, default 50) - Overall enhancement intensity
+                    - `corrections` (object, optional) - Toggle individual corrections:
+                      - `exposure` (boolean, default true)
+                      - `contrast` (boolean, default true)
+                      - `whiteBalance` (boolean, default true)
+                      - `saturation` (boolean, default true)
+                      - `sharpness` (boolean, default true)
+                      - `denoise` (boolean, default true)
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/image-enhancement/analyze:
+    post:
+      tags: [Tools]
+      summary: Analyze image for enhancement
+      description: |
+        Analyze an image and return suggested corrections without applying them.
+        Useful for previewing what enhancements would be made.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to analyze
+      responses:
+        "200":
+          description: Image analysis with suggested corrections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  corrections:
+                    type: object
+                    description: Suggested correction values
+                  metrics:
+                    type: object
+                    description: Image quality metrics
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/noise-removal:
+    post:
+      tags: [Tools]
+      summary: Noise removal
+      description: |
+        AI-powered noise removal using the Python sidecar. Supports multiple
+        quality tiers from quick preview to maximum quality. Requires the
+        noise-removal feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `tier` (string, default "balanced") - One of: quick, balanced, quality, maximum
+                    - `strength` (number, default 50) - Denoising strength
+                    - `detailPreservation` (number, default 50) - Detail preservation level
+                    - `colorNoise` (number, default 30) - Color noise reduction
+                    - `format` (string, default "original") - One of: original, png, jpeg, webp, avif
+                    - `quality` (number, default 90) - Output quality (1-100)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/red-eye-removal:
+    post:
+      tags: [Tools]
+      summary: Red-eye removal
+      description: |
+        AI-powered red-eye detection and removal. Detects faces and corrects
+        red-eye artifacts in photographs. Requires the red-eye-removal feature
+        bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `sensitivity` (number 0-100, default 50) - Detection sensitivity
+                    - `strength` (number 0-100, default 70) - Correction strength
+                    - `format` (string, optional) - Output format
+                    - `quality` (number 1-100, default 90) - Output quality
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed image with correction details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      facesDetected:
+                        type: integer
+                        description: Number of faces detected
+                      eyesCorrected:
+                        type: integer
+                        description: Number of eyes corrected
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/restore-photo:
+    post:
+      tags: [Tools]
+      summary: Photo restoration
+      description: |
+        AI-powered photo restoration pipeline. Repairs scratches, enhances faces,
+        denoises, and optionally colorizes old or damaged photographs. Requires
+        the photo-restoration feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "auto") - One of: auto, light, heavy
+                    - `scratchRemoval` (boolean, default true) - Enable scratch repair
+                    - `faceEnhancement` (boolean, default true) - Enhance detected faces
+                    - `fidelity` (number 0-1, default 0.7) - Face enhancement fidelity
+                    - `denoise` (boolean, default true) - Enable denoising
+                    - `denoiseStrength` (number 0-100, default 40) - Denoising strength
+                    - `colorize` (boolean, default false) - Colorize grayscale photos
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Restored image with processing details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      previewUrl:
+                        type: string
+                        description: WebP preview URL for non-previewable formats
+                      width:
+                        type: integer
+                      height:
+                        type: integer
+                      steps:
+                        type: array
+                        items:
+                          type: string
+                        description: Processing steps performed
+                      scratchCoverage:
+                        type: number
+                        description: Percentage of image with scratches detected
+                      facesEnhanced:
+                        type: integer
+                        description: Number of faces enhanced
+                      isGrayscale:
+                        type: boolean
+                        description: Whether the input was grayscale
+                      colorized:
+                        type: boolean
+                        description: Whether colorization was applied
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/passport-photo/analyze:
+    post:
+      tags: [Tools]
+      summary: Passport photo - analyze
+      description: |
+        Phase 1 of passport photo generation. Detects face landmarks and removes
+        the background. Returns landmark data and a base64-encoded preview for
+        the client to use in the generate phase. Requires the passport-photo
+        feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Photo with a clear, front-facing face
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Face analysis and background removal result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: Job ID to pass to the generate endpoint
+                  filename:
+                    type: string
+                  preview:
+                    type: string
+                    description: Base64-encoded PNG preview of the background-removed image
+                  previewWidth:
+                    type: integer
+                  previewHeight:
+                    type: integer
+                  landmarks:
+                    type: object
+                    description: Normalized face landmark coordinates (0-1)
+                    properties:
+                      leftEye:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      rightEye:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      eyeCenter:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      chin:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      forehead:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      crown:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      nose:
+                        type: object
+                        properties:
+                          x:
+                            type: number
+                          y:
+                            type: number
+                      faceCenterX:
+                        type: number
+                  imageWidth:
+                    type: integer
+                  imageHeight:
+                    type: integer
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: No face detected or analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/passport-photo/generate:
+    post:
+      tags: [Tools]
+      summary: Passport photo - generate
+      description: |
+        Phase 2 of passport photo generation. Uses the jobId and landmarks from
+        the analyze phase to crop, resize, and tile the photo to the specified
+        country/document specification. Fast response (no AI re-run).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId, filename, countryCode, landmarks, imageWidth, imageHeight]
+              properties:
+                jobId:
+                  type: string
+                  description: Job ID from the analyze phase
+                filename:
+                  type: string
+                  description: Original filename from analyze phase
+                countryCode:
+                  type: string
+                  description: ISO country code for passport specification
+                documentType:
+                  type: string
+                  default: passport
+                  description: Document type (passport, visa, etc.)
+                bgColor:
+                  type: string
+                  default: "#FFFFFF"
+                  description: Background color (hex)
+                printLayout:
+                  type: string
+                  default: none
+                  description: Print sheet layout (none, 4x6, A4, letter)
+                maxFileSizeKb:
+                  type: number
+                  default: 0
+                  description: Max file size in KB (0 = no limit)
+                dpi:
+                  type: number
+                  minimum: 72
+                  maximum: 1200
+                  default: 300
+                  description: Output DPI
+                customWidthMm:
+                  type: number
+                  description: Custom photo width in mm (overrides country spec)
+                customHeightMm:
+                  type: number
+                  description: Custom photo height in mm (overrides country spec)
+                zoom:
+                  type: number
+                  minimum: 0.5
+                  maximum: 3
+                  default: 1
+                  description: Zoom level (>1 = tighter crop)
+                adjustX:
+                  type: number
+                  default: 0
+                  description: Horizontal position adjustment
+                adjustY:
+                  type: number
+                  default: 0
+                  description: Vertical position adjustment
+                landmarks:
+                  type: object
+                  description: Face landmarks from analyze phase
+                imageWidth:
+                  type: integer
+                  description: Original image width from analyze phase
+                imageHeight:
+                  type: integer
+                  description: Original image height from analyze phase
+      responses:
+        "200":
+          description: Generated passport photo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  downloadUrl:
+                    type: string
+                  dimensions:
+                    type: object
+                    properties:
+                      widthMm:
+                        type: number
+                      heightMm:
+                        type: number
+                      widthPx:
+                        type: integer
+                      heightPx:
+                        type: integer
+                      dpi:
+                        type: integer
+                  spec:
+                    type: object
+                    properties:
+                      country:
+                        type: string
+                      countryCode:
+                        type: string
+                      documentType:
+                        type: string
+                      documentLabel:
+                        type: string
+                  printDownloadUrl:
+                    type: string
+                    description: URL for print sheet download (if printLayout was specified)
+        "400":
+          description: Invalid settings or unknown country code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/colorize:
+    post:
+      tags: [Tools]
+      summary: Colorize
+      description: |
+        AI-powered photo colorization. Converts black-and-white or grayscale
+        photographs to full color using DDColor with OpenCV DNN fallback. Requires
+        the colorize feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Grayscale or B&W image file
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `intensity` (number 0-1, default 1.0) - Colorization intensity
+                    - `model` (string, default "auto") - One of: auto, ddcolor, opencv
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Colorized image
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      previewUrl:
+                        type: string
+                        description: WebP preview URL for non-previewable formats
+                      width:
+                        type: integer
+                      height:
+                        type: integer
+                      method:
+                        type: string
+                        description: Colorization model used (ddcolor or opencv)
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/enhance-faces:
+    post:
+      tags: [Tools]
+      summary: Face enhancement
+      description: |
+        AI-powered face enhancement using GFPGAN or CodeFormer. Detects faces
+        in the image and enhances facial details, skin texture, and clarity.
+        Requires the enhance-faces feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file containing faces
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `model` (string, default "auto") - One of: auto, gfpgan, codeformer
+                    - `strength` (number 0-1, default 0.8) - Enhancement strength
+                    - `onlyCenterFace` (boolean, default false) - Only enhance the center face
+                    - `sensitivity` (number 0-1, default 0.5) - Face detection sensitivity
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Enhanced image with face details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      previewUrl:
+                        type: string
+                        description: WebP preview URL
+                      facesDetected:
+                        type: integer
+                        description: Number of faces detected
+                      faces:
+                        type: array
+                        items:
+                          type: object
+                        description: Per-face bounding boxes and confidence scores
+                      model:
+                        type: string
+                        description: Model actually used (gfpgan or codeformer)
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/image-to-base64:
+    post:
+      tags: [Tools]
+      summary: Image to Base64
+      description: |
+        Convert one or more images to Base64-encoded strings with data URIs.
+        Supports optional format conversion and resizing. Returns both the raw
+        Base64 string and a ready-to-use data URI for each file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: One or more image files to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `outputFormat` (string, default "original") - One of: original, jpeg, png, webp, avif
+                    - `quality` (integer 1-100, default 80) - Output quality for lossy formats
+                    - `maxWidth` (integer, default 0) - Max width in pixels (0 = no limit)
+                    - `maxHeight` (integer, default 0) - Max height in pixels (0 = no limit)
+      responses:
+        "200":
+          description: Base64-encoded results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename:
+                          type: string
+                        mimeType:
+                          type: string
+                        width:
+                          type: integer
+                        height:
+                          type: integer
+                        originalSize:
+                          type: integer
+                          description: Original file size in bytes
+                        encodedSize:
+                          type: integer
+                          description: Base64 string size in bytes
+                        overheadPercent:
+                          type: number
+                          description: Size overhead of Base64 encoding
+                        base64:
+                          type: string
+                          description: Raw Base64-encoded image data
+                        dataUri:
+                          type: string
+                          description: Complete data URI (data:mime;base64,...)
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename:
+                          type: string
+                        error:
+                          type: string
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/watermark-text:
     post:
@@ -697,6 +1923,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/text-overlay:
     post:
@@ -743,6 +1973,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/replace-color:
     post:
@@ -786,6 +2020,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/gif-tools:
     post:
@@ -829,6 +2067,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/gif-tools/info:
     post:
@@ -933,6 +2175,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/vectorize:
     post:
@@ -980,6 +2226,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/svg-to-raster:
     post:
@@ -1025,6 +2275,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/svg-to-raster/batch:
     post:
@@ -1065,6 +2319,10 @@ paths:
           description: Invalid input
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "422":
           description: All files failed processing
 
@@ -1111,6 +2369,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/pdf-to-image:
     post:
@@ -1183,6 +2445,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/pdf-to-image/info:
     post:
@@ -1309,6 +2575,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/bulk-rename:
     post:
@@ -1353,6 +2623,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/favicon:
     post:
@@ -1389,6 +2663,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/watermark-image:
     post:
@@ -1435,6 +2713,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/compose:
     post:
@@ -1482,6 +2764,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/compare:
     post:
@@ -1521,6 +2807,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/erase-object:
     post:
@@ -1560,6 +2850,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/collage:
     post:
@@ -1604,6 +2898,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/stitch:
     post:
@@ -1655,6 +2953,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/remove-background:
     post:
@@ -1696,6 +2998,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/remove-background/effects:
     post:
@@ -1755,6 +3061,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/upscale:
     post:
@@ -1795,6 +3105,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/blur-faces:
     post:
@@ -1836,6 +3150,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/ocr:
     post:
@@ -1885,6 +3203,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/info:
     post:
@@ -1941,6 +3263,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/color-palette:
     post:
@@ -1982,6 +3308,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/barcode-read:
     post:
@@ -2022,6 +3352,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/find-duplicates:
     post:
@@ -2071,6 +3405,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/qr-generate:
     post:
@@ -2124,6 +3462,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/strip-metadata/inspect:
     post:
@@ -2172,6 +3514,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/edit-metadata:
     post:
@@ -2231,6 +3577,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/tools/edit-metadata/inspect:
     post:
@@ -2321,6 +3671,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Pipelines ────────────────────────────────────────────────────────────
 
@@ -2368,6 +3722,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/pipeline/save:
     post:
@@ -2416,6 +3774,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/pipeline/list:
     get:
@@ -2457,6 +3819,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/pipeline/{id}:
     delete:
@@ -2468,6 +3834,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Pipeline UUID
           schema:
             type: string
       responses:
@@ -2481,6 +3848,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/pipeline/tools:
     get:
@@ -2557,6 +3928,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Files ────────────────────────────────────────────────────────────────
 
@@ -2597,6 +3972,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/download/{jobId}/{filename}:
     get:
@@ -2607,11 +3986,13 @@ paths:
         - name: jobId
           in: path
           required: true
+          description: Job identifier from a tool processing response
           schema:
             type: string
         - name: filename
           in: path
           required: true
+          description: Output filename from the processing response
           schema:
             type: string
       responses:
@@ -2696,6 +4077,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
     delete:
       tags: [Files]
       summary: Bulk delete saved files
@@ -2734,6 +4119,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/files/upload:
     post:
@@ -2772,6 +4161,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/files/save-result:
     post:
@@ -2811,6 +4204,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/files/{id}:
     get:
@@ -2822,6 +4219,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Saved file UUID
           schema:
             type: string
       responses:
@@ -2848,6 +4246,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/files/{id}/download:
     get:
@@ -2859,6 +4261,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Saved file UUID
           schema:
             type: string
       responses:
@@ -2877,6 +4280,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/files/{id}/thumbnail:
     get:
@@ -2888,6 +4295,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Saved file UUID
           schema:
             type: string
       responses:
@@ -2906,6 +4314,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Auth ─────────────────────────────────────────────────────────────────
 
@@ -2954,6 +4366,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/auth/logout:
     post:
@@ -2972,6 +4388,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/auth/session:
     get:
@@ -3029,6 +4449,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/auth/users:
     get:
@@ -3070,8 +4494,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
     post:
       tags: [Auth]
       summary: Create user (admin)
@@ -3119,10 +4551,22 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
         "409":
           description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /api/auth/users/{id}:
     put:
@@ -3134,6 +4578,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: User UUID
           schema:
             type: string
       requestBody:
@@ -3170,8 +4615,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
     delete:
       tags: [Auth]
       summary: Delete user (admin)
@@ -3181,6 +4634,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: User UUID
           schema:
             type: string
       responses:
@@ -3194,8 +4648,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
 
   /api/auth/users/{id}/reset-password:
     post:
@@ -3207,6 +4669,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: User UUID
           schema:
             type: string
       requestBody:
@@ -3231,8 +4694,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
 
   # ─── API Keys ─────────────────────────────────────────────────────────────
 
@@ -3280,6 +4751,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
     get:
       tags: [API Keys]
       summary: List API keys
@@ -3316,6 +4791,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   /api/v1/api-keys/{id}:
     delete:
@@ -3327,6 +4806,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: API key UUID
           schema:
             type: string
       responses:
@@ -3340,6 +4820,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Settings ─────────────────────────────────────────────────────────────
 
@@ -3366,6 +4850,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
     put:
       tags: [Settings]
       summary: Update settings (admin)
@@ -3390,8 +4878,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
 
   /api/v1/settings/{key}:
     get:
@@ -3403,6 +4899,7 @@ paths:
         - name: key
           in: path
           required: true
+          description: Setting key name
           schema:
             type: string
       responses:
@@ -3425,6 +4922,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Teams ────────────────────────────────────────────────────────────────
 
@@ -3459,6 +4960,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
     post:
       tags: [Teams]
       summary: Create a team
@@ -3494,8 +4999,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "409":
           description: Team name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
 
   /api/v1/teams/{id}:
     put:
@@ -3507,6 +5020,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Team integer ID
           schema:
             type: integer
       requestBody:
@@ -3539,6 +5053,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
     delete:
       tags: [Teams]
       summary: Delete a team
@@ -3548,6 +5066,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Team integer ID
           schema:
             type: integer
       responses:
@@ -3561,6 +5080,10 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
 
   # ─── Branding ─────────────────────────────────────────────────────────────
 
@@ -3607,8 +5130,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
     delete:
       tags: [Branding]
       summary: Remove custom logo (admin)
@@ -3625,8 +5156,16 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
         "403":
           description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
 
   # ─── System (additional) ──────────────────────────────────────────────────
 
@@ -3658,6 +5197,7 @@ paths:
         - name: jobId
           in: path
           required: true
+          description: Job UUID from a tool processing or installation response
           schema:
             type: string
       responses:
@@ -3683,3 +5223,661 @@ paths:
                     type: array
                     items:
                       type: string
+
+  # ─── Admin ───────────────────────────────────────────────────────────────
+
+  /api/v1/admin/health:
+    get:
+      tags: [Admin]
+      summary: Admin health check
+      description: |
+        Full system diagnostics including database status, storage mode, queue
+        state, and GPU availability. Requires the system:health permission.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Detailed system health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminHealthResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+
+  # ─── Analytics ───────────────────────────────────────────────────────────
+
+  /api/v1/config/analytics:
+    get:
+      tags: [Analytics]
+      summary: Get analytics configuration
+      description: |
+        Returns analytics provider configuration. When ANALYTICS_ENABLED is
+        false on the server, all values are empty. Public endpoint.
+      security: []
+      responses:
+        "200":
+          description: Analytics configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  posthogApiKey:
+                    type: string
+                  posthogHost:
+                    type: string
+                  sentryDsn:
+                    type: string
+                  sampleRate:
+                    type: number
+                  instanceId:
+                    type: string
+
+  /api/v1/user/analytics:
+    put:
+      tags: [Analytics]
+      summary: Update user analytics consent
+      description: |
+        Set the authenticated user's analytics consent preference, or snooze
+        the consent prompt for 7 days with remindLater.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  description: Whether the user consents to analytics
+                remindLater:
+                  type: boolean
+                  description: Snooze the consent prompt for 7 days
+      responses:
+        "200":
+          description: Consent updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  analyticsEnabled:
+                    type: boolean
+                    nullable: true
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  # ─── Features ────────────────────────────────────────────────────────────
+
+  /api/v1/features:
+    get:
+      tags: [Features]
+      summary: List feature bundles
+      description: |
+        Returns all available AI feature bundles and their installation status.
+        In non-Docker environments, all bundles show as installed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Feature bundle list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          type: string
+                          enum: [installed, not_installed, installing, error]
+                        installedVersion:
+                          type: string
+                          nullable: true
+                        estimatedSize:
+                          type: string
+                        enablesTools:
+                          type: array
+                          items:
+                            type: string
+                        progress:
+                          type: object
+                          nullable: true
+                          properties:
+                            percent:
+                              type: number
+                            stage:
+                              type: string
+                        error:
+                          type: string
+                          nullable: true
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/admin/features/{bundleId}/install:
+    post:
+      tags: [Features]
+      summary: Install a feature bundle
+      description: |
+        Start async installation of an AI feature bundle. Downloads models and
+        configures the Python sidecar. Returns a jobId for progress tracking
+        via the SSE endpoint. Requires features:manage permission.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bundleId
+          in: path
+          required: true
+          description: Feature bundle identifier
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Installation started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: Job ID for tracking installation progress via SSE
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: Unknown bundle ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Bundle already installed or another install in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+
+  /api/v1/admin/features/{bundleId}/uninstall:
+    post:
+      tags: [Features]
+      summary: Uninstall a feature bundle
+      description: |
+        Uninstall an AI feature bundle and delete its model files (unless shared
+        with another installed bundle). Requires features:manage permission.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bundleId
+          in: path
+          required: true
+          description: Feature bundle identifier
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bundle uninstalled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: Unknown bundle ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Bundle is not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+
+  /api/v1/admin/features/disk-usage:
+    get:
+      tags: [Features]
+      summary: AI model disk usage
+      description: |
+        Returns the total disk space used by AI model files.
+        Requires features:manage permission.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Disk usage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalBytes:
+                    type: integer
+                    description: Total bytes used by AI model files
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+
+  # ─── Audit Log ───────────────────────────────────────────────────────────
+
+  /api/v1/audit-log:
+    get:
+      tags: [Audit]
+      summary: Query audit log
+      description: |
+        Paginated audit log of administrative actions. Supports filtering by
+        action type and date range. Requires audit:read permission.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (default 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Results per page (1-100, default 50)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: action
+          in: query
+          description: Filter by action type
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Filter entries after this ISO 8601 date
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Filter entries before this ISO 8601 date
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        actorId:
+                          type: string
+                        actorUsername:
+                          type: string
+                        action:
+                          type: string
+                        targetType:
+                          type: string
+                        targetId:
+                          type: string
+                        details:
+                          type: object
+                          nullable: true
+                        ipAddress:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                    description: Total matching entries
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+
+  # ─── Roles ───────────────────────────────────────────────────────────────
+
+  /api/v1/roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      description: |
+        List all roles (built-in and custom) with their permissions and user
+        counts. Requires audit:read permission.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        permissions:
+                          type: array
+                          items:
+                            type: string
+                        isBuiltin:
+                          type: boolean
+                        userCount:
+                          type: integer
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+    post:
+      tags: [Roles]
+      summary: Create a custom role
+      description: |
+        Create a new custom role with specified permissions. Role names must be
+        2-30 characters, lowercase alphanumeric with hyphens and underscores.
+        Requires users:manage permission.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, permissions]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 30
+                  pattern: "^[a-z0-9_-]+$"
+                  description: Lowercase role name
+                description:
+                  type: string
+                  description: Human-readable description
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                  description: |
+                    Permission strings. Valid values: tools:use, files:own, files:all,
+                    apikeys:own, apikeys:all, pipelines:own, pipelines:all,
+                    settings:read, settings:write, users:manage, teams:manage,
+                    branding:manage, features:manage, system:health, audit:read
+      responses:
+        "201":
+          description: Role created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  isBuiltin:
+                    type: boolean
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "409":
+          description: Role name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+
+  /api/v1/roles/{id}:
+    put:
+      tags: [Roles]
+      summary: Update a custom role
+      description: |
+        Update name, description, or permissions of a custom role. Built-in
+        roles cannot be modified. Requires users:manage permission.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Role UUID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 30
+                description:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: Validation error or cannot modify built-in role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: Role not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Role name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+    delete:
+      tags: [Roles]
+      summary: Delete a custom role
+      description: |
+        Delete a custom role. Users assigned to this role are reassigned to the
+        default "user" role. Built-in roles cannot be deleted. Requires
+        users:manage permission.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Role UUID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Role deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: Cannot delete built-in role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: Role not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

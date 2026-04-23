@@ -9,7 +9,10 @@ All configuration is done through environment variables. Every variable has a se
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `1349` | Port the server listens on. |
-| `RATE_LIMIT_PER_MIN` | `100` | Maximum requests per minute per IP. |
+| `RATE_LIMIT_PER_MIN` | `0` (disabled) | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
+| `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
+| `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `true` | Trust `X-Forwarded-For` headers from a reverse proxy. Set to `false` if not behind a proxy. |
 
 ### Authentication
 
@@ -18,7 +21,8 @@ All configuration is done through environment variables. Every variable has a se
 | `AUTH_ENABLED` | `false` | Set to `true` to require login. The Docker image defaults to `true`. |
 | `DEFAULT_USERNAME` | `admin` | Username for the initial admin account. Only used on first run. |
 | `DEFAULT_PASSWORD` | `admin` | Password for the initial admin account. Change this after first login. |
-| `MAX_USERS` | `5` | Maximum number of registered user accounts |
+| `MAX_USERS` | `0` (unlimited) | Maximum number of registered user accounts. Set to 0 for unlimited. |
+| `SESSION_DURATION_HOURS` | `168` | Login session lifetime in hours (default is 7 days). |
 | `SKIP_MUST_CHANGE_PASSWORD` | - | Set to any non-empty value to bypass the forced password-change prompt on first login |
 
 ### Storage
@@ -34,17 +38,25 @@ All configuration is done through environment variables. Every variable has a se
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Maximum file size per upload in megabytes. |
-| `MAX_BATCH_SIZE` | `200` | Maximum number of files in a single batch request. |
-| `CONCURRENT_JOBS` | `3` | Number of batch jobs that run in parallel. Higher values use more memory. |
-| `MAX_MEGAPIXELS` | `100` | Maximum image resolution allowed. Rejects images larger than this. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Maximum file size per upload in megabytes. Set to 0 for unlimited. |
+| `MAX_BATCH_SIZE` | `0` (unlimited) | Maximum number of files in a single batch request. Set to 0 for unlimited. |
+| `CONCURRENT_JOBS` | `0` (auto) | Number of batch jobs that run in parallel. Set to 0 to auto-detect based on available CPU cores. |
+| `MAX_MEGAPIXELS` | `0` (unlimited) | Maximum image resolution allowed in megapixels. Set to 0 for unlimited. |
+| `MAX_WORKER_THREADS` | `0` (auto) | Maximum worker threads for image processing. Set to 0 to auto-detect based on available CPU cores. |
+| `PROCESSING_TIMEOUT_S` | `0` (no limit) | Maximum processing time per request in seconds. Set to 0 for no timeout. |
+| `MAX_PIPELINE_STEPS` | `0` (no limit) | Maximum number of steps in a pipeline. Set to 0 for no limit. |
+| `MAX_CANVAS_PIXELS` | `0` (no limit) | Maximum canvas size in pixels for output images. Set to 0 for no limit. |
+| `MAX_SVG_SIZE_MB` | `0` (unlimited) | Maximum SVG file size in megabytes. Set to 0 for unlimited. |
+| `MAX_LOGO_SIZE_KB` | `500` | Maximum custom branding logo size in kilobytes. |
+| `MAX_SPLIT_GRID` | `100` | Maximum grid dimension for the image split tool. |
+| `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
 
 ### Cleanup
 
 | Variable | Default | Description |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `24` | How long temporary files are kept before automatic deletion. |
-| `CLEANUP_INTERVAL_MINUTES` | `30` | How often the cleanup job runs. |
+| `FILE_MAX_AGE_HOURS` | `72` | How long temporary files are kept before automatic deletion. |
+| `CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup job runs. |
 
 ### Appearance
 
@@ -53,6 +65,13 @@ All configuration is done through environment variables. Every variable has a se
 | `APP_NAME` | `ashim` | Display name shown in the UI. |
 | `DEFAULT_THEME` | `light` | Default theme for new sessions. `light` or `dark`. |
 | `DEFAULT_LOCALE` | `en` | Default interface language. |
+
+### Docker permissions
+
+| Variable | Default | Description |
+|---|---|---|
+| `PUID` | `999` | Run the container process as this UID. Set to match your host user for bind mounts (`id -u`). |
+| `PGID` | `999` | Run the container process as this GID. Set to match your host group for bind mounts (`id -g`). |
 
 ## Docker example
 

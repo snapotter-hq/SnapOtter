@@ -10,16 +10,21 @@
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { requirePermission } from "../permissions.js";
 
-function validateTeamName(name: unknown): string | null {
-  if (typeof name !== "string") return "Team name is required";
-  const trimmed = name.trim();
-  if (trimmed.length === 0) return "Team name is required";
-  if (trimmed.length > 50) return "Team name must be 50 characters or fewer";
-  return null;
-}
+const teamNameSchema = z.object({
+  name: z
+    .string({ required_error: "Team name is required" })
+    .transform((v) => v.trim())
+    .pipe(
+      z
+        .string()
+        .min(1, "Team name is required")
+        .max(50, "Team name must be 50 characters or fewer"),
+    ),
+});
 
 export async function teamsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/teams — List all teams with member count (admin only)
@@ -50,14 +55,14 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     const admin = requirePermission("teams:manage")(request, reply);
     if (!admin) return;
 
-    const body = request.body as { name?: string } | null;
-
-    const nameError = validateTeamName(body?.name);
-    if (nameError) {
-      return reply.status(400).send({ error: nameError, code: "VALIDATION_ERROR" });
+    const parsed = teamNameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.issues.map((i) => i.message).join("; "),
+        code: "VALIDATION_ERROR",
+      });
     }
-
-    const trimmedName = (body?.name ?? "").trim();
+    const trimmedName = parsed.data.name;
 
     // Check for duplicate name (case-insensitive)
     const existing = db
@@ -85,19 +90,20 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
-      const body = request.body as { name?: string } | null;
 
       const team = db.select().from(schema.teams).where(eq(schema.teams.id, id)).get();
       if (!team) {
         return reply.status(404).send({ error: "Team not found", code: "NOT_FOUND" });
       }
 
-      const nameError = validateTeamName(body?.name);
-      if (nameError) {
-        return reply.status(400).send({ error: nameError, code: "VALIDATION_ERROR" });
+      const parsed = teamNameSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.issues.map((i) => i.message).join("; "),
+          code: "VALIDATION_ERROR",
+        });
       }
-
-      const trimmedName = (body?.name ?? "").trim();
+      const trimmedName = parsed.data.name;
 
       // Check for duplicate name (case-insensitive), excluding current team
       const duplicate = db

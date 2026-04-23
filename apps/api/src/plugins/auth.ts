@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
@@ -68,6 +69,34 @@ function validateUsername(username: string): string | null {
   }
   return null;
 }
+
+// ── Zod schemas for auth request bodies ──────────────────────────
+
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(1, "New password is required"),
+});
+
+const registerSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+  role: z.string().optional(),
+  team: z.string().optional(),
+});
+
+const updateUserSchema = z.object({
+  role: z.string().optional(),
+  team: z.string().optional(),
+});
+
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(1, "New password is required"),
+});
 
 // ── Request helpers ───────────────────────────────────────────────
 
@@ -164,11 +193,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "Authentication is disabled" });
       }
 
-      const body = request.body as { username?: string; password?: string } | null;
-
-      if (!body?.username || !body?.password) {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
         return reply.status(400).send({ error: "Username and password are required" });
       }
+      const body = parsed.data;
 
       const user = db
         .select()
@@ -290,17 +319,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const authUser = requireAuth(request, reply);
     if (!authUser) return;
 
-    const body = request.body as {
-      currentPassword?: string;
-      newPassword?: string;
-    } | null;
-
-    if (!body?.currentPassword || !body?.newPassword) {
+    const parsed = changePasswordSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.status(400).send({
         error: "Current password and new password are required",
         code: "VALIDATION_ERROR",
       });
     }
+    const body = parsed.data;
 
     const pwError = validatePasswordStrength(body.newPassword);
     if (pwError) {
@@ -386,18 +412,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const admin = requirePermission("users:manage")(request, reply);
     if (!admin) return;
 
-    const body = request.body as {
-      username?: string;
-      password?: string;
-      role?: string;
-    } | null;
-
-    if (!body?.username || !body?.password) {
+    const parsed = registerSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.status(400).send({
         error: "Username and password are required",
         code: "VALIDATION_ERROR",
       });
     }
+    const body = parsed.data;
 
     const usernameError = validateUsername(body.username);
     if (usernameError) {
@@ -443,8 +465,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Resolve team — frontend sends team name (e.g. "Default"), not ID
-    const requestedTeam = (body as { team?: string }).team;
+    // Resolve team -- frontend sends team name (e.g. "Default"), not ID
+    const requestedTeam = body.team;
     let teamId: string;
     let teamName: string;
 
@@ -487,13 +509,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Check user limit
-    const userCount = db.select().from(schema.users).all().length;
-    if (userCount >= MAX_USERS) {
-      return reply.status(403).send({
-        error: `User limit reached (${MAX_USERS} max)`,
-        code: "USER_LIMIT_REACHED",
-      });
+    // Check user limit (0 = unlimited)
+    if (MAX_USERS > 0) {
+      const userCount = db.select().from(schema.users).all().length;
+      if (userCount >= MAX_USERS) {
+        return reply.status(403).send({
+          error: `User limit reached (${MAX_USERS} max)`,
+          code: "USER_LIMIT_REACHED",
+        });
+      }
     }
 
     const id = randomUUID();
@@ -533,7 +557,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
-      const body = request.body as { role?: string; team?: string } | null;
+      const parsed = updateUserSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.issues.map((i) => i.message).join("; "),
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const body = parsed.data;
 
       const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
 
@@ -546,7 +577,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       };
 
       // Escalation prevention
-      if (body?.role) {
+      if (body.role) {
         const roleHierarchy: Record<string, number> = { admin: 3, editor: 2, user: 1 };
         const actorLevel = roleHierarchy[admin.role] ?? 0;
         const targetLevel = roleHierarchy[body.role] ?? 0;
@@ -558,7 +589,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      if (body?.role) {
+      if (body.role) {
         const validBuiltinRoles = ["admin", "editor", "user"];
         const isValid =
           validBuiltinRoles.includes(body.role) ||
@@ -591,7 +622,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      if (typeof body?.team === "string" && body.team.trim()) {
+      if (body.team?.trim()) {
         // Look up by name first, then fall back to ID
         const teamByName = db
           .select()
@@ -628,14 +659,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!admin) return;
 
       const { id } = request.params;
-      const body = request.body as { newPassword?: string } | null;
-
-      if (!body?.newPassword) {
+      const parsed = resetPasswordSchema.safeParse(request.body);
+      if (!parsed.success) {
         return reply.status(400).send({
           error: "New password is required",
           code: "VALIDATION_ERROR",
         });
       }
+      const body = parsed.data;
 
       const pwError = validatePasswordStrength(body.newPassword);
       if (pwError) {
