@@ -83,6 +83,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     analyticsEnabled,
     analyticsConsentShownAt,
   } = useAuth();
+  const storeConsent = useAnalyticsStore((s) => s.consent);
   const location = useLocation();
 
   // Don't guard the login or change-password pages
@@ -115,7 +116,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/change-password" replace />;
   }
 
-  if (authEnabled && analyticsEnabled === null && analyticsConsentShownAt === null) {
+  // Check both session state (useAuth) and real-time store state.
+  // After the consent page calls acceptAnalytics(), the store updates immediately
+  // but useAuth won't re-fetch until the next session check.
+  const effectiveEnabled = storeConsent.analyticsEnabled ?? analyticsEnabled;
+  const effectiveShownAt = storeConsent.analyticsConsentShownAt ?? analyticsConsentShownAt;
+  if (authEnabled && effectiveEnabled === null && effectiveShownAt === null) {
     return <Navigate to="/analytics-consent" replace />;
   }
 
