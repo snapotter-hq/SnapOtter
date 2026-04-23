@@ -67,7 +67,10 @@ export function Navbar() {
           >
             <Github size={16} />
             <Star size={12} className="text-accent" />
-            <span>{stars}</span>
+            <span>Star on GitHub</span>
+            {stars !== "Star" && (
+              <span className="rounded-full bg-background-alt px-1.5 py-0.5 text-xs">{stars}</span>
+            )}
           </a>
           <a
             href="/contact"
