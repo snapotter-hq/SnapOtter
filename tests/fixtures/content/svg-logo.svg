@@ -1,0 +1,38 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>SVG Drop Shadow Filter Effects - ConvertICO</title>
+  <desc>Sample SVG demonstrating drop shadow and glow filter effects. Free download at ConvertICO.com</desc>
+  
+  <defs>
+    <linearGradient id="logoGradient" x1="35" y1="250" x2="465" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EF4362"/>
+      <stop offset="0.5625" stop-color="#F04E63"/>
+      <stop offset="1" stop-color="#F16667"/>
+    </linearGradient>
+    
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <rect width="400" height="400" fill="#1a252f"/>
+  <circle cx="50" cy="50" r="80" fill="#3399cc" opacity="0.1"/>
+  <circle cx="350" cy="350" r="100" fill="#339966" opacity="0.1"/>
+  
+  <!-- ConvertICO Logo with glow (exact paths) -->
+  <g transform="translate(80, 65) scale(0.48)" filter="url(#glow)">
+    <path d="M250 465C368.741 465 465 368.741 465 250C465 131.259 368.741 35 250 35C131.259 35 35 131.259 35 250C35 368.741 131.259 465 250 465Z" fill="url(#logoGradient)"/>
+    <path d="M381.7 222.9C394.9 222.9 405.6 212.2 405.6 199C405.6 185.8 394.9 175.1 381.7 175.1C368.5 175.1 357.8 185.8 357.8 199C357.8 212.2 368.5 222.9 381.7 222.9Z" fill="white"/>
+    <path d="M365.295 294.67C379.597 286.027 359.018 260.022 373.163 248.835C387.308 237.647 402.765 242.338 408.593 251.058C413.021 262.52 412.818 272.435 404.875 278.379C396.932 284.323 411.106 292.461 396.366 308.906C393.517 315.686 395.157 313.774 395.356 324.998C395.555 336.222 379.73 360.586 354.619 346.39C329.509 332.193 350.993 303.313 365.295 294.67Z" fill="white"/>
+    <path d="M359 154.2C350.1 164 335.1 165.2 324.8 156.9C322.2 154.8 319.4 152.8 316.6 150.9C274.1 121.5 212.7 124.7 173.5 158.4C164.8 165.7 157.2 174.1 150.9 183.5C121.5 226 124.7 287.4 158.4 326.6C165.7 335.3 174.1 342.9 183.5 349.2C221.1 375.2 273.5 375.7 312.2 352.2C321.5 346.5 333.4 347.8 341.5 355.1C344.9 358.1 348.3 361.3 351.6 364.2C357.4 369.5 357.1 378.7 350.9 383.5C239.4 469.7 69 379.6 83.5 234.7C93.8 96.1 269.1 33.7 365.5 128.8C370.3 133.6 370.6 141.3 366.1 146.3L359 154.2Z" fill="white"/>
+    <ellipse cx="389.5" cy="263" rx="22.5" ry="23" fill="white"/>
+  </g>
+  
+  <text x="200" y="320" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle" fill="#ffffff">CONVERTICO</text>
+  <text x="200" y="348" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">Filter Effects Sample</text>
+  <text x="200" y="380" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#3399cc">convertico.com/samples/svg</text>
+</svg>

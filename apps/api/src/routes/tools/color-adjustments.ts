@@ -73,9 +73,19 @@ async function processColorAdjustments(
     image = await adjustContrast(image, { value: settings.contrast });
   }
   if (settings.exposure !== 0) {
-    // Map -100..+100 to gamma 3.0..0.33 (lower gamma = brighter midtones)
-    const gamma = 1 / (1 + settings.exposure / 100);
-    image = image.gamma(gamma);
+    // Sharp's gamma() accepts values between 1.0 and 3.0.
+    // Positive exposure → brighten midtones → apply gamma > 1.0 on output.
+    // Negative exposure → darken midtones → apply gamma > 1.0 on input.
+    // Map -100..+100 to a gamma range of 1.0..3.0 applied on the correct side.
+    const strength = Math.abs(settings.exposure) / 100;
+    const g = 1 + strength * 2; // 1.0..3.0
+    if (settings.exposure > 0) {
+      // Brighten: linearize at gamma 1.0, encode at higher gamma
+      image = image.gamma(1, g);
+    } else {
+      // Darken: linearize at higher gamma, encode at gamma 1.0
+      image = image.gamma(g, 1);
+    }
   }
 
   // Color

@@ -97,6 +97,7 @@ export default defineConfig({
       // from the root vitest runner.
       react: path.join(webNodeModules, "react"),
       "react-dom": path.join(webNodeModules, "react-dom"),
+      zustand: path.join(webNodeModules, "zustand"),
     },
   },
 });

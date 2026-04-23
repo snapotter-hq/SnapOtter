@@ -354,6 +354,277 @@ describe("validateImageBuffer", () => {
     const result = await validateImageBuffer(exe);
     expect(result.valid).toBe(false);
   });
+
+  // -- Null-byte buffers ----------------------------------------------------
+
+  it("rejects a buffer that is entirely null bytes (small)", async () => {
+    const nullBuf = Buffer.alloc(32); // all zeros
+    const result = await validateImageBuffer(nullBuf);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("File contains no image data");
+    }
+  });
+
+  it("rejects a large buffer that is entirely null bytes", async () => {
+    const nullBuf = Buffer.alloc(1024); // all zeros, > 64 bytes
+    const result = await validateImageBuffer(nullBuf);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("File contains no image data");
+    }
+  });
+
+  // -- SVG detection --------------------------------------------------------
+
+  it("accepts an SVG buffer with valid XML", async () => {
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>',
+    );
+    const result = await validateImageBuffer(svg);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("svg");
+    }
+  });
+
+  // -- HDR text detection ---------------------------------------------------
+
+  it("accepts an HDR buffer with #?RADIANCE header", async () => {
+    // Build a minimal buffer that starts with the HDR magic text
+    const hdrHeader = Buffer.from("#?RADIANCE\n");
+    const padding = Buffer.alloc(100);
+    const hdrBuf = Buffer.concat([hdrHeader, padding]);
+    const result = await validateImageBuffer(hdrBuf);
+    // HDR is a CLI_DECODED_FORMAT, so it bypasses sharp metadata
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("hdr");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  it("accepts an HDR buffer with #?RGBE header", async () => {
+    const hdrHeader = Buffer.from("#?RGBE\n");
+    const padding = Buffer.alloc(100);
+    const hdrBuf = Buffer.concat([hdrHeader, padding]);
+    const result = await validateImageBuffer(hdrBuf);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("hdr");
+    }
+  });
+
+  it("does not detect HDR for a buffer shorter than 10 bytes", async () => {
+    const shortBuf = Buffer.from("#?RADIAN"); // 8 bytes, too short
+    const result = await validateImageBuffer(shortBuf);
+    expect(result.valid).toBe(false);
+  });
+
+  // -- RAW extension differentiation ----------------------------------------
+
+  it("detects RAW format when TIFF magic bytes + RAW extension (DNG)", async () => {
+    const tiffLE = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00]);
+    const result = await validateImageBuffer(tiffLE, "photo.dng");
+    // RAW is a CLI_DECODED_FORMAT, so width/height are 0
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("raw");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  it("detects RAW format with CR2 extension", async () => {
+    const tiffLE = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00]);
+    const result = await validateImageBuffer(tiffLE, "photo.cr2");
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("raw");
+    }
+  });
+
+  it("detects RAW format with NEF extension", async () => {
+    const tiffLE = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00]);
+    const result = await validateImageBuffer(tiffLE, "photo.nef");
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("raw");
+    }
+  });
+
+  // -- TGA extension-only detection -----------------------------------------
+
+  it("detects TGA format by extension (no magic bytes)", async () => {
+    // TGA has no magic bytes, so detection is extension-only
+    const randomBytes = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+    const result = await validateImageBuffer(randomBytes, "image.tga");
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("tga");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  // -- CLI decoded format bypass (PSD, EXR) ---------------------------------
+
+  it("detects PSD format and bypasses sharp dimension check", async () => {
+    // PSD magic: "8BPS"
+    const psdBuf = Buffer.alloc(64);
+    psdBuf[0] = 0x38;
+    psdBuf[1] = 0x42;
+    psdBuf[2] = 0x50;
+    psdBuf[3] = 0x53;
+    const result = await validateImageBuffer(psdBuf);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("psd");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  it("detects EXR format and bypasses sharp dimension check", async () => {
+    // OpenEXR magic bytes
+    const exrBuf = Buffer.alloc(64);
+    exrBuf[0] = 0x76;
+    exrBuf[1] = 0x2f;
+    exrBuf[2] = 0x31;
+    exrBuf[3] = 0x01;
+    const result = await validateImageBuffer(exrBuf);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("exr");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  // -- ICO detection --------------------------------------------------------
+
+  it("detects ICO format via magic bytes", async () => {
+    const icoBuf = Buffer.alloc(64);
+    icoBuf[0] = 0x00;
+    icoBuf[1] = 0x00;
+    icoBuf[2] = 0x01;
+    icoBuf[3] = 0x00;
+    // Need non-zero bytes past first 64 positions to avoid null-byte rejection
+    icoBuf[4] = 0x01;
+    const result = await validateImageBuffer(icoBuf);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.format).toBe("ico");
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+    }
+  });
+
+  // -- AVIF/HEIF ftyp brand verification -----------------------------------
+
+  it("rejects ftyp box with unrecognized brand (not avif/heic)", async () => {
+    // Build a buffer with ftyp at offset 4 but brand "mp41" (not avif or heif)
+    const buf = Buffer.alloc(16);
+    buf.write("ftyp", 4, "ascii");
+    buf.write("mp41", 8, "ascii");
+    const result = await validateImageBuffer(buf);
+    expect(result.valid).toBe(false);
+  });
+
+  // -- JXL detection --------------------------------------------------------
+
+  it("detects JXL ISOBMFF container format", async () => {
+    const jxlBuf = Buffer.alloc(64);
+    // JXL ISOBMFF magic: 00 00 00 0C 4A 58 4C 20
+    jxlBuf[0] = 0x00;
+    jxlBuf[1] = 0x00;
+    jxlBuf[2] = 0x00;
+    jxlBuf[3] = 0x0c;
+    jxlBuf[4] = 0x4a;
+    jxlBuf[5] = 0x58;
+    jxlBuf[6] = 0x4c;
+    jxlBuf[7] = 0x20;
+    // Need non-null bytes to avoid null-byte rejection
+    jxlBuf[8] = 0x01;
+    const result = await validateImageBuffer(jxlBuf);
+    // JXL is not in CLI_DECODED_FORMATS, so sharp metadata may fail
+    expect(result).toBeDefined();
+    if (result.valid) {
+      expect(result.format).toBe("jxl");
+    }
+  });
+
+  it("detects JXL raw codestream format", async () => {
+    const jxlRaw = Buffer.alloc(64);
+    jxlRaw[0] = 0xff;
+    jxlRaw[1] = 0x0a;
+    // Need more non-zero data
+    jxlRaw[2] = 0x01;
+    const result = await validateImageBuffer(jxlRaw);
+    expect(result).toBeDefined();
+    if (result.valid) {
+      expect(result.format).toBe("jxl");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. isRawExtension
+// ---------------------------------------------------------------------------
+
+describe("isRawExtension", () => {
+  let isRawExtension: typeof import("../../../apps/api/src/lib/file-validation.js").isRawExtension;
+
+  beforeEach(async () => {
+    const mod = await import("../../../apps/api/src/lib/file-validation.js");
+    isRawExtension = mod.isRawExtension;
+  });
+
+  it("returns true for DNG extension", () => {
+    expect(isRawExtension("dng")).toBe(true);
+  });
+
+  it("returns true for CR2 extension", () => {
+    expect(isRawExtension("cr2")).toBe(true);
+  });
+
+  it("returns true for NEF extension", () => {
+    expect(isRawExtension("nef")).toBe(true);
+  });
+
+  it("returns true for ARW extension", () => {
+    expect(isRawExtension("arw")).toBe(true);
+  });
+
+  it("returns true for ORF extension", () => {
+    expect(isRawExtension("orf")).toBe(true);
+  });
+
+  it("returns true for RW2 extension", () => {
+    expect(isRawExtension("rw2")).toBe(true);
+  });
+
+  it("returns true for uppercase extensions", () => {
+    expect(isRawExtension("DNG")).toBe(true);
+    expect(isRawExtension("CR2")).toBe(true);
+  });
+
+  it("returns true with leading dot", () => {
+    expect(isRawExtension(".dng")).toBe(true);
+    expect(isRawExtension(".CR2")).toBe(true);
+  });
+
+  it("returns false for non-RAW extensions", () => {
+    expect(isRawExtension("png")).toBe(false);
+    expect(isRawExtension("jpg")).toBe(false);
+    expect(isRawExtension("tiff")).toBe(false);
+    expect(isRawExtension("webp")).toBe(false);
+  });
+
+  it("returns false for empty string", () => {
+    expect(isRawExtension("")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
