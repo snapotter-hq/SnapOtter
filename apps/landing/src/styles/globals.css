@@ -13,3 +13,8 @@
   --color-dark-fg: #fafaf9;
   --color-dark-muted: #a8a29e;
 }
+
+/* Tool card hover border uses --cat-color set inline */
+.tool-card:hover {
+  border-color: var(--cat-color);
+}
