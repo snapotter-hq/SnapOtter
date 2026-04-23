@@ -4,7 +4,6 @@ import { Github, Menu, Star, X } from "lucide-react";
 import { useState } from "react";
 
 const links = [
-  { label: "Download", href: "#how-it-works" },
   { label: "Features", href: "#features" },
   { label: "Pricing", href: "#pricing" },
   { label: "Docs", href: "https://docs.snapotter.com" },
