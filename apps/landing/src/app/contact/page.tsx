@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Monitor, Shield } from "lucide-react";
+import { CheckCircle, FileText, Loader2, Monitor, Shield } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -28,22 +28,37 @@ const benefits = [
 
 const subjects = ["Book a Demo", "Enterprise Licensing", "Deployment Help", "General Inquiry"];
 
+const FORMSPREE_URL = "https://formspree.io/f/mykllwek";
+
 export default function ContactPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [subject, setSubject] = useState(subjects[0]);
-  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSubmitting(true);
+    setError("");
 
-    const lines = [`Name: ${name}`, `Company: ${company}`, `Email: ${email}`, "", message].join(
-      "\n",
-    );
+    const formData = new FormData(e.currentTarget);
 
-    const mailto = `mailto:contact@snapotter.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines)}`;
-    window.location.href = mailto;
+    try {
+      const res = await fetch(FORMSPREE_URL, {
+        method: "POST",
+        body: formData,
+        headers: { Accept: "application/json" },
+      });
+
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError("Something went wrong. Please try again or email us directly.");
+      }
+    } catch {
+      setError("Network error. Please try again or email us directly.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -88,103 +103,130 @@ export default function ContactPage() {
 
             {/* Right column */}
             <FadeIn delay={0.1}>
-              <form
-                onSubmit={handleSubmit}
-                className="rounded-2xl border border-border bg-background-alt p-8"
-              >
-                <div className="space-y-5">
-                  <div>
-                    <label htmlFor="name" className="mb-1.5 block text-sm font-medium">
-                      Name <span className="text-accent">*</span>
-                    </label>
-                    <input
-                      id="name"
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-                      Email <span className="text-accent">*</span>
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="company" className="mb-1.5 block text-sm font-medium">
-                      Company <span className="text-accent">*</span>
-                    </label>
-                    <input
-                      id="company"
-                      type="text"
-                      required
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="subject" className="mb-1.5 block text-sm font-medium">
-                      Subject
-                    </label>
-                    <select
-                      id="subject"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                    >
-                      {subjects.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="message" className="mb-1.5 block text-sm font-medium">
-                      Message <span className="text-accent">*</span>
-                    </label>
-                    <textarea
-                      id="message"
-                      required
-                      rows={5}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      className="w-full resize-none rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-                    />
-                  </div>
-
+              {submitted ? (
+                <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-border bg-background-alt p-12 text-center">
+                  <CheckCircle size={48} className="text-emerald-500" />
+                  <h2 className="mt-6 text-2xl font-bold">Message sent!</h2>
+                  <p className="mt-3 text-muted">
+                    Thanks for reaching out. We will get back to you within 24 hours.
+                  </p>
                   <button
-                    type="submit"
-                    className="w-full rounded-lg bg-accent py-3 text-sm font-bold text-accent-foreground transition-colors hover:bg-accent-hover"
+                    type="button"
+                    onClick={() => setSubmitted(false)}
+                    className="mt-8 rounded-lg border border-border px-6 py-2.5 text-sm font-medium transition-colors hover:bg-background"
                   >
-                    Send Message
+                    Send another message
                   </button>
                 </div>
+              ) : (
+                <form
+                  onSubmit={handleSubmit}
+                  className="rounded-2xl border border-border bg-background-alt p-8"
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <label htmlFor="name" className="mb-1.5 block text-sm font-medium">
+                        Name <span className="text-accent">*</span>
+                      </label>
+                      <input
+                        id="name"
+                        type="text"
+                        name="name"
+                        required
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
 
-                <p className="mt-5 text-center text-sm text-muted">
-                  Or email us directly at{" "}
-                  <a
-                    href="mailto:contact@snapotter.com"
-                    className="text-accent underline underline-offset-4 hover:text-accent-hover"
-                  >
-                    contact@snapotter.com
-                  </a>
-                </p>
-              </form>
+                    <div>
+                      <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
+                        Email <span className="text-accent">*</span>
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        name="email"
+                        required
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="company" className="mb-1.5 block text-sm font-medium">
+                        Company <span className="text-accent">*</span>
+                      </label>
+                      <input
+                        id="company"
+                        type="text"
+                        name="company"
+                        required
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="subject" className="mb-1.5 block text-sm font-medium">
+                        Subject
+                      </label>
+                      <select
+                        id="subject"
+                        name="subject"
+                        defaultValue={subjects[0]}
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                      >
+                        {subjects.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="message" className="mb-1.5 block text-sm font-medium">
+                        Message <span className="text-accent">*</span>
+                      </label>
+                      <textarea
+                        id="message"
+                        name="message"
+                        required
+                        rows={5}
+                        className="w-full resize-none rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+
+                    {error && (
+                      <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                        {error}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-bold text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        "Send Message"
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="mt-5 text-center text-sm text-muted">
+                    Or email us directly at{" "}
+                    <a
+                      href="mailto:contact@snapotter.com"
+                      className="text-accent underline underline-offset-4 hover:text-accent-hover"
+                    >
+                      contact@snapotter.com
+                    </a>
+                  </p>
+                </form>
+              )}
             </FadeIn>
           </div>
         </section>
