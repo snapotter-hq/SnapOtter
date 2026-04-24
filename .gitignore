@@ -24,7 +24,7 @@ __pycache__/
 
 # Build artifacts
 .next/
-.vitepress/cache/
+**/.vitepress/cache/
 out/
 coverage/
 *.tsbuildinfo
