@@ -114,7 +114,7 @@ export function Hero() {
       </div>
 
       <div className="relative mx-auto max-w-4xl text-center">
-        <h1 className="animate-[fadeUp_0.6s_ease-out_both] text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+        <h1 className="animate-[fadeUp_0.6s_ease-out_both] font-[family-name:var(--font-nunito)] text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
           Your images. Stay yours.
         </h1>
 

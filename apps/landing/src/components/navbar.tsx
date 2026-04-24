@@ -37,10 +37,15 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-transparent after:via-accent/30 after:to-transparent">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <a href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-accent-foreground text-sm font-bold">
-            S
-          </div>
-          <span className="text-lg font-bold tracking-tight">SnapOtter</span>
+          <img
+            src="/logo.png"
+            alt="SnapOtter"
+            className="h-8 w-8"
+            style={{ imageRendering: "auto" }}
+          />
+          <span className="font-[family-name:var(--font-nunito)] text-lg font-bold tracking-tight">
+            SnapOtter
+          </span>
         </a>
 
         <div className="hidden items-center gap-6 lg:flex">
