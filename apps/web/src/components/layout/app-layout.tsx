@@ -6,7 +6,7 @@ import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection-store";
 import { Dropzone } from "../common/dropzone";
-import { GemLogo } from "../common/gem-logo";
+import { OtterLogo } from "../common/otter-logo";
 import { HelpDialog } from "../help/help-dialog";
 import { SettingsDialog } from "../settings/settings-dialog";
 import { AiInstallIndicator } from "./ai-install-indicator";
@@ -68,7 +68,7 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
                 />
               ) : (
                 <div className="flex items-center gap-2">
-                  <GemLogo className="h-5 w-5 text-primary" />
+                  <OtterLogo className="h-5 w-5 text-primary" />
                   <span className="text-sm font-bold text-foreground">
                     <span className="text-primary">ashim</span>
                   </span>
@@ -121,7 +121,7 @@ export function AppLayout({ children, showToolPanel = true, onFiles }: AppLayout
             />
           ) : (
             <div className="flex items-center gap-2">
-              <GemLogo className="h-5 w-5 text-primary" />
+              <OtterLogo className="h-5 w-5 text-primary" />
               <span className="text-sm font-bold text-foreground">
                 <span className="text-primary">ashim</span>
               </span>

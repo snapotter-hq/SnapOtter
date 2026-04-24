@@ -32,7 +32,7 @@ import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { GemLogo } from "../common/gem-logo";
+import { OtterLogo } from "../common/otter-logo";
 import { AiFeaturesSection } from "./ai-features-section";
 
 interface SettingsDialogProps {
@@ -2511,7 +2511,7 @@ function AboutSection() {
 
       <div className="p-4 rounded-lg border border-border bg-muted/20 space-y-3">
         <div className="flex items-center gap-3">
-          <GemLogo className="h-8 w-8 text-primary" />
+          <OtterLogo className="h-8 w-8 text-primary" />
           <div className="text-2xl font-bold text-foreground">
             <span className="text-primary">ashim</span>
           </div>

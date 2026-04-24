@@ -3,7 +3,7 @@ import { ANALYTICS_EVENTS, CATEGORIES, TOOLS } from "@ashim/shared";
 import { Eye, EyeOff, FileImage, LayoutGrid, List, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GemLogo } from "@/components/common/gem-logo";
+import { OtterLogo } from "@/components/common/otter-logo";
 import { track } from "@/lib/analytics";
 import { apiGet } from "@/lib/api";
 import { ICON_MAP } from "@/lib/icon-map";
@@ -84,7 +84,7 @@ export function FullscreenGridPage() {
             to="/"
             className="flex items-center gap-2 text-lg font-bold text-foreground shrink-0"
           >
-            <GemLogo className="h-6 w-6 text-primary" />
+            <OtterLogo className="h-6 w-6 text-primary" />
             <span className="text-primary">ashim</span>
           </Link>
 
