@@ -121,7 +121,7 @@ docker logs SnapOtter 2>&1 | head -20
 
 ## Hardware Requirements
 
-These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ryzen 5 7500F + RTX 4070, Intel i7-7600U, Docker Desktop on Windows). See `docs/HARDWARE_RECOMMENDATIONS.md` in the repo for full methodology and raw data.
+These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ryzen 5 7500F + RTX 4070, Intel i7-7600U, Docker Desktop on Windows). See [HARDWARE_RECOMMENDATIONS.md](https://github.com/snapotter-hq/SnapOtter/blob/main/docs/HARDWARE_RECOMMENDATIONS.md) for full methodology and raw data.
 
 ### Quick Reference
 
