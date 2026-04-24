@@ -2,20 +2,20 @@
 
 ## Supported Versions
 
-Only the latest release of ashim receives security updates. We recommend always running the most recent version.
+Only the latest release of SnapOtter receives security updates. We recommend always running the most recent version.
 
 | Version | Supported |
 |---------|-----------|
 | Latest release | Yes |
 | Previous releases | No |
 
-Self-hosted deployments should subscribe to [GitHub release notifications](https://github.com/ashim-hq/ashim/releases) and upgrade promptly when security patches are published.
+Self-hosted deployments should subscribe to [GitHub release notifications](https://github.com/snapotter-hq/snapotter/releases) and upgrade promptly when security patches are published.
 
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-To report a vulnerability, email **security@ashim.local** with:
+To report a vulnerability, email **security@snapotter.local** with:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce or a proof-of-concept
@@ -83,7 +83,7 @@ The following headers are set on all responses:
 
 ### Container Security
 
-- **Non-root execution**: Dedicated `ashim` user and group created at build time. The entrypoint starts as root only to fix volume permissions, then drops privileges via `gosu`
+- **Non-root execution**: Dedicated `snapotter` user and group created at build time. The entrypoint starts as root only to fix volume permissions, then drops privileges via `gosu`
 - **Root prevention**: PUID/PGID of 0 are explicitly rejected with a warning
 - **PID 1**: `tini` handles zombie reaping and signal forwarding
 - **Multi-stage build**: Production image contains only runtime dependencies
@@ -105,11 +105,11 @@ Security-relevant events are dual-written to structured stdout (for log aggregat
 
 ## Shared Responsibility Model
 
-ashim is a self-hosted application. Security is a shared responsibility between the ashim maintainers and the deployer.
+SnapOtter is a self-hosted application. Security is a shared responsibility between the SnapOtter maintainers and the deployer.
 
-| Area | ashim maintainers | Deployer |
+| Area | SnapOtter maintainers | Deployer |
 |------|-------------------|----------|
-| Application code | Patch vulnerabilities, follow secure coding practices | Keep ashim updated to the latest release |
+| Application code | Patch vulnerabilities, follow secure coding practices | Keep SnapOtter updated to the latest release |
 | Docker image | Publish hardened images with non-root user, minimal attack surface | Pull updates regularly, scan images with your own tooling |
 | Dependencies | Monitor and update npm/pip dependencies | N/A |
 | Authentication | Provide secure auth implementation (scrypt, RBAC, brute-force protection) | Change default credentials before production use, enforce strong passwords |
@@ -127,7 +127,7 @@ The following configurations are recommended for production deployments:
 ### Required
 
 - [ ] Change the default admin password immediately after first login (enforced by `mustChangePassword` unless `SKIP_MUST_CHANGE_PASSWORD=true`)
-- [ ] Place ashim behind a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
+- [ ] Place SnapOtter behind a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
 - [ ] Set `CORS_ORIGIN` to your specific domain(s) if cross-origin access is needed (default in production is same-origin only)
 
 ### Strongly Recommended

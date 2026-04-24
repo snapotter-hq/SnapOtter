@@ -1,5 +1,5 @@
-import type { Tool } from "@ashim/shared";
-import { PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import type { Tool } from "@snapotter/shared";
+import { PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import { Download, FileImage, Star } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";

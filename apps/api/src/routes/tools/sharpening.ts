@@ -1,4 +1,4 @@
-import { sharpenAdvanced } from "@ashim/image-engine";
+import { sharpenAdvanced } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

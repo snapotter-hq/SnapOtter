@@ -405,7 +405,7 @@ test.describe("QR Generate", () => {
     const res = await request.post("/api/v1/tools/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
-        text: "https://ashim.app",
+        text: "https://snapotter.app",
         size: 512,
       },
     });
@@ -434,7 +434,7 @@ test.describe("QR Generate", () => {
     const res = await request.post("/api/v1/tools/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
-        text: "https://github.com/ashim-hq/ashim",
+        text: "https://github.com/snapotter/snapotter",
         size: 300,
         errorCorrection: "H",
       },

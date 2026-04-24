@@ -109,7 +109,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ashimhq/ashim
+            snapotterhq/snapotter
             ghcr.io/${{ github.repository }}
 
       - name: Build and push by digest
@@ -120,7 +120,7 @@ jobs:
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,"name=ashimhq/ashim,ghcr.io/${{ github.repository }}",push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,"name=snapotterhq/snapotter,ghcr.io/${{ github.repository }}",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-${{ env.PLATFORM_PAIR }},mode=max
 
@@ -168,7 +168,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ashimhq/ashim
+            snapotterhq/snapotter
             ghcr.io/${{ github.repository }}
           tags: |
             type=semver,pattern={{version}},value=v${{ needs.release.outputs.new_version }}
@@ -180,8 +180,8 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("ashimhq/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ashimhq/ashim@sha256:%s ' *)
+            $(jq -cr '.tags | map(select(startswith("snapotterhq/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'snapotterhq/snapotter@sha256:%s ' *)
 
       - name: Create GHCR manifest
         working-directory: /tmp/digests

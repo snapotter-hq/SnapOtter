@@ -3,7 +3,7 @@
 ## Our Pledge
 
 We as members, contributors, and maintainers pledge to make participation in
-the ashim community a harassment-free experience for everyone, regardless of
+the SnapOtter community a harassment-free experience for everyone, regardless of
 age, body size, visible or invisible disability, ethnicity, sex characteristics,
 gender identity and expression, level of experience, education, socio-economic
 status, nationality, personal appearance, race, caste, color, religion, or
@@ -36,12 +36,12 @@ Examples of unacceptable behavior:
 ## Scope
 
 This Code of Conduct applies within all community spaces, including GitHub
-Issues, Discussions, and any other channels managed by the ashim project.
+Issues, Discussions, and any other channels managed by the SnapOtter project.
 
 ## Reporting
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to **ashim.hq@gmail.com**. All complaints will be reviewed promptly
+reported to **snapotter.hq@gmail.com**. All complaints will be reviewed promptly
 and fairly. The maintainer is obligated to respect the privacy and security of
 the reporter of any incident.
 

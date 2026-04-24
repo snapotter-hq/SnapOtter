@@ -1,4 +1,4 @@
-import type { AnalyticsConfig, ConsentState } from "@ashim/shared";
+import type { AnalyticsConfig, ConsentState } from "@snapotter/shared";
 import { create } from "zustand";
 import { setAnalyticsConsent } from "@/lib/analytics";
 import { apiPut } from "@/lib/api";
@@ -44,7 +44,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
     try {
       await apiPut("/v1/user/analytics", { enabled: true });
     } catch {
-      localStorage.setItem("ashim-analytics-consent", "true");
+      localStorage.setItem("snapotter-analytics-consent", "true");
     }
     const now = Date.now();
     const consent: ConsentState = {
@@ -60,7 +60,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
     try {
       await apiPut("/v1/user/analytics", { enabled: false });
     } catch {
-      localStorage.setItem("ashim-analytics-consent", "false");
+      localStorage.setItem("snapotter-analytics-consent", "false");
     }
     const now = Date.now();
     const consent: ConsentState = {
@@ -76,7 +76,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
     try {
       await apiPut("/v1/user/analytics", { remindLater: true });
     } catch {
-      localStorage.setItem("ashim-analytics-consent", "remind");
+      localStorage.setItem("snapotter-analytics-consent", "remind");
     }
     const now = Date.now();
     const consent: ConsentState = {
@@ -92,7 +92,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
     try {
       await apiPut("/v1/user/analytics", { enabled });
     } catch {
-      localStorage.setItem("ashim-analytics-consent", enabled ? "true" : "false");
+      localStorage.setItem("snapotter-analytics-consent", enabled ? "true" : "false");
     }
     set((state) => ({
       consent: { ...state.consent, analyticsEnabled: enabled },

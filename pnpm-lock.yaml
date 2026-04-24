@@ -87,15 +87,6 @@ importers:
 
   apps/api:
     dependencies:
-      '@ashim/ai':
-        specifier: workspace:*
-        version: link:../../packages/ai
-      '@ashim/image-engine':
-        specifier: workspace:*
-        version: link:../../packages/image-engine
-      '@ashim/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.2.0
@@ -117,6 +108,15 @@ importers:
       '@sentry/node':
         specifier: ^10.49.0
         version: 10.49.0
+      '@snapotter/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@snapotter/image-engine':
+        specifier: workspace:*
+        version: link:../../packages/image-engine
+      '@snapotter/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -251,9 +251,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@ashim/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -266,6 +263,9 @@ importers:
       '@sentry/react':
         specifier: ^10.49.0
         version: 10.49.0(react@19.2.4)
+      '@snapotter/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@use-gesture/react':
         specifier: ^10.3.1
         version: 10.3.1(react@19.2.4)
@@ -339,7 +339,7 @@ importers:
 
   packages/ai:
     dependencies:
-      '@ashim/shared':
+      '@snapotter/shared':
         specifier: workspace:*
         version: link:../shared
       sharp:
@@ -355,7 +355,7 @@ importers:
 
   packages/image-engine:
     dependencies:
-      '@ashim/shared':
+      '@snapotter/shared':
         specifier: workspace:*
         version: link:../shared
       exif-reader:

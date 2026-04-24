@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: ashim API
+  title: SnapOtter API
   version: 1.15.9
   description: |
-    REST API for ashim, a self-hosted image processing platform with 30+ tools.
+    REST API for SnapOtter, a self-hosted image processing platform with 30+ tools.
 
     ## Authentication
 
@@ -16,7 +16,7 @@ info:
     Endpoints marked with a lock icon require authentication. Admin-only endpoints are noted in their description.
   license:
     name: AGPL-3.0
-    url: https://github.com/ashim-hq/ashim/blob/main/LICENSE
+    url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
 
 servers:
   - url: /

@@ -317,7 +317,7 @@ base.describe("RBAC Full — Custom Role User", () => {
       await login(page, CUSTOM_USER, CUSTOM_PASSWORD);
 
       // Extract token from localStorage
-      const token = await page.evaluate(() => localStorage.getItem("ashim-token"));
+      const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
       expect(token).toBeTruthy();
       const bearerToken = token as string;
 

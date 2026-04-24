@@ -1,5 +1,5 @@
-import type { AnalyticsConfig } from "@ashim/shared";
 import * as Sentry from "@sentry/react";
+import type { AnalyticsConfig } from "@snapotter/shared";
 import posthogJs from "posthog-js";
 
 let posthog: import("posthog-js").PostHog | null = null;

@@ -49,7 +49,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 
-// Only the icons actually used by tool definitions in @ashim/shared constants.
+// Only the icons actually used by tool definitions in @snapotter/shared constants.
 // Avoids `import * as icons from "lucide-react"` which pulls the entire 1000+ icon library.
 export const ICON_MAP: Record<string, LucideIcon> = {
   CheckCircle2,

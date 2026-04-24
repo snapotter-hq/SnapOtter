@@ -76,7 +76,7 @@ test.describe("Settings Dialog", () => {
     await page.getByText("About").click();
 
     // Should show app description
-    await expect(page.getByText(/ashim|privacy|self-hosted/i).first()).toBeVisible();
+    await expect(page.getByText(/snapotter|privacy|self-hosted/i).first()).toBeVisible();
   });
 
   test("System Settings section has configuration", async ({ loggedInPage: page }) => {

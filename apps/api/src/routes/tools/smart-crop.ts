@@ -1,5 +1,5 @@
-import { detectFaces } from "@ashim/ai";
-import { SMART_CROP_FACE_PRESETS } from "@ashim/shared";
+import { detectFaces } from "@snapotter/ai";
+import { SMART_CROP_FACE_PRESETS } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

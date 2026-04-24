@@ -24,7 +24,7 @@ const freePlan = {
     "AGPL-3.0 licensed",
   ],
   cta: "Get Started Free",
-  href: "https://github.com/ashim-hq/ashim",
+  href: "https://github.com/snapotter-hq/snapotter",
   external: true,
 };
 

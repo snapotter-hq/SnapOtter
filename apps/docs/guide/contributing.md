@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for your interest in ashim. Community feedback helps shape the project, and there are several ways to get involved.
+Thanks for your interest in SnapOtter. Community feedback helps shape the project, and there are several ways to get involved.
 
 ## How to contribute
 
-The best way to contribute is through [GitHub Issues](https://github.com/ashim-hq/ashim/issues):
+The best way to contribute is through [GitHub Issues](https://github.com/snapotter-hq/snapotter/issues):
 
 - **Bug reports** - Found something broken? Open a bug report with steps to reproduce, your Docker setup, and what you expected to happen.
 - **Feature requests** - Have an idea for a new tool or improvement? Describe the problem you want solved and why it matters to you.
@@ -18,8 +18,8 @@ If you have found a bug, open an issue describing it rather than submitting a fi
 
 ## Forking
 
-You are welcome to fork the project for your own use under the terms of the [AGPLv3 license](https://github.com/ashim-hq/ashim/blob/main/LICENSE). The [Developer Guide](/guide/developer) covers setup, architecture, and how to add new tools.
+You are welcome to fork the project for your own use under the terms of the [AGPLv3 license](https://github.com/snapotter-hq/snapotter/blob/main/LICENSE). The [Developer Guide](/guide/developer) covers setup, architecture, and how to add new tools.
 
 ## Security
 
-If you discover a security vulnerability, please report it privately through [GitHub Security Advisories](https://github.com/ashim-hq/ashim/security/advisories/new) rather than opening a public issue.
+If you discover a security vulnerability, please report it privately through [GitHub Security Advisories](https://github.com/snapotter-hq/snapotter/security/advisories/new) rather than opening a public issue.

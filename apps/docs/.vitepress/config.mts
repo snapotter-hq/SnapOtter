@@ -6,6 +6,7 @@ export default defineConfig({
   description:
     "Documentation for SnapOtter - A Self Hosted Image Manipulator. 45+ tools, local AI, pipelines, REST API.",
   base: "/",
+  appearance: { initialValue: "light" },
   srcDir: ".",
   outDir: "./.vitepress/dist",
   ignoreDeadLinks: [/localhost/],
@@ -13,13 +14,13 @@ export default defineConfig({
   head: [
     ["meta", { name: "theme-color", content: "#3b82f6" }],
     ["link", { rel: "icon", type: "image/png", href: "/favicon.png" }],
-    ["link", { rel: "llms-txt", href: "/ashim/llms.txt" }],
+    ["link", { rel: "llms-txt", href: "/llms.txt" }],
   ],
 
   vite: {
     plugins: [
       llmstxt({
-        domain: "https://ashim-hq.github.io",
+        domain: "https://docs.snapotter.com",
         customLLMsTxtTemplate: `# {title}
 
 {description}
@@ -42,7 +43,7 @@ export default defineConfig({
 
 ## Source
 
-- [GitHub](https://github.com/ashim-hq/ashim)
+- [GitHub](https://github.com/snapotter-hq/snapotter)
 - License: AGPLv3 (commercial license also available)
 `,
         customTemplateVariables: {
@@ -96,13 +97,13 @@ export default defineConfig({
 
     footer: {
       message:
-        'Released under the <a href="https://github.com/ashim-hq/ashim/blob/main/LICENSE">AGPLv3 License</a>.',
+        'Released under the <a href="https://github.com/snapotter-hq/snapotter/blob/main/LICENSE">AGPLv3 License</a>.',
       copyright:
-        'AI-friendly docs available at <a href="/ashim/llms.txt">/llms.txt</a> · <a href="/ashim/llms-full.txt">/llms-full.txt</a>',
+        'AI-friendly docs available at <a href="/llms.txt">/llms.txt</a> · <a href="/llms-full.txt">/llms-full.txt</a>',
     },
 
     editLink: {
-      pattern: "https://github.com/ashim-hq/ashim/edit/main/apps/docs/:path",
+      pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",
       text: "Edit this page on GitHub",
     },
   },

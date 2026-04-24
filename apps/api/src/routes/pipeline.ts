@@ -9,7 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import archiver from "archiver";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";

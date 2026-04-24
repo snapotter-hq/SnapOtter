@@ -498,17 +498,17 @@ describe("API lib", () => {
   // -- Token management ----------------------------------------------------
 
   describe("token management", () => {
-    it("setToken stores in localStorage under 'ashim-token'", () => {
+    it("setToken stores in localStorage under 'snapotter-token'", () => {
       setToken("my-secret");
-      expect(localStorageMock.setItem).toHaveBeenCalledWith("ashim-token", "my-secret");
-      expect(storageMap.get("ashim-token")).toBe("my-secret");
+      expect(localStorageMock.setItem).toHaveBeenCalledWith("snapotter-token", "my-secret");
+      expect(storageMap.get("snapotter-token")).toBe("my-secret");
     });
 
-    it("clearToken removes 'ashim-token' from localStorage", () => {
+    it("clearToken removes 'snapotter-token' from localStorage", () => {
       setToken("to-remove");
       clearToken();
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith("ashim-token");
-      expect(storageMap.has("ashim-token")).toBe(false);
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith("snapotter-token");
+      expect(storageMap.has("snapotter-token")).toBe(false);
     });
 
     it("clearToken is idempotent (no throw when key missing)", () => {

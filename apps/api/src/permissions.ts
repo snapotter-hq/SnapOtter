@@ -1,4 +1,4 @@
-import type { Permission, Role } from "@ashim/shared";
+import type { Permission, Role } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "./db/index.js";

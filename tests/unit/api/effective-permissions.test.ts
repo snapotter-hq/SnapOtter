@@ -5,7 +5,7 @@
  * getPermissions edge cases, and hasPermission edge cases.
  */
 
-import type { Permission, Role } from "@ashim/shared";
+import type { Permission, Role } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock the auth plugin to avoid transitively opening a SQLite connection

@@ -8,7 +8,7 @@ GPU_MODE="${4:-gpu}"
 BASE_URL="http://localhost:${PORT}"
 RESULTS_FILE="bench-ai-results-${SYSTEM}-${GPU_MODE}.jsonl"
 
-CONTAINER_NAME="ashim"
+CONTAINER_NAME="SnapOtter"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 

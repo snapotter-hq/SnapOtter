@@ -25,6 +25,6 @@ export const useThemeStore = create<ThemeStore>()(
         set({ theme, resolvedTheme: resolved });
       },
     }),
-    { name: "ashim-theme" },
+    { name: "snapotter-theme" },
   ),
 );

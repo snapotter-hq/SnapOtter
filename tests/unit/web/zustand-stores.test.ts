@@ -1447,7 +1447,7 @@ describe("useSettingsStore", () => {
 // FeaturesStore
 // ==========================================================================
 
-vi.mock("@ashim/shared", async (importOriginal) => {
+vi.mock("@snapotter/shared", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
@@ -1753,7 +1753,7 @@ describe("useAnalyticsStore", () => {
 
     await useAnalyticsStore.getState().acceptAnalytics();
 
-    expect(localStorage.setItem).toHaveBeenCalledWith("ashim-analytics-consent", "true");
+    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "true");
     expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(true);
   });
 
@@ -1773,7 +1773,7 @@ describe("useAnalyticsStore", () => {
 
     await useAnalyticsStore.getState().declineAnalytics();
 
-    expect(localStorage.setItem).toHaveBeenCalledWith("ashim-analytics-consent", "false");
+    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "false");
   });
 
   it("remindLater calls API and sets remind-at 7 days in the future", async () => {
@@ -1798,7 +1798,7 @@ describe("useAnalyticsStore", () => {
 
     await useAnalyticsStore.getState().remindLater();
 
-    expect(localStorage.setItem).toHaveBeenCalledWith("ashim-analytics-consent", "remind");
+    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "remind");
   });
 
   it("toggleAnalytics enables analytics", async () => {
@@ -1824,7 +1824,7 @@ describe("useAnalyticsStore", () => {
 
     await useAnalyticsStore.getState().toggleAnalytics(true);
 
-    expect(localStorage.setItem).toHaveBeenCalledWith("ashim-analytics-consent", "true");
+    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "true");
     expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(true);
   });
 });

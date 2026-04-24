@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { restorePhoto } from "@ashim/ai";
-import { getBundleForTool } from "@ashim/shared";
+import { restorePhoto } from "@snapotter/ai";
+import { getBundleForTool } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

@@ -1,4 +1,4 @@
-import { CATEGORIES, TOOLS } from "@ashim/shared";
+import { CATEGORIES, TOOLS } from "@snapotter/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useSettingsStore } from "@/stores/settings-store";

@@ -1,5 +1,5 @@
 /**
- * FULL TOOL AUDIT — Tests every tool in ashim on Windows/amd64.
+ * FULL TOOL AUDIT — Tests every tool in SnapOtter on Windows/amd64.
  * Verifies: (1) tool works, (2) GPU tools use GPU not CPU fallback,
  * (3) no unexpected model/method downgrades.
  */
@@ -79,7 +79,7 @@ async function test(name, path, settings, checks = {}) {
 
 async function main() {
   console.log("=============================================================");
-  console.log("  ASHIM FULL TOOL AUDIT — Windows amd64 + RTX 4070");
+  console.log("  SNAPOTTER FULL TOOL AUDIT — Windows amd64 + RTX 4070");
   console.log("=============================================================\n");
 
   // Login
@@ -278,7 +278,7 @@ async function main() {
   // ════════════════════════════════════════════════════════════════
   console.log("\n--- SPECIAL TOOLS (may need specific inputs) ---\n");
 
-  await test("QR Generate", "qr-generate", { text: "https://ashim.app", size: 512, format: "png" });
+  await test("QR Generate", "qr-generate", { text: "https://snapotter.app", size: 512, format: "png" });
   await test("Text Overlay", "text-overlay", {
     text: "TEST",
     fontSize: 48,
@@ -314,7 +314,7 @@ async function main() {
   // Check GPU usage in docker logs
   console.log("\n--- GPU USAGE CHECK ---\n");
   const { execSync } = await import("child_process");
-  const logs = execSync("docker logs ashim 2>&1", { encoding: "utf-8", maxBuffer: 1024 * 1024 });
+  const logs = execSync("docker logs SnapOtter 2>&1", { encoding: "utf-8", maxBuffer: 1024 * 1024 });
   const gpuLines = logs
     .split("\n")
     .filter(

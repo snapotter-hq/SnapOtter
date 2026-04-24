@@ -1,22 +1,22 @@
-name: ashim
+name: SnapOtter
 
 # NVIDIA GPU deployment — requires nvidia-container-toolkit.
 # Install: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 # Usage: docker compose -f docker-compose-gpu.yml up -d
-# Verify: docker logs ashim 2>&1 | grep GPU
+# Verify: docker logs SnapOtter 2>&1 | grep GPU
 
 services:
-  ashim:
+  SnapOtter:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: ashim:latest
-    container_name: ashim
+    image: snapotter:latest
+    container_name: SnapOtter
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data           # Database, AI models, user files
-      - ashim-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
+      - SnapOtter-data:/data           # Database, AI models, user files
+      - SnapOtter-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
@@ -55,5 +55,5 @@ services:
         max-file: "5"
 
 volumes:
-  ashim-data:
-  ashim-workspace:
+  SnapOtter-data:
+  SnapOtter-workspace:

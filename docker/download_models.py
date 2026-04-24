@@ -11,7 +11,7 @@ import urllib.request
 
 # Some servers (e.g. Berkeley) block the default Python-urllib User-Agent.
 _opener = urllib.request.build_opener()
-_opener.addheaders = [("User-Agent", "ashim/1.0")]
+_opener.addheaders = [("User-Agent", "snapotter/1.0")]
 urllib.request.install_opener(_opener)
 
 

@@ -636,7 +636,7 @@ describe("workspace", () => {
   let TEST_WORKSPACE: string;
 
   beforeEach(async () => {
-    TEST_WORKSPACE = join(tmpdir(), `ashim-test-workspace-${randomUUID()}`);
+    TEST_WORKSPACE = join(tmpdir(), `SnapOtter-test-workspace-${randomUUID()}`);
     await mkdir(TEST_WORKSPACE, { recursive: true });
 
     // Point the env mock's WORKSPACE_PATH at our temp dir

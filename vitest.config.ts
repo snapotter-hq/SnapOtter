@@ -13,7 +13,7 @@ const webNodeModules = path.resolve(__dirname, "apps/web/node_modules");
 const landingNodeModules = path.resolve(__dirname, "apps/landing/node_modules");
 
 // Temp dir for integration test DB + workspace (set BEFORE any app code loads)
-const testDir = path.join(os.tmpdir(), `ashim-test-${crypto.randomUUID().slice(0, 8)}`);
+const testDir = path.join(os.tmpdir(), `SnapOtter-test-${crypto.randomUUID().slice(0, 8)}`);
 
 export default defineConfig({
   esbuild: {
@@ -84,8 +84,8 @@ export default defineConfig({
       "@/components/navbar": path.resolve(__dirname, "apps/landing/src/components/navbar"),
       "@": path.resolve(__dirname, "apps/web/src"),
       "framer-motion": path.join(landingNodeModules, "framer-motion"),
-      "@ashim/image-engine": path.resolve(__dirname, "packages/image-engine/src/index.ts"),
-      "@ashim/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+      "@snapotter/image-engine": path.resolve(__dirname, "packages/image-engine/src/index.ts"),
+      "@snapotter/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
       fastify: path.join(apiNodeModules, "fastify"),
       "@fastify/cors": path.join(apiNodeModules, "@fastify/cors"),
       "@fastify/multipart": path.join(apiNodeModules, "@fastify/multipart"),

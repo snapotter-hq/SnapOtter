@@ -50,7 +50,7 @@ describe("Navbar", () => {
   it("fetches GitHub star count on mount", async () => {
     render(<Navbar />);
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("https://api.github.com/repos/ashim-hq/ashim");
+      expect(fetchMock).toHaveBeenCalledWith("https://api.github.com/repos/snapotter-hq/snapotter");
     });
   });
 
@@ -121,7 +121,7 @@ describe("Navbar", () => {
     render(<Navbar />);
     const githubLinks = screen.getAllByText("Star on GitHub");
     const link = githubLinks[0].closest("a");
-    expect(link?.getAttribute("href")).toBe("https://github.com/ashim-hq/ashim");
+    expect(link?.getAttribute("href")).toBe("https://github.com/snapotter-hq/snapotter");
     expect(link?.getAttribute("target")).toBe("_blank");
   });
 });

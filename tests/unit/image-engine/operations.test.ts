@@ -34,7 +34,7 @@ import {
   saturation,
   sepia,
   stripMetadata,
-} from "@ashim/image-engine";
+} from "@snapotter/image-engine";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
 
@@ -1395,7 +1395,7 @@ describe("parseExif", () => {
     const result = parseExif(metadata.exif!);
     expect(result.image.Artist).toBe("Test Artist");
     expect(result.image.Copyright).toBe("2026 Test Copyright");
-    expect(result.image.Software).toBe("ashim Test");
+    expect(result.image.Software).toBe("SnapOtter Test");
     expect(result.image.ImageDescription).toBe("Test Description");
   });
 
@@ -1489,7 +1489,7 @@ describe("editMetadata", () => {
     expect(parsed.Image?.Artist).toBe("New Artist");
     expect(parsed.Image?.Copyright).toBe("New Copyright");
     // Original fields should be preserved via withExifMerge
-    expect(parsed.Image?.Software).toBe("ashim Test");
+    expect(parsed.Image?.Software).toBe("SnapOtter Test");
   });
 
   it("clears GPS while preserving other EXIF", async () => {

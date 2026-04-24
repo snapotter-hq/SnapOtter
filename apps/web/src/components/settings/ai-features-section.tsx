@@ -1,4 +1,4 @@
-import type { FeatureBundleState } from "@ashim/shared";
+import type { FeatureBundleState } from "@snapotter/shared";
 import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet } from "@/lib/api";

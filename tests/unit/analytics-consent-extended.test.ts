@@ -1,5 +1,5 @@
-import type { ConsentState } from "@ashim/shared";
-import { isConsentEnabled, shouldShowConsent } from "@ashim/shared";
+import type { ConsentState } from "@snapotter/shared";
+import { isConsentEnabled, shouldShowConsent } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;

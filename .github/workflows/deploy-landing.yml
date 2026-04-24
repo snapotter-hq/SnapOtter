@@ -1,14 +1,14 @@
-name: Deploy Docs to Cloudflare Pages
+name: Deploy Landing to Cloudflare Pages
 
 on:
   push:
     branches: [main]
     paths:
-      - "apps/docs/**"
+      - "apps/landing/**"
   workflow_dispatch:
 
 concurrency:
-  group: deploy-docs
+  group: deploy-landing
   cancel-in-progress: true
 
 jobs:
@@ -27,12 +27,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build Docs
-        run: pnpm --filter @snapotter/docs docs:build
+      - name: Build Landing Page
+        run: pnpm --filter @snapotter/landing build
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/docs/.vitepress/dist --project-name snapotter-docs --branch main --commit-dirty=true
+          command: pages deploy apps/landing/out --project-name snapotter-landing --branch main --commit-dirty=true

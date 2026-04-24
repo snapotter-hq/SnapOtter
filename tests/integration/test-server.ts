@@ -19,8 +19,8 @@ import { dirname } from "node:path";
 mkdirSync(dirname(process.env.DB_PATH!), { recursive: true });
 mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
-import { APP_VERSION } from "@ashim/shared";
 import cors from "@fastify/cors";
+import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
 // 2. Import app modules. config.ts already captured our env vars.

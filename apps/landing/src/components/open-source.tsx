@@ -15,7 +15,7 @@ export function OpenSource() {
           </p>
           <div className="mt-10">
             <a
-              href="https://github.com/ashim-hq/ashim"
+              href="https://github.com/snapotter-hq/snapotter"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-xl bg-teal px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-teal-hover"

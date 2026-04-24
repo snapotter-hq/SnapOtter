@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { detectFormat } from "@ashim/image-engine";
+import { detectFormat } from "@snapotter/image-engine";
 import { describe, expect, it } from "vitest";
 
 const FORMATS_DIR = path.resolve(__dirname, "../../fixtures/formats");

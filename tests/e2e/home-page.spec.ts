@@ -1,8 +1,8 @@
 import { expect, test, uploadTestImage } from "./helpers";
 
 test.describe("Home Page", () => {
-  test("shows ashim branding in dropzone", async ({ loggedInPage: page }) => {
-    await expect(page.getByText("ashim").first()).toBeVisible();
+  test("shows SnapOtter branding in dropzone", async ({ loggedInPage: page }) => {
+    await expect(page.getByText("SnapOtter").first()).toBeVisible();
   });
 
   test("dropzone shows upload button", async ({ loggedInPage: page }) => {

@@ -7,7 +7,7 @@ PORT="${3:-1349}"
 BASE_URL="http://localhost:${PORT}"
 RESULTS_FILE="bench-results-${SYSTEM}.jsonl"
 
-CONTAINER_NAME="ashim"
+CONTAINER_NAME="SnapOtter"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 

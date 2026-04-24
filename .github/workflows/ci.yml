@@ -8,6 +8,7 @@ on:
       - "CONTRIBUTING.md"
       - "images/**"
       - "apps/docs/**"
+      - "apps/landing/**"
       - "docs/**"
   pull_request:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - "CONTRIBUTING.md"
       - "images/**"
       - "apps/docs/**"
+      - "apps/landing/**"
       - "docs/**"
 
 concurrency:
@@ -111,7 +113,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
-          tags: ashim:ci
+          tags: snapotter:ci
           build-args: SKIP_MODEL_DOWNLOADS=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache-linux-amd64
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache-ci,mode=max

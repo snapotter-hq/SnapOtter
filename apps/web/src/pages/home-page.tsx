@@ -1,4 +1,4 @@
-import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOLS } from "@ashim/shared";
+import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";

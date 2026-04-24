@@ -1,11 +1,11 @@
 # Architecture
 
-ashim is a monorepo managed with pnpm workspaces and Turborepo. Everything ships as a single Docker container.
+SnapOtter is a monorepo managed with pnpm workspaces and Turborepo. Everything ships as a single Docker container.
 
 ## Project structure
 
 ```
-ashim/
+snapotter/
 ├── apps/
 │   ├── api/          # Fastify backend
 │   ├── web/          # React + Vite frontend
@@ -19,13 +19,13 @@ ashim/
 
 ## Packages
 
-### `@ashim/image-engine`
+### `@snapotter/image-engine`
 
 The core image processing library built on [Sharp](https://sharp.pixelplumbing.com/). It handles all non-AI operations: resize, crop, rotate, flip, convert, compress, strip metadata, and color adjustments (brightness, contrast, saturation, grayscale, sepia, invert, color channels).
 
 This package has no network dependencies and runs entirely in-process.
 
-### `@ashim/ai`
+### `@snapotter/ai`
 
 A bridge layer that calls Python scripts for ML operations. On first use, the bridge starts a persistent Python dispatcher process that pre-imports heavy libraries (PIL, NumPy, MediaPipe, rembg) so subsequent AI calls skip the import overhead. If the dispatcher is not yet ready, the bridge falls back to spawning a fresh Python subprocess per request.
 
@@ -35,7 +35,7 @@ Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN
 
 Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works fully offline.
 
-### `@ashim/shared`
+### `@snapotter/shared`
 
 Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), and i18n translation strings used by both the frontend and backend.
 
@@ -88,7 +88,7 @@ For batch processing, the API uses p-queue with a configurable concurrency limit
 
 ## Resource footprint
 
-ashim is designed for low idle memory use. Nothing is preloaded or kept warm at startup.
+SnapOtter is designed for low idle memory use. Nothing is preloaded or kept warm at startup.
 
 ### At idle
 

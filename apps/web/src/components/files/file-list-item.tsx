@@ -1,4 +1,4 @@
-import { TOOLS } from "@ashim/shared";
+import { TOOLS } from "@snapotter/shared";
 import type { UserFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useFilesPageStore } from "@/stores/files-page-store";

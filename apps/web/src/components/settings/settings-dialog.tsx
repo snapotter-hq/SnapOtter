@@ -1,4 +1,4 @@
-import { APP_VERSION, CATEGORIES, TOOLS } from "@ashim/shared";
+import { APP_VERSION, CATEGORIES, TOOLS } from "@snapotter/shared";
 import {
   Check,
   Copy,
@@ -216,7 +216,7 @@ function GeneralSection() {
         .catch(() => {
           setUser({
             id: 0,
-            username: localStorage.getItem("ashim-username") || "",
+            username: localStorage.getItem("snapotter-username") || "",
             role: "unknown",
           });
         }),
@@ -232,7 +232,7 @@ function GeneralSection() {
 
   const handleLogout = () => {
     clearToken();
-    localStorage.removeItem("ashim-username");
+    localStorage.removeItem("snapotter-username");
     window.location.href = "/login";
   };
 
@@ -2530,7 +2530,7 @@ function AboutSection() {
         <h4 className="text-sm font-medium text-foreground">Links</h4>
         <div className="flex flex-col gap-1.5">
           <a
-            href="https://github.com/ashim-hq/ashim"
+            href="https://github.com/snapotter-hq/snapotter"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline"
@@ -2538,7 +2538,7 @@ function AboutSection() {
             GitHub Repository
           </a>
           <a
-            href="https://ashim-hq.github.io/ashim/"
+            href="https://docs.snapotter.com/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline"

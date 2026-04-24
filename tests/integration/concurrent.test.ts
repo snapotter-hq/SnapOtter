@@ -1,5 +1,5 @@
 /**
- * Concurrent request integration tests for the ashim image API.
+ * Concurrent request integration tests for the SnapOtter image API.
  *
  * Tests that the server handles parallel and rapid sequential requests
  * correctly without data corruption, crashes, or race conditions.

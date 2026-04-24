@@ -1,4 +1,4 @@
-import { flip, rotate } from "@ashim/image-engine";
+import { flip, rotate } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

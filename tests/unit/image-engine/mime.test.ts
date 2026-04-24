@@ -1,4 +1,4 @@
-import { extToMime, formatToExt, formatToMime, mimeToExt } from "@ashim/image-engine";
+import { extToMime, formatToExt, formatToMime, mimeToExt } from "@snapotter/image-engine";
 import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------

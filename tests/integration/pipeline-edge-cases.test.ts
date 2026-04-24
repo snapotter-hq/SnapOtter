@@ -1,5 +1,5 @@
 /**
- * Pipeline edge-case integration tests for the ashim image API.
+ * Pipeline edge-case integration tests for the SnapOtter image API.
  *
  * Tests the pipeline execution system with unusual inputs: empty pipelines,
  * single steps, invalid tools, conflicting steps, and multi-step chains.

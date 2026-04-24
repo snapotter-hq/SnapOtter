@@ -1,5 +1,5 @@
 # ============================================
-# ashim - Test Dockerfile
+# SnapOtter - Test Dockerfile
 # Runs the full test suite (unit + integration)
 # ============================================
 
@@ -40,7 +40,7 @@ ENV NODE_ENV=test \
     AUTH_ENABLED=true \
     DEFAULT_USERNAME=admin \
     DEFAULT_PASSWORD=admin \
-    DB_PATH=/tmp/test-ashim.db \
+    DB_PATH=/tmp/test-snapotter.db \
     WORKSPACE_PATH=/tmp/test-workspace \
     MAX_MEGAPIXELS=100 \
     MAX_UPLOAD_SIZE_MB=100 \

@@ -3,7 +3,7 @@ import {
   type PassportDocumentSpec,
   type PassportRegion,
   type PassportSpec,
-} from "@ashim/shared";
+} from "@snapotter/shared";
 import {
   Check,
   ChevronDown,

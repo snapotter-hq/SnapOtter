@@ -1,4 +1,4 @@
-import { ANALYTICS_EVENTS } from "@ashim/shared";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {

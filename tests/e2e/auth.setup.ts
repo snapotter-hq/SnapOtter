@@ -15,7 +15,7 @@ setup("authenticate", async ({ page }) => {
   await page.getByRole("button", { name: /login/i }).click();
 
   // Wait for login to complete and grab the token in one step
-  const handle = await page.waitForFunction(() => localStorage.getItem("ashim-token"), null, {
+  const handle = await page.waitForFunction(() => localStorage.getItem("snapotter-token"), null, {
     timeout: 15_000,
   });
   const token = await handle.jsonValue();

@@ -1,4 +1,4 @@
-import type { FeatureBundleState } from "@ashim/shared";
+import type { FeatureBundleState } from "@snapotter/shared";
 import { AlertCircle, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFeaturesStore } from "@/stores/features-store";

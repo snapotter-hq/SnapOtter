@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { detectFaceLandmarks, removeBackground } from "@ashim/ai";
-import { getBundleForTool, PASSPORT_SPECS, PRINT_LAYOUTS, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
+import {
+  getBundleForTool,
+  PASSPORT_SPECS,
+  PRINT_LAYOUTS,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

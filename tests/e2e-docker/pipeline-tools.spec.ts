@@ -469,7 +469,7 @@ test.describe("Pipeline edge cases", () => {
             {
               toolId: "watermark-text",
               settings: {
-                text: "ashim",
+                text: "snapotter",
                 fontSize: 20,
                 color: "#808080",
                 opacity: 20,

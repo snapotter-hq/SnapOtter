@@ -23,7 +23,7 @@ export function Navbar() {
   const [stars, setStars] = useState<string>("Star");
 
   useEffect(() => {
-    fetch("https://api.github.com/repos/ashim-hq/ashim")
+    fetch("https://api.github.com/repos/snapotter-hq/snapotter")
       .then((res) => res.json())
       .then((data) => {
         if (typeof data.stargazers_count === "number") {
@@ -65,7 +65,7 @@ export function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           <a
-            href="https://github.com/ashim-hq/ashim"
+            href="https://github.com/snapotter-hq/snapotter"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
@@ -109,7 +109,7 @@ export function Navbar() {
           ))}
           <div className="mt-3 flex flex-col gap-2">
             <a
-              href="https://github.com/ashim-hq/ashim"
+              href="https://github.com/snapotter-hq/snapotter"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium"

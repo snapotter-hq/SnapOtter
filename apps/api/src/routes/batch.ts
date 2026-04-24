@@ -9,7 +9,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import PQueue from "p-queue";

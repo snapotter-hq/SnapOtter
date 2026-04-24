@@ -1,4 +1,4 @@
-import { TOOLS } from "@ashim/shared";
+import { TOOLS } from "@snapotter/shared";
 import { ArrowRight, ChevronDown, ChevronRight, Download, FileImage, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";

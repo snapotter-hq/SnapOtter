@@ -1,5 +1,5 @@
 /**
- * Edge-case integration tests for the ashim image API.
+ * Edge-case integration tests for the SnapOtter image API.
  *
  * Tests unusual but valid inputs: empty files, tiny images, wrong extensions,
  * extreme filenames, missing/empty settings, and unknown fields.

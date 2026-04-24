@@ -9,7 +9,7 @@ body:
       options:
         - label: I searched existing issues and didn't find a duplicate
           required: true
-        - label: I'm running the latest version of ashim
+        - label: I'm running the latest version of SnapOtter
           required: true
 
   - type: textarea

@@ -25,7 +25,7 @@ export function LoginPage() {
       const data = await res.json();
       setToken(data.token);
       // Store username for settings display
-      localStorage.setItem("ashim-username", data.user?.username || username);
+      localStorage.setItem("snapotter-username", data.user?.username || username);
       // Redirect to password change if required, otherwise go home
       if (data.user?.mustChangePassword) {
         window.location.href = "/change-password";

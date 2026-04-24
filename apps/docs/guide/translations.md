@@ -1,6 +1,6 @@
 # Translation guide
 
-ashim ships with English by default. The i18n system is designed so adding a new language is straightforward.
+SnapOtter ships with English by default. The i18n system is designed so adding a new language is straightforward.
 
 ## How translations work
 
@@ -10,7 +10,7 @@ The `TranslationKeys` type is derived from the English file, so TypeScript will 
 
 ## Requesting a translation
 
-To request a new language or report a mistranslation, open a [GitHub Issue](https://github.com/ashim-hq/ashim/issues) with:
+To request a new language or report a mistranslation, open a [GitHub Issue](https://github.com/snapotter-hq/snapotter/issues) with:
 
 - The language name and locale code (e.g., German / `de`)
 - Any specific strings or sections you want translated

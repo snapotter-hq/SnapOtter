@@ -1,4 +1,4 @@
-import { PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@ashim/shared";
+import { PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronLeft,

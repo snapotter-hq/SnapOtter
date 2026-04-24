@@ -3,14 +3,14 @@
 ## Quick Start
 
 ```bash
-docker run -d --name ashim -p 1349:1349 -v ashim-data:/data ghcr.io/ashim-hq/ashim:latest
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
 ```
 
 Open [http://localhost:1349](http://localhost:1349) in your browser.
 
 ::: tip Also on Docker Hub
 ```bash
-docker run -d --name ashim -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotterhq/snapotter:latest
 ```
 
 Both registries publish the same image on every release.
@@ -29,7 +29,7 @@ You will be asked to change your password on first login.
 Add `--gpus all` for GPU-accelerated background removal, upscaling, OCR, face enhancement, and restoration:
 
 ```bash
-docker run -d --name ashim -p 1349:1349 --gpus all -v ashim-data:/data ashimhq/ashim:latest
+docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotterhq/snapotter:latest
 ```
 
 Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU automatically. See [Docker Tags](/guide/docker-tags) for benchmarks.
@@ -39,12 +39,12 @@ Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud
 
 ```yaml
 services:
-  ashim:
-    image: ghcr.io/ashim-hq/ashim:latest  # or ashimhq/ashim:latest
+  SnapOtter:
+    image: ghcr.io/snapotter-hq/snapotter:latest  # or snapotterhq/snapotter:latest
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data
+      - SnapOtter-data:/data
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  ashim-data:
+  SnapOtter-data:
 ```
 
 See [Configuration](/guide/configuration) for all environment variables.
@@ -62,8 +62,8 @@ See [Configuration](/guide/configuration) for all environment variables.
 **Prerequisites:** Node.js 22+, pnpm 9+, Python 3.10+ (for AI features), Git.
 
 ```bash
-git clone https://github.com/ashim-hq/ashim.git
-cd ashim
+git clone https://github.com/snapotter-hq/snapotter.git
+cd snapotter
 pnpm install
 pnpm dev
 ```
@@ -99,7 +99,7 @@ Pipelines have unlimited steps by default.
 
 ### File Library
 
-Every file you process can be saved to your **Files** library. ashim tracks the full version history so you can trace every processing step from the original upload to the final output.
+Every file you process can be saved to your **Files** library. SnapOtter tracks the full version history so you can trace every processing step from the original upload to the final output.
 
 ### REST API & API Keys
 

@@ -1,5 +1,5 @@
 {
-  "name": "@ashim/ai",
+  "name": "@snapotter/ai",
   "version": "1.15.9",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ashim/shared": "workspace:*",
+    "@snapotter/shared": "workspace:*",
     "sharp": "^0.33.0"
   },
   "devDependencies": {

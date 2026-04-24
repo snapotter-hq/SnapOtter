@@ -5,7 +5,7 @@
  * and that the hasPermission check works as expected.
  */
 
-import type { Role } from "@ashim/shared";
+import type { Role } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock the auth plugin to avoid transitively opening a SQLite connection

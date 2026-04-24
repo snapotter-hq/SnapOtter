@@ -193,7 +193,7 @@ export const en = {
     regenerateKey: "Regenerate",
     copyKey: "Copy Key",
     aboutDescription:
-      "ashim is a self-hosted, privacy-first image processing suite with 30+ tools.",
+      "SnapOtter is a self-hosted, privacy-first image processing suite with 30+ tools.",
     aboutLinks: "Links",
     github: "GitHub",
     documentation: "Documentation",
@@ -302,14 +302,14 @@ export const en = {
     settings: "Settings",
   },
   analytics: {
-    consentTitle: "Help improve ashim",
+    consentTitle: "Help improve SnapOtter",
     consentDescription:
       "Anonymous usage stats help us fix bugs and build the tools you actually need. Your images and files stay on your machine.",
     consentChangeable: "You can turn this off anytime in Settings.",
     acceptButton: "Sure, sounds good",
     declineButton: "Not right now",
     settingsTitle: "Product Analytics",
-    settingsDescription: "Share anonymous usage data to help improve ashim.",
+    settingsDescription: "Share anonymous usage data to help improve SnapOtter.",
     settingsPrivacy: "Your images never leave your machine.",
     settingsDisabledByAdmin: "Product analytics has been disabled by the server administrator.",
     learnMore: "Learn more",

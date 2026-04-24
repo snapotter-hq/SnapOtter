@@ -3,11 +3,11 @@ set -euo pipefail
 
 SYSTEM="${1:?Usage: bench-limits.sh <system-name> <fixture-dir> <docker-image>}"
 FIXTURE_DIR="${2:?}"
-DOCKER_IMAGE="${3:-ashim:latest}"
+DOCKER_IMAGE="${3:-snapotter:latest}"
 PORT=13491
 BASE_URL="http://localhost:${PORT}"
 RESULTS_FILE="bench-limits-results-${SYSTEM}.jsonl"
-CONTAINER_NAME="ashim-bench-limits"
+CONTAINER_NAME="SnapOtter-bench-limits"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 

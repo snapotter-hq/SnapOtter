@@ -59,7 +59,7 @@ export function useAuth() {
           return;
         }
 
-        const token = localStorage.getItem("ashim-token");
+        const token = localStorage.getItem("snapotter-token");
         if (!token) {
           if (!cancelled)
             setState({
@@ -96,7 +96,7 @@ export function useAuth() {
               analyticsConsentRemindAt: session.user?.analyticsConsentRemindAt ?? null,
             });
         } else {
-          localStorage.removeItem("ashim-token");
+          localStorage.removeItem("snapotter-token");
           if (!cancelled)
             setState({
               loading: false,

@@ -1,6 +1,6 @@
 # Deployment
 
-ashim ships as a single Docker container. The image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
+SnapOtter ships as a single Docker container. The image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
 
 See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
@@ -9,14 +9,14 @@ See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and ve
 ```yaml
 # docker-compose.yml — Copy this file and run: docker compose up -d
 services:
-  ashim:
-    image: ashimhq/ashim:latest    # or ghcr.io/ashim-hq/ashim:latest
-    container_name: ashim
+  SnapOtter:
+    image: snapotterhq/snapotter:latest    # or ghcr.io/snapotter-hq/snapotter:latest
+    container_name: SnapOtter
     ports:
       - "1349:1349"                # Web UI + API
     volumes:
-      - ashim-data:/data           # Database, AI models, user files (PERSISTENT)
-      - ashim-workspace:/tmp/workspace  # Temp processing files (can be tmpfs)
+      - SnapOtter-data:/data           # Database, AI models, user files (PERSISTENT)
+      - SnapOtter-workspace:/tmp/workspace  # Temp processing files (can be tmpfs)
     environment:
       # --- Authentication ---
       - AUTH_ENABLED=true          # Set to false to disable login entirely
@@ -50,8 +50,8 @@ services:
         max-file: "3"
 
 volumes:
-  ashim-data:       # Named volume — Docker manages permissions automatically
-  ashim-workspace:
+  SnapOtter-data:       # Named volume — Docker manages permissions automatically
+  SnapOtter-workspace:
 ```
 
 ```bash
@@ -60,7 +60,7 @@ docker compose up -d
 
 The app is then available at `http://localhost:1349`.
 
-> **Docker Hub rate limits?** Replace `ashimhq/ashim:latest` with `ghcr.io/ashim-hq/ashim:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
+> **Docker Hub rate limits?** Replace `snapotterhq/snapotter:latest` with `ghcr.io/snapotter-hq/snapotter:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
 
 ## Quick Start (GPU)
 
@@ -70,14 +70,14 @@ For NVIDIA GPU acceleration on AI tools (background removal, upscaling, face enh
 # docker-compose-gpu.yml — Requires: NVIDIA GPU + nvidia-container-toolkit
 # Install toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 services:
-  ashim:
-    image: ashimhq/ashim:latest
-    container_name: ashim
+  SnapOtter:
+    image: snapotterhq/snapotter:latest
+    container_name: SnapOtter
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data
-      - ashim-workspace:/tmp/workspace
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
@@ -104,8 +104,8 @@ services:
         max-file: "3"
 
 volumes:
-  ashim-data:
-  ashim-workspace:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
 ```bash
@@ -115,7 +115,7 @@ docker compose -f docker-compose-gpu.yml up -d
 Check GPU detection in the logs:
 
 ```bash
-docker logs ashim 2>&1 | head -20
+docker logs SnapOtter 2>&1 | head -20
 # Look for: [INFO] GPU detected — AI tools will use CUDA acceleration
 ```
 
@@ -281,13 +281,13 @@ Not supported: BMP (V4/V5 headers), JPEG XL (JXL), EXR (missing decode delegate 
 **Named volumes** (recommended) — Docker manages permissions automatically:
 ```yaml
 volumes:
-  - ashim-data:/data
+  - SnapOtter-data:/data
 ```
 
 **Bind mounts** — You manage permissions. Set `PUID`/`PGID` to match your host user:
 ```yaml
 volumes:
-  - ./ashim-data:/data
+  - ./SnapOtter-data:/data
 environment:
   - PUID=1000    # Your host UID (run: id -u)
   - PGID=1000    # Your host GID (run: id -g)
@@ -318,7 +318,7 @@ The container includes a built-in health check:
 
 ```bash
 # Check container health status
-docker inspect --format='{{.State.Health.Status}}' ashim
+docker inspect --format='{{.State.Health.Status}}' SnapOtter
 
 # Manual health check
 curl http://localhost:1349/api/v1/health
@@ -327,7 +327,7 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy
 
-ashim sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
+SnapOtter sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
 
 ### Nginx
 
@@ -360,23 +360,23 @@ server {
 
 1. Add a new Proxy Host
 2. Set Domain Name to your domain
-3. Set Scheme to `http`, Forward Hostname to `ashim` (or your container IP), Forward Port to `1349`
+3. Set Scheme to `http`, Forward Hostname to `SnapOtter` (or your container IP), Forward Port to `1349`
 4. Enable WebSocket support
 5. Under Advanced, add: `client_max_body_size 500M;` and `proxy_buffering off;`
 
 ### Traefik
 
 ```yaml
-# Add these labels to the ashim service in docker-compose.yml
+# Add these labels to the SnapOtter service in docker-compose.yml
 labels:
   - "traefik.enable=true"
-  - "traefik.http.routers.ashim.rule=Host(`images.example.com`)"
-  - "traefik.http.routers.ashim.entrypoints=websecure"
-  - "traefik.http.routers.ashim.tls.certresolver=letsencrypt"
-  - "traefik.http.services.ashim.loadbalancer.server.port=1349"
+  - "traefik.http.routers.snapotter.rule=Host(`images.example.com`)"
+  - "traefik.http.routers.snapotter.entrypoints=websecure"
+  - "traefik.http.routers.snapotter.tls.certresolver=letsencrypt"
+  - "traefik.http.services.snapotter.loadbalancer.server.port=1349"
   # Increase upload limit (default 2MB is too low)
-  - "traefik.http.middlewares.ashim-body.buffering.maxRequestBodyBytes=524288000"
-  - "traefik.http.routers.ashim.middlewares=ashim-body"
+  - "traefik.http.middlewares.snapotter-body.buffering.maxRequestBodyBytes=524288000"
+  - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
 ### Cloudflare Tunnels
@@ -392,7 +392,7 @@ Note: Cloudflare has a 100 MB upload limit on free plans. Set `MAX_UPLOAD_SIZE_M
 The GitHub repository has three workflows:
 
 - **ci.yml** -- Runs automatically on every push and PR. Lints, typechecks, tests, builds, and validates the Docker image (without pushing).
-- **release.yml** -- Triggered manually via `workflow_dispatch`. Runs semantic-release to create a version tag and GitHub release, then builds a multi-arch Docker image (amd64 + arm64) and pushes to Docker Hub (`ashimhq/ashim`) and GitHub Container Registry (`ghcr.io/ashim-hq/ashim`).
+- **release.yml** -- Triggered manually via `workflow_dispatch`. Runs semantic-release to create a version tag and GitHub release, then builds a multi-arch Docker image (amd64 + arm64) and pushes to Docker Hub (`snapotterhq/snapotter`) and GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
 - **deploy-docs.yml** -- Builds this documentation site and deploys it to GitHub Pages on push to `main`.
 
 To create a release, go to **Actions > Release > Run workflow** in the GitHub UI, or run:

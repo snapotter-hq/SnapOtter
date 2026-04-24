@@ -50,7 +50,7 @@ describe("Hero", () => {
     render(<Hero />);
     const cta = screen.getByText("Get it for free");
     const link = cta.closest("a");
-    expect(link?.getAttribute("href")).toBe("https://github.com/ashim-hq/ashim");
+    expect(link?.getAttribute("href")).toBe("https://github.com/snapotter-hq/snapotter");
     expect(link?.getAttribute("target")).toBe("_blank");
   });
 
@@ -175,7 +175,9 @@ describe("Pricing", () => {
   it("links free plan CTA to GitHub", () => {
     render(<Pricing />);
     const freeButton = screen.getByText(/Get Started Free/);
-    expect(freeButton.closest("a")?.getAttribute("href")).toBe("https://github.com/ashim-hq/ashim");
+    expect(freeButton.closest("a")?.getAttribute("href")).toBe(
+      "https://github.com/snapotter-hq/snapotter",
+    );
   });
 
   it("links enterprise CTA to contact page", () => {
@@ -201,7 +203,7 @@ describe("OpenSource", () => {
   it("links to GitHub", () => {
     render(<OpenSource />);
     const link = screen.getByText("Star on GitHub").closest("a");
-    expect(link?.getAttribute("href")).toBe("https://github.com/ashim-hq/ashim");
+    expect(link?.getAttribute("href")).toBe("https://github.com/snapotter-hq/snapotter");
   });
 });
 
@@ -230,7 +232,9 @@ describe("Footer", () => {
   it("renders community links to GitHub", () => {
     render(<Footer />);
     const ghLink = screen.getByText("GitHub");
-    expect(ghLink.closest("a")?.getAttribute("href")).toBe("https://github.com/ashim-hq/ashim");
+    expect(ghLink.closest("a")?.getAttribute("href")).toBe(
+      "https://github.com/snapotter-hq/snapotter",
+    );
   });
 
   it("renders legal links", () => {

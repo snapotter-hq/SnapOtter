@@ -23,14 +23,14 @@ const columns = [
   {
     title: "Community",
     links: [
-      { label: "GitHub", href: "https://github.com/ashim-hq/ashim" },
+      { label: "GitHub", href: "https://github.com/snapotter-hq/snapotter" },
       {
         label: "Contributing",
-        href: "https://github.com/ashim-hq/ashim/blob/main/CONTRIBUTING.md",
+        href: "https://github.com/snapotter-hq/snapotter/blob/main/CONTRIBUTING.md",
       },
       {
         label: "Discussions",
-        href: "https://github.com/ashim-hq/ashim/discussions",
+        href: "https://github.com/snapotter-hq/snapotter/discussions",
       },
     ],
   },
@@ -88,7 +88,7 @@ export function Footer() {
       <div className="mx-auto mt-12 flex max-w-6xl items-center justify-between border-t border-border pt-8">
         <p className="text-sm text-muted">&copy; {new Date().getFullYear()} SnapOtter</p>
         <a
-          href="https://github.com/ashim-hq/ashim"
+          href="https://github.com/snapotter-hq/snapotter"
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted transition-colors hover:text-foreground"

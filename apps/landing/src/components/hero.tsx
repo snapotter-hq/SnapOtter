@@ -128,7 +128,7 @@ export function Hero() {
 
         <div className="mt-10 animate-[fadeUp_0.6s_ease-out_0.3s_both]">
           <a
-            href="https://github.com/ashim-hq/ashim"
+            href="https://github.com/snapotter-hq/snapotter"
             target="_blank"
             rel="noopener noreferrer"
             className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_100%] px-10 py-4 text-base font-semibold text-white shadow-[0_0_32px_-8px] shadow-amber-500/40 transition-all duration-500 hover:bg-[position:100%_0] hover:shadow-[0_0_40px_-4px] hover:shadow-amber-500/50"

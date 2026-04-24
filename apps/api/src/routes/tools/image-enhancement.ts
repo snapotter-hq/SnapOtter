@@ -1,4 +1,4 @@
-import { analyzeImage, applyCorrections } from "@ashim/image-engine";
+import { analyzeImage, applyCorrections } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

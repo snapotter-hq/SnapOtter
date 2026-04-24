@@ -9,7 +9,13 @@ const require = createRequire(
 );
 const sharp = require("sharp") as typeof import("sharp").default;
 
-import { getImageInfo, parseExif, parseGps, parseXmp, sanitizeValue } from "@ashim/image-engine";
+import {
+  getImageInfo,
+  parseExif,
+  parseGps,
+  parseXmp,
+  sanitizeValue,
+} from "@snapotter/image-engine";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
 

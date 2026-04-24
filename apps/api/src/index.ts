@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { isGpuAvailable } from "@ashim/ai";
-import { APP_VERSION } from "@ashim/shared";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import { isGpuAvailable } from "@snapotter/ai";
+import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
@@ -230,7 +230,7 @@ try {
   const gpu = isGpuAvailable();
   console.log(
     [
-      `ashim v${APP_VERSION} running on port ${env.PORT}`,
+      `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
       gpu
         ? "[INFO] GPU detected — AI tools will use CUDA acceleration"
         : "[WARN] No GPU detected — AI tools will use CPU (slower)",
@@ -275,7 +275,7 @@ async function shutdown(signal: string) {
   }
 
   try {
-    const { shutdownDispatcher } = await import("@ashim/ai");
+    const { shutdownDispatcher } = await import("@snapotter/ai");
     shutdownDispatcher();
     console.log("Python dispatcher shut down");
   } catch {

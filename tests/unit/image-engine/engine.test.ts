@@ -17,7 +17,7 @@ const require = createRequire(
 );
 const sharp = require("sharp") as typeof import("sharp").default;
 
-import { processImage } from "@ashim/image-engine";
+import { processImage } from "@snapotter/image-engine";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
 const FORMATS_DIR = path.resolve(__dirname, "../../fixtures/formats");

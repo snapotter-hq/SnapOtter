@@ -1,11 +1,11 @@
 {
-  "name": "ashim",
+  "name": "snapotter",
   "version": "1.15.9",
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "turbo dev",
-    "docs:dev": "pnpm --filter @ashim/docs docs:dev",
+    "docs:dev": "pnpm --filter @snapotter/docs docs:dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "biome check --write .",

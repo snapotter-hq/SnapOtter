@@ -1,6 +1,6 @@
 # AI Engine Reference
 
-The `@ashim/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
+The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
 
 14 AI tool routes. All models run locally - no internet required after initial model download.
 
@@ -10,7 +10,7 @@ The `@ashim/ai` package bridges Node.js to a **persistent Python sidecar** for a
 Node.js Tool Route
       │
       ▼
- @ashim/ai bridge.ts
+ @snapotter/ai bridge.ts
       │ (stdin/stdout JSON + stderr progress events)
       ▼
  Python dispatcher (persistent process)

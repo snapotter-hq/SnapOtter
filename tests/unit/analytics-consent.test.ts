@@ -1,4 +1,4 @@
-import { isConsentEnabled, shouldShowConsent } from "@ashim/shared";
+import { isConsentEnabled, shouldShowConsent } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("shouldShowConsent", () => {

@@ -1,4 +1,4 @@
-import { APP_VERSION } from "@ashim/shared";
+import { APP_VERSION } from "@snapotter/shared";
 import { BookOpen, ExternalLink, Github, Keyboard, X } from "lucide-react";
 import { useEffect } from "react";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
@@ -99,7 +99,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             </div>
             <div className="flex flex-col gap-1.5">
               <a
-                href="https://github.com/ashim-hq/ashim"
+                href="https://github.com/snapotter-hq/snapotter"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-primary hover:underline"
@@ -108,7 +108,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 <ExternalLink className="h-3 w-3" />
               </a>
               <a
-                href="https://github.com/ashim-hq/ashim/issues"
+                href="https://github.com/snapotter-hq/snapotter/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-primary hover:underline"
@@ -117,7 +117,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 <ExternalLink className="h-3 w-3" />
               </a>
               <a
-                href="https://ashim-hq.github.io/ashim/"
+                href="https://docs.snapotter.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-primary hover:underline"

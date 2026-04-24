@@ -1,4 +1,4 @@
-import { resize } from "@ashim/image-engine";
+import { resize } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

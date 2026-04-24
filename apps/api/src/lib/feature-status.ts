@@ -10,8 +10,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type { FeatureBundleState, FeatureStatus } from "@ashim/shared";
-import { FEATURE_BUNDLES, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
+import { FEATURE_BUNDLES, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 
 // ── Paths ───────────────────────────────────────────────────────────────
 

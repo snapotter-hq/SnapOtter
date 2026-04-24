@@ -1,4 +1,4 @@
-import { PYTHON_SIDECAR_TOOLS } from "@ashim/shared";
+import { PYTHON_SIDECAR_TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { generateId } from "@/lib/utils";

@@ -1,4 +1,4 @@
-import { TOOLS } from "@ashim/shared";
+import { TOOLS } from "@snapotter/shared";
 import { FileImage, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";

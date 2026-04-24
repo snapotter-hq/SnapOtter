@@ -1,4 +1,4 @@
-import { SMART_CROP_FACE_PRESETS, SOCIAL_MEDIA_PRESETS } from "@ashim/shared";
+import { SMART_CROP_FACE_PRESETS, SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
 import { ArrowLeftRight, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";

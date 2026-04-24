@@ -6,7 +6,7 @@ import {
   grayscale,
   invert,
   sepia,
-} from "@ashim/image-engine";
+} from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";

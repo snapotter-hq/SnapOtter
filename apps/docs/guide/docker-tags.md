@@ -1,11 +1,11 @@
 # Docker Image
 
-ashim ships as a single Docker image that works on all platforms.
+SnapOtter ships as a single Docker image that works on all platforms.
 
 ## Quick start
 
 ```bash
-docker run -d --name ashim -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotterhq/snapotter:latest
 ```
 
 The app is available at `http://localhost:1349`.
@@ -15,7 +15,7 @@ The app is available at `http://localhost:1349`.
 The image includes CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
 
 ```bash
-docker run -d --name ashim --gpus all -p 1349:1349 -v ashim-data:/data ashimhq/ashim:latest
+docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotterhq/snapotter:latest
 ```
 
 The image auto-detects your GPU at runtime. Without `--gpus all`, it runs on CPU. Same image either way.
@@ -56,13 +56,13 @@ GET /api/v1/admin/health
 
 ```yaml
 services:
-  ashim:
-    image: ashimhq/ashim:latest
+  SnapOtter:
+    image: snapotterhq/snapotter:latest
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data
-      - ashim-workspace:/tmp/workspace
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace
     restart: unless-stopped
     logging:
       driver: json-file
@@ -71,21 +71,21 @@ services:
         max-file: "3"
 
 volumes:
-  ashim-data:
-  ashim-workspace:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
 For GPU acceleration via Docker Compose, add the deploy section:
 
 ```yaml
 services:
-  ashim:
-    image: ashimhq/ashim:latest
+  SnapOtter:
+    image: snapotterhq/snapotter:latest
     ports:
       - "1349:1349"
     volumes:
-      - ashim-data:/data
-      - ashim-workspace:/tmp/workspace
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace
     deploy:
       resources:
         reservations:
@@ -96,8 +96,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  ashim-data:
-  ashim-workspace:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
 ## Version pinning

@@ -15,7 +15,7 @@ def emit_progress(percent, stage):
 _MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
 LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", os.path.join(_MODELS_BASE, "lama"))
 LAMA_MODEL_PATH = os.path.join(LAMA_MODEL_DIR, "lama_fp32.onnx")
-LAMA_LOCAL_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "ashim", "lama")
+LAMA_LOCAL_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "snapotter", "lama")
 LAMA_LOCAL_PATH = os.path.join(LAMA_LOCAL_CACHE, "lama_fp32.onnx")
 LAMA_HF_URL = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"
 

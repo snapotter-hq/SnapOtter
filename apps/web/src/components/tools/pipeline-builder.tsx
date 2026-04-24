@@ -1,4 +1,3 @@
-import { TOOLS } from "@ashim/shared";
 import {
   closestCenter,
   DndContext,
@@ -15,6 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { TOOLS } from "@snapotter/shared";
 import { FileImage, GripVertical, X } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";

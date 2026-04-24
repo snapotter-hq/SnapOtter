@@ -46,7 +46,7 @@ export function parseApiError(
 
 function getToken(): string {
   try {
-    return localStorage.getItem("ashim-token") || "";
+    return localStorage.getItem("snapotter-token") || "";
   } catch {
     return "";
   }
@@ -62,7 +62,7 @@ export function formatHeaders(init?: HeadersInit): Headers {
   }
   if (!token) {
     try {
-      const consent = localStorage.getItem("ashim-analytics-consent");
+      const consent = localStorage.getItem("snapotter-analytics-consent");
       if (consent === "true" || consent === "false") {
         headers.set("X-Analytics-Consent", consent);
       }
@@ -157,11 +157,11 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 export function setToken(token: string) {
-  localStorage.setItem("ashim-token", token);
+  localStorage.setItem("snapotter-token", token);
 }
 
 export function clearToken() {
-  localStorage.removeItem("ashim-token");
+  localStorage.removeItem("snapotter-token");
 }
 
 // ── File Upload / Download ──────────────────────────────────────

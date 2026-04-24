@@ -27,7 +27,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const DOCKER_COMMAND =
-  "docker run -d --name ashim -p 1349:1349 -v ashim-data:/data ghcr.io/ashim-hq/ashim:latest";
+  "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest";
 
 describe("HowItWorks", () => {
   it("renders the section heading", () => {

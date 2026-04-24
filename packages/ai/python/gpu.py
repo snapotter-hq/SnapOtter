@@ -15,7 +15,7 @@ def emit_info(msg):
 def gpu_available():
     """Return True if a usable CUDA GPU is present at runtime."""
     # Allow explicit disable via env var (set to "false" or "0")
-    override = os.environ.get("ASHIM_GPU")
+    override = os.environ.get("SNAPOTTER_GPU")
     if override is not None and override.lower() in ("0", "false", "no"):
         return False
 

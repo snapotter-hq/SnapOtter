@@ -23,7 +23,7 @@ NAFNET_MODEL_PATH = os.environ.get(
 )
 
 # Local cache for dev installs
-_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "ashim", "models")
+_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "snapotter", "models")
 
 # GitHub release URLs for auto-download
 SCUNET_URL = "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth"

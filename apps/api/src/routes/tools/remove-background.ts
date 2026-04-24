@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { removeBackground } from "@ashim/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@ashim/shared";
+import { removeBackground } from "@snapotter/ai";
+import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";

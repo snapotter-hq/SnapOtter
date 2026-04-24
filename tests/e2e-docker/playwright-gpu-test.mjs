@@ -18,7 +18,7 @@ function log(tool, status, detail = "") {
 }
 
 async function main() {
-  console.log("=== Ashim GPU Tools E2E Test ===\n");
+  console.log("=== SnapOtter GPU Tools E2E Test ===\n");
 
   // Login via API
   const loginRes = await fetch(`${BASE}/api/auth/login`, {

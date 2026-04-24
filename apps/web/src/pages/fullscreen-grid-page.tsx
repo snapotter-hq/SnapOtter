@@ -1,5 +1,5 @@
-import type { CategoryInfo, Tool } from "@ashim/shared";
-import { ANALYTICS_EVENTS, CATEGORIES, TOOLS } from "@ashim/shared";
+import type { CategoryInfo, Tool } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, CATEGORIES, TOOLS } from "@snapotter/shared";
 import { Eye, EyeOff, FileImage, LayoutGrid, List, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";

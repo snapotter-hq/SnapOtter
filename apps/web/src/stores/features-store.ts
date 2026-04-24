@@ -1,5 +1,5 @@
-import type { FeatureBundleState } from "@ashim/shared";
-import { TOOL_BUNDLE_MAP } from "@ashim/shared";
+import type { FeatureBundleState } from "@snapotter/shared";
+import { TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import { create } from "zustand";
 import { apiGet, apiPost } from "@/lib/api";
 

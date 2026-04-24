@@ -53,7 +53,7 @@ async function loginFresh(page: import("@playwright/test").Page) {
  */
 async function disableAnalytics(page: import("@playwright/test").Page): Promise<void> {
   const ok = await page.evaluate(async () => {
-    const token = localStorage.getItem("ashim-token") ?? "";
+    const token = localStorage.getItem("snapotter-token") ?? "";
     const res = await fetch("/api/v1/user/analytics", {
       method: "PUT",
       headers: {
@@ -76,7 +76,7 @@ async function disableAnalytics(page: import("@playwright/test").Page): Promise<
 async function enableAnalytics(page: import("@playwright/test").Page): Promise<void> {
   try {
     await page.evaluate(async () => {
-      const token = localStorage.getItem("ashim-token") ?? "";
+      const token = localStorage.getItem("snapotter-token") ?? "";
       await fetch("/api/v1/user/analytics", {
         method: "PUT",
         headers: {

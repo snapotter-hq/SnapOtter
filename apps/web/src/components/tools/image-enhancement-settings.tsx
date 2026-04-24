@@ -216,10 +216,10 @@ export function ImageEnhancementControls({
       parts.push(`saturate(${1 + adj / 100})`);
     }
     if (toggles.whiteBalance && Math.abs(c.temperature) > 2) {
-      parts.push("url(#ashim-enhance-temp-filter)");
+      parts.push("url(#snapotter-enhance-temp-filter)");
     }
     if (toggles.sharpness && c.sharpness > 2) {
-      parts.push("url(#ashim-enhance-sharpen-filter)");
+      parts.push("url(#snapotter-enhance-sharpen-filter)");
     }
 
     onPreviewFilter(parts.join(" "));
@@ -246,7 +246,7 @@ export function ImageEnhancementControls({
       {toggles.whiteBalance && Math.abs(tempAdj) > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
           <title>White balance temperature filter</title>
-          <filter id="ashim-enhance-temp-filter" colorInterpolationFilters="sRGB">
+          <filter id="snapotter-enhance-temp-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
               values={`${1 + tempAdj * 0.15} 0 0 0 0  0 ${1 + tempAdj * 0.05} 0 0 0  0 0 ${1 - tempAdj * 0.15} 0 0  0 0 0 1 0`}
@@ -257,7 +257,7 @@ export function ImageEnhancementControls({
       {toggles.sharpness && sharpAdj > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
           <title>Sharpen filter</title>
-          <filter id="ashim-enhance-sharpen-filter" colorInterpolationFilters="sRGB">
+          <filter id="snapotter-enhance-sharpen-filter" colorInterpolationFilters="sRGB">
             <feConvolveMatrix
               order="3"
               preserveAlpha="true"

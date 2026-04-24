@@ -1,4 +1,4 @@
-import { en } from "@ashim/shared";
+import { en } from "@snapotter/shared";
 import { Shield } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";

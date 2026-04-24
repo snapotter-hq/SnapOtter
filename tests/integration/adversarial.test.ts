@@ -1,5 +1,5 @@
 /**
- * Adversarial integration tests for the ashim image API.
+ * Adversarial integration tests for the SnapOtter image API.
  *
  * Tests malicious and stress inputs: corrupted images, truncated data,
  * oversized images, invalid dimensions, injection attacks, and malformed

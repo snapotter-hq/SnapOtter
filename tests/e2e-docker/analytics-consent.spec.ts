@@ -46,7 +46,7 @@ test.describe("Analytics consent page", () => {
 
     // Verify session has analyticsEnabled=true via API (using the in-browser token)
     const sessionData = await page.evaluate(async () => {
-      const token = localStorage.getItem("ashim-token") ?? "";
+      const token = localStorage.getItem("snapotter-token") ?? "";
       const res = await fetch("/api/auth/session", {
         headers: { Authorization: `Bearer ${token}` },
       });

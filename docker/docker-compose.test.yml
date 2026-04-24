@@ -8,14 +8,14 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.test
-    container_name: ashim-test-unit
+    container_name: SnapOtter-test-unit
     command: ["pnpm", "test:ci"]
     environment:
       - NODE_ENV=test
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DB_PATH=/tmp/test-ashim.db
+      - DB_PATH=/tmp/test-snapotter.db
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000
@@ -28,14 +28,14 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.test
-    container_name: ashim-test-e2e
+    container_name: SnapOtter-test-e2e
     command: ["sh", "-c", "npx playwright install --with-deps chromium && pnpm test:e2e"]
     environment:
       - NODE_ENV=test
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DB_PATH=/tmp/test-ashim.db
+      - DB_PATH=/tmp/test-snapotter.db
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000

@@ -20,7 +20,7 @@ describe("API docs", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("text/yaml");
     expect(res.body).toContain("openapi: 3.1.0");
-    expect(res.body).toContain("ashim API");
+    expect(res.body).toContain("SnapOtter API");
   });
 
   it("serves the Scalar docs page without auth", async () => {

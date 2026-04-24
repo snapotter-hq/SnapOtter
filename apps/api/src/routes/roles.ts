@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Permission } from "@ashim/shared";
+import type { Permission } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";

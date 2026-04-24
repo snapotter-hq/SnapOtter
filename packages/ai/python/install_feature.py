@@ -228,7 +228,7 @@ def urlretrieve_with_retry(url: str, dest: str, max_retries: int = 3) -> None:
     for attempt in range(max_retries):
         try:
             req = urllib.request.Request(
-                url, headers={"User-Agent": "ashim-installer/1.0"}
+                url, headers={"User-Agent": "snapotter-installer/1.0"}
             )
             with urllib.request.urlopen(req, timeout=300) as resp, open(dest, "wb") as f:
                 shutil.copyfileobj(resp, f)

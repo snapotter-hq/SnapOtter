@@ -2,11 +2,11 @@
 import { onMounted, ref } from "vue";
 
 const stars = ref<string | null>(null);
-const repo = "https://github.com/ashim-hq/ashim";
+const repo = "https://github.com/snapotter-hq/snapotter";
 
 onMounted(async () => {
   try {
-    const res = await fetch("https://api.github.com/repos/ashim-hq/ashim");
+    const res = await fetch("https://api.github.com/repos/snapotter-hq/snapotter");
     if (!res.ok) return;
     const data = await res.json();
     const count = data.stargazers_count;

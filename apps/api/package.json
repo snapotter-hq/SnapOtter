@@ -1,5 +1,5 @@
 {
-  "name": "@ashim/api",
+  "name": "@snapotter/api",
   "version": "1.15.9",
   "private": true,
   "type": "module",
@@ -12,9 +12,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ashim/ai": "workspace:*",
-    "@ashim/image-engine": "workspace:*",
-    "@ashim/shared": "workspace:*",
+    "@snapotter/ai": "workspace:*",
+    "@snapotter/image-engine": "workspace:*",
+    "@snapotter/shared": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.0.0",
     "@fastify/rate-limit": "^10.2.0",

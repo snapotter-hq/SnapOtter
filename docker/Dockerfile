@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ============================================
-# ashim - Unified Production Dockerfile
+# SnapOtter - Unified Production Dockerfile
 # Single image: GPU auto-detected on amd64, CPU on arm64
 # ============================================
 
@@ -38,7 +38,7 @@ COPY apps/web/public ./apps/web/public
 
 # Build only the web frontend (API runs from TS source via tsx)
 RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
-    pnpm --filter @ashim/web build
+    pnpm --filter @snapotter/web build
 
 # ============================================
 # Stage 2: Build caire (content-aware resize)
@@ -223,7 +223,7 @@ RUN mkdir -p /data /data/files /data/ai/models /data/ai/pip-cache /tmp/workspace
 ENV PORT=1349 \
     NODE_ENV=production \
     STORAGE_MODE=local \
-    DB_PATH=/data/ashim.db \
+    DB_PATH=/data/snapotter.db \
     WORKSPACE_PATH=/tmp/workspace \
     FILES_STORAGE_PATH=/data/files \
     PYTHON_VENV_PATH=/data/ai/venv \
@@ -232,7 +232,7 @@ ENV PORT=1349 \
     U2NET_HOME=/data/ai/models/rembg \
     DEFAULT_THEME=light \
     DEFAULT_LOCALE=en \
-    APP_NAME="ashim" \
+    APP_NAME="snapotter" \
     FILE_MAX_AGE_HOURS=72 \
     CLEANUP_INTERVAL_MINUTES=60 \
     MAX_UPLOAD_SIZE_MB=0 \
@@ -264,10 +264,10 @@ ENV PYTHONWARNINGS=default \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 # Create non-root user for runtime
-RUN groupadd -r ashim && useradd -r -g ashim -d /app -s /sbin/nologin ashim
-RUN chown -R ashim:ashim /app /data /tmp/workspace /opt/venv
+RUN groupadd -r snapotter && useradd -r -g snapotter -d /app -s /sbin/nologin snapotter
+RUN chown -R snapotter:snapotter /app /data /tmp/workspace /opt/venv
 
-# Entrypoint fixes volume permissions then drops to ashim via gosu
+# Entrypoint fixes volume permissions then drops to snapotter via gosu
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
@@ -278,4 +278,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 
 # tini as PID 1 for zombie reaping + signal forwarding
 ENTRYPOINT ["tini", "--", "entrypoint.sh"]
-CMD ["pnpm", "--filter", "@ashim/api", "run", "start"]
+CMD ["pnpm", "--filter", "@snapotter/api", "run", "start"]

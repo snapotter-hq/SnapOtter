@@ -160,7 +160,7 @@ base.describe("RBAC - User sees restricted tabs", () => {
     await login(page, TEST_USER, TEST_PASSWORD);
 
     // Extract token from localStorage
-    const token = await page.evaluate(() => localStorage.getItem("ashim-token"));
+    const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
     expect(token).toBeTruthy();
     const bearerToken = token as string;
 
@@ -269,7 +269,7 @@ base.describe("RBAC - Editor sees collaborative tabs", () => {
 
   base.test("editor gets 403 on admin API endpoints", async ({ page }) => {
     await login(page, "editortest", "EditorTest1");
-    const token = await page.evaluate(() => localStorage.getItem("ashim-token"));
+    const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
     expect(token).toBeTruthy();
 
     const usersRes = await fetch(`${API}/api/auth/users`, {

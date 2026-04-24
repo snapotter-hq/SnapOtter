@@ -1,4 +1,4 @@
-import { TOOLS } from "@ashim/shared";
+import { TOOLS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";

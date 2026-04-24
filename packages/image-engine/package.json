@@ -1,5 +1,5 @@
 {
-  "name": "@ashim/image-engine",
+  "name": "@snapotter/image-engine",
   "version": "1.15.9",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ashim/shared": "workspace:*",
+    "@snapotter/shared": "workspace:*",
     "exif-reader": "^2.0.3",
     "sharp": "^0.33.0"
   },

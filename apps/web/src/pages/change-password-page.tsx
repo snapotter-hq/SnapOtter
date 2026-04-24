@@ -99,7 +99,7 @@ export function ChangePasswordPage() {
       }
 
       // Trigger browser password save prompt via real form submission + navigation
-      const username = localStorage.getItem("ashim-username") || "admin";
+      const username = localStorage.getItem("snapotter-username") || "admin";
       triggerBrowserPasswordSave(username, newPassword);
       return; // navigation happens inside triggerBrowserPasswordSave
     } catch {
@@ -133,7 +133,7 @@ export function ChangePasswordPage() {
                 type="text"
                 name="username"
                 autoComplete="username"
-                value={localStorage.getItem("ashim-username") || "admin"}
+                value={localStorage.getItem("snapotter-username") || "admin"}
                 readOnly
                 className="w-full px-4 py-3 rounded-lg border border-border bg-muted text-muted-foreground cursor-not-allowed"
               />

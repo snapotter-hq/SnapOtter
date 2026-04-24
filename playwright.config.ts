@@ -2,7 +2,7 @@ import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const authFile = path.join(__dirname, "test-results", ".auth", "user.json");
-const testDbPath = path.join(__dirname, "test-results", ".e2e-db", "ashim.db");
+const testDbPath = path.join(__dirname, "test-results", ".e2e-db", "snapotter.db");
 
 const TEST_WEB_PORT = 2349;
 
@@ -43,7 +43,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f "${testDbPath}" "${testDbPath}-shm" "${testDbPath}-wal" && mkdir -p "${path.dirname(testDbPath)}" && pnpm --filter @ashim/api dev`,
+      command: `rm -f "${testDbPath}" "${testDbPath}-shm" "${testDbPath}-wal" && mkdir -p "${path.dirname(testDbPath)}" && pnpm --filter @snapotter/api dev`,
       port: 13490,
       reuseExistingServer: !process.env.CI,
       env: {
@@ -58,7 +58,7 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: "pnpm --filter @ashim/web dev",
+      command: "pnpm --filter @snapotter/web dev",
       port: TEST_WEB_PORT,
       reuseExistingServer: !process.env.CI,
       env: {

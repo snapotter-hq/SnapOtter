@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { analyzeImage, applyCorrections, scaleCorrections } from "@ashim/image-engine";
+import { analyzeImage, applyCorrections, scaleCorrections } from "@snapotter/image-engine";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 

@@ -4,7 +4,7 @@ import {
   getToolsForBundle,
   PYTHON_SIDECAR_TOOLS,
   TOOL_BUNDLE_MAP,
-} from "@ashim/shared";
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("Feature bundles", () => {

@@ -1,4 +1,4 @@
-import { CATEGORIES, TOOLS } from "@ashim/shared";
+import { CATEGORIES, TOOLS } from "@snapotter/shared";
 import { FileImage, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";

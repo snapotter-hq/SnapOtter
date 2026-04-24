@@ -11,8 +11,8 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { shutdownDispatcher } from "@ashim/ai";
-import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@ashim/shared";
+import { shutdownDispatcher } from "@snapotter/ai";
+import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { trackEvent } from "../lib/analytics.js";
 import {

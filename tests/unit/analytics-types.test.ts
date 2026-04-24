@@ -1,4 +1,4 @@
-import type { AnalyticsConfig, ConsentState } from "@ashim/shared";
+import type { AnalyticsConfig, ConsentState } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("AnalyticsConfig type", () => {
