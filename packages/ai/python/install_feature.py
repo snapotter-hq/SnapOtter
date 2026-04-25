@@ -87,7 +87,8 @@ def cpu_fallback_packages(packages: list[str]) -> list[str]:
             # Use CPU-only wheels (~200MB vs ~2.6GB with CUDA)
             cpu_pkgs.append("--index-url")
             cpu_pkgs.append("https://download.pytorch.org/whl/cpu")
-            result.extend(cpu_pkgs)
+            # Join into a single string so pip_install processes them as one command
+            result.append(" ".join(cpu_pkgs))
             continue
 
         name = pkg.split("==")[0].split(">=")[0].split("[")[0].strip()
