@@ -1966,7 +1966,7 @@ describe("useFeaturesStore", () => {
 
     await useFeaturesStore.getState().uninstallBundle("ai-rembg");
 
-    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/uninstall");
+    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/uninstall", {});
   });
 
   it("uninstallBundle sets error on failure", async () => {
@@ -2207,8 +2207,8 @@ describe("useFeaturesStore", () => {
 
     await useFeaturesStore.getState().reinstallBundle("ai-rembg");
 
-    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/uninstall");
-    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install");
+    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/uninstall", {});
+    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install", {});
   });
 
   // -- EventSource progress handling ----------------------------------------
@@ -2452,7 +2452,7 @@ describe("useFeaturesStore", () => {
     expect(useFeaturesStore.getState().installAllActive).toBe(false);
     expect(useFeaturesStore.getState().queued).toEqual([]);
     // Only not-installed bundle should have been installed
-    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install");
+    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install", {});
   });
 
   it("installAll skips bundles that are already installed", async () => {

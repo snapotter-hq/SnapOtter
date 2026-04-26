@@ -202,9 +202,32 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
             duration_ms: Date.now() - installStartTime,
           });
         } else {
-          const errorDetail =
-            lastStderrLines.filter((l) => !l.startsWith("{")).join("\n") || stdoutBuffer.trim();
-          const errorMsg = errorDetail || `Install failed with exit code ${code}`;
+          // Extract the structured error from Python's fail() function first.
+          // fail() writes {"error": "..."} to stderr — prefer this over raw lines.
+          let errorMsg: string | undefined;
+          for (let i = lastStderrLines.length - 1; i >= 0; i--) {
+            const line = lastStderrLines[i];
+            if (line.startsWith("{")) {
+              try {
+                const parsed = JSON.parse(line) as Record<string, unknown>;
+                if (typeof parsed.error === "string") {
+                  errorMsg = parsed.error;
+                  break;
+                }
+              } catch {
+                // Not valid JSON
+              }
+            }
+          }
+          if (!errorMsg) {
+            const meaningful = lastStderrLines.filter(
+              (l) => !l.startsWith("{") && !l.includes("pthread_setaffinity_np"),
+            );
+            errorMsg =
+              meaningful.join("\n") ||
+              stdoutBuffer.trim() ||
+              `Install failed with exit code ${code}`;
+          }
           setInstallProgress(bundleId, null, errorMsg);
           updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
         }
