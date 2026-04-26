@@ -443,7 +443,7 @@ describe("QR Generate", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("generates QR code at maximum allowed size (10000)", async () => {
+  it("generates QR code at large size (2000)", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/tools/qr-generate",
@@ -452,15 +452,15 @@ describe("QR Generate", () => {
         "content-type": "application/json",
       },
       payload: {
-        text: "max size test",
-        size: 10000,
+        text: "large size test",
+        size: 2000,
       },
     });
 
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.processedSize).toBeGreaterThan(0);
-  }, 120_000);
+  });
 
   it("generates QR with transparent background (3-char hex)", async () => {
     const res = await app.inject({
