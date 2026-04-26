@@ -3,8 +3,9 @@
  *
  * For each supported input format, verifies that the core non-AI tools
  * (resize, crop, rotate, convert, compress, color-adjustments, sharpening,
- * info, optimize-for-web, border, watermark-text, image-to-base64) work
- * correctly via the API.
+ * info, optimize-for-web, border, watermark-text, image-to-base64,
+ * image-enhancement, strip-metadata, replace-color, text-overlay,
+ * color-palette) work correctly via the API.
  *
  * Some formats (PSD, EXR, HDR, TGA, DNG, ICO, JXL) require CLI decoders
  * (ImageMagick / dcraw) that may not be installed in every test environment.
@@ -195,8 +196,9 @@ interface ToolDef {
    * "download" = standard {downloadUrl, processedSize} shape
    * "info"     = metadata JSON {width, height, fileSize, format}
    * "base64"   = {results, errors} shape from image-to-base64
+   * "palette"  = {colors, count} shape from color-palette
    */
-  responseType: "download" | "info" | "base64";
+  responseType: "download" | "info" | "base64" | "palette";
 }
 
 const TOOLS: ToolDef[] = [
@@ -271,6 +273,36 @@ const TOOLS: ToolDef[] = [
     label: "Image to Base64",
     settings: {},
     responseType: "base64",
+  },
+  {
+    id: "image-enhancement",
+    label: "Image enhancement",
+    settings: { mode: "auto", intensity: 50 },
+    responseType: "download",
+  },
+  {
+    id: "strip-metadata",
+    label: "Strip metadata",
+    settings: { stripAll: true },
+    responseType: "download",
+  },
+  {
+    id: "replace-color",
+    label: "Replace color",
+    settings: { sourceColor: "#FF0000", targetColor: "#00FF00", tolerance: 30 },
+    responseType: "download",
+  },
+  {
+    id: "text-overlay",
+    label: "Text overlay",
+    settings: { text: "TEST", fontSize: 16, position: "bottom" },
+    responseType: "download",
+  },
+  {
+    id: "color-palette",
+    label: "Color palette",
+    settings: {},
+    responseType: "palette",
   },
 ];
 
@@ -416,6 +448,17 @@ describe("Cross-format matrix", () => {
                     expect(r.height).toBeGreaterThan(0);
                   }
                   break;
+
+                case "palette":
+                  // color-palette returns { colors: string[], count: number }
+                  expect(Array.isArray(body.colors)).toBe(true);
+                  expect(body.colors.length).toBeGreaterThan(0);
+                  expect(body.count).toBeGreaterThan(0);
+                  // Each color should be a hex string
+                  for (const color of body.colors) {
+                    expect(color).toMatch(/^#[0-9a-f]{6}$/);
+                  }
+                  break;
               }
             }
 
@@ -484,6 +527,9 @@ describe("Multipage TIFF handling", () => {
           }
         } else if (tool.responseType === "base64") {
           expect(Array.isArray(body.results)).toBe(true);
+        } else if (tool.responseType === "palette") {
+          expect(Array.isArray(body.colors)).toBe(true);
+          expect(body.count).toBeGreaterThan(0);
         } else {
           expect(body.downloadUrl).toBeDefined();
           expect(body.processedSize).toBeGreaterThan(0);
@@ -560,7 +606,9 @@ describe("Exotic format error resilience", () => {
   const EXOTIC_FORMATS = FORMAT_SAMPLES.filter((f) => f.needsCliDecoder);
 
   // Tools that actually process the image (not just read metadata)
-  const PROCESSING_TOOLS = TOOLS.filter((t) => t.responseType === "download");
+  const PROCESSING_TOOLS = TOOLS.filter(
+    (t) => t.responseType === "download" || t.responseType === "palette",
+  );
 
   for (const fmt of EXOTIC_FORMATS) {
     for (const tool of PROCESSING_TOOLS) {
@@ -594,5 +642,131 @@ describe("Exotic format error resilience", () => {
         }
       });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Image enhancement analysis: dedicated /analyze endpoint
+// ---------------------------------------------------------------------------
+describe("Image enhancement analysis across formats", () => {
+  // Core formats that Sharp can read natively
+  const ANALYZABLE_FORMATS = FORMAT_SAMPLES.filter(
+    (f) => !f.needsCliDecoder && !f.needsHeifDecoder && !f.mayFailValidation,
+  );
+
+  for (const fmt of ANALYZABLE_FORMATS) {
+    it(`analyzes ${fmt.name} and returns correction recommendations`, async () => {
+      const fixturePath = join(FORMATS_DIR, fmt.file);
+      if (!existsSync(fixturePath)) return;
+
+      const buffer = readFileSync(fixturePath);
+      const { body: payload, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: fmt.file,
+          contentType: fmt.mime,
+          content: buffer,
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image-enhancement/analyze",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body: payload,
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      const body = JSON.parse(res.body);
+      // Analysis should return corrections object
+      expect(body.corrections).toBeDefined();
+      expect(typeof body.corrections).toBe("object");
+    });
+  }
+
+  // Exotic formats: should not crash, return clean error or succeed
+  const EXOTIC_FORMATS = FORMAT_SAMPLES.filter((f) => f.needsCliDecoder);
+
+  for (const fmt of EXOTIC_FORMATS) {
+    it(`${fmt.name} analyze: returns clean response (no crash)`, async () => {
+      const fixturePath = join(FORMATS_DIR, fmt.file);
+      if (!existsSync(fixturePath)) return;
+
+      const buffer = readFileSync(fixturePath);
+      const { body: payload, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: fmt.file,
+          contentType: fmt.mime,
+          content: buffer,
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image-enhancement/analyze",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body: payload,
+      });
+
+      expect(res.statusCode).not.toBe(500);
+      expect([200, 400, 422]).toContain(res.statusCode);
+
+      const body = JSON.parse(res.body);
+      if (res.statusCode !== 200) {
+        expect(body.error).toBeDefined();
+        expect(typeof body.error).toBe("string");
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Strip-metadata inspect: dedicated /inspect endpoint
+// ---------------------------------------------------------------------------
+describe("Strip-metadata inspection across formats", () => {
+  // Core formats that Sharp can read natively
+  const INSPECTABLE_FORMATS = FORMAT_SAMPLES.filter(
+    (f) => !f.needsCliDecoder && !f.needsHeifDecoder && !f.mayFailValidation,
+  );
+
+  for (const fmt of INSPECTABLE_FORMATS) {
+    it(`inspects ${fmt.name} metadata`, async () => {
+      const fixturePath = join(FORMATS_DIR, fmt.file);
+      if (!existsSync(fixturePath)) return;
+
+      const buffer = readFileSync(fixturePath);
+      const { body: payload, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: fmt.file,
+          contentType: fmt.mime,
+          content: buffer,
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/strip-metadata/inspect",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body: payload,
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      const body = JSON.parse(res.body);
+      expect(body.filename).toBeDefined();
+      expect(body.fileSize).toBeGreaterThan(0);
+    });
   }
 });

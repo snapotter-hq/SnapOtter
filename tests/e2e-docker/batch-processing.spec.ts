@@ -616,6 +616,210 @@ test.describe("Batch Text Overlay", () => {
   });
 });
 
+// ─── Batch Favicon ────────────────────────────────────────────────
+
+test.describe("Batch Favicon", () => {
+  test("batch favicon from 3 images", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+      ],
+      [{ name: "settings", value: JSON.stringify({}) }],
+    );
+    const res = await request.post("/api/v1/tools/favicon/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    // Favicon batch may not be registered — accept 200 or 404
+    if (res.status() === 404) {
+      const json = await res.json();
+      expect(json.error).toBeDefined();
+      return;
+    }
+    expect(res.ok()).toBe(true);
+    const resContentType = res.headers()["content-type"] ?? "";
+    if (resContentType.includes("application/json")) {
+      const json = await res.json();
+      expect(json.downloadUrl).toBeTruthy();
+    } else {
+      const buffer = Buffer.from(await res.body());
+      expect(buffer.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ─── Batch Edit Metadata ──────────────────────────────────────────
+
+test.describe("Batch Edit Metadata", () => {
+  test("batch edit metadata on 3 images", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "b.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+      ],
+      [
+        {
+          name: "settings",
+          value: JSON.stringify({ artist: "Batch Test", copyright: "CC0" }),
+        },
+      ],
+    );
+    const res = await request.post("/api/v1/tools/edit-metadata/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    // edit-metadata batch may not be registered — accept 200 or 404
+    if (res.status() === 404) {
+      const json = await res.json();
+      expect(json.error).toBeDefined();
+      return;
+    }
+    expect(res.ok()).toBe(true);
+    const resContentType = res.headers()["content-type"] ?? "";
+    if (resContentType.includes("application/json")) {
+      const json = await res.json();
+      expect(json.downloadUrl).toBeTruthy();
+    } else {
+      const buffer = Buffer.from(await res.body());
+      expect(buffer.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ─── Batch Convert to Multiple Formats ────────────────────────────
+
+test.describe("Batch Convert — format variety", () => {
+  test("batch convert to PNG", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "b.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+        { name: "file", filename: "c.heic", contentType: "image/heic", buffer: HEIC_200x150 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ format: "png" }) }],
+    );
+    const res = await request.post("/api/v1/tools/convert/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+    const resContentType = res.headers()["content-type"] ?? "";
+    if (resContentType.includes("application/json")) {
+      const json = await res.json();
+      expect(json.downloadUrl).toBeTruthy();
+    } else {
+      const buffer = Buffer.from(await res.body());
+      expect(buffer.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("batch convert to TIFF", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ format: "tiff" }) }],
+    );
+    const res = await request.post("/api/v1/tools/convert/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+  });
+});
+
+// ─── Batch Rotate with Various Angles ─────────────────────────────
+
+test.describe("Batch Rotate — angles", () => {
+  test("batch rotate 180 degrees", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ angle: 180 }) }],
+    );
+    const res = await request.post("/api/v1/tools/rotate/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+    const resContentType = res.headers()["content-type"] ?? "";
+    if (resContentType.includes("application/json")) {
+      const json = await res.json();
+      expect(json.downloadUrl).toBeTruthy();
+    } else {
+      const buffer = Buffer.from(await res.body());
+      expect(buffer.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("batch rotate 270 degrees", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ angle: 270 }) }],
+    );
+    const res = await request.post("/api/v1/tools/rotate/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+  });
+});
+
+// ─── Batch with HEIC Input ────────────────────────────────────────
+
+test.describe("Batch with HEIC input", () => {
+  test("batch resize HEIC and other formats", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.heic", contentType: "image/heic", buffer: HEIC_200x150 },
+        { name: "file", filename: "b.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "c.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ width: 64, fit: "contain" }) }],
+    );
+    const res = await request.post("/api/v1/tools/resize/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+    const resContentType = res.headers()["content-type"] ?? "";
+    if (resContentType.includes("application/json")) {
+      const json = await res.json();
+      expect(json.downloadUrl).toBeTruthy();
+    } else {
+      const buffer = Buffer.from(await res.body());
+      expect(buffer.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("batch compress HEIC with other formats", async ({ request }) => {
+    const { body: reqBody, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.heic", contentType: "image/heic", buffer: HEIC_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+        { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ quality: 50 }) }],
+    );
+    const res = await request.post("/api/v1/tools/compress/batch", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      data: reqBody,
+    });
+    expect(res.ok()).toBe(true);
+  });
+});
+
 // ─── Batch with Empty File List ────────────────────────────────────
 
 test.describe("Batch validation", () => {

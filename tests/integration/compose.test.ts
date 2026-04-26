@@ -642,4 +642,184 @@ describe("Compose", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/json/i);
   });
+
+  // ── Branch coverage: multipart parse error (lines 60-64) ────────────
+
+  it("returns 400 for corrupt base image that fails processing", async () => {
+    // Send a corrupt buffer that passes initial multipart parse but fails Sharp processing
+    const corruptBuffer = Buffer.from("not a real image content at all!!!");
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: corruptBuffer },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Should get 422 because the corrupt buffer fails Sharp processing
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/processing failed/i);
+  });
+
+  // ── Branch coverage: overlay larger than base causes 422 (line 140-144) ──
+
+  it("returns 422 when overlay is larger than base image", async () => {
+    // Overlay (200x150) is larger than base (100x100) — Sharp composite fails
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "overlay", filename: "overlay.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ x: 0, y: 0 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/processing failed/i);
+  });
+
+  // ── Branch coverage: 1x1 tiny image handling ────────────────────────
+
+  it("returns 422 when 1x1 base is smaller than overlay", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: TINY },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Overlay (100x100) extends beyond 1x1 base — Sharp fails
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/processing failed/i);
+  });
+
+  it("handles 1x1 pixel overlay image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.png", contentType: "image/png", content: TINY },
+      { name: "settings", content: JSON.stringify({ x: 50, y: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
+
+  // ── Branch coverage: large file handling ────────────────────────────
+
+  it("handles a large content image as base", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ x: 10, y: 10, opacity: 80 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: HEIC overlay with opacity ──────────────────────
+
+  it("applies opacity with HEIC overlay", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ opacity: 60, blendMode: "multiply" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: both images empty → 400 ───────────────────────
+
+  it("rejects when no files are provided at all", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no base image/i);
+  });
 });

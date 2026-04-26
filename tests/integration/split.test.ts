@@ -748,4 +748,251 @@ describe("Split", () => {
     const entries = zip.getEntries();
     expect(entries.length).toBe(100);
   });
+
+  // ── Branch coverage: HEIC with grid split (lines 59-165) ────────────
+
+  it("splits a HEIC image into a grid without format conversion", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+  });
+
+  // ── Branch coverage: custom tile dimensions with HEIC ───────────────
+
+  it("splits HEIC image using fixed tile dimensions", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 100, tileHeight: 75, outputFormat: "jpg" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.jpg$/);
+    }
+  });
+
+  // ── Branch coverage: 1x1 pixel image split ──────────────────────────
+
+  it("splits a 1x1 pixel image into a single tile", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 1, rows: 1 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(1);
+    const meta = await sharp(entries[0].getData()).metadata();
+    expect(meta.width).toBe(1);
+    expect(meta.height).toBe(1);
+  });
+
+  // ── Branch coverage: large stress image ─────────────────────────────
+
+  it("splits a large stress image", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 3, rows: 3, outputFormat: "jpg", quality: 80 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(9);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.jpg$/);
+    }
+  });
+
+  // ── Branch coverage: tile dimensions larger than image ──────────────
+
+  it("uses tile dimensions larger than the image (single tile)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 500, tileHeight: 500 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    // 200/500 = ceil(0.4) = 1 col, 150/500 = ceil(0.3) = 1 row = 1 tile
+    expect(entries.length).toBe(1);
+    const meta = await sharp(entries[0].getData()).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
+
+  // ── Branch coverage: tile dimensions with avif format conversion ────
+
+  it("splits using tile dimensions with avif output format", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          tileWidth: 100,
+          tileHeight: 75,
+          outputFormat: "avif",
+          quality: 60,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.avif$/);
+    }
+  });
+
+  // ── Branch coverage: file without extension ─────────────────────────
+
+  it("handles a file without an extension (uses .png default)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "noext", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+  });
+
+  // ── Branch coverage: PNG format conversion ──────────────────────────
+
+  it("converts tiles to explicit png format from jpg source", async () => {
+    const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "png" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.png$/);
+      const meta = await sharp(entry.getData()).metadata();
+      expect(meta.format).toBe("png");
+    }
+  });
 });

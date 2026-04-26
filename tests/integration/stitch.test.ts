@@ -1033,4 +1033,314 @@ describe("Stitch", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/json/i);
   });
+
+  // ── Branch coverage: invalid file validation (line 157 area) ────────
+
+  it("rejects an invalid/corrupt image file", async () => {
+    const corruptBuffer = Buffer.from("this is not a valid image file");
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "corrupt.png", contentType: "image/png", content: corruptBuffer },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid file/i);
+  });
+
+  // ── Branch coverage: horizontal fit when image already matches min height (line 300) ──
+
+  it("stitches horizontally with fit mode when images have same height", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", resizeMode: "fit" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // Both 100x100, same height: no resizing needed, combined = 200x100
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(100);
+  });
+
+  // ── Branch coverage: vertical fit when image already matches min width (line 338) ──
+
+  it("stitches vertically with fit mode when images have same width", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "vertical", resizeMode: "fit" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // Both 100x100, same width: no resizing needed, combined = 100x200
+    expect(meta.width).toBe(100);
+    expect(meta.height).toBe(200);
+  });
+
+  // ── Branch coverage: grid fit with large image (line 377 area) ──────
+
+  it("stitches in grid mode with fit resize where images already fit", async () => {
+    // All same-size images: scale factor >= 1 means no resizing
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f4", filename: "d.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "grid",
+          gridColumns: 2,
+          resizeMode: "fit",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // 2 cols, 2 rows of 100x100; no gap, no border
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(200);
+  });
+
+  // ── Branch coverage: corner radius with webp output ─────────────────
+
+  it("applies corner radius with webp output format", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "horizontal",
+          cornerRadius: 30,
+          format: "webp",
+          quality: 80,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("webp");
+  });
+
+  // ── Branch coverage: corner radius with avif output ─────────────────
+
+  it("applies corner radius with avif output format", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "horizontal",
+          cornerRadius: 20,
+          format: "avif",
+          quality: 70,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("heif");
+  });
+
+  // ── Branch coverage: corner radius with jpeg output (flatten) ───────
+
+  it("applies corner radius with jpeg output format (flattens alpha)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "horizontal",
+          cornerRadius: 15,
+          format: "jpeg",
+          quality: 85,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("jpeg");
+  });
+
+  // ── Branch coverage: 1x1 tiny images ────────────────────────────────
+
+  it("handles 1x1 pixel input images", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: TINY },
+      { name: "f2", filename: "b.png", contentType: "image/png", content: TINY },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: large file handling ────────────────────────────
+
+  it("handles a large content image in stitching", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", resizeMode: "fit" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
 });

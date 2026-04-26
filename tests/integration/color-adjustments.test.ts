@@ -317,3 +317,103 @@ describe("Download verification", () => {
     expect(meta.height).toBe(150);
   });
 });
+
+// ── Branch coverage: lines 87-88 (negative exposure path) ────────
+describe("Exposure adjustments", () => {
+  it("applies positive exposure (brightens midtones)", async () => {
+    const res = await postTool("adjust-colors", { exposure: 50 });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies negative exposure (darkens midtones)", async () => {
+    const res = await postTool("adjust-colors", { exposure: -50 });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("handles max positive exposure (+100)", async () => {
+    const res = await postTool("adjust-colors", { exposure: 100 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles max negative exposure (-100)", async () => {
+    const res = await postTool("adjust-colors", { exposure: -100 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles zero exposure (no-op)", async () => {
+    const res = await postTool("adjust-colors", { exposure: 0 });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── HEIC input ──────────────────────────────────────────────────
+describe("HEIC input", () => {
+  it("processes HEIC input with brightness adjustment", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      "adjust-colors",
+      { brightness: 30 },
+      HEIC,
+      "photo.heic",
+      "image/heic",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Combined adjustments with exposure ──────────────────────────
+describe("Combined exposure adjustments", () => {
+  it("applies exposure + brightness + contrast together", async () => {
+    const res = await postTool("adjust-colors", {
+      exposure: -30,
+      brightness: 20,
+      contrast: 10,
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies all adjustments simultaneously", async () => {
+    const res = await postTool("adjust-colors", {
+      brightness: 10,
+      contrast: 15,
+      exposure: 20,
+      saturation: 30,
+      temperature: 10,
+      tint: -5,
+      hue: 45,
+      sharpness: 25,
+      red: 110,
+      green: 90,
+      blue: 105,
+      effect: "none",
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Tiny and stress inputs ──────────────────────────────────────
+describe("Edge size inputs", () => {
+  it("processes 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool("adjust-colors", { brightness: 50 }, TINY, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("processes stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool("adjust-colors", { contrast: 30 }, LARGE, "large.jpg", "image/jpeg");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});

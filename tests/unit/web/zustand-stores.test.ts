@@ -1041,6 +1041,305 @@ describe("usePdfToImageStore", () => {
     expect(s.processing).toBe(false);
     expect(s.error).toBeNull();
   });
+
+  // -- setPages (page range parsing) ----------------------------------------
+
+  it("setPages with valid range sets selectedPages from parsed range", () => {
+    usePdfToImageStore.setState({ pageCount: 10 });
+    usePdfToImageStore.getState().setPages("1-3, 5");
+    const s = usePdfToImageStore.getState();
+    expect(s.pages).toBe("1-3, 5");
+    expect(s.selectedPages.size).toBe(4);
+    expect(s.selectedPages.has(1)).toBe(true);
+    expect(s.selectedPages.has(2)).toBe(true);
+    expect(s.selectedPages.has(3)).toBe(true);
+    expect(s.selectedPages.has(5)).toBe(true);
+  });
+
+  it("setPages with 'all' selects all pages", () => {
+    usePdfToImageStore.setState({ pageCount: 5 });
+    usePdfToImageStore.getState().setPages("all");
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(5);
+  });
+
+  it("setPages with empty string selects all pages", () => {
+    usePdfToImageStore.setState({ pageCount: 3 });
+    usePdfToImageStore.getState().setPages("");
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(3);
+  });
+
+  it("setPages with invalid range falls back to all pages", () => {
+    usePdfToImageStore.setState({ pageCount: 4 });
+    usePdfToImageStore.getState().setPages("5-3"); // invalid: start > end
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(4);
+  });
+
+  it("setPages with out-of-range page falls back to all pages", () => {
+    usePdfToImageStore.setState({ pageCount: 3 });
+    usePdfToImageStore.getState().setPages("5"); // page 5 > pageCount 3
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(3);
+  });
+
+  it("setPages with null pageCount yields empty selectedPages", () => {
+    // pageCount is null by default after reset
+    usePdfToImageStore.getState().setPages("1-3");
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(0);
+  });
+
+  it("setPages with single page number", () => {
+    usePdfToImageStore.setState({ pageCount: 10 });
+    usePdfToImageStore.getState().setPages("7");
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(1);
+    expect(usePdfToImageStore.getState().selectedPages.has(7)).toBe(true);
+  });
+
+  // -- togglePage generates compact range strings ---------------------------
+
+  it("togglePage updates pages string as compact range", () => {
+    usePdfToImageStore.setState({ pageCount: 5 });
+    usePdfToImageStore.getState().togglePage(1);
+    usePdfToImageStore.getState().togglePage(2);
+    usePdfToImageStore.getState().togglePage(3);
+    expect(usePdfToImageStore.getState().pages).toBe("1-3");
+  });
+
+  it("togglePage with non-contiguous pages shows individual values", () => {
+    usePdfToImageStore.setState({ pageCount: 10 });
+    usePdfToImageStore.getState().togglePage(1);
+    usePdfToImageStore.getState().togglePage(5);
+    expect(usePdfToImageStore.getState().pages).toBe("1, 5");
+  });
+
+  it("togglePage clearing all pages sets empty pages string", () => {
+    usePdfToImageStore.setState({ pageCount: 2 });
+    usePdfToImageStore.getState().togglePage(1);
+    usePdfToImageStore.getState().togglePage(1); // untoggle
+    expect(usePdfToImageStore.getState().pages).toBe("");
+    expect(usePdfToImageStore.getState().selectedPages.size).toBe(0);
+  });
+
+  // -- loadPreview ----------------------------------------------------------
+
+  it("loadPreview fetches preview and sets pageCount and thumbnails", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          pageCount: 3,
+          thumbnails: [{ page: 1, dataUrl: "data:...", width: 100, height: 150 }],
+        }),
+    });
+
+    await usePdfToImageStore.getState().loadPreview(file);
+
+    const s = usePdfToImageStore.getState();
+    expect(s.pageCount).toBe(3);
+    expect(s.thumbnails).toHaveLength(1);
+    expect(s.selectedPages.size).toBe(3);
+    expect(s.loadingPreview).toBe(false);
+  });
+
+  it("loadPreview sets error on HTTP failure", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "Server error" }),
+    });
+
+    await usePdfToImageStore.getState().loadPreview(file);
+
+    const s = usePdfToImageStore.getState();
+    expect(s.error).toBe("Server error");
+    expect(s.file).toBeNull();
+    expect(s.pageCount).toBeNull();
+    expect(s.loadingPreview).toBe(false);
+  });
+
+  it("loadPreview sets error on fetch failure with fallback", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new Error("not json")),
+    });
+
+    await usePdfToImageStore.getState().loadPreview(file);
+
+    expect(usePdfToImageStore.getState().error).toBe("Failed: 500");
+  });
+
+  it("loadPreview sets error on network exception", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+    await usePdfToImageStore.getState().loadPreview(file);
+
+    expect(usePdfToImageStore.getState().error).toBe("Network error");
+    expect(usePdfToImageStore.getState().loadingPreview).toBe(false);
+  });
+
+  it("loadPreview sets generic error for non-Error throws", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    fetchMock.mockRejectedValueOnce("string error");
+
+    await usePdfToImageStore.getState().loadPreview(file);
+
+    expect(usePdfToImageStore.getState().error).toBe("Failed to read PDF");
+  });
+
+  // -- convert --------------------------------------------------------------
+
+  it("convert sends file with settings and stores results", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({
+      file,
+      format: "jpg",
+      dpi: 300,
+      quality: 90,
+      colorMode: "grayscale",
+      pages: "",
+      selectedPages: new Set([1, 2]),
+      pageCount: 3,
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          pages: [{ page: 1, downloadUrl: "/dl/1", size: 100 }],
+          zipUrl: "/dl/zip",
+          zipSize: 500,
+        }),
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    const s = usePdfToImageStore.getState();
+    expect(s.results).toHaveLength(1);
+    expect(s.zipUrl).toBe("/dl/zip");
+    expect(s.zipSize).toBe(500);
+    expect(s.processing).toBe(false);
+  });
+
+  it("convert is a no-op when no file is set", async () => {
+    const callsBefore = fetchMock.mock.calls.length;
+    await usePdfToImageStore.getState().convert();
+
+    // No new fetch calls should have been made
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    expect(usePdfToImageStore.getState().processing).toBe(false);
+  });
+
+  it("convert sets error on HTTP failure", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2 });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "Conversion error" }),
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(usePdfToImageStore.getState().error).toBe("Conversion error");
+    expect(usePdfToImageStore.getState().processing).toBe(false);
+  });
+
+  it("convert sets error on network exception", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2 });
+
+    fetchMock.mockRejectedValueOnce(new Error("Offline"));
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(usePdfToImageStore.getState().error).toBe("Offline");
+    expect(usePdfToImageStore.getState().processing).toBe(false);
+  });
+
+  it("convert sets generic error for non-Error throws", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2 });
+
+    fetchMock.mockRejectedValueOnce(42);
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(usePdfToImageStore.getState().error).toBe("Conversion failed");
+  });
+
+  it("convert uses 'all' when pages is empty", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({
+      file,
+      pages: "",
+      selectedPages: new Set([1, 2, 3]),
+      pageCount: 3,
+    });
+
+    let capturedFormData: FormData | null = null;
+    fetchMock.mockImplementationOnce((_url: string, opts: { body: FormData }) => {
+      capturedFormData = opts.body;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+      });
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(capturedFormData).not.toBeNull();
+    // FormData.get works in jsdom when appended synchronously
+    const settings = capturedFormData!.get("settings");
+    expect(settings).not.toBeNull();
+    const parsed = JSON.parse(settings as string);
+    expect(parsed.pages).toBe("all");
+  });
+
+  it("convert sends compact page range for specific selection", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({
+      file,
+      pages: "1-2",
+      selectedPages: new Set([1, 2]),
+      pageCount: 5,
+    });
+
+    let capturedFormData: FormData | null = null;
+    fetchMock.mockImplementationOnce((_url: string, opts: { body: FormData }) => {
+      capturedFormData = opts.body;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+      });
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(capturedFormData).not.toBeNull();
+    const settings = capturedFormData!.get("settings");
+    expect(settings).not.toBeNull();
+    const parsed = JSON.parse(settings as string);
+    expect(parsed.pages).toBe("1-2");
+  });
+
+  it("convert handles JSON parse failure on error response", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2 });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new Error("bad json")),
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(usePdfToImageStore.getState().error).toBe("Conversion failed: 500");
+  });
 });
 
 // ==========================================================================
@@ -1910,6 +2209,321 @@ describe("useFeaturesStore", () => {
 
     expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/uninstall");
     expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install");
+  });
+
+  // -- EventSource progress handling ----------------------------------------
+
+  it("listenToProgress handles complete phase from EventSource", async () => {
+    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        // Capture for later triggering
+        setTimeout(() => {
+          esOnMessage = es.onmessage;
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-complete" });
+    // refresh after complete
+    mockApiGet.mockResolvedValueOnce({ bundles: [] });
+
+    await useFeaturesStore.getState().installBundle("ai-rembg");
+    // Wait for setTimeout to capture the onmessage handler
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Simulate complete event
+    if (esOnMessage) {
+      esOnMessage({
+        data: JSON.stringify({ phase: "complete", percent: 100, stage: "Done" }),
+      } as MessageEvent);
+    }
+    expect(mockClose).toHaveBeenCalled();
+    // Installing should be cleared
+    expect(useFeaturesStore.getState().installing["ai-rembg"]).toBeUndefined();
+  });
+
+  it("listenToProgress handles failed phase from EventSource", async () => {
+    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        setTimeout(() => {
+          esOnMessage = es.onmessage;
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-fail" });
+
+    await useFeaturesStore.getState().installBundle("ai-rembg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Simulate failed event
+    if (esOnMessage) {
+      esOnMessage({
+        data: JSON.stringify({ phase: "failed", percent: 0, stage: "", error: "Disk full" }),
+      } as MessageEvent);
+    }
+    expect(mockClose).toHaveBeenCalled();
+    expect(useFeaturesStore.getState().errors["ai-rembg"]).toBe("Disk full");
+    expect(useFeaturesStore.getState().installing["ai-rembg"]).toBeUndefined();
+  });
+
+  it("listenToProgress handles progress updates from EventSource", async () => {
+    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        setTimeout(() => {
+          esOnMessage = es.onmessage;
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-progress" });
+
+    await useFeaturesStore.getState().installBundle("ai-rembg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Simulate progress update
+    if (esOnMessage) {
+      esOnMessage({
+        data: JSON.stringify({ phase: "processing", percent: 50, stage: "Downloading..." }),
+      } as MessageEvent);
+    }
+    expect(useFeaturesStore.getState().installing["ai-rembg"].percent).toBe(50);
+    expect(useFeaturesStore.getState().installing["ai-rembg"].stage).toBe("Downloading...");
+  });
+
+  it("listenToProgress uses max of current and new percent", async () => {
+    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        setTimeout(() => {
+          esOnMessage = es.onmessage;
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-max" });
+
+    await useFeaturesStore.getState().installBundle("ai-rembg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Send a high percent first
+    if (esOnMessage) {
+      esOnMessage({
+        data: JSON.stringify({ phase: "processing", percent: 70, stage: "Step 1" }),
+      } as MessageEvent);
+    }
+    // Then a lower percent (should keep the higher one)
+    if (esOnMessage) {
+      esOnMessage({
+        data: JSON.stringify({ phase: "processing", percent: 40, stage: "Step 2" }),
+      } as MessageEvent);
+    }
+    expect(useFeaturesStore.getState().installing["ai-rembg"].percent).toBe(70);
+    expect(useFeaturesStore.getState().installing["ai-rembg"].stage).toBe("Step 2");
+  });
+
+  it("EventSource onerror closes and falls back to polling", async () => {
+    let esOnError: (() => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        setTimeout(() => {
+          esOnError = es.onerror;
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-err" });
+
+    await useFeaturesStore.getState().installBundle("ai-rembg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Trigger onerror
+    if (esOnError) {
+      esOnError();
+    }
+    expect(mockClose).toHaveBeenCalled();
+    // Bundle should still be in installing state (polling takes over)
+    expect(useFeaturesStore.getState().installing["ai-rembg"]).toBeDefined();
+  });
+
+  // -- installAll -----------------------------------------------------------
+
+  it("installAll processes all not-installed bundles sequentially", async () => {
+    const bundles = [
+      {
+        id: "ai-rembg",
+        name: "AI Background Remover",
+        description: "Remove backgrounds",
+        status: "not_installed" as const,
+        installedVersion: null,
+        estimatedSize: "500MB",
+        enablesTools: ["remove-bg"],
+        progress: null,
+        error: null,
+      },
+      {
+        id: "ai-esrgan",
+        name: "AI Upscaler",
+        description: "Upscale images",
+        status: "installed" as const,
+        installedVersion: "1.0",
+        estimatedSize: "1GB",
+        enablesTools: ["upscale"],
+        progress: null,
+        error: null,
+      },
+    ];
+    useFeaturesStore.setState({ bundles, loaded: true });
+
+    // For the install call, we need to immediately resolve so installAll loop progresses
+    let esOnMessage: ((event: MessageEvent) => void) | null = null;
+    const mockClose = vi.fn();
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: mockClose,
+        };
+        setTimeout(() => {
+          esOnMessage = es.onmessage;
+          // Immediately complete the install
+          if (esOnMessage) {
+            esOnMessage({
+              data: JSON.stringify({ phase: "complete", percent: 100, stage: "Done" }),
+            } as MessageEvent);
+          }
+        }, 0);
+        return es;
+      }),
+    );
+
+    // install call for ai-rembg
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-all-1" });
+    // refresh after completion
+    mockApiGet.mockResolvedValue({ bundles });
+
+    await useFeaturesStore.getState().installAll();
+
+    expect(useFeaturesStore.getState().installAllActive).toBe(false);
+    expect(useFeaturesStore.getState().queued).toEqual([]);
+    // Only not-installed bundle should have been installed
+    expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install");
+  });
+
+  it("installAll skips bundles that are already installed", async () => {
+    const bundles = [
+      {
+        id: "ai-rembg",
+        name: "AI BG",
+        description: "Remove backgrounds",
+        status: "installed" as const,
+        installedVersion: "1.0",
+        estimatedSize: "500MB",
+        enablesTools: ["remove-bg"],
+        progress: null,
+        error: null,
+      },
+    ];
+    useFeaturesStore.setState({ bundles, loaded: true });
+
+    await useFeaturesStore.getState().installAll();
+
+    expect(useFeaturesStore.getState().installAllActive).toBe(false);
+    expect(mockApiPost).not.toHaveBeenCalled();
+  });
+
+  it("installAll clears stale errors for pending bundles", async () => {
+    const bundles = [
+      {
+        id: "ai-rembg",
+        name: "AI BG",
+        description: "Remove backgrounds",
+        status: "not_installed" as const,
+        installedVersion: null,
+        estimatedSize: "500MB",
+        enablesTools: ["remove-bg"],
+        progress: null,
+        error: null,
+      },
+    ];
+    useFeaturesStore.setState({
+      bundles,
+      loaded: true,
+      errors: { "ai-rembg": "Previous error" },
+    });
+
+    // Setup fast-completing EventSource
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const es = {
+          onmessage: null as ((event: MessageEvent) => void) | null,
+          onerror: null as (() => void) | null,
+          close: vi.fn(),
+        };
+        setTimeout(() => {
+          if (es.onmessage) {
+            es.onmessage({
+              data: JSON.stringify({ phase: "complete", percent: 100, stage: "Done" }),
+            } as MessageEvent);
+          }
+        }, 0);
+        return es;
+      }),
+    );
+
+    mockApiPost.mockResolvedValueOnce({ jobId: "job-clear" });
+    mockApiGet.mockResolvedValue({ bundles });
+
+    await useFeaturesStore.getState().installAll();
+
+    // Error should have been cleared at the start of installAll
+    expect(useFeaturesStore.getState().errors["ai-rembg"]).toBeUndefined();
   });
 });
 

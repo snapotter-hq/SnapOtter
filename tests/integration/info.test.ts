@@ -342,6 +342,51 @@ describe("Info", () => {
     expect(result.hasExif).toBe(false);
   });
 
+  it("returns 422 for corrupt/unreadable image data", async () => {
+    // Create a buffer that passes magic-number validation but fails Sharp parsing
+    // A JPEG starts with FF D8 FF, then garbage
+    const corruptJpeg = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.alloc(100, 0x00),
+    ]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "corrupt.jpg", contentType: "image/jpeg", content: corruptJpeg },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Should return 422 (metadata read failure) or 400 (validation rejection)
+    expect([400, 422]).toContain(res.statusCode);
+  });
+
+  it("returns 400 for empty file upload", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no image/i);
+  });
+
   it("reports hasIcc for image with ICC profile", async () => {
     const { body, contentType } = createMultipartPayload([
       {

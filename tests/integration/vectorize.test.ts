@@ -389,4 +389,111 @@ describe("vectorize", () => {
 
     expect(res.statusCode).toBe(401);
   });
+
+  it("works with HEIC input after decoding", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // HEIC may fail if system decoder missing
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toMatch(/\.svg$/);
+    }
+  });
+
+  it("rejects colorPrecision out of range", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ colorPrecision: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects invalid pathMode value", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pathMode: "bezier" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("color mode with all path modes produces valid SVG", async () => {
+    for (const pathMode of ["none", "polygon", "spline"] as const) {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        {
+          name: "settings",
+          content: JSON.stringify({ colorMode: "color", pathMode }),
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/vectorize",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+
+      const dlRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const svgContent = dlRes.rawPayload.toString("utf-8");
+      expect(svgContent).toContain("<svg");
+    }
+  });
+
+  it("handles WebP input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.webp",
+        contentType: "image/webp",
+        content: readFileSync(join(FIXTURES, "test-50x50.webp")),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toMatch(/\.svg$/);
+  });
 });

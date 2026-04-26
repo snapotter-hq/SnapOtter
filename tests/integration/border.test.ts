@@ -591,4 +591,171 @@ describe("Border", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  // ── Branch coverage: lines 152-156 (needsAlpha + non-alpha format) ──
+
+  it("forces PNG output when corner radius is applied to a JPEG input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          borderWidth: 5,
+          borderColor: "#000000",
+          cornerRadius: 15,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    // Download and verify format is PNG (forced due to alpha from corner radius)
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4);
+  });
+
+  it("forces PNG output when shadow is applied to a JPEG input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          borderWidth: 5,
+          borderColor: "#333333",
+          shadow: true,
+          shadowBlur: 10,
+          shadowOffsetX: 0,
+          shadowOffsetY: 5,
+          shadowColor: "#000000",
+          shadowOpacity: 40,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // JPEG doesn't support alpha, so output is forced to PNG
+    expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4);
+  });
+
+  it("keeps PNG output when corner radius is applied to a PNG input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          borderWidth: 5,
+          borderColor: "#000000",
+          cornerRadius: 15,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // PNG already supports alpha, so it stays PNG
+    expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4);
+  });
+
+  it("handles WebP input with border only (no alpha needed)", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ borderWidth: 10, borderColor: "#FF00FF" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(50 + 10 * 2);
+    expect(meta.height).toBe(50 + 10 * 2);
+  });
+
+  it("handles tiny 1x1 image input", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      {
+        name: "settings",
+        content: JSON.stringify({ borderWidth: 5, borderColor: "#000000" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(1 + 5 * 2);
+    expect(meta.height).toBe(1 + 5 * 2);
+  });
 });

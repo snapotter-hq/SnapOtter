@@ -489,3 +489,132 @@ test.describe("Pipeline edge cases", () => {
     expect(body.processedSize).toBeLessThan(body.originalSize);
   });
 });
+
+// ─── Batch Pipeline Execution ──────────────────────────────────────
+
+test.describe("Batch pipeline execution", () => {
+  test("batch pipeline resize+compress on 3 images", async ({ request }) => {
+    const boundary = `----PlaywrightBoundary${Date.now()}`;
+    const files = [
+      { filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+      { filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+      { filename: "c.jpg", contentType: "image/jpeg", buffer: JPG_SAMPLE },
+    ];
+    const parts: Buffer[] = [];
+    for (const file of files) {
+      parts.push(
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.filename}"\r\nContent-Type: ${file.contentType}\r\n\r\n`,
+        ),
+      );
+      parts.push(file.buffer);
+      parts.push(Buffer.from("\r\n"));
+    }
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="pipeline"\r\n\r\n${JSON.stringify({
+          steps: [
+            { toolId: "resize", settings: { width: 100, fit: "contain" } },
+            { toolId: "compress", settings: { quality: 60 } },
+          ],
+        })}\r\n`,
+      ),
+    );
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+    const res = await request.post("/api/v1/pipeline/execute", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      data: Buffer.concat(parts),
+    });
+    // Batch pipeline may return ZIP or JSON depending on implementation
+    if (res.ok()) {
+      const ct = res.headers()["content-type"] ?? "";
+      if (ct.includes("application/json")) {
+        const body = await res.json();
+        expect(body.downloadUrl || body.results).toBeTruthy();
+      } else {
+        const buffer = Buffer.from(await res.body());
+        expect(buffer.length).toBeGreaterThan(0);
+      }
+    } else {
+      // Batch pipeline may not be supported — single-file only
+      // Verify the error is coherent, not a crash
+      const body = await res.json();
+      expect(body.error).toBeDefined();
+    }
+  });
+});
+
+// ─── Pipeline with Crop Dimensions ─────────────────────────────────
+
+test.describe("Pipeline with various tools", () => {
+  test("crop then border then compress pipeline", async ({ request }) => {
+    const res = await request.post("/api/v1/pipeline/execute", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
+        pipeline: JSON.stringify({
+          steps: [
+            { toolId: "crop", settings: { left: 0, top: 0, width: 200, height: 200 } },
+            { toolId: "border", settings: { size: 10, color: "#ff0000" } },
+            { toolId: "compress", settings: { quality: 70 } },
+          ],
+        }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  test("replace-color then resize pipeline", async ({ request }) => {
+    const res = await request.post("/api/v1/pipeline/execute", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        pipeline: JSON.stringify({
+          steps: [
+            {
+              toolId: "replace-color",
+              settings: {
+                targetColor: "#ffffff",
+                replacementColor: "#f0f0f0",
+                tolerance: 20,
+              },
+            },
+            { toolId: "resize", settings: { width: 100, fit: "contain" } },
+          ],
+        }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("edit-metadata then strip-metadata roundtrip", async ({ request }) => {
+    const jpgExif = fixture("test-with-exif.jpg");
+    const res = await request.post("/api/v1/pipeline/execute", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "photo.jpg", mimeType: "image/jpeg", buffer: jpgExif },
+        pipeline: JSON.stringify({
+          steps: [
+            {
+              toolId: "edit-metadata",
+              settings: { artist: "Pipeline Author", copyright: "CC0" },
+            },
+            { toolId: "strip-metadata", settings: {} },
+          ],
+        }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+});

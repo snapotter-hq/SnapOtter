@@ -333,6 +333,44 @@ describe("Rotate mode", () => {
     expect(result.downloadUrl).toBeDefined();
   });
 
+  it("rotates 180 degrees", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "rotate",
+      angle: 180,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rotates 270 degrees", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "rotate",
+      angle: 270,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
   it("flips horizontally", async () => {
     const { body: payload, contentType } = makePayload({
       mode: "rotate",
@@ -350,5 +388,358 @@ describe("Rotate mode", () => {
     });
 
     expect(res.statusCode).toBe(200);
+  });
+
+  it("flips vertically", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "rotate",
+      flipV: true,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rotates and flips simultaneously", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "rotate",
+      angle: 90,
+      flipH: true,
+      flipV: true,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rotates a static image (single frame)", async () => {
+    const png = readFileSync(join(FIXTURES, "test-200x150.png"));
+    const gifBuf = await sharp(png).gif().toBuffer();
+    const { body: payload, contentType } = makePayload(
+      { mode: "rotate", angle: 90 },
+      gifBuf,
+      "static.gif",
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Reverse mode with speed adjustment ──────────────────────────
+describe("Reverse mode with speed adjustment", () => {
+  it("reverses and doubles speed simultaneously", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "reverse",
+      speedFactor: 2.0,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("reverses a single-frame GIF gracefully", async () => {
+    const png = readFileSync(join(FIXTURES, "test-200x150.png"));
+    const singleFrameGif = await sharp(png).gif().toBuffer();
+    const { body: payload, contentType } = makePayload(
+      { mode: "reverse" },
+      singleFrameGif,
+      "single.gif",
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Extract mode additional tests ────────────────────────────────
+describe("Extract mode additional tests", () => {
+  it("extracts a single frame as WebP", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "extract",
+      extractMode: "single",
+      frameNumber: 1,
+      extractFormat: "webp",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toContain("_frame1.webp");
+  });
+
+  it("extracts a specific range of frames as PNG", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "extract",
+      extractMode: "range",
+      frameStart: 1,
+      frameEnd: 2,
+      extractFormat: "png",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toContain("_frames.zip");
+  });
+});
+
+// ── Speed mode edge cases ────────────────────────────────────────
+describe("Speed mode edge cases", () => {
+  it("slows down the playback speed", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "speed",
+      speedFactor: 0.5,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    const origMeta = await sharp(animatedGif).metadata();
+    const origDelay = origMeta.delay?.[0] ?? 100;
+    const newDelay = meta.delay?.[0] ?? 0;
+    // Slowing down doubles the delay
+    expect(newDelay).toBe(Math.max(20, Math.round(origDelay / 0.5)));
+  });
+});
+
+// ── Resize mode edge cases ──────────────────────────────────────
+describe("Resize mode edge cases", () => {
+  it("resizes with only height specified", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "resize",
+      height: 50,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("resizes with both width and height", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "resize",
+      width: 40,
+      height: 30,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("resize without dimensions or percentage passes through", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "resize",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Metadata endpoint edge cases ────────────────────────────────
+describe("Metadata endpoint edge cases", () => {
+  it("returns 400 when no file is provided", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "other", content: "nothing" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools/info",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Custom loop count ────────────────────────────────────────────
+describe("Loop count", () => {
+  it("sets a custom loop count", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "optimize",
+      loop: 3,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Validation ─────────────────────────────────────────────────
+describe("Validation", () => {
+  it("returns 400 when no file is provided to process", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({ mode: "resize", width: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 for invalid settings JSON", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.gif", contentType: "image/gif", content: animatedGif },
+      { name: "settings", content: "not-json" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 for invalid mode", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "invalid-mode",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 });

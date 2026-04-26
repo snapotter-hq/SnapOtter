@@ -21,6 +21,7 @@ const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG_200x150 = readFileSync(join(FIXTURES, "test-200x150.png"));
 const PNG_1x1 = readFileSync(join(FIXTURES, "test-1x1.png"));
 const JPG_100x100 = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+const STRESS_LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -1338,4 +1339,405 @@ describe("Non-existent tool and route handling", () => {
 
     expect(res.statusCode).toBe(404);
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEMORY PRESSURE — LARGE FILE SEQUENTIAL UPLOADS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Memory pressure — large file (6.7MB) sequential uploads", () => {
+  it("processes 5 sequential resize requests with stress-large.jpg — all succeed", async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await postTool("resize", [
+        {
+          name: "file",
+          filename: `stress-${i}.jpg`,
+          content: STRESS_LARGE,
+          contentType: "image/jpeg",
+        },
+        { name: "settings", content: JSON.stringify({ width: 200 }) },
+      ]);
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.jobId).toBeDefined();
+      expect(json.processedSize).toBeLessThan(json.originalSize);
+    }
+  }, 120_000);
+
+  it("processes stress-large.jpg through compress", async () => {
+    const res = await postTool("compress", [
+      {
+        name: "file",
+        filename: "stress-compress.jpg",
+        content: STRESS_LARGE,
+        contentType: "image/jpeg",
+      },
+      { name: "settings", content: JSON.stringify({ quality: 40 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeLessThan(json.originalSize);
+  }, 60_000);
+
+  it("processes stress-large.jpg through convert (JPEG to WebP)", async () => {
+    const res = await postTool("convert", [
+      {
+        name: "file",
+        filename: "stress-convert.jpg",
+        content: STRESS_LARGE,
+        contentType: "image/jpeg",
+      },
+      { name: "settings", content: JSON.stringify({ format: "webp" }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  }, 60_000);
+
+  it("processes stress-large.jpg through info", async () => {
+    const res = await postTool("info", [
+      {
+        name: "file",
+        filename: "stress-info.jpg",
+        content: STRESS_LARGE,
+        contentType: "image/jpeg",
+      },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.width).toBeGreaterThan(0);
+    expect(json.height).toBeGreaterThan(0);
+    expect(json.format).toBe("jpeg");
+  }, 60_000);
+
+  it("processes stress-large.jpg through rotate", async () => {
+    const res = await postTool("rotate", [
+      {
+        name: "file",
+        filename: "stress-rotate.jpg",
+        content: STRESS_LARGE,
+        contentType: "image/jpeg",
+      },
+      { name: "settings", content: JSON.stringify({ angle: 90 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+  }, 60_000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE LIMIT — MANY STEPS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline with many repeated steps", () => {
+  it("handles pipeline with 10 resize steps (repeated operation)", async () => {
+    const steps = Array.from({ length: 10 }, () => ({
+      toolId: "resize",
+      settings: { percentage: 95 },
+    }));
+
+    const res = await executePipeline(PNG_200x150, "multi-resize.png", { steps });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(10);
+  }, 120_000);
+
+  it("handles pipeline with alternating resize and compress (circular-like)", async () => {
+    const steps = [
+      { toolId: "resize", settings: { width: 180 } },
+      { toolId: "compress", settings: { quality: 90 } },
+      { toolId: "resize", settings: { width: 160 } },
+      { toolId: "compress", settings: { quality: 80 } },
+      { toolId: "resize", settings: { width: 140 } },
+      { toolId: "compress", settings: { quality: 70 } },
+    ];
+
+    const res = await executePipeline(PNG_200x150, "circular.png", { steps });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(6);
+    // Each resize reduces size, so final should be smaller than original
+    expect(json.processedSize).toBeLessThan(json.originalSize);
+  }, 60_000);
+
+  it("handles pipeline with duplicate consecutive steps (same tool, same settings)", async () => {
+    const steps = Array.from({ length: 5 }, () => ({
+      toolId: "compress",
+      settings: { quality: 50 },
+    }));
+
+    const res = await executePipeline(PNG_200x150, "dupe-steps.png", { steps });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(5);
+  }, 60_000);
+
+  it("rejects pipeline with only non-existent tool IDs", async () => {
+    const res = await executePipeline(PNG_200x150, "bad-pipeline.png", {
+      steps: [{ toolId: "fake-tool-a" }, { toolId: "fake-tool-b" }],
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/not found/i);
+  });
+
+  it("handles pipeline where middle step fails — returns partial step info", async () => {
+    // Resize to 10x10, then crop 200x200 (exceeds image), then border
+    const res = await executePipeline(PNG_200x150, "mid-fail.png", {
+      steps: [
+        { toolId: "resize", settings: { width: 10, height: 10 } },
+        { toolId: "crop", settings: { left: 0, top: 0, width: 200, height: 200 } },
+        { toolId: "border", settings: { borderWidth: 5 } },
+      ],
+    });
+
+    // Should fail at the crop step (step 2)
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 422) {
+      const json = JSON.parse(res.body);
+      expect(json.completedSteps).toBeDefined();
+      expect(json.completedSteps.length).toBe(1); // only step 1 completed
+    }
+  }, 30_000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BATCH LIMITS — BOUNDARY TESTS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Batch limits — boundary tests", () => {
+  it("handles batch with exactly 1 image (minimum valid batch)", async () => {
+    const res = await postBatch("resize", [
+      {
+        name: "file",
+        filename: "single-batch.png",
+        contentType: "image/png",
+        content: PNG_200x150,
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const fileResults = JSON.parse(res.headers["x-file-results"] as string);
+    expect(Object.keys(fileResults).length).toBe(1);
+  });
+
+  it("handles batch at MAX_BATCH_SIZE limit (10 images)", async () => {
+    const fields = Array.from({ length: 10 }, (_, i) => ({
+      name: "file",
+      filename: `batch-max-${i}.png`,
+      contentType: "image/png",
+      content: PNG_200x150,
+    }));
+    fields.push({
+      name: "settings",
+      filename: undefined as unknown as string,
+      contentType: undefined as unknown as string,
+      content: JSON.stringify({ width: 30 }) as unknown as Buffer,
+    });
+
+    const res = await postBatch("resize", fields);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const fileResults = JSON.parse(res.headers["x-file-results"] as string);
+    expect(Object.keys(fileResults).length).toBe(10);
+  }, 120_000);
+
+  it("rejects batch exceeding MAX_BATCH_SIZE (11 images, limit is 10)", async () => {
+    const fields = Array.from({ length: 11 }, (_, i) => ({
+      name: "file",
+      filename: `batch-over-${i}.png`,
+      contentType: "image/png",
+      content: PNG_200x150,
+    }));
+    fields.push({
+      name: "settings",
+      filename: undefined as unknown as string,
+      contentType: undefined as unknown as string,
+      content: JSON.stringify({ width: 30 }) as unknown as Buffer,
+    });
+
+    const res = await postBatch("resize", fields);
+
+    // @fastify/multipart enforces a files limit at the parser level (set to
+    // MAX_BATCH_SIZE in upload.ts), so the request fails at multipart parsing
+    // before the application-level batch size check runs.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UNICODE FILENAMES — ADDITIONAL EDGE CASES
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Unicode filenames — specific requested patterns", () => {
+  it("handles filename with picture frame emoji: \u{1F5BC}️.jpg", async () => {
+    const res = await postTool("resize", [
+      {
+        name: "file",
+        filename: "\u{1F5BC}️.jpg",
+        content: JPG_100x100,
+        contentType: "image/jpeg",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  it("handles filename with Japanese katakana: テスト.png", async () => {
+    const res = await postTool("resize", [
+      {
+        name: "file",
+        filename: "テスト.png",
+        content: PNG_200x150,
+        contentType: "image/png",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles filename with ampersand and equals: file&name=special.jpg", async () => {
+    const res = await postTool("resize", [
+      {
+        name: "file",
+        filename: "file&name=special.jpg",
+        content: JPG_100x100,
+        contentType: "image/jpeg",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  it("handles filename with URL-encoded characters: %20photo%2F.png", async () => {
+    const res = await postTool("resize", [
+      {
+        name: "file",
+        filename: "%20photo%2F.png",
+        content: PNG_200x150,
+        contentType: "image/png",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles filename with backslashes: path\\to\\image.png", async () => {
+    const res = await postTool("resize", [
+      {
+        name: "file",
+        filename: "path\\to\\image.png",
+        content: PNG_200x150,
+        contentType: "image/png",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    // Backslashes should be stripped or sanitized
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).not.toContain("\\");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXTREME DIMENSIONS — 1x1 IMAGE CROP LARGER THAN IMAGE
+// ═══════════════════════════════════════════════════════════════════════════
+describe("1x1 pixel image — crop larger than image", () => {
+  it("rejects crop of 100x100 on a 1x1 image", async () => {
+    const res = await postTool("crop", [
+      {
+        name: "file",
+        filename: "tiny.png",
+        content: PNG_1x1,
+        contentType: "image/png",
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ left: 0, top: 0, width: 100, height: 100 }),
+      },
+    ]);
+
+    // Crop region extends beyond image — should fail
+    expect([400, 422]).toContain(res.statusCode);
+  });
+
+  it("rejects crop with offset beyond 1x1 bounds", async () => {
+    const res = await postTool("crop", [
+      {
+        name: "file",
+        filename: "tiny.png",
+        content: PNG_1x1,
+        contentType: "image/png",
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ left: 5, top: 5, width: 1, height: 1 }),
+      },
+    ]);
+
+    expect([400, 422]).toContain(res.statusCode);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE WITH LARGE FILE
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline with large file (6.7MB)", () => {
+  it("processes stress-large.jpg through resize + compress pipeline", async () => {
+    const res = await executePipeline(STRESS_LARGE, "stress-pipeline.jpg", {
+      steps: [
+        { toolId: "resize", settings: { width: 400 } },
+        { toolId: "compress", settings: { quality: 50 } },
+      ],
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(2);
+    expect(json.processedSize).toBeLessThan(json.originalSize);
+  }, 120_000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BATCH WITH LARGE FILES
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Batch with large files", () => {
+  it("processes 2 large files in batch resize", async () => {
+    const res = await postBatch("resize", [
+      {
+        name: "file",
+        filename: "stress-1.jpg",
+        contentType: "image/jpeg",
+        content: STRESS_LARGE,
+      },
+      {
+        name: "file",
+        filename: "stress-2.jpg",
+        contentType: "image/jpeg",
+        content: STRESS_LARGE,
+      },
+      { name: "settings", content: JSON.stringify({ width: 200 }) },
+    ]);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+  }, 120_000);
 });

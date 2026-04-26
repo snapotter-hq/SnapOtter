@@ -424,4 +424,136 @@ describe("Error handling", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("returns 400 for invalid image data", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.jpg",
+        contentType: "image/jpeg",
+        content: Buffer.from("not an image"),
+      },
+      { name: "settings", content: JSON.stringify({ artist: "test" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
+  });
+
+  it("returns 400 for invalid settings values (bad dateShift)", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.jpg",
+        contentType: "image/jpeg",
+        content: EXIF_JPG,
+      },
+      { name: "settings", content: JSON.stringify({ dateShift: "abc" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  it("returns 400 when file is empty", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.jpg",
+        contentType: "image/jpeg",
+        content: Buffer.alloc(0),
+      },
+      { name: "settings", content: JSON.stringify({ artist: "test" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── HEIC handling ──────────────────────────────────────────────
+describe("HEIC format handling", () => {
+  it("generates preview for HEIC output", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool({ artist: "HEIC Author" }, HEIC, "test.heic", "image/heic");
+    // 422 when exiftool is not installed or heic decode fails
+    if (res.statusCode === 422 || res.statusCode === 400) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    // HEIC may get a previewUrl for browser compatibility
+    if (result.previewUrl) {
+      expect(result.previewUrl).toContain("preview.webp");
+    }
+  });
+});
+
+// ── Comprehensive field writing ───────────────────────────────
+describe("Comprehensive field writing", () => {
+  it("writes all supported fields at once", async () => {
+    const res = await postTool({
+      artist: "Full Test Artist",
+      copyright: "2026 Full Test",
+      title: "Full Title",
+      imageDescription: "Full description",
+      software: "TestSuite v2.0",
+      dateTime: "2025:06:15 12:00:00",
+      dateTimeOriginal: "2025:06:15 10:00:00",
+      gpsLatitude: 37.7749,
+      gpsLongitude: -122.4194,
+      gpsAltitude: 100,
+      keywords: ["test", "integration", "full"],
+      keywordsMode: "set",
+      iptcTitle: "IPTC Full Title",
+      iptcHeadline: "Full Headline",
+      iptcCity: "San Francisco",
+      iptcState: "California",
+      iptcCountry: "United States",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("removes specific fields and adds new ones simultaneously", async () => {
+    const res = await postTool({
+      artist: "New Artist",
+      fieldsToRemove: ["Software"],
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles negative date shift", async () => {
+    const res = await postTool({ dateShift: "-03:30" });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
 });

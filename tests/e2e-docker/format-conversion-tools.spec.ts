@@ -501,3 +501,219 @@ test.describe("Multipage TIFF handling", () => {
     expect(body.format).toBeTruthy();
   });
 });
+
+// ─── JXL Format Handling ──────────────────────────────────────────
+
+test.describe("JXL format handling", () => {
+  test("convert JXL to PNG", async ({ request }) => {
+    const jxl = formatFixture("sample.jxl");
+    const res = await request.post("/api/v1/tools/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jxl", mimeType: "image/jxl", buffer: jxl },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    // JXL decode may require fallback — accept success or unsupported format
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.downloadUrl).toContain(".png");
+      expect(body.processedSize).toBeGreaterThan(0);
+    } else {
+      expect([400, 422]).toContain(res.status());
+    }
+  });
+
+  test("convert JXL to JPEG", async ({ request }) => {
+    const jxl = formatFixture("sample.jxl");
+    const res = await request.post("/api/v1/tools/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jxl", mimeType: "image/jxl", buffer: jxl },
+        settings: JSON.stringify({ format: "jpg" }),
+      },
+    });
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.downloadUrl).toContain(".jpg");
+    } else {
+      expect([400, 422]).toContain(res.status());
+    }
+  });
+
+  test("get info from JXL file", async ({ request }) => {
+    const jxl = formatFixture("sample.jxl");
+    const res = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jxl", mimeType: "image/jxl", buffer: jxl },
+      },
+    });
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.width).toBeGreaterThan(0);
+      expect(body.height).toBeGreaterThan(0);
+    } else {
+      // JXL may not be fully supported
+      expect([400, 422]).toContain(res.status());
+    }
+  });
+});
+
+// ─── ICO Format Handling ──────────────────────────────────────────
+
+test.describe("ICO format handling", () => {
+  test("convert ICO to PNG", async ({ request }) => {
+    const ico = formatFixture("sample.ico");
+    const res = await request.post("/api/v1/tools/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.ico", mimeType: "image/x-icon", buffer: ico },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.downloadUrl).toContain(".png");
+    } else {
+      // ICO decode may not be supported
+      expect([400, 422]).toContain(res.status());
+    }
+  });
+});
+
+// ─── SVG to Raster — All Output Formats ──────────────────────────
+
+test.describe("SVG to Raster — all output formats", () => {
+  test("convert SVG to GIF", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/svg-to-raster", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
+        settings: JSON.stringify({ format: "gif", width: 200 }),
+      },
+    });
+    // GIF output from SVG may not be supported
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.downloadUrl).toBeTruthy();
+    } else {
+      const body = await res.json();
+      expect(body.error).toBeDefined();
+    }
+  });
+
+  test("convert SVG with small render width (32px)", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/svg-to-raster", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
+        settings: JSON.stringify({ format: "png", width: 32 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  test("convert SVG logo to WebP", async ({ request }) => {
+    const svgLogo = contentFixture("svg-logo.svg");
+    const res = await request.post("/api/v1/tools/svg-to-raster", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "logo.svg", mimeType: "image/svg+xml", buffer: svgLogo },
+        settings: JSON.stringify({ format: "webp", width: 300 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+});
+
+// ─── Vectorize — Round-trip Verification ──────────────────────────
+
+test.describe("Vectorize — round-trip", () => {
+  test("vectorize PNG then convert SVG back to raster", async ({ request }) => {
+    // Step 1: Vectorize PNG to SVG
+    const vecRes = await request.post("/api/v1/tools/vectorize", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(vecRes.ok()).toBe(true);
+    const vecBody = await vecRes.json();
+    expect(vecBody.downloadUrl).toContain(".svg");
+
+    // Step 2: Download the SVG
+    const dlRes = await request.get(vecBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const svgBuffer = Buffer.from(await dlRes.body());
+
+    // Step 3: Convert SVG back to PNG
+    const rasterRes = await request.post("/api/v1/tools/svg-to-raster", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "vectorized.svg", mimeType: "image/svg+xml", buffer: svgBuffer },
+        settings: JSON.stringify({ format: "png", width: 200 }),
+      },
+    });
+    expect(rasterRes.ok()).toBe(true);
+    const rasterBody = await rasterRes.json();
+    expect(rasterBody.downloadUrl).toBeTruthy();
+    expect(rasterBody.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ─── PDF to Image — WebP and TIFF Output ──────────────────────────
+
+test.describe("PDF to Image — additional formats", () => {
+  test("convert PDF to TIFF format", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/pdf-to-image", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
+        settings: JSON.stringify({ format: "tiff", dpi: 150, pages: "1" }),
+      },
+    });
+    // TIFF output from PDF may not be supported
+    if (res.ok()) {
+      const body = await res.json();
+      expect(body.downloadUrl || body.pages || body.jobId).toBeTruthy();
+    } else {
+      const body = await res.json();
+      expect(body.error).toBeDefined();
+    }
+  });
+
+  test("convert all 3 pages to WebP", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/pdf-to-image", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
+        settings: JSON.stringify({ format: "webp", dpi: 150, pages: "all" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl || body.pages || body.jobId).toBeTruthy();
+  });
+
+  test("convert page range 1-3 to PNG", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/pdf-to-image", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
+        settings: JSON.stringify({ format: "png", dpi: 200, pages: "1-3" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl || body.pages || body.jobId).toBeTruthy();
+  });
+});

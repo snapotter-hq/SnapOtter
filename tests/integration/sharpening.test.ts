@@ -244,3 +244,60 @@ describe("Error handling", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ── HEIC input handling ─────────────────────────────────────────
+describe("HEIC input", () => {
+  it("processes HEIC image with adaptive sharpening", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool({ method: "adaptive" }, HEIC, "photo.heic", "image/heic");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Edge size inputs ────────────────────────────────────────────
+describe("Edge size inputs", () => {
+  it("processes 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ method: "adaptive" }, TINY, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("processes stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { method: "unsharp-mask", amount: 150 },
+      LARGE,
+      "large.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Combined sharpening + denoise ───────────────────────────────
+describe("Combined sharpening + denoise", () => {
+  it("applies high-pass sharpening with strong denoise", async () => {
+    const res = await postTool({
+      method: "high-pass",
+      strength: 80,
+      kernelSize: 5,
+      denoise: "strong",
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies adaptive sharpening with light denoise", async () => {
+    const res = await postTool({
+      method: "adaptive",
+      sigma: 1.5,
+      denoise: "light",
+    });
+    expect(res.statusCode).toBe(200);
+  });
+});

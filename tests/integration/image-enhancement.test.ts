@@ -16,6 +16,7 @@ const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
 const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
 const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -430,5 +431,55 @@ describe("Error handling", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Analyze endpoint HEIC handling ─────────────────────────────
+describe("Analyze endpoint HEIC handling", () => {
+  it("analyze decodes HEIC input before analysis", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement/analyze",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    // HEIC decode may fail if system decoder is missing
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.corrections).toBeDefined();
+    }
+  });
+});
+
+// ── Analyze endpoint invalid image ─────────────────────────────
+describe("Analyze endpoint invalid image", () => {
+  it("analyze returns 400 for invalid image data", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image at all"),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement/analyze",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
   });
 });

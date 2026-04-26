@@ -539,3 +539,198 @@ test.describe("Edit Metadata — extended", () => {
     expect(infoBody.hasExif).toBe(true);
   });
 });
+
+// ─── Strip Metadata — Extended ────────────────────────────────────
+
+test.describe("Strip Metadata — extended", () => {
+  test("strip metadata from JPEG with EXIF preserves dimensions", async ({ request }) => {
+    const jpgExif = fixture("test-with-exif.jpg");
+    const res = await request.post("/api/v1/tools/strip-metadata", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: jpgExif },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+    expect(body.processedSize).toBeLessThanOrEqual(body.originalSize);
+  });
+
+  test("strip metadata from WebP image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/strip-metadata", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("strip metadata from HEIC image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/strip-metadata", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("stripped image verified via info has no EXIF", async ({ request }) => {
+    const jpgExif = fixture("test-with-exif.jpg");
+    const stripRes = await request.post("/api/v1/tools/strip-metadata", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: jpgExif },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(stripRes.ok()).toBe(true);
+    const stripBody = await stripRes.json();
+
+    // Download stripped image
+    const dlRes = await request.get(stripBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const strippedBuffer = Buffer.from(await dlRes.body());
+
+    // Verify via info tool
+    const infoRes = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "stripped.jpg", mimeType: "image/jpeg", buffer: strippedBuffer },
+      },
+    });
+    expect(infoRes.ok()).toBe(true);
+    const infoBody = await infoRes.json();
+    expect(infoBody.hasExif).toBe(false);
+  });
+});
+
+// ─── Image Enhancement — Extended ─────────────────────────────────
+
+test.describe("Image Enhancement — extended", () => {
+  test("enhancement with auto preset", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-enhancement", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ preset: "auto" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  test("enhancement with vivid preset", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-enhancement", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
+        settings: JSON.stringify({ preset: "vivid" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    // Enhancement should modify the image
+    expect(body.processedSize).not.toBe(body.originalSize);
+  });
+
+  test("enhancement on WebP image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-enhancement", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
+        settings: JSON.stringify({ preset: "auto" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("enhancement on HEIC image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-enhancement", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
+        settings: JSON.stringify({ preset: "auto" }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+});
+
+// ─── Content-Aware Resize ─────────────────────────────────────────
+
+test.describe("Content-Aware Resize — extended", () => {
+  test("content-aware resize to smaller width", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/content-aware-resize", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ width: 150, height: 150 }),
+      },
+    });
+    if (res.status() === 501) {
+      const body = await res.json();
+      expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+    } else {
+      expect(res.ok()).toBe(true);
+      const body = await res.json();
+      expect(body.downloadUrl).toBeTruthy();
+      expect(body.processedSize).toBeGreaterThan(0);
+    }
+  });
+
+  test("content-aware resize JPEG image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/content-aware-resize", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ width: 80, height: 80 }),
+      },
+    });
+    if (res.status() === 501) {
+      const body = await res.json();
+      expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+    } else {
+      expect(res.ok()).toBe(true);
+      const body = await res.json();
+      expect(body.downloadUrl).toBeTruthy();
+    }
+  });
+
+  test("content-aware resize on large content image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/content-aware-resize", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
+        settings: JSON.stringify({ width: 300, height: 300 }),
+      },
+    });
+    if (res.status() === 501) {
+      const body = await res.json();
+      expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+    } else {
+      expect(res.ok()).toBe(true);
+      const body = await res.json();
+      expect(body.downloadUrl).toBeTruthy();
+    }
+  });
+});

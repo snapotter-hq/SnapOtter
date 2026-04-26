@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
@@ -212,5 +213,166 @@ describe("text-overlay", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: lines 40-41 (metadata fallback for width/height) ──
+
+  it("handles tiny 1x1 image input", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      { name: "settings", content: JSON.stringify({ text: "Tiny", position: "center" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── HEIC input handling ───────────────────────────────────────────
+
+  it("handles HEIC input", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ text: "HEIC overlay" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Background box + shadow combined ──────────────────────────────
+
+  it("combines background box and shadow with position top", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          text: "Combined",
+          position: "top",
+          backgroundBox: true,
+          backgroundColor: "#FF0000",
+          shadow: true,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── XML escaping in text ──────────────────────────────────────────
+
+  it("handles special XML characters in overlay text", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: '<Test & "Quotes">' }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── JPEG format preserves correctly ───────────────────────────────
+
+  it("preserves JPEG format", async () => {
+    const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ text: "JPEG" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("jpeg");
+  });
+
+  // ── Large file (stress test) ──────────────────────────────────────
+
+  it("handles stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ text: "Stress test", fontSize: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── No shadow, no background box ──────────────────────────────────
+
+  it("renders text with no shadow and no background box", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Minimal", shadow: false, backgroundBox: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
   });
 });

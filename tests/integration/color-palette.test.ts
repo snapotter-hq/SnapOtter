@@ -173,3 +173,126 @@ describe("Error handling", () => {
     expect(res.statusCode).toBe(422);
   });
 });
+
+// ── Branch coverage: lines 62-66 (multipart parse error) ────────
+describe("Multipart error handling", () => {
+  it("returns 400 for empty file buffer", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toBeDefined();
+  });
+});
+
+// ── HEIC input handling ─────────────────────────────────────────
+describe("HEIC input", () => {
+  it("extracts palette from HEIC image", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body: payload, contentType } = makeFilePayload(HEIC, "photo.heic", "image/heic");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+    expect(result.filename).toBe("photo.heic");
+  });
+});
+
+// ── Multi-color image ───────────────────────────────────────────
+describe("Multi-color extraction", () => {
+  it("extracts multiple colors from a multi-color image", async () => {
+    // Create a 2-color image (half red, half blue)
+    const halfWidth = 25;
+    const halfBuffer = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    })
+      .composite([
+        {
+          input: await sharp({
+            create: {
+              width: halfWidth,
+              height: 50,
+              channels: 3,
+              background: { r: 0, g: 0, b: 255 },
+            },
+          })
+            .png()
+            .toBuffer(),
+          left: halfWidth,
+          top: 0,
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    const { body: payload, contentType } = makeFilePayload(halfBuffer, "bicolor.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── Tiny and stress inputs ──────────────────────────────────────
+describe("Edge size inputs", () => {
+  it("extracts palette from 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body: payload, contentType } = makeFilePayload(TINY, "tiny.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+  });
+
+  it("extracts palette from stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body: payload, contentType } = makeFilePayload(LARGE, "large.jpg", "image/jpeg");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+    expect(result.colors.length).toBeLessThanOrEqual(8);
+  });
+});

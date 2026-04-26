@@ -13,6 +13,8 @@ import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from
 
 const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG_200x150 = readFileSync(join(FIXTURES, "test-200x150.png"));
+const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -270,4 +272,181 @@ describe("Content-Aware Resize", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  it("rejects invalid settings JSON", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: "not-json{{{" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/json/i);
+  });
+
+  it("rejects invalid image data", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      { name: "settings", content: JSON.stringify({ width: 150 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
+  });
+
+  it("handles HEIC input (decodes before processing)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // HEIC decode or caire may not be available
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+    }
+  }, 60_000);
+
+  it("processes both width and height simultaneously", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: 120, height: 100, protectFaces: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.width).toBe(120);
+      expect(resBody.height).toBe(100);
+    }
+  }, 60_000);
+
+  it("returns expected response fields on success", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody).toHaveProperty("jobId");
+      expect(resBody).toHaveProperty("downloadUrl");
+      expect(resBody).toHaveProperty("originalSize");
+      expect(resBody).toHaveProperty("processedSize");
+      expect(resBody).toHaveProperty("width");
+      expect(resBody).toHaveProperty("height");
+      expect(resBody.originalSize).toBeGreaterThan(0);
+      expect(resBody.processedSize).toBeGreaterThan(0);
+    }
+  }, 60_000);
+
+  it("returns 400 when file is empty", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "settings", content: JSON.stringify({ width: 150 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no image/i);
+  });
+
+  it("processes JPEG input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ width: 80, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+    }
+  }, 60_000);
 });

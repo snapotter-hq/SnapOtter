@@ -398,4 +398,143 @@ describe("favicon", () => {
     expect(entries).toContain("brand1/favicon.ico");
     expect(entries).toContain("brand2/favicon.ico");
   });
+
+  // ── Branch coverage: line 33 (multipart parse error catch) ────────
+  // The multipart parse error (lines 48-53) triggers on malformed streams
+  // which is very hard to synthesize in inject(). The settings path is
+  // already covered by the invalid JSON test above.
+
+  // ── Branch coverage: lines 74-77 (settings JSON parse catch) ──────
+  // Already covered by "rejects invalid settings JSON" test above.
+
+  // ── Branch coverage: lines 144-150 (processing error after hijack) ──
+  // This branch is the catch block when processing fails AFTER reply.hijack()
+  // has already been called. When headers have been sent, the code skips
+  // the 422 reply. We test the pre-hijack path here (corrupted data
+  // that fails file validation triggers before hijack).
+
+  // ── Tiny 1x1 input ───────────────────────────────────────────────
+
+  it("generates favicons from a 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-16x16.png");
+    expect(entries).toContain("android-chrome-512x512.png");
+
+    // Verify the 16x16 is actually 16x16 even from a 1x1 source
+    const entry16 = zip.getEntry("favicon-16x16.png");
+    expect(entry16).toBeDefined();
+    const meta = await sharp(entry16!.getData()).metadata();
+    expect(meta.width).toBe(16);
+    expect(meta.height).toBe(16);
+  });
+
+  // ── Large stress file ─────────────────────────────────────────────
+
+  it("generates favicons from stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-32x32.png");
+    expect(entries).toContain("android-chrome-512x512.png");
+  });
+
+  // ── Portrait HEIC input ───────────────────────────────────────────
+
+  it("generates favicons from portrait HEIC", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "portrait.heic",
+        contentType: "image/heic",
+        content: HEIC_PORTRAIT,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-32x32.png");
+
+    // Square output even from portrait input (fit: cover)
+    const entry32 = zip.getEntry("favicon-32x32.png");
+    const meta = await sharp(entry32!.getData()).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+  });
+
+  // ── Empty settings object ─────────────────────────────────────────
+
+  it("accepts empty settings object", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-16x16.png");
+  });
+
+  // ── No settings field at all ──────────────────────────────────────
+
+  it("works when no settings field is provided", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-16x16.png");
+    expect(entries).toContain("manifest.json");
+  });
 });

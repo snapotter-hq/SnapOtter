@@ -406,6 +406,62 @@ describe("QR Generate", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
+  it("handles very long text (approaching max 2000 chars)", async () => {
+    const longText = "A".repeat(2000);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: longText,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("rejects text exceeding max length (2001 chars)", async () => {
+    const tooLong = "A".repeat(2001);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: tooLong,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("generates QR code at maximum allowed size (10000)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "max size test",
+        size: 10000,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
   it("generates QR with transparent background (3-char hex)", async () => {
     const res = await app.inject({
       method: "POST",

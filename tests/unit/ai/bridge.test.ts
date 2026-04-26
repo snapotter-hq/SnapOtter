@@ -618,3 +618,235 @@ describe("bridge - parseStdoutJson edge cases", () => {
     expect(result).toEqual({ success: true, device: "cpu" });
   });
 });
+
+describe("bridge - getDispatcherStatus", () => {
+  let getDispatcherStatus: typeof import("../../../packages/ai/src/bridge.js").getDispatcherStatus;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    const mod = await import("../../../packages/ai/src/bridge.js");
+    getDispatcherStatus = mod.getDispatcherStatus;
+  });
+
+  it("returns initial state with no dispatcher running", () => {
+    const status = getDispatcherStatus();
+    expect(status).toEqual({
+      running: false,
+      ready: false,
+      failed: false,
+      gpu: false,
+      pid: null,
+      consecutiveCrashes: 0,
+    });
+  });
+});
+
+describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
+  let runPythonWithProgress: typeof import("../../../packages/ai/src/bridge.js").runPythonWithProgress;
+  let getDispatcherStatus: typeof import("../../../packages/ai/src/bridge.js").getDispatcherStatus;
+  let shutdownDispatcher: typeof import("../../../packages/ai/src/bridge.js").shutdownDispatcher;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+
+    const mod = await import("../../../packages/ai/src/bridge.js");
+    runPythonWithProgress = mod.runPythonWithProgress;
+    getDispatcherStatus = mod.getDispatcherStatus;
+    shutdownDispatcher = mod.shutdownDispatcher;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("falls back to per-request spawn when dispatcher ENOENT marks it failed", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerRequest = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerRequest.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", ["arg1"]);
+
+    // Dispatcher fails with ENOENT => permanently failed
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDispatcher.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Per-request spawn succeeds
+    mockPerRequest.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerRequest.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toContain('{"ok": true}');
+  });
+
+  it("reports failed status when dispatcher ENOENT occurs", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerRequest = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerRequest.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDispatcher.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Finish the per-request
+    mockPerRequest.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerRequest.emitEvent("close", 0, null);
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.failed).toBe(true);
+    expect(status.running).toBe(false);
+  });
+
+  it("graceful shutdown does not throw when dispatcher already exited", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher closes (crash) -- sets dispatcher = null internally
+    mockDispatcher.emitEvent("close", 1, null);
+    await new Promise((r) => setTimeout(r, 10));
+
+    // shutdownDispatcher should not throw even when no dispatcher is running
+    expect(() => shutdownDispatcher()).not.toThrow();
+
+    // Finish the per-request fallback
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    await promise;
+  });
+
+  it("shutdown is idempotent when called multiple times", () => {
+    expect(() => {
+      shutdownDispatcher();
+      shutdownDispatcher();
+      shutdownDispatcher();
+    }).not.toThrow();
+  });
+
+  it("concurrent requests to per-request fallback both resolve", async () => {
+    // Dispatcher fails immediately, so both requests go to per-request path
+    const mockDispatcher = createMockProcess();
+    const mockReq1 = createMockProcess();
+    const mockReq2 = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      if (callCount === 2) return mockReq1.process;
+      return mockReq2.process;
+    });
+
+    // Start first request
+    const promise1 = runPythonWithProgress("tool1.py", ["a"]);
+
+    // Kill dispatcher
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDispatcher.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Start second request (dispatcher is now permanently failed)
+    const promise2 = runPythonWithProgress("tool2.py", ["b"]);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Complete both per-request processes
+    mockReq1.stdout.emit("data", Buffer.from('{"result": "one"}\n'));
+    mockReq1.emitEvent("close", 0, null);
+
+    mockReq2.stdout.emit("data", Buffer.from('{"result": "two"}\n'));
+    mockReq2.emitEvent("close", 0, null);
+
+    const [r1, r2] = await Promise.all([promise1, promise2]);
+    expect(r1.stdout).toContain("one");
+    expect(r2.stdout).toContain("two");
+  });
+
+  it("timeout rejects the promise without affecting other requests", async () => {
+    vi.useFakeTimers();
+    const mockDispatcher = createMockProcess();
+    const mockReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockReq.process;
+    });
+
+    const promise = runPythonWithProgress("slow.py", [], { timeout: 2000 });
+
+    // Dispatcher ENOENT => per-request fallback
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDispatcher.emitEvent("error", enoent);
+
+    // Advance past timeout
+    vi.advanceTimersByTime(3000);
+
+    // Process gets killed, close fires
+    mockReq.emitEvent("close", null, "SIGTERM");
+
+    await expect(promise).rejects.toThrow("Python script timed out");
+    vi.useRealTimers();
+  });
+
+  it("handles dispatcher crash followed by successful per-request retry", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher crashes with a non-ENOENT error
+    const err = new Error("spawn failed");
+    (err as NodeJS.ErrnoException).code = "EACCES";
+    mockDispatcher.emitEvent("error", err);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Per-request succeeds
+    mockPerReq.stdout.emit("data", Buffer.from('{"success": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toContain("success");
+  });
+});

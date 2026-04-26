@@ -714,4 +714,169 @@ describe("svg-to-raster", () => {
       expect(json.error).toMatch(/json/i);
     });
   });
+
+  // ── Branch coverage: HEIF output with preview (line 363, 404) ───────
+
+  it("converts to heif format and generates a preview", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+    // HEIF is non-previewable, so previewUrl should be generated
+    expect(json.previewUrl).toBeDefined();
+
+    // Download the preview and verify it is a webp image
+    if (json.previewUrl) {
+      const previewRes = await app.inject({
+        method: "GET",
+        url: json.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+      expect(meta.format).toBe("webp");
+    }
+  });
+
+  // ── Branch coverage: TIFF preview generation (non-previewable) ──────
+
+  it("converts to tiff format and generates a webp preview", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+    expect(json.previewUrl).toBeDefined();
+
+    if (json.previewUrl) {
+      const previewRes = await app.inject({
+        method: "GET",
+        url: json.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+      expect(meta.format).toBe("webp");
+      // Preview is resized to fit within 1200x1200
+      expect(meta.width).toBeLessThanOrEqual(1200);
+      expect(meta.height).toBeLessThanOrEqual(1200);
+    }
+  });
+
+  // ── Branch coverage: no previewUrl for previewable formats ──────────
+
+  it("does not generate previewUrl for previewable formats (png)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    // PNG is previewable, no preview URL should be set
+    expect(json.previewUrl).toBeUndefined();
+  });
+
+  // ── Branch coverage: transparent bg default (line 404 area) ─────────
+
+  it("converts with default transparent background (no flatten)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "png", backgroundColor: "#00000000" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4); // Alpha channel preserved
+  });
+
+  // ── Branch coverage: batch with duplicate filenames ─────────────────
+
+  it("batch handles duplicate SVG filenames by deduplicating", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    // X-File-Results should contain deduplicated names
+    const fileResults = JSON.parse(res.headers["x-file-results"] as string);
+    const filenames = Object.values(fileResults) as string[];
+    // Filenames should be unique
+    expect(new Set(filenames).size).toBe(filenames.length);
+  });
+
+  // ── Branch coverage: batch with heif output ─────────────────────────
+
+  it("batch converts SVGs to tiff format", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/svg-to-raster/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+  });
 });

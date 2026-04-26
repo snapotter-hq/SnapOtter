@@ -215,3 +215,107 @@ describe("Error handling", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ── Branch coverage: line 82 (makeTransparent on non-alpha format → forced PNG) ──
+describe("Alpha format fallback", () => {
+  it("forces PNG when makeTransparent is used on a JPEG input", async () => {
+    // Use solidRedBuffer with matching sourceColor to ensure transparency is applied
+    const res = await postTool(
+      { sourceColor: "#FF0000", makeTransparent: true, tolerance: 30 },
+      solidRedBuffer,
+      "test.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // JPEG doesn't support alpha, so output is forced to PNG
+    expect(meta.format).toBe("png");
+  });
+
+  it("keeps PNG when makeTransparent is used on a PNG input", async () => {
+    const res = await postTool(
+      { sourceColor: "#FF0000", makeTransparent: true, tolerance: 30 },
+      solidRedBuffer,
+      "test.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+  });
+});
+
+// ── HEIC input handling ─────────────────────────────────────────
+describe("HEIC input", () => {
+  it("processes HEIC image", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      { sourceColor: "#808080", targetColor: "#FF0000", tolerance: 50 },
+      HEIC,
+      "photo.heic",
+      "image/heic",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── WebP input ──────────────────────────────────────────────────
+describe("WebP input", () => {
+  it("processes WebP image", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const res = await postTool(
+      { sourceColor: "#808080", targetColor: "#00FF00", tolerance: 40 },
+      WEBP,
+      "test.webp",
+      "image/webp",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Edge size inputs ────────────────────────────────────────────
+describe("Edge size inputs", () => {
+  it("processes 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool(
+      { sourceColor: "#000000", targetColor: "#FFFFFF", tolerance: 255 },
+      TINY,
+      "tiny.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("processes stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { sourceColor: "#808080", targetColor: "#FF0000", tolerance: 30 },
+      LARGE,
+      "large.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});

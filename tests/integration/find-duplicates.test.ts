@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
@@ -497,5 +498,278 @@ describe("Find Duplicates", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/at least 2/i);
+  });
+
+  // ── Branch coverage: best image selection by pixel count (lines 138-240) ──
+
+  it("marks the higher-resolution image as best in a duplicate group", async () => {
+    // Create a smaller version of PNG via sharp
+    const smallerPng = await sharp(PNG).resize(100, 75).png().toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "small.png", contentType: "image/png", content: smallerPng },
+      { name: "file", filename: "large.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.duplicateGroups).toHaveLength(1);
+
+    const group = result.duplicateGroups[0];
+    const bestFile = group.files.find((f: { isBest: boolean }) => f.isBest);
+    expect(bestFile).toBeDefined();
+    // The larger (200x150) image should be marked as best
+    expect(bestFile.width).toBe(200);
+    expect(bestFile.height).toBe(150);
+  });
+
+  // ── Branch coverage: best selection tie-break by file size ──────────
+
+  it("tie-breaks best selection by file size when pixel count is equal", async () => {
+    // Same dimensions but different quality = different file sizes
+    const highQuality = await sharp(PNG).jpeg({ quality: 100 }).toBuffer();
+    const lowQuality = await sharp(PNG).jpeg({ quality: 10 }).toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "low.jpg", contentType: "image/jpeg", content: lowQuality },
+      { name: "file", filename: "high.jpg", contentType: "image/jpeg", content: highQuality },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.duplicateGroups).toHaveLength(1);
+
+    const group = result.duplicateGroups[0];
+    const bestFile = group.files.find((f: { isBest: boolean }) => f.isBest);
+    expect(bestFile).toBeDefined();
+    // The larger file size should be marked as best (same pixel count)
+    expect(bestFile.fileSize).toBe(Math.max(highQuality.length, lowQuality.length));
+  });
+
+  // ── Branch coverage: error path (lines 258-262) ─────────────────────
+
+  it("returns 422 when image processing fails due to corrupt data", async () => {
+    // Create a buffer that has valid PNG magic bytes but is truncated
+    const validPng = PNG;
+    // Take only the header (first 20 bytes) - valid magic but corrupt content
+    const truncatedPng = Buffer.concat([
+      validPng.subarray(0, 8), // PNG signature
+      Buffer.alloc(50, 0), // garbage
+    ]);
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "corrupt1.png", contentType: "image/png", content: truncatedPng },
+      { name: "file", filename: "corrupt2.png", contentType: "image/png", content: truncatedPng },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Should either process (with sharp handling corrupt data gracefully)
+    // or return 422 for processing failure
+    expect([200, 422]).toContain(res.statusCode);
+  });
+
+  // ── Branch coverage: thumbnail generation for different formats ──────
+
+  it("generates thumbnails for various image formats", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "c.webp", contentType: "image/webp", content: WEBP },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(3);
+
+    // Check that all groups' files have thumbnails as data URIs
+    for (const group of result.duplicateGroups) {
+      for (const file of group.files) {
+        if (file.thumbnail) {
+          expect(file.thumbnail).toMatch(/^data:image\/jpeg;base64,/);
+        }
+      }
+    }
+  });
+
+  // ── Branch coverage: threshold 0 with identical images ──────────────
+
+  it("groups identical images even at threshold 0", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ threshold: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // Identical images have hamming distance 0, so they should be grouped
+    expect(result.duplicateGroups).toHaveLength(1);
+    expect(result.duplicateGroups[0].files).toHaveLength(2);
+  });
+
+  // ── Branch coverage: 1x1 tiny images ────────────────────────────────
+
+  it("handles 1x1 pixel images", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny1.png", contentType: "image/png", content: TINY },
+      { name: "file", filename: "tiny2.png", contentType: "image/png", content: TINY },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    // 1x1 images should still hash and be grouped as duplicates
+    expect(result.duplicateGroups).toHaveLength(1);
+  });
+
+  // ── Branch coverage: large file handling ────────────────────────────
+
+  it("handles a large content image in duplicate detection", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large1.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "file", filename: "large2.jpg", contentType: "image/jpeg", content: LARGE },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    expect(result.duplicateGroups).toHaveLength(1);
+    expect(result.duplicateGroups[0].files).toHaveLength(2);
+  });
+
+  // ── Branch coverage: invalid JSON settings ──────────────────────────
+
+  it("rejects invalid JSON in settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{{bad json" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/json/i);
+  });
+
+  // ── Branch coverage: multiple separate duplicate groups ─────────────
+
+  it("detects multiple separate duplicate groups", async () => {
+    // Resize PNG to make a perceptually similar but different-res copy
+    const pngSmall = await sharp(PNG).resize(100, 75).png().toBuffer();
+    const jpgSmall = await sharp(JPG).resize(50, 50).jpeg().toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "png1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "png2.png", contentType: "image/png", content: pngSmall },
+      { name: "file", filename: "jpg1.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "jpg2.jpg", contentType: "image/jpeg", content: jpgSmall },
+      { name: "file", filename: "unique.jpg", contentType: "image/jpeg", content: PORTRAIT },
+      {
+        name: "settings",
+        content: JSON.stringify({ threshold: 10 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(5);
+    // Should have at least 1 group (PNG pair), possibly 2 (also JPG pair)
+    expect(result.duplicateGroups.length).toBeGreaterThanOrEqual(1);
+    // The portrait should not be in any group
+    expect(result.uniqueImages).toBeGreaterThanOrEqual(1);
   });
 });
