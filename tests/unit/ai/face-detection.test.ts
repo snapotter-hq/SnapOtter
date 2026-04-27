@@ -167,6 +167,14 @@ describe("blurFaces", () => {
 
       await expect(blurFaces(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("timed out");
     });
+
+    it("propagates OOM errors from bridge", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(blurFaces(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("out of memory");
+    });
   });
 
   describe("onProgress forwarding", () => {
@@ -281,6 +289,14 @@ describe("detectFaces", () => {
       );
 
       await expect(detectFaces(FAKE_INPUT)).rejects.toThrow("segmentation fault");
+    });
+
+    it("propagates OOM errors from bridge", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(detectFaces(FAKE_INPUT)).rejects.toThrow("out of memory");
     });
   });
 

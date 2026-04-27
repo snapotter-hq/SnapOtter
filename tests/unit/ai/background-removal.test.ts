@@ -299,4 +299,189 @@ describe("removeBackground", () => {
       expect(options.onProgress).toBeUndefined();
     });
   });
+
+  describe("image downscaling", () => {
+    it("does not call resize when image is within limit", async () => {
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: resizeFn,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 1024, height: 768 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(resizeFn).not.toHaveBeenCalled();
+    });
+
+    it("calls resize when longest edge exceeds 2048px", async () => {
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: resizeFn,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(resizeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ width: 2048, fit: "inside", withoutEnlargement: true }),
+      );
+    });
+
+    it("constrains by height when portrait orientation", async () => {
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: resizeFn,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 4000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(resizeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ height: 2048, fit: "inside" }),
+      );
+    });
+
+    it("upscales mask back to original dimensions after processing", async () => {
+      const callCount = 0;
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: resizeFn,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 5000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      const upscaleCall = resizeFn.mock.calls.find(
+        (c: unknown[]) =>
+          c[0] && typeof c[0] === "object" && (c[0] as Record<string, unknown>).width === 5000,
+      );
+      expect(upscaleCall).toBeDefined();
+      expect(upscaleCall![0]).toMatchObject({ width: 5000, height: 3000, fit: "fill" });
+    });
+
+    it("does not upscale mask when image was not downscaled", async () => {
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: resizeFn,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(resizeFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("OOM fallback", () => {
+    it("retries with u2net when OOM is detected", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      const fallbackOpts = JSON.parse(fallbackArgs[2]);
+      expect(fallbackOpts.model).toBe("u2net");
+    });
+
+    it("fires progress callback on fallback retry", async () => {
+      const onProgress = vi.fn();
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(
+        FAKE_INPUT,
+        FAKE_OUTPUT_DIR,
+        { model: "birefnet-general" },
+        onProgress,
+      );
+
+      expect(onProgress).toHaveBeenCalledWith(5, expect.stringContaining("u2net"));
+    });
+
+    it("does not retry when already using u2net", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not retry on non-OOM errors", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(new Error("Python script timed out"));
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" }),
+      ).rejects.toThrow("timed out");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses 300000ms timeout for the u2net fallback attempt", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+      const fallbackOptions = vi.mocked(runPythonWithProgress).mock.calls[1][2];
+      expect(fallbackOptions.timeout).toBe(300000);
+    });
+
+    it("propagates error if fallback also fails", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"));
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries with fallback when no model is specified (default)", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      expect(JSON.parse(fallbackArgs[2]).model).toBe("u2net");
+    });
+  });
 });

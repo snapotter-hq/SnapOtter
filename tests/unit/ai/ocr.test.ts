@@ -235,6 +235,14 @@ describe("extractText", () => {
       await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("timed out");
     });
 
+    it("propagates OOM errors from bridge", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("out of memory");
+    });
+
     it("propagates parseStdoutJson errors", async () => {
       vi.mocked(parseStdoutJson).mockImplementation(() => {
         throw new Error("No JSON response from Python script");
