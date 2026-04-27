@@ -111,6 +111,13 @@ export function ImageToPdfSettings() {
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
   const [margin, setMargin] = useState(20);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [targetSizeValue, setTargetSizeValue] = useState<string>("");
+  const [targetSizeUnit, setTargetSizeUnit] = useState<"KB" | "MB">("MB");
+  const [compressionResult, setCompressionResult] = useState<{
+    targetMet: boolean;
+    jpegQuality: number;
+    targetRequested: number;
+  } | null>(null);
 
   // Local processing state so the ProgressCard renders reliably
   const [busy, setBusy] = useState(false);
@@ -151,6 +158,7 @@ export function ImageToPdfSettings() {
       setProcessing(true);
       setError(null);
       setDownloadUrl(null);
+      setCompressionResult(null);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
@@ -163,7 +171,14 @@ export function ImageToPdfSettings() {
     for (const file of files) {
       formData.append("file", file);
     }
-    formData.append("settings", JSON.stringify({ pageSize, orientation, margin }));
+    const settings: Record<string, unknown> = { pageSize, orientation, margin };
+    if (targetSizeValue.trim() !== "") {
+      const numVal = Number.parseFloat(targetSizeValue);
+      if (!Number.isNaN(numVal) && numVal > 0) {
+        settings.targetSize = { value: numVal, unit: targetSizeUnit };
+      }
+    }
+    formData.append("settings", JSON.stringify(settings));
 
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -194,6 +209,7 @@ export function ImageToPdfSettings() {
         try {
           const result = JSON.parse(xhr.responseText);
           setDownloadUrl(result.downloadUrl);
+          setCompressionResult(result.compression ?? null);
           setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
         } catch {
           setError("Failed to parse server response");
@@ -224,7 +240,16 @@ export function ImageToPdfSettings() {
       xhr.setRequestHeader(key, value);
     });
     xhr.send(formData);
-  }, [files, pageSize, orientation, margin, setProcessing, setError]);
+  }, [
+    files,
+    pageSize,
+    orientation,
+    margin,
+    targetSizeValue,
+    targetSizeUnit,
+    setProcessing,
+    setError,
+  ]);
 
   const hasFiles = files.length > 0;
 
@@ -290,6 +315,35 @@ export function ImageToPdfSettings() {
         />
       </div>
 
+      <div>
+        <label htmlFor="image-to-pdf-target-size" className="text-xs text-muted-foreground">
+          Target file size (optional)
+        </label>
+        <div className="flex gap-2 mt-0.5">
+          <input
+            id="image-to-pdf-target-size"
+            type="number"
+            min={0}
+            step="any"
+            placeholder="e.g. 2"
+            value={targetSizeValue}
+            onChange={(e) => setTargetSizeValue(e.target.value)}
+            className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+            data-testid="image-to-pdf-target-size-value"
+          />
+          <select
+            value={targetSizeUnit}
+            onChange={(e) => setTargetSizeUnit(e.target.value as "KB" | "MB")}
+            className="px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+            data-testid="image-to-pdf-target-size-unit"
+          >
+            <option value="KB">KB</option>
+            <option value="MB">MB</option>
+          </select>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">Leave empty for maximum quality</p>
+      </div>
+
       <PdfPagePreview
         pageSize={pageSize}
         orientation={orientation}
@@ -334,6 +388,23 @@ export function ImageToPdfSettings() {
           <Download className="h-4 w-4" />
           Download PDF
         </a>
+      )}
+
+      {compressionResult && (
+        <div
+          data-testid="image-to-pdf-compression-result"
+          className={`text-xs px-3 py-2 rounded ${
+            compressionResult.targetMet
+              ? "bg-green-500/10 text-green-600"
+              : "bg-amber-500/10 text-amber-600"
+          }`}
+        >
+          {compressionResult.targetMet ? (
+            <span>Target met (JPEG quality: {compressionResult.jpegQuality}%)</span>
+          ) : (
+            <span>Could not reach target. File compressed to minimum quality.</span>
+          )}
+        </div>
       )}
     </div>
   );
