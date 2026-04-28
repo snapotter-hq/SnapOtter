@@ -265,5 +265,78 @@ describe("extractText", () => {
         expect.objectContaining({ onProgress }),
       );
     });
+
+    it("omits onProgress when not provided", async () => {
+      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.onProgress).toBeUndefined();
+    });
+  });
+
+  describe("image downscaling", () => {
+    it("caps input to 2048px using resize with inside fit", async () => {
+      const resizeFn = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            resize: resizeFn,
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(resizeFn).toHaveBeenCalledWith({
+        width: 2048,
+        height: 2048,
+        fit: "inside",
+        withoutEnlargement: true,
+      });
+    });
+  });
+
+  describe("multiline and unicode text", () => {
+    it("handles multiline OCR text", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        success: true,
+        text: "Line 1\nLine 2\nLine 3",
+        engine: "paddleocr",
+      });
+
+      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+      expect(result.text).toBe("Line 1\nLine 2\nLine 3");
+    });
+
+    it("handles unicode text from CJK languages", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        success: true,
+        text: "你好世界",
+        engine: "paddleocr",
+      });
+
+      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+      expect(result.text).toBe("你好世界");
+    });
+  });
+
+  describe("sharp conversion errors", () => {
+    it("propagates sharp conversion errors", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            resize: vi.fn().mockReturnThis(),
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockRejectedValue(new Error("Input buffer is empty")),
+            metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
+        "Input buffer is empty",
+      );
+    });
   });
 });

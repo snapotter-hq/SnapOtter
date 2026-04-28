@@ -375,4 +375,216 @@ describe("text-overlay", () => {
 
     expect(res.statusCode).toBe(200);
   });
+
+  // ── Rejects text exceeding max length ────────────────────────────
+
+  it("rejects text exceeding max length (>500 chars)", async () => {
+    const longText = "B".repeat(501);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: longText }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── WebP input ───────────────────────────────────────────────────
+
+  it("processes WebP input", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ text: "WebP overlay" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: "Unauth" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── Background box with bottom position ──────────────────────────
+
+  it("applies background box at bottom position", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          text: "Bottom box",
+          position: "bottom",
+          backgroundBox: true,
+          backgroundColor: "#0000FF",
+          shadow: true,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Max font size ────────────────────────────────────────────────
+
+  it("applies maximum font size (200)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Max", fontSize: 200 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Min font size ────────────────────────────────────────────────
+
+  it("applies minimum font size (8)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Tiny text", fontSize: 8 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Invalid backgroundColor format ───────────────────────────────
+
+  it("rejects invalid backgroundColor format", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          text: "Bad BG",
+          backgroundBox: true,
+          backgroundColor: "green",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Preserves image dimensions ───────────────────────────────────
+
+  it("preserves image dimensions after text overlay", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: "Dim test" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
+
+  // ── All parameters combined ──────────────────────────────────────
+
+  it("applies all parameters at once", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          text: "Full",
+          fontSize: 24,
+          color: "#00FF00",
+          position: "center",
+          backgroundBox: true,
+          backgroundColor: "#333333",
+          shadow: true,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
 });

@@ -347,4 +347,204 @@ describe("watermark-text", () => {
     const meta = await sharp(dlRes.rawPayload).metadata();
     expect(meta.format).toBe("jpeg");
   });
+
+  // ── Rejects text exceeding max length ────────────────────────────
+
+  it("rejects text exceeding max length (>500 chars)", async () => {
+    const longText = "A".repeat(501);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: longText }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Max rotation values ──────────────────────────────────────────
+
+  it("applies maximum rotation (+360)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Rotated", rotation: 360 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("applies negative rotation (-360)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "NegRotated", rotation: -360 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── WebP input ───────────────────────────────────────────────────
+
+  it("processes WebP input", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ text: "WebP" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: "Unauth" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── Max fontSize boundary ────────────────────────────────────────
+
+  it("applies maximum font size (1000)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "BIG", fontSize: 1000 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── All parameters combined ──────────────────────────────────────
+
+  it("applies all parameters: position, color, opacity, fontSize, rotation", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          text: "Full",
+          position: "bottom-right",
+          color: "#00FF00",
+          opacity: 90,
+          fontSize: 32,
+          rotation: -45,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Rotation exceeding range ─────────────────────────────────────
+
+  it("rejects rotation exceeding range (>360)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Bad", rotation: 361 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Preserves image dimensions ───────────────────────────────────
+
+  it("preserves image dimensions after watermark", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Dims", position: "bottom-left" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
 });

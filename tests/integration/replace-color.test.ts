@@ -319,3 +319,104 @@ describe("Edge size inputs", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 });
+
+// ── Unauthenticated request ────────────────────────────────────
+describe("Authentication", () => {
+  it("rejects unauthenticated request", async () => {
+    const { body: payload, contentType } = makePayload({
+      sourceColor: "#FF0000",
+      targetColor: "#00FF00",
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/replace-color",
+      payload,
+      headers: { "content-type": contentType },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── Preserves dimensions ────────────────────────────────────────
+describe("Dimension preservation", () => {
+  it("output preserves original dimensions", async () => {
+    const res = await postTool(
+      { sourceColor: "#FF0000", targetColor: "#0000FF", tolerance: 30 },
+      solidRedBuffer,
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(50);
+    expect(meta.height).toBe(50);
+  });
+});
+
+// ── makeTransparent on WebP (alpha-capable, no forced PNG) ──────
+describe("WebP with makeTransparent", () => {
+  it("keeps WebP when makeTransparent is used on WebP input", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const res = await postTool(
+      { sourceColor: "#808080", makeTransparent: true, tolerance: 100 },
+      WEBP,
+      "test.webp",
+      "image/webp",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // WebP supports alpha, so no format conversion needed
+    expect(meta.channels).toBe(4);
+  });
+});
+
+// ── Blend behavior with medium tolerance ────────────────────────
+describe("Blend behavior", () => {
+  it("partially blends colors within tolerance range", async () => {
+    // Create a gradient: pure red on left, slightly off-red on right
+    const w = 100;
+    const h = 50;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 3;
+        raw[idx] = 255;
+        raw[idx + 1] = Math.round((x / w) * 100);
+        raw[idx + 2] = 0;
+      }
+    }
+    const gradientBuf = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const res = await postTool(
+      { sourceColor: "#FF0000", targetColor: "#0000FF", tolerance: 50 },
+      gradientBuf,
+      "gradient.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Invalid target color format ─────────────────────────────────
+describe("Target color validation", () => {
+  it("rejects invalid target color format", async () => {
+    const res = await postTool({ sourceColor: "#FF0000", targetColor: "blue" });
+    expect(res.statusCode).toBe(400);
+  });
+});

@@ -995,4 +995,395 @@ describe("Split", () => {
       expect(meta.format).toBe("png");
     }
   });
+
+  // ── Branch coverage: split with jpg quality conversion ──────────────
+
+  it("splits PNG source to jpg tiles with custom quality setting", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 1, outputFormat: "jpg", quality: 50 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(2);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.jpg$/);
+      const meta = await sharp(entry.getData()).metadata();
+      expect(meta.format).toBe("jpeg");
+    }
+  });
+
+  // ── Branch coverage: portrait image split ───────────────────────────
+
+  it("splits a portrait image into a grid", async () => {
+    const PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "portrait.jpg", contentType: "image/jpeg", content: PORTRAIT },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 3 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(6);
+  });
+
+  // ── Branch coverage: HEIC split with webp output ────────────────────
+
+  it("splits HEIC image with webp output format", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "webp", quality: 75 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(/\.webp$/);
+      const meta = await sharp(entry.getData()).metadata();
+      expect(meta.format).toBe("webp");
+    }
+  });
+
+  // ── Branch coverage: tileWidth only (no tileHeight) uses grid mode ─
+
+  it("falls back to grid columns/rows when only tileWidth is provided", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 50, columns: 2, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    // Without tileHeight, tileWidth is ignored, falls back to columns/rows: 2x2 = 4
+    expect(entries.length).toBe(4);
+  });
+
+  // ── Branch coverage: columns 0 is clamped by Zod min(1) ────────────
+
+  it("rejects columns less than minimum (1)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 0, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: tileHeight below min(10) ──────────────────────
+
+  it("rejects tileHeight below minimum (10)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 50, tileHeight: 5 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: exif-oriented image split ──────────────────────
+
+  it("splits an image with EXIF orientation data", async () => {
+    const EXIF = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "exif.jpg", contentType: "image/jpeg", content: EXIF },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "png" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBe(4);
+    for (const entry of entries) {
+      const meta = await sharp(entry.getData()).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.width).toBeGreaterThan(0);
+      expect(meta.height).toBeGreaterThan(0);
+    }
+  });
+
+  // ── Batch endpoint for split (exercises registerToolProcessFn) ──────
+
+  it("splits via batch endpoint with grid mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "batch1.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.length).toBeGreaterThan(0);
+  });
+
+  it("splits via batch endpoint with tileWidth and tileHeight", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "batch-tile.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 100, tileHeight: 75 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+  });
+
+  it("splits via batch endpoint with output format conversion", async () => {
+    const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "batch-fmt.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "webp", quality: 80 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("splits via batch endpoint with avif output and custom quality", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "batch-avif.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 1, outputFormat: "avif", quality: 60 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("splits via batch endpoint with remainder tiles", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "batch-rem.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ tileWidth: 80, tileHeight: 80 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Additional edge cases ──────────────────────────────────────────
+
+  it("splits large stress image via batch endpoint", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "stress.jpg", contentType: "image/jpeg", content: LARGE },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "jpg", quality: 70 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("splits with original format preserved via batch endpoint", async () => {
+    const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "keep.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 1, outputFormat: "original" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("splits file without extension via batch endpoint", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "noext", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ columns: 2, rows: 2 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/split/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
 });

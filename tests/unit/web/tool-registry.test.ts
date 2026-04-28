@@ -361,3 +361,76 @@ describe("getToolRegistryEntry", () => {
     expect(entry?.ResultsPanel).toBeDefined();
   });
 });
+
+// ==========================================================================
+// Wrapper components (lines 305-324)
+// ==========================================================================
+
+import { render } from "@testing-library/react";
+import React from "react";
+
+function renderSettings(Settings: React.ComponentType<Record<string, unknown>>, props = {}) {
+  return render(
+    React.createElement(React.Suspense, { fallback: null }, React.createElement(Settings, props)),
+  );
+}
+
+describe("CropSettingsWrapper", () => {
+  it("renders null when cropProps is undefined", () => {
+    const entry = getToolRegistryEntry("crop");
+    expect(entry).toBeDefined();
+    const { container } = renderSettings(entry!.Settings as never);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders CropSettings when cropProps is provided", () => {
+    const entry = getToolRegistryEntry("crop");
+    expect(entry).toBeDefined();
+    const cropProps = {
+      cropState: {
+        crop: { x: 0, y: 0, width: 50, height: 50, unit: "%" },
+        aspect: undefined,
+        showGrid: true,
+        imgDimensions: { width: 200, height: 150 },
+      },
+      onCropChange: vi.fn(),
+      onAspectChange: vi.fn(),
+      onGridToggle: vi.fn(),
+    };
+    const { container } = renderSettings(entry!.Settings as never, { cropProps });
+    expect(container).toBeDefined();
+  });
+});
+
+describe("EraseObjectSettingsWrapper", () => {
+  it("renders null when eraserProps is undefined", () => {
+    const entry = getToolRegistryEntry("erase-object");
+    expect(entry).toBeDefined();
+    const { container } = renderSettings(entry!.Settings as never);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders EraseObjectSettings when eraserProps is provided", () => {
+    const entry = getToolRegistryEntry("erase-object");
+    expect(entry).toBeDefined();
+    const eraserProps = {
+      eraserRef: React.createRef(),
+      hasStrokes: false,
+      brushSize: 20,
+      onBrushSizeChange: vi.fn(),
+    };
+    const { container } = renderSettings(entry!.Settings as never, { eraserProps });
+    expect(container).toBeDefined();
+  });
+});
+
+describe("makeColorSettingsComponent", () => {
+  it("adjust-colors Settings renders without throwing", () => {
+    const entry = getToolRegistryEntry("adjust-colors");
+    expect(entry).toBeDefined();
+    const { container } = renderSettings(entry!.Settings as never, {
+      onPreviewFilter: vi.fn(),
+    });
+    expect(container).toBeDefined();
+  });
+});

@@ -1179,4 +1179,279 @@ describe("Collage", () => {
     const result = JSON.parse(res.body);
     expect(result.processedSize).toBeGreaterThan(0);
   });
+
+  // ── Branch coverage: 2-h-left-large template ───────────────────────
+
+  it("creates a 2-image left-large horizontal collage", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-left-large" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: 2-h-right-large template ──────────────────────
+
+  it("creates a 2-image right-large horizontal collage", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-right-large" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: 3-right-large template ────────────────────────
+
+  it("creates a 3-image right-large collage", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "3-right-large" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: 3-top-large template ──────────────────────────
+
+  it("creates a 3-image top-large collage", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "3-top-large" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: 3-v-equal template ────────────────────────────
+
+  it("creates a 3-image vertical equal collage", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "3-v-equal" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: quality below min rejects ─────────────────────
+
+  it("rejects quality below minimum (1)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", quality: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: corner radius above max rejects ───────────────
+
+  it("rejects cornerRadius above maximum (500)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", cornerRadius: 600 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: missing templateId rejects ────────────────────
+
+  it("rejects missing templateId in settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({}),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: portrait aspect ratio arMultiplier > 1 ────────
+
+  it("uses free aspect ratio (default 4:3)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", aspectRatio: "free" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // Free uses 4:3 default: w=2400, h=1800
+    const ratio = (meta.width ?? 1) / (meta.height ?? 1);
+    expect(ratio).toBeCloseTo(4 / 3, 1);
+  });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("handles portrait HEIC input images", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
 });

@@ -589,4 +589,174 @@ describe("image-to-pdf", () => {
     const json = JSON.parse(res.body);
     expect(json.compression.targetRequested).toBe(500 * 1024);
   });
+
+  // ── Large stress file ────────────────────────────────────────────
+
+  it("converts stress-large.jpg to PDF", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(1);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── 5+ images batch PDF ──────────────────────────────────────────
+
+  it("creates 5-page PDF from five images", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "p1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "p2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "p3.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "p4.png", contentType: "image/png", content: TINY },
+      { name: "file", filename: "p5.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(5);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── A5 portrait with zero margin ─────────────────────────────────
+
+  it("handles A5 portrait with zero margin", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          pageSize: "A5",
+          orientation: "portrait",
+          margin: 0,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(1);
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── Multi-image with target size ─────────────────────────────────
+
+  it("compresses 3-image PDF with target size", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "p1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "p2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "p3.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ targetSize: { value: 2, unit: "MB" } }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(3);
+    expect(json.compression).toBeDefined();
+    expect(json.compression.targetMet).toBe(true);
+  });
+
+  // ── Letter landscape ─────────────────────────────────────────────
+
+  it("handles Letter landscape", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          pageSize: "Letter",
+          orientation: "landscape",
+          margin: 30,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(1);
+  });
+
+  // ── Rejects invalid orientation ──────────────────────────────────
+
+  it("rejects invalid orientation value", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ orientation: "sideways" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });

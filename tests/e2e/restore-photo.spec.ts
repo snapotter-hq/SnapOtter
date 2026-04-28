@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "./helpers";
+import { expect, isAiSidecarRunning, test } from "./helpers";
 
 function fixturePath(name: string): string {
   return path.join(process.cwd(), "tests", "fixtures", name);
@@ -26,6 +26,9 @@ test.describe("Restore Photo tool", () => {
       await page.getByTestId("restore-photo-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {
       test.skip(true, "photo-restoration feature bundle not installed");
+    }
+    if (!(await isAiSidecarRunning(page))) {
+      test.skip(true, "AI sidecar not running");
     }
   }
 

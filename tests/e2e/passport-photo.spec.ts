@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "./helpers";
+import { expect, isAiSidecarRunning, test } from "./helpers";
 
 function fixturePath(name: string): string {
   return path.join(process.cwd(), "tests", "fixtures", name);
@@ -18,10 +18,13 @@ test.describe("Passport Photo tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
     await page.goto("/passport-photo");
     try {
-      // Wait for the page to load — the country dropdown is always present
+      // Wait for the page to load -- the country dropdown is always present
       await page.getByText("Country").waitFor({ state: "visible", timeout: 15_000 });
     } catch {
       test.skip(true, "background-removal or face-detection feature bundle not installed");
+    }
+    if (!(await isAiSidecarRunning(page))) {
+      test.skip(true, "AI sidecar not running");
     }
   }
 

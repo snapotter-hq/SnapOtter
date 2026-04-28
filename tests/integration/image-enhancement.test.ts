@@ -482,4 +482,135 @@ describe("Analyze endpoint invalid image", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/invalid image/i);
   });
+
+  it("analyze returns 400 for empty file", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.png",
+        contentType: "image/png",
+        content: Buffer.alloc(0),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-enhancement/analyze",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── HEIC input enhancement ──────────────────────────────────────
+describe("HEIC input enhancement", () => {
+  it("enhances HEIC input image", async () => {
+    const res = await postTool({ mode: "auto" }, HEIC, "test.heic", "image/heic");
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.processedSize).toBeGreaterThan(0);
+    }
+  });
+
+  it("enhances HEIC in portrait mode", async () => {
+    const res = await postTool(
+      { mode: "portrait", intensity: 60 },
+      HEIC,
+      "portrait.heic",
+      "image/heic",
+    );
+    expect([200, 422]).toContain(res.statusCode);
+  });
+});
+
+// ── Large file handling ─────────────────────────────────────────
+describe("Large file handling", () => {
+  it("enhances a large stress image", async () => {
+    const large = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { mode: "auto", intensity: 50 },
+      large,
+      "stress-large.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Tiny file handling ──────────────────────────────────────────
+describe("Tiny file handling", () => {
+  it("enhances a 1x1 pixel image", async () => {
+    const tiny = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ mode: "auto" }, tiny, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Empty file handling ─────────────────────────────────────────
+describe("Empty file handling", () => {
+  it("returns 400 for empty file upload", async () => {
+    const res = await postTool({ mode: "auto" }, Buffer.alloc(0), "empty.png", "image/png");
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Document mode with different inputs ─────────────────────────
+describe("Document mode variations", () => {
+  it("enhances JPEG in document mode at high intensity", async () => {
+    const res = await postTool({ mode: "document", intensity: 90 }, JPG, "doc.jpg", "image/jpeg");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("enhances WebP in landscape mode", async () => {
+    const res = await postTool(
+      { mode: "landscape", intensity: 70 },
+      WEBP,
+      "landscape.webp",
+      "image/webp",
+    );
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Selective correction combinations ───────────────────────────
+describe("Selective correction edge cases", () => {
+  it("enables only contrast and white balance", async () => {
+    const res = await postTool({
+      corrections: {
+        exposure: false,
+        contrast: true,
+        whiteBalance: true,
+        saturation: false,
+        sharpness: false,
+        denoise: false,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("enables only saturation at max intensity", async () => {
+    const res = await postTool({
+      intensity: 100,
+      corrections: {
+        exposure: false,
+        contrast: false,
+        whiteBalance: false,
+        saturation: true,
+        sharpness: false,
+        denoise: false,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+  });
 });

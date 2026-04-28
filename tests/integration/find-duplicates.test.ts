@@ -772,4 +772,194 @@ describe("Find Duplicates", () => {
     // The portrait should not be in any group
     expect(result.uniqueImages).toBeGreaterThanOrEqual(1);
   });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("handles portrait HEIC images in duplicate detection", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+      { name: "file", filename: "b.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    expect(result.duplicateGroups).toHaveLength(1);
+  });
+
+  // ── Branch coverage: threshold at max boundary (20) ────────────────
+
+  it("uses threshold at max boundary (20)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ threshold: 20 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+  });
+
+  // ── Branch coverage: negative threshold rejects ────────────────────
+
+  it("rejects threshold below minimum (0)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ threshold: -1 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: all unique images with strict threshold ───────
+
+  it("reports all images as unique with threshold 0 and different images", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: PORTRAIT },
+      {
+        name: "settings",
+        content: JSON.stringify({ threshold: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    expect(result.duplicateGroups).toHaveLength(0);
+    expect(result.uniqueImages).toBe(2);
+    expect(result.spaceSaveable).toBe(0);
+  });
+
+  // ── Branch coverage: exif-oriented image duplicate detection ───────
+
+  it("handles EXIF-oriented images in duplicate detection", async () => {
+    const EXIF = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "exif1.jpg", contentType: "image/jpeg", content: EXIF },
+      { name: "file", filename: "exif2.jpg", contentType: "image/jpeg", content: EXIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    expect(result.duplicateGroups).toHaveLength(1);
+  });
+
+  // ── Branch coverage: 6+ images in batch ────────────────────────────
+
+  it("handles 6+ images in a single batch", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "c.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "d.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "e.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "f.jpg", contentType: "image/jpeg", content: PORTRAIT },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(6);
+    // PNG pair and JPG pair should be grouped
+    expect(result.duplicateGroups.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Branch coverage: spaceSaveable for multiple groups ─────────────
+
+  it("calculates space saveable across multiple duplicate groups", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "c.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.duplicateGroups).toHaveLength(1);
+    expect(result.duplicateGroups[0].files).toHaveLength(3);
+    // Space saveable should be the size of the 2 non-best duplicates
+    expect(result.spaceSaveable).toBeGreaterThan(0);
+    // Should be roughly 2x the file size of a single PNG
+    expect(result.spaceSaveable).toBeGreaterThan(PNG.length);
+  });
 });

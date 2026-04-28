@@ -417,3 +417,123 @@ describe("Edge size inputs", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 });
+
+// ── Temperature + tint branch coverage ──────────────────────────
+describe("Temperature and tint isolation", () => {
+  it("applies only temperature (no tint)", async () => {
+    const res = await postTool("adjust-colors", { temperature: 80 });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies only tint (no temperature)", async () => {
+    const res = await postTool("adjust-colors", { tint: 60 });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies negative temperature (cool)", async () => {
+    const res = await postTool("adjust-colors", { temperature: -80 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("applies negative tint", async () => {
+    const res = await postTool("adjust-colors", { tint: -80 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("applies max temperature + max tint", async () => {
+    const res = await postTool("adjust-colors", { temperature: 100, tint: 100 });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Saturation + hue isolation ──────────────────────────────────
+describe("Saturation and hue isolation", () => {
+  it("applies only saturation (no hue)", async () => {
+    const res = await postTool("adjust-colors", { saturation: -50 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("applies only hue (no saturation)", async () => {
+    const res = await postTool("adjust-colors", { hue: 120 });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Channel isolation ───────────────────────────────────────────
+describe("Channel isolation", () => {
+  it("adjusts only red channel", async () => {
+    const res = await postTool("adjust-colors", { red: 150 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("adjusts only green channel", async () => {
+    const res = await postTool("adjust-colors", { green: 50 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("adjusts only blue channel", async () => {
+    const res = await postTool("adjust-colors", { blue: 180 });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Sharpness isolation ─────────────────────────────────────────
+describe("Sharpness isolation", () => {
+  it("applies max sharpness (100)", async () => {
+    const res = await postTool("adjust-colors", { sharpness: 100 });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies zero sharpness (no-op)", async () => {
+    const res = await postTool("adjust-colors", { sharpness: 0 });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Rejects invalid temperature/tint ────────────────────────────
+describe("Temperature/tint validation", () => {
+  it("rejects temperature out of range (>100)", async () => {
+    const res = await postTool("adjust-colors", { temperature: 150 });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects tint out of range (>100)", async () => {
+    const res = await postTool("adjust-colors", { tint: 150 });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects sharpness out of range (>100)", async () => {
+    const res = await postTool("adjust-colors", { sharpness: 150 });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Unauthenticated ─────────────────────────────────────────────
+describe("Authentication", () => {
+  it("rejects unauthenticated request", async () => {
+    const { body: payload, contentType } = makePayload({ brightness: 30 });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/adjust-colors",
+      payload,
+      headers: { "content-type": contentType },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── Effect: none (no-op effect) ─────────────────────────────────
+describe("No-op effect", () => {
+  it("applies 'none' effect (no color effect applied)", async () => {
+    const res = await postTool("adjust-colors", { effect: "none" });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});

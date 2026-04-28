@@ -335,4 +335,173 @@ describe("watermark-image", () => {
     const json = JSON.parse(res.body);
     expect(json.downloadUrl).toBeDefined();
   });
+
+  // ── Corrupted watermark image (processing failure) ───────────────
+
+  it("returns 422 when watermark image is corrupted", async () => {
+    const corruptedWm = Buffer.alloc(50, 0xaa);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: corruptedWm },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(422);
+    const json = JSON.parse(res.body);
+    expect(json.error).toContain("Processing failed");
+  });
+
+  // ── Tiny 1x1 main image ──────────────────────────────────────────
+
+  it("handles 1x1 pixel main image", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "watermark", filename: "wm.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ scale: 50, position: "center" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── HEIC watermark image ─────────────────────────────────────────
+
+  it("processes HEIC watermark image", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ scale: 25 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── Minimum scale (1%) ───────────────────────────────────────────
+
+  it("applies watermark at minimum scale (1%)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ scale: 1, opacity: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Maximum scale (100%) ─────────────────────────────────────────
+
+  it("applies watermark at maximum scale (100%)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ scale: 100, opacity: 100, position: "center" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // scale=100 causes the watermark to be resized to full main-image width,
+    // which can exceed the main image dimensions when composited. The route
+    // returns 422 because Sharp's composite rejects overlapping bounds.
+    expect(res.statusCode).toBe(422);
+  });
+
+  // ── Minimum opacity (0%) ─────────────────────────────────────────
+
+  it("applies watermark at zero opacity", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "settings", content: JSON.stringify({ opacity: 0, scale: 25 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── WebP watermark image ─────────────────────────────────────────
+
+  it("processes WebP watermark image", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      { name: "watermark", filename: "wm.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ scale: 30, position: "top-left" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
 });

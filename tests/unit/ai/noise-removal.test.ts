@@ -248,5 +248,86 @@ describe("noiseRemoval", () => {
         expect.objectContaining({ onProgress }),
       );
     });
+
+    it("omits onProgress when not provided", async () => {
+      await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.onProgress).toBeUndefined();
+    });
+  });
+
+  describe("timeout calculation", () => {
+    it("uses minimum 300000ms timeout for small images", async () => {
+      await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      // 800x600 = 0.48 MP, 0.48 * 120000 = 57600 < 300000
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.timeout).toBe(300000);
+    });
+
+    it("scales timeout for large images using megapixels * 120000", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      // 4000x3000 = 12 MP, 12 * 120000 = 1440000 > 300000
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.timeout).toBe(1440000);
+    });
+
+    it("uses metadata from the PNG-converted buffer for timeout", async () => {
+      // The second sharp() call reads metadata from the PNG buffer
+      let callCount = 0;
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi
+              .fn()
+              .mockResolvedValue(
+                callCount++ === 0 ? { width: 800, height: 600 } : { width: 2000, height: 2000 },
+              ),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      // Timeout is based on the metadata call, which returns dimensions
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.timeout).toBeGreaterThanOrEqual(300000);
+    });
+  });
+
+  describe("parseStdoutJson error propagation", () => {
+    it("propagates parseStdoutJson errors", async () => {
+      vi.mocked(parseStdoutJson).mockImplementation(() => {
+        throw new Error("No JSON response from Python script");
+      });
+
+      await expect(noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
+        "No JSON response from Python script",
+      );
+    });
+  });
+
+  describe("sharp conversion", () => {
+    it("converts input to PNG and writes to outputDir", async () => {
+      await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      expect(sharp).toHaveBeenCalledWith(FAKE_INPUT);
+      expect(writeFile).toHaveBeenCalledWith(
+        `${FAKE_OUTPUT_DIR}/input_denoise.png`,
+        Buffer.from("mock-png-data"),
+      );
+    });
   });
 });

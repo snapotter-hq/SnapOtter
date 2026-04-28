@@ -636,4 +636,176 @@ describe("image-to-base64", () => {
     const json = JSON.parse(res.body);
     expect(json.results).toHaveLength(1);
   });
+
+  // ── 5+ images batch conversion ──────────────────────────────────
+
+  it("converts 5 images in a single request", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "img2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "img3.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "img4.png", contentType: "image/png", content: TINY },
+      { name: "file", filename: "img5.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(5);
+    expect(json.errors).toHaveLength(0);
+    for (const result of json.results) {
+      expect(result.base64.length).toBeGreaterThan(0);
+      expect(result.dataUri).toMatch(/^data:image\/.+;base64,/);
+    }
+  });
+
+  // ── Corrupted image produces error entry ─────────────────────────
+
+  it("reports corrupted image in errors array", async () => {
+    const corrupted = Buffer.alloc(50, 0xff);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "bad.png", contentType: "image/png", content: corrupted },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    // Good image should succeed, bad one should end up in errors
+    expect(json.results.length + json.errors.length).toBe(2);
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── HEIF input (alternative extension) ───────────────────────────
+
+  it("converts HEIF to JPEG in original mode", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  }, 60_000);
+
+  // ── Quality=1 minimum ────────────────────────────────────────────
+
+  it("accepts quality at minimum boundary (1)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "jpeg", quality: 1 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── Quality=100 maximum ──────────────────────────────────────────
+
+  it("accepts quality at maximum boundary (100)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "jpeg", quality: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── Rejects invalid outputFormat ─────────────────────────────────
+
+  it("rejects invalid outputFormat value", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "bmp" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── maxHeight=0 means no resize ──────────────────────────────────
+
+  it("maxHeight=0 means no height resize (pass-through)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ maxHeight: 0 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].width).toBe(200);
+    expect(json.results[0].height).toBe(150);
+  });
 });

@@ -537,4 +537,115 @@ describe("favicon", () => {
     expect(entries).toContain("favicon-16x16.png");
     expect(entries).toContain("manifest.json");
   });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── ICO file is a valid PNG (simple ICO format) ──────────────────
+
+  it("favicon.ico entry has non-zero content", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const icoEntry = zip.getEntry("favicon.ico");
+    expect(icoEntry).toBeDefined();
+    const icoData = icoEntry!.getData();
+    expect(icoData.length).toBeGreaterThan(0);
+    // ICO is generated as PNG which starts with PNG magic bytes
+    const meta = await sharp(icoData).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+  });
+
+  // ── Three images produce three subfolders ────────────────────────
+
+  it("generates favicons for 3 images in subfolders", async () => {
+    const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "brand1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "brand2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "brand3.webp", contentType: "image/webp", content: WEBP },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries.some((e) => e.startsWith("brand1/"))).toBe(true);
+    expect(entries.some((e) => e.startsWith("brand2/"))).toBe(true);
+    expect(entries.some((e) => e.startsWith("brand3/"))).toBe(true);
+  });
+
+  // ── Single file with dot in name ─────────────────────────────────
+
+  it("handles filename with multiple dots", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "my.app.logo.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const manifest = JSON.parse(zip.getEntry("manifest.json")!.getData().toString("utf-8"));
+    expect(manifest.name).toBe("my.app.logo");
+  });
+
+  // ── HEIF format input ────────────────────────────────────────────
+
+  it("generates favicons from HEIF input", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-16x16.png");
+    expect(entries).toContain("favicon.ico");
+  });
 });

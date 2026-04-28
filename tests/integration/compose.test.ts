@@ -822,4 +822,191 @@ describe("Compose", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/no base image/i);
   });
+
+  // ── Branch coverage: negative y position rejects ───────────────────
+
+  it("rejects negative y position", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ y: -5 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: opacity at boundary (1%) ──────────────────────
+
+  it("applies minimal opacity (1%)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ opacity: 1 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("handles portrait HEIC base image", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ x: 10, y: 10 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: overlay at (0,0) position ─────────────────────
+
+  it("positions overlay at origin (0,0)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ x: 0, y: 0 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
+
+  // ── Branch coverage: over blend mode (default) ─────────────────────
+
+  it("uses default over blend mode explicitly", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ blendMode: "over" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: same-size overlay and base ────────────────────
+
+  it("overlays same-size images successfully", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      { name: "overlay", filename: "overlay.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ opacity: 50, blendMode: "screen" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+  });
+
+  // ── Branch coverage: corrupt overlay ───────────────────────────────
+
+  it("returns 422 for corrupt overlay image", async () => {
+    const corruptBuffer = Buffer.from("not a valid image at all");
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
+      {
+        name: "overlay",
+        filename: "overlay.png",
+        contentType: "image/png",
+        content: corruptBuffer,
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compose",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/processing failed/i);
+  });
 });

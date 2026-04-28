@@ -646,4 +646,131 @@ describe("Compare", () => {
     expect(result.similarity).toBeGreaterThanOrEqual(0);
     expect(result.similarity).toBeLessThan(100);
   });
+
+  // ── Branch coverage: both corrupt images fail processing ───────────
+
+  it("returns 422 when both images are corrupt", async () => {
+    const corrupt1 = Buffer.from("this is not an image");
+    const corrupt2 = Buffer.from("neither is this one");
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: corrupt1 },
+      { name: "file", filename: "b.png", contentType: "image/png", content: corrupt2 },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compare",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/comparison failed/i);
+  });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("compares portrait HEIC image with PNG", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compare",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.similarity).toBeGreaterThanOrEqual(0);
+    expect(result.similarity).toBeLessThanOrEqual(100);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: same JPEG compared to itself ──────────────────
+
+  it("reports 100% similarity for same JPEG compared to itself", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compare",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.similarity).toBe(100);
+    expect(result.dimensions.width).toBe(100);
+    expect(result.dimensions.height).toBe(100);
+  });
+
+  // ── Branch coverage: exif-oriented image comparison ────────────────
+
+  it("compares an EXIF-oriented image with a standard image", async () => {
+    const EXIF = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "exif.jpg", contentType: "image/jpeg", content: EXIF },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compare",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.similarity).toBeGreaterThanOrEqual(0);
+    expect(result.similarity).toBeLessThanOrEqual(100);
+    expect(result.dimensions.width).toBeGreaterThan(0);
+    expect(result.dimensions.height).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: large stress image compared to small ──────────
+
+  it("compares two large stress images", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: LARGE },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compare",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.similarity).toBe(100);
+  });
 });

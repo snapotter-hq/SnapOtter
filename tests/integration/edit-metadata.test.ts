@@ -557,3 +557,246 @@ describe("Comprehensive field writing", () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+// ── HEIC format handling (extended) ──────────────────────────────
+describe("HEIC format handling (extended)", () => {
+  it("edits metadata on HEIC input with GPS coordinates", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      {
+        artist: "HEIC GPS Test",
+        gpsLatitude: 35.6762,
+        gpsLongitude: 139.6503,
+      },
+      HEIC,
+      "photo.heic",
+      "image/heic",
+    );
+    if (res.statusCode === 422 || res.statusCode === 400) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("edits metadata on HEIC and verifies preview generation", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      { copyright: "HEIC Preview Test" },
+      HEIC,
+      "preview-test.heic",
+      "image/heic",
+    );
+    if (res.statusCode === 422 || res.statusCode === 400) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Large file handling ──────────────────────────────────────────
+describe("Large file handling", () => {
+  it("edits metadata on a large stress image", async () => {
+    const large = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { artist: "Large File Test", copyright: "2026 Test" },
+      large,
+      "stress-large.jpg",
+      "image/jpeg",
+    );
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Tiny file handling ───────────────────────────────────────────
+describe("Tiny file handling", () => {
+  it("edits metadata on a 1x1 pixel image", async () => {
+    const tiny = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ artist: "Tiny Author" }, tiny, "tiny.png", "image/png");
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── WebP format handling ─────────────────────────────────────────
+describe("WebP format handling", () => {
+  it("edits metadata on WebP file", async () => {
+    const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const res = await postTool(
+      { artist: "WebP Author", title: "WebP Title" },
+      webp,
+      "test.webp",
+      "image/webp",
+    );
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Keywords mode: remove ────────────────────────────────────────
+describe("Keywords advanced", () => {
+  it("sets keywords with keywordsMode=add (default)", async () => {
+    const res = await postTool({
+      keywords: ["added1", "added2"],
+      keywordsMode: "add",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("combines keywords with other metadata fields", async () => {
+    const res = await postTool({
+      artist: "Keyword Combo Author",
+      keywords: ["combo1", "combo2"],
+      keywordsMode: "set",
+      iptcCity: "Tokyo",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Date manipulation edge cases ─────────────────────────────────
+describe("Date manipulation edge cases", () => {
+  it("writes dateTimeOriginal and dateTime together", async () => {
+    const res = await postTool({
+      dateTime: "2025:12:31 23:59:59",
+      dateTimeOriginal: "2025:12:31 23:59:59",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("combines setAllDates with dateShift", async () => {
+    const res = await postTool({
+      setAllDates: "2025:01:01 00:00:00",
+      dateShift: "+01:00",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Field removal edge cases ─────────────────────────────────────
+describe("Field removal edge cases", () => {
+  it("removes multiple fields at once", async () => {
+    const res = await postTool({
+      fieldsToRemove: ["Artist", "Copyright", "Software", "ImageDescription"],
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("combines clearGps with new GPS coordinates (clear then set)", async () => {
+    const res = await postTool({
+      clearGps: true,
+      gpsLatitude: 51.5074,
+      gpsLongitude: -0.1278,
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Inspect endpoint edge cases ──────────────────────────────────
+describe("Inspect endpoint edge cases", () => {
+  it("inspect handles WebP input", async () => {
+    const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.webp",
+        contentType: "image/webp",
+        content: webp,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.filename).toBe("test.webp");
+  });
+
+  it("inspect handles empty file buffer", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.jpg",
+        contentType: "image/jpeg",
+        content: Buffer.alloc(0),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("inspect returns correct filename for HEIC input", async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "photo.heic",
+        contentType: "image/heic",
+        content: HEIC,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/edit-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.filename).toBe("photo.heic");
+  });
+});
+
+// ── IPTC field combinations ──────────────────────────────────────
+describe("IPTC field combinations", () => {
+  it("writes all IPTC fields together", async () => {
+    const res = await postTool({
+      iptcTitle: "Full IPTC",
+      iptcHeadline: "Full Headline",
+      iptcCity: "London",
+      iptcState: "England",
+      iptcCountry: "United Kingdom",
+    });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Author vs artist field ───────────────────────────────────────
+describe("Author field", () => {
+  it("writes author field (alias for artist)", async () => {
+    const res = await postTool({ author: "Author Name Test" });
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+  });
+});

@@ -1343,4 +1343,251 @@ describe("Stitch", () => {
     const result = JSON.parse(res.body);
     expect(result.processedSize).toBeGreaterThan(0);
   });
+
+  // ── Branch coverage: gap exceeding max rejects ─────────────────────
+
+  it("rejects gap exceeding max (1000)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", gap: 1001 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: border exceeding max rejects ──────────────────
+
+  it("rejects border exceeding max (500)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", border: 501 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Branch coverage: center alignment (default) verified ───────────
+
+  it("uses center alignment by default in horizontal mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", resizeMode: "original" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.jobId).toBeDefined();
+    expect(result.originalSize).toBeGreaterThan(0);
+  });
+
+  // ── Branch coverage: grid mode with gap and odd number of images ───
+
+  it("stitches in grid mode with odd number of images", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "grid",
+          gridColumns: 2,
+          resizeMode: "stretch",
+          gap: 5,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("handles portrait HEIC input in stitching", async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Branch coverage: vertical crop with very different sizes ───────
+
+  it("stitches vertically with crop mode using very different image sizes", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "vertical", resizeMode: "crop" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // Crop mode vertically: min width = 50
+    expect(meta.width).toBe(50);
+  });
+
+  // ── Branch coverage: horizontal crop with very different sizes ─────
+
+  it("stitches horizontally with crop mode using very different image sizes", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ direction: "horizontal", resizeMode: "crop" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // Crop mode horizontally: min height = 50
+    expect(meta.height).toBe(50);
+  });
+
+  // ── Branch coverage: grid with 5+ images ───────────────────────────
+
+  it("stitches 5+ images in grid mode with 3 columns", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f3", filename: "c.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f4", filename: "d.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "f5", filename: "e.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          direction: "grid",
+          gridColumns: 3,
+          resizeMode: "stretch",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/stitch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
 });

@@ -296,3 +296,125 @@ describe("Edge size inputs", () => {
     expect(result.colors.length).toBeLessThanOrEqual(8);
   });
 });
+
+// ── Unauthenticated request ──────────────────────────────────────
+describe("Authentication", () => {
+  it("rejects unauthenticated request", async () => {
+    const { body: payload, contentType } = makeFilePayload(PNG, "test.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+      },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── Gradient image (many unique colors) ──────────────────────────
+describe("Gradient image palette", () => {
+  it("extracts palette from a gradient image (max 8 colors)", async () => {
+    // Create a horizontal gradient image
+    const w = 100;
+    const h = 50;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 3;
+        raw[idx] = Math.round((x / w) * 255);
+        raw[idx + 1] = Math.round((y / h) * 255);
+        raw[idx + 2] = 128;
+      }
+    }
+    const gradientBuffer = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const { body: payload, contentType } = makeFilePayload(
+      gradientBuffer,
+      "gradient.png",
+      "image/png",
+    );
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThanOrEqual(2);
+    expect(result.colors.length).toBeLessThanOrEqual(8);
+  });
+});
+
+// ── Solid white image ──────────────────────────────────────────
+describe("Solid white image", () => {
+  it("returns a single dominant color for a solid white image", async () => {
+    const whiteBuffer = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+
+    const { body: payload, contentType } = makeFilePayload(whiteBuffer, "white.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBe(1);
+    // Quantized white should be #f0f0f0 or #ffffff
+    expect(result.colors[0]).toMatch(/^#[ef][0f][ef][0f][ef][0f]$/);
+  });
+});
+
+// ── HEIF input ─────────────────────────────────────────────────
+describe("HEIF input", () => {
+  it("extracts palette from HEIF image", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body: payload, contentType } = makeFilePayload(HEIF, "photo.heif", "image/heif");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+  });
+});
+
+// ── Filename preserved in response ──────────────────────────────
+describe("Filename tracking", () => {
+  it("returns the original filename in the response", async () => {
+    const { body: payload, contentType } = makeFilePayload(PNG, "my-image-2024.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("my-image-2024.png");
+  });
+});

@@ -849,4 +849,228 @@ describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
     const result = await promise;
     expect(result.stdout).toContain("success");
   });
+
+  it("dispatcher ready signal sets dispatcherReady and processes requests via dispatcher", async () => {
+    const mockDispatcher = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      return mockDispatcher.process;
+    });
+
+    // Trigger dispatcher start by calling runPythonWithProgress
+    // The dispatcher needs to be marked ready before it can handle requests
+    const promise = runPythonWithProgress("test.py", ["arg1"]);
+
+    // Simulate the dispatcher readiness signal on stderr
+    mockDispatcher.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+
+    // Wait for readiness to be processed
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Since the request was sent before ready, it went to per-request path
+    // Finish via per-request path
+    mockDispatcher.stdout.emit("data", Buffer.from('{"success": true}\n'));
+    mockDispatcher.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toContain("success");
+  });
+
+  it("dispatcher ready signal with GPU=false sets gpu to false", async () => {
+    const mockDispatcher = createMockProcess();
+
+    vi.mocked(spawn).mockImplementation(() => mockDispatcher.process);
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Send ready signal without GPU
+    mockDispatcher.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Finish via per-request
+    mockDispatcher.stdout.emit("data", Buffer.from('{"success": true}\n'));
+    mockDispatcher.emitEvent("close", 0, null);
+
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.gpu).toBe(false);
+  });
+
+  it("dispatcher close event rejects all pending requests", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher closes unexpectedly
+    mockDispatcher.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Per-request fallback should handle the request
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toContain("ok");
+  });
+
+  it("getDispatcherStatus reflects consecutiveCrashes after dispatcher crashes", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher crashes (non-ENOENT triggers recordCrash)
+    mockDispatcher.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.consecutiveCrashes).toBeGreaterThanOrEqual(1);
+  });
+
+  it("dispatcher progress events are forwarded to pending request callbacks", async () => {
+    const mockDispatcher = createMockProcess();
+
+    vi.mocked(spawn).mockImplementation(() => mockDispatcher.process);
+
+    // Emit ready signal to make dispatcher available
+    // But since it might go to per-request first, test progress on per-request path
+    const progressUpdates: Array<{ percent: number; stage: string }> = [];
+
+    const promise = runPythonWithProgress("test.py", [], {
+      onProgress: (percent, stage) => progressUpdates.push({ percent, stage }),
+    });
+
+    // stderr progress lines
+    mockDispatcher.stderr.emit("data", Buffer.from('{"progress": 50, "stage": "Processing"}\n'));
+
+    mockDispatcher.stdout.emit("data", Buffer.from('{"success": true}\n'));
+    mockDispatcher.emitEvent("close", 0, null);
+
+    await promise;
+    expect(progressUpdates).toEqual([{ percent: 50, stage: "Processing" }]);
+  });
+
+  it("dispatcher stderr routes diagnostic messages with bracket prefix to logger", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Bracket-prefixed line should be logged as diagnostic
+    mockDispatcher.stderr.emit("data", Buffer.from("[model] Loading weights...\n"));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Finish with per-request
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    await promise;
+
+    // The bridge logs bracket-prefixed lines with console.log
+    const pythonLogCalls = logSpy.mock.calls.filter(
+      (call) => typeof call[0] === "string" && call[0].includes("[python]"),
+    );
+    expect(pythonLogCalls.length).toBeGreaterThanOrEqual(1);
+
+    logSpy.mockRestore();
+  });
+
+  it("dispatcher stderr collects non-JSON non-bracket lines as error output", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Non-JSON, non-bracket line should be collected as stderr
+    mockDispatcher.stderr.emit("data", Buffer.from("Some warning text\n"));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    await promise;
+    // The important thing is no crash -- the line is collected for pending requests
+  });
+
+  it("per-request fallback retries with python3 when venv python fails with ENOENT", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockVenvPython = createMockProcess();
+    const mockFallbackPython = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      if (callCount === 2) return mockVenvPython.process;
+      return mockFallbackPython.process;
+    });
+
+    // Kill dispatcher immediately
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+
+    const promise = runPythonWithProgress("test.py", []);
+    mockDispatcher.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Venv python fails with ENOENT
+    const venvError = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    venvError.code = "ENOENT";
+    mockVenvPython.emitEvent("error", venvError);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Fallback python3 succeeds
+    mockFallbackPython.stdout.emit("data", Buffer.from('{"success": true}\n'));
+    mockFallbackPython.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toContain("success");
+    // 3 spawn calls: dispatcher, venv python, fallback python3
+    expect(callCount).toBe(3);
+  });
 });
