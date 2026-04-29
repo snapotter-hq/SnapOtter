@@ -6,7 +6,7 @@ import { db, schema } from "../db/index.js";
 import { getAuthUser } from "../plugins/auth.js";
 
 const FILE_EXT_PATTERN =
-  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|he[ic]f?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
+  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
 const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai)\//g;
 
 let posthogClient: PostHog | null = null;
@@ -72,8 +72,10 @@ export async function initAnalytics(): Promise<void> {
   }
 }
 
-export function captureException(error: unknown): void {
-  sentryModule?.captureException(error);
+export function captureException(error: unknown, request?: FastifyRequest): void {
+  if (!sentryModule) return;
+  if (request && !isRequestOptedIn(request)) return;
+  sentryModule.captureException(error);
 }
 
 export async function shutdownAnalytics(): Promise<void> {

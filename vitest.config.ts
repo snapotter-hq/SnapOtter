@@ -36,6 +36,7 @@ export default defineConfig({
       "tests/e2e-docs/**",
       "tests/e2e-landing/**",
       "tests/e2e-docker/**",
+      "tests/e2e-analytics/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/.{idea,git,cache,output,temp}/**",

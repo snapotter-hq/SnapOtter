@@ -7,7 +7,7 @@ let initialized = false;
 let consentGranted = false;
 
 const FILE_EXT_PATTERN =
-  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|he[ic]f?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
+  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
 const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai|Users|home)\//g;
 
 function scrubString(str: string): string {

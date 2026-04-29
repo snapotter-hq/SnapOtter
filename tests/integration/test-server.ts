@@ -32,6 +32,7 @@ import { runMigrations } from "../../apps/api/src/db/migrate.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import { authMiddleware, authRoutes, ensureDefaultAdmin } from "../../apps/api/src/plugins/auth.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
+import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
 import { apiKeyRoutes } from "../../apps/api/src/routes/api-keys.js";
 import { auditLogRoutes } from "../../apps/api/src/routes/audit-log.js";
 import { registerBatchRoutes } from "../../apps/api/src/routes/batch.js";
@@ -119,6 +120,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // Roles management routes
   await rolesRoutes(app);
+
+  // Analytics routes
+  await analyticsRoutes(app);
 
   // API docs (Scalar)
   await docsRoutes(app);
