@@ -734,3 +734,41 @@ test.describe("Content-Aware Resize — extended", () => {
     }
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("optimize-for-web without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/optimize-for-web", {
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ maxWidth: 800, quality: 75 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("favicon without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/favicon", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("replace-color without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/replace-color", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({
+          targetColor: "#ffffff",
+          replacementColor: "#000000",
+          tolerance: 30,
+        }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

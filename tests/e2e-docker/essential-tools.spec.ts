@@ -618,3 +618,37 @@ test.describe("Sharpening", () => {
     expect(body.downloadUrl).toBeTruthy();
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("resize without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/resize", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ width: 100 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("crop without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/crop", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ left: 0, top: 0, width: 50, height: 50 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("convert without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/convert", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ format: "jpg" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

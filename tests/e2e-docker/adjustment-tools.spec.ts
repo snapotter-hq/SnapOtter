@@ -398,3 +398,37 @@ test.describe("Image Enhancement", () => {
     expect(body.processedSize).not.toBe(body.originalSize);
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("adjust-colors without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/adjust-colors", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ brightness: 20 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("strip-metadata without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/strip-metadata", {
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_WITH_EXIF },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("edit-metadata without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/edit-metadata", {
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ artist: "Test" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

@@ -581,3 +581,39 @@ test.describe("Convert format matrix", () => {
     }
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("gif-tools without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/gif-tools", {
+      multipart: {
+        file: { name: "animated.gif", mimeType: "image/gif", buffer: ANIMATED_GIF },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("image-to-base64 without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("image-to-pdf without token returns 401", async ({ request }) => {
+    const { body, contentType } = buildMultipart(
+      [{ name: "file", filename: "test.jpg", contentType: "image/jpeg", buffer: JPG_100x100 }],
+      [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
+    );
+    const res = await request.post("/api/v1/tools/image-to-pdf", {
+      headers: { "Content-Type": contentType },
+      data: body,
+    });
+    expect(res.status()).toBe(401);
+  });
+});

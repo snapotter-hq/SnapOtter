@@ -717,3 +717,37 @@ test.describe("PDF to Image — additional formats", () => {
     expect(body.downloadUrl || body.pages || body.jobId).toBeTruthy();
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("svg-to-raster without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/svg-to-raster", {
+      multipart: {
+        file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
+        settings: JSON.stringify({ format: "png", width: 200 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("vectorize without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/vectorize", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("pdf-to-image without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/pdf-to-image", {
+      multipart: {
+        file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
+        settings: JSON.stringify({ format: "png", dpi: 150, pages: "1" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

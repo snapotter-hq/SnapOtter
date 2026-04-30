@@ -754,3 +754,37 @@ test.describe("AI Feature Bundle Status", () => {
     }
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("remove-background without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/remove-background", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("upscale without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/upscale", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
+        settings: JSON.stringify({ scale: 2, model: "auto" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("ocr without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/ocr", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

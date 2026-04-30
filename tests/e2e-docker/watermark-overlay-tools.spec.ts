@@ -538,3 +538,43 @@ test.describe("Compose — extended", () => {
     expect(json.downloadUrl).toBeTruthy();
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("watermark-text without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/watermark-text", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({
+          text: "TEST",
+          fontSize: 24,
+          color: "#ff0000",
+          opacity: 50,
+          position: "center",
+        }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("compose without token returns 401", async ({ request }) => {
+    const { body, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "base.png", contentType: "image/png", buffer: PNG_200x150 },
+        {
+          name: "overlay",
+          filename: "overlay.webp",
+          contentType: "image/webp",
+          buffer: WEBP_50x50,
+        },
+      ],
+      [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 100 }) }],
+    );
+    const res = await request.post("/api/v1/tools/compose", {
+      headers: { "Content-Type": contentType },
+      data: body,
+    });
+    expect(res.status()).toBe(401);
+  });
+});

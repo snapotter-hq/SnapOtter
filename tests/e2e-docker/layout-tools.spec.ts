@@ -543,3 +543,27 @@ test.describe("Border — extended", () => {
     expect(body.processedSize).toBeGreaterThan(0);
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("split without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/split", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ columns: 2, rows: 2 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("border without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/border", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ size: 10, color: "#ff0000" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

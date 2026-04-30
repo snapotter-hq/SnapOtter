@@ -758,3 +758,32 @@ test.describe("QR Read", () => {
     }
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("info without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/info", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("qr-generate without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/qr-generate", {
+      data: { text: "https://snapotter.app", size: 512 },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("color-palette without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/color-palette", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});
