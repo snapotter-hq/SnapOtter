@@ -40,6 +40,24 @@ export default defineConfig({
       },
       dependencies: ["setup"],
     },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: authFile,
+      },
+      testMatch: /gui-cross-browser\.spec\.ts/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "webkit",
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: authFile,
+      },
+      testMatch: /gui-cross-browser\.spec\.ts/,
+      dependencies: ["setup"],
+    },
   ],
   webServer: [
     {
