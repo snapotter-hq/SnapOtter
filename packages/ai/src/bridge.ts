@@ -216,12 +216,14 @@ function startDispatcher(): ChildProcess | null {
       dispatcherReady = false;
     });
 
-    child.on("close", () => {
+    child.on("close", (code) => {
       for (const [id, req] of pendingRequests.entries()) {
         req.reject(new Error("Python dispatcher exited unexpectedly"));
         pendingRequests.delete(id);
       }
-      recordCrash();
+      if (code !== 0) {
+        recordCrash();
+      }
       dispatcher = null;
       dispatcherReady = false;
     });
@@ -326,6 +328,44 @@ export function shutdownDispatcher(): void {
     dispatcher = null;
     dispatcherReady = false;
   }
+}
+
+/**
+ * Eagerly start the Python dispatcher and wait for its readiness signal.
+ * Returns the GPU status once ready, or {ready: false} on timeout/failure.
+ * Safe to call multiple times -- idempotent if the dispatcher is already running.
+ */
+export function initDispatcher(timeoutMs = 30_000): Promise<{ ready: boolean; gpu: boolean }> {
+  if (dispatcherReady) {
+    return Promise.resolve({ ready: true, gpu: dispatcherGpuAvailable });
+  }
+  if (dispatcherFailed) {
+    return Promise.resolve({ ready: false, gpu: false });
+  }
+
+  const proc = getDispatcher();
+  if (!proc) {
+    return Promise.resolve({ ready: false, gpu: false });
+  }
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      clearInterval(poll);
+      resolve({ ready: false, gpu: false });
+    }, timeoutMs);
+
+    const poll = setInterval(() => {
+      if (dispatcherReady) {
+        clearTimeout(timer);
+        clearInterval(poll);
+        resolve({ ready: true, gpu: dispatcherGpuAvailable });
+      } else if (dispatcherFailed) {
+        clearTimeout(timer);
+        clearInterval(poll);
+        resolve({ ready: false, gpu: false });
+      }
+    }, 50);
+  });
 }
 
 // ── Per-request fallback (original implementation) ──────────────────

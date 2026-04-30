@@ -1035,6 +1035,59 @@ describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
     // The important thing is no crash -- the line is collected for pending requests
   });
 
+  it("does not count exit code 0 as a crash (normal MAX_REQUESTS restart)", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher exits with code 0 (normal MAX_REQUESTS shutdown)
+    mockDispatcher.emitEvent("close", 0, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.consecutiveCrashes).toBe(0);
+    expect(status.failed).toBe(false);
+  });
+
+  it("still counts non-zero exit codes as crashes", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher exits with code 1 (real crash)
+    mockDispatcher.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.consecutiveCrashes).toBeGreaterThanOrEqual(1);
+  });
+
   it("per-request fallback retries with python3 when venv python fails with ENOENT", async () => {
     const mockDispatcher = createMockProcess();
     const mockVenvPython = createMockProcess();
@@ -1072,5 +1125,96 @@ describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
     expect(result.stdout).toContain("success");
     // 3 spawn calls: dispatcher, venv python, fallback python3
     expect(callCount).toBe(3);
+  });
+});
+
+describe("bridge - initDispatcher", () => {
+  let initDispatcher: typeof import("../../../packages/ai/src/bridge.js").initDispatcher;
+  let getDispatcherStatus: typeof import("../../../packages/ai/src/bridge.js").getDispatcherStatus;
+  let shutdownDispatcher: typeof import("../../../packages/ai/src/bridge.js").shutdownDispatcher;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+
+    const mod = await import("../../../packages/ai/src/bridge.js");
+    initDispatcher = mod.initDispatcher;
+    getDispatcherStatus = mod.getDispatcherStatus;
+    shutdownDispatcher = mod.shutdownDispatcher;
+  });
+
+  afterEach(() => {
+    shutdownDispatcher();
+    vi.restoreAllMocks();
+  });
+
+  it("resolves with ready=true and gpu status after dispatcher emits readiness", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+
+    // Dispatcher emits readiness signal
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+
+    const result = await promise;
+    expect(result).toEqual({ ready: true, gpu: true });
+    expect(getDispatcherStatus().ready).toBe(true);
+    expect(getDispatcherStatus().gpu).toBe(true);
+  });
+
+  it("resolves with ready=false when dispatcher fails with ENOENT", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+
+    const err = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    err.code = "ENOENT";
+    mock.emitEvent("error", err);
+
+    const result = await promise;
+    expect(result).toEqual({ ready: false, gpu: false });
+  });
+
+  it("resolves with ready=false after timeout when dispatcher never signals ready", async () => {
+    vi.useFakeTimers();
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher(500);
+
+    vi.advanceTimersByTime(600);
+
+    const result = await promise;
+    expect(result).toEqual({ ready: false, gpu: false });
+
+    vi.useRealTimers();
+  });
+
+  it("resolves with gpu=false when dispatcher reports no GPU", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+
+    const result = await promise;
+    expect(result).toEqual({ ready: true, gpu: false });
+  });
+
+  it("is idempotent -- second call returns same result without respawning", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise1 = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await promise1;
+
+    const result2 = await initDispatcher();
+    expect(result2).toEqual({ ready: true, gpu: true });
+    // spawn should only have been called once
+    expect(spawn).toHaveBeenCalledTimes(1);
   });
 });

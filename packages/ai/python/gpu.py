@@ -60,10 +60,18 @@ def onnx_providers():
     """Return (providers, device) tuple.
 
     providers: ONNX Runtime execution providers in priority order.
-    device: "cuda" or "cpu" — reflects which hardware will actually be used.
+    device: "cuda" or "cpu" -- reflects which hardware will actually be used.
     """
     if gpu_available():
-        return (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
+        try:
+            import onnxruntime as _ort
+            available = _ort.get_available_providers()
+            if "CUDAExecutionProvider" in available:
+                return (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
+            emit_info("GPU detected by torch but CUDAExecutionProvider not available in onnxruntime "
+                      "-- install onnxruntime-gpu for GPU acceleration")
+        except ImportError:
+            emit_info("onnxruntime not installed, cannot check CUDA provider")
     emit_info("No GPU detected, processing on CPU")
     return (["CPUExecutionProvider"], "cpu")
 

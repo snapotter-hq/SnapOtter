@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
-import { getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
+import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
@@ -242,12 +242,13 @@ const cleanupCron = startCleanupCron();
 // Start
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  const dispatcherStatus = getDispatcherStatus();
-  const gpuLine = !dispatcherStatus.ready
-    ? "[INFO] GPU status: waiting for AI sidecar startup..."
-    : dispatcherStatus.gpu
-      ? "[INFO] GPU detected — AI tools will use CUDA acceleration"
-      : "[WARN] No GPU detected — AI tools will use CPU (slower)";
+
+  const dispatcherResult = await initDispatcher();
+  const gpuLine = dispatcherResult.ready
+    ? dispatcherResult.gpu
+      ? "[INFO] GPU detected -- AI tools will use CUDA acceleration"
+      : "[WARN] No GPU detected -- AI tools will use CPU (slower)"
+    : "[WARN] AI sidecar did not start -- AI tools will use per-request Python (slower)";
   console.log(
     [
       `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
