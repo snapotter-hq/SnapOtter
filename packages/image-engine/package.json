@@ -14,7 +14,7 @@
   "dependencies": {
     "@snapotter/shared": "workspace:*",
     "exif-reader": "^2.0.3",
-    "sharp": "^0.33.0"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

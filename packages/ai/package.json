@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@snapotter/shared": "workspace:*",
-    "sharp": "^0.33.0"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
