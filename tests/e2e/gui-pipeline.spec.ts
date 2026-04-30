@@ -1,4 +1,16 @@
-import { expect, getTestImagePath, test } from "./helpers";
+import path from "node:path";
+import { expect, getTestImagePath, test, waitForProcessing } from "./helpers";
+
+// ---------------------------------------------------------------------------
+// Helper: resolve fixture image paths
+// ---------------------------------------------------------------------------
+function getFixturePath(name: string): string {
+  return path.join(process.cwd(), "tests", "fixtures", name);
+}
+
+const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
+const FIXTURE_PNG = getFixturePath("test-200x150.png");
+const FIXTURE_WEBP = getFixturePath("test-50x50.webp");
 
 // ---------------------------------------------------------------------------
 // Helper: navigate to /automate with retry logic for blank-page flakes
@@ -192,6 +204,17 @@ test.describe("Pipeline Builder - Step management", () => {
     await compressRow.click();
     await expect(page.locator(".border-primary").first()).toBeVisible({ timeout: 3_000 });
   });
+
+  test("drag handles are visible for reordering steps", async ({ loggedInPage: page }) => {
+    await gotoAutomate(page);
+
+    await addToolStep(page, "Resize", 1);
+    await addToolStep(page, "Compress", 2);
+
+    // Each step has a GripVertical drag handle (rendered as a <span> with cursor-grab)
+    const dragHandles = page.locator(".cursor-grab");
+    await expect(dragHandles).toHaveCount(2);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -252,6 +275,103 @@ test.describe("Pipeline Builder - File upload and processing", () => {
 
     // File info should be visible in the preview area
     await expect(page.getByText("test-image.png").first()).toBeVisible();
+  });
+
+  test("processing completes and shows before/after result", async ({ loggedInPage: page }) => {
+    await gotoAutomate(page);
+
+    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Compress", 2);
+    await uploadTestFile(page);
+
+    // Click Process
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    // Wait for processing to complete (may be instant for small images)
+    await waitForProcessing(page, 30_000);
+
+    // After completion, the before/after slider should appear
+    const slider = page.locator("[aria-label='Before/after comparison slider']");
+    await expect(slider).toBeVisible({ timeout: 15_000 });
+
+    // Original and Processed labels should be shown
+    await expect(page.getByText("Original").first()).toBeVisible();
+    await expect(page.getByText("Processed").first()).toBeVisible();
+  });
+
+  test("process button disabled without file even when steps present", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoAutomate(page);
+
+    await addToolStep(page, "Compress", 1);
+
+    // Process should be disabled without a file
+    const processBtn = page.getByRole("button", { name: "Process", exact: true });
+    await expect(processBtn).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Batch pipeline tests
+// ---------------------------------------------------------------------------
+test.describe("Pipeline Builder - Batch processing", () => {
+  /** Upload multiple fixture images via the dropzone file chooser. */
+  async function uploadMultipleFiles(page: import("@playwright/test").Page) {
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /upload from computer/i }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
+    await page.waitForTimeout(500);
+  }
+
+  test("batch pipeline: 3 images through 2 steps, all processed", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoAutomate(page);
+
+    // Add 2 pipeline steps
+    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Compress", 2);
+
+    // Upload 3 images
+    await uploadMultipleFiles(page);
+
+    // File badge should show "3 files"
+    await expect(page.getByText("3 files").first()).toBeVisible();
+
+    // Process button should show batch count
+    const processBtn = page.getByRole("button", { name: /process all.*3/i });
+    await expect(processBtn).toBeEnabled();
+    await processBtn.click();
+
+    // Wait for processing to complete (may be instant for small images)
+    await waitForProcessing(page, 45_000);
+
+    // Counter badge should appear (N / M format)
+    await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("batch pipeline: Download ZIP button appears after batch processing", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoAutomate(page);
+
+    await addToolStep(page, "Compress", 1);
+    await uploadMultipleFiles(page);
+
+    // Process batch
+    const processBtn = page.getByRole("button", { name: /process all.*3/i });
+    await processBtn.click();
+
+    // Wait for processing to complete
+    await waitForProcessing(page, 45_000);
+
+    // Counter badge should appear to confirm results are ready
+    await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
+
+    // Download ZIP button should be visible
+    await expect(page.getByRole("button", { name: /download zip/i })).toBeVisible();
   });
 });
 

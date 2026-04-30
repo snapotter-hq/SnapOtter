@@ -11,6 +11,8 @@ function getFixturePath(name: string): string {
 const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
 const FIXTURE_PNG = getFixturePath("test-200x150.png");
 const FIXTURE_WEBP = getFixturePath("test-50x50.webp");
+const FIXTURE_HEIC = getFixturePath("test-200x150.heic");
+const FIXTURE_PORTRAIT_JPG = getFixturePath("test-portrait.jpg");
 
 // ---------------------------------------------------------------------------
 // Multi-file upload tests
@@ -172,6 +174,33 @@ test.describe("Multi-file upload", () => {
 
     // Should display "1 / 2" counter badge
     await expect(page.getByText("1 / 2")).toBeVisible();
+  });
+
+  test("upload 5 files and all are listed", async ({ loggedInPage: page }) => {
+    await page.goto("/resize");
+
+    // Upload initial 3 files
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    const dropzone = page.locator("[class*='border-dashed']").first();
+    await dropzone.click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
+    await page.waitForTimeout(500);
+
+    await expect(page.getByText("Files (3)")).toBeVisible();
+
+    // Add 2 more via "+ Add more"
+    const addMorePromise = page.waitForEvent("filechooser");
+    await page.getByText("+ Add more").click();
+    const addMoreChooser = await addMorePromise;
+    await addMoreChooser.setFiles([FIXTURE_HEIC, FIXTURE_PORTRAIT_JPG]);
+    await page.waitForTimeout(500);
+
+    // All 5 files should be registered
+    await expect(page.getByText("Files (5)")).toBeVisible();
+
+    // Counter badge should show "1 / 5"
+    await expect(page.getByText("1 / 5")).toBeVisible();
   });
 });
 
@@ -380,5 +409,30 @@ test.describe("Mixed formats", () => {
     await expect(page.locator("button[title='test-100x100.jpg']")).toBeVisible();
     await expect(page.locator("button[title='test-200x150.png']")).toBeVisible();
     await expect(page.locator("button[title='test-50x50.webp']")).toBeVisible();
+  });
+
+  test("upload JPEG + PNG + WebP + HEIC mixed batch and all are accepted", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/resize");
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    const dropzone = page.locator("[class*='border-dashed']").first();
+    await dropzone.click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP, FIXTURE_HEIC]);
+    await page.waitForTimeout(1000);
+
+    // All 4 files should be registered
+    await expect(page.getByText("Files (4)")).toBeVisible();
+
+    // Counter badge should show "1 / 4"
+    await expect(page.getByText("1 / 4")).toBeVisible();
+
+    // All 4 thumbnails should be visible in the thumbnail strip
+    await expect(page.locator("button[title='test-100x100.jpg']")).toBeVisible();
+    await expect(page.locator("button[title='test-200x150.png']")).toBeVisible();
+    await expect(page.locator("button[title='test-50x50.webp']")).toBeVisible();
+    await expect(page.locator("button[title='test-200x150.heic']")).toBeVisible();
   });
 });
