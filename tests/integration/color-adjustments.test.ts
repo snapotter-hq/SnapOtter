@@ -537,3 +537,42 @@ describe("No-op effect", () => {
     expect(result.downloadUrl).toBeDefined();
   });
 });
+
+// ── HEIF input ──────────────────────────────────────────────────
+describe("HEIF input", () => {
+  it("processes HEIF input (motorcycle.heif)", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const res = await postTool(
+      "adjust-colors",
+      { brightness: 20 },
+      HEIF,
+      "photo.heif",
+      "image/heif",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  }, 60_000);
+});
+
+// ── Animated GIF input ──────────────────────────────────────────
+describe("Animated GIF input", () => {
+  it("processes animated GIF", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const res = await postTool("adjust-colors", { saturation: 30 }, GIF, "anim.gif", "image/gif");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── SVG input ───────────────────────────────────────────────────
+describe("SVG input", () => {
+  it("processes SVG input", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const res = await postTool("adjust-colors", { contrast: 20 }, SVG, "icon.svg", "image/svg+xml");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
