@@ -1,9 +1,9 @@
 import { expect, type Page } from "@playwright/test";
-import { getTestImagePath, test } from "./helpers";
+import { getTestImagePath, test, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Cross-browser smoke tests -- critical flows validated on Chromium.
-// To add Firefox/WebKit, configure additional projects in playwright.config.ts.
+// Cross-browser smoke tests -- critical flows validated across browsers.
+// Firefox and WebKit projects are scoped to this file in playwright.config.ts.
 // ---------------------------------------------------------------------------
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -48,6 +48,27 @@ test.describe("Cross-browser smoke tests", () => {
     expect(errors).toHaveLength(0);
   });
 
+  test("resize E2E: upload, set dimensions, verify settings", async ({ loggedInPage: page }) => {
+    const errors = collectConsoleErrors(page);
+
+    await page.goto("/resize");
+    await page.waitForLoadState("networkidle");
+
+    await uploadImage(page);
+
+    // Verify settings panel appeared after upload
+    await expect(page.getByText("Settings").first()).toBeVisible();
+
+    // Check that width/height inputs are present and interactable
+    const widthInput = page.locator("input[type='number']").first();
+    await expect(widthInput).toBeVisible();
+    await widthInput.fill("200");
+
+    await waitForProcessing(page);
+
+    expect(errors).toHaveLength(0);
+  });
+
   test("theme toggle: click toggle, verify theme changes", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
     await page.waitForLoadState("networkidle");
@@ -66,6 +87,16 @@ test.describe("Cross-browser smoke tests", () => {
     );
 
     expect(hasDarkAfter).not.toBe(hadDarkBefore);
+
+    // Toggle back and verify it reverts
+    await themeBtn.click();
+    await page.waitForTimeout(300);
+
+    const hasDarkFinal = await page.evaluate(() =>
+      document.documentElement.classList.contains("dark"),
+    );
+
+    expect(hasDarkFinal).toBe(hadDarkBefore);
 
     expect(errors).toHaveLength(0);
   });
