@@ -21,6 +21,12 @@ test.describe("GUI Format & Conversion Tools", () => {
       await page.goto("/svg-to-raster");
       await expect(page.getByText("Settings").first()).toBeVisible();
     });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/svg-to-raster");
+      // SVG tool needs an SVG file; just verify the submit testid exists on the page
+      await expect(page.getByTestId("svg-to-raster-submit")).toBeVisible();
+    });
   });
 
   // ========================================================================
@@ -88,6 +94,13 @@ test.describe("GUI Format & Conversion Tools", () => {
       await page.goto("/gif-tools");
       await expect(page.getByText("Settings").first()).toBeVisible();
     });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/gif-tools");
+      await uploadTestImage(page);
+
+      await expect(page.getByTestId("gif-tools-submit")).toBeVisible();
+    });
   });
 
   // ========================================================================
@@ -98,6 +111,21 @@ test.describe("GUI Format & Conversion Tools", () => {
       await page.goto("/image-to-pdf");
       await expect(page.getByText("Image to PDF").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
+    });
+
+    test("shows page size and orientation controls", async ({ loggedInPage: page }) => {
+      await page.goto("/image-to-pdf");
+
+      await expect(page.getByText("Page Size")).toBeVisible();
+      await expect(page.getByText("Orientation")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Portrait" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Landscape" })).toBeVisible();
+    });
+
+    test("shows submit button with page count", async ({ loggedInPage: page }) => {
+      await page.goto("/image-to-pdf");
+
+      await expect(page.getByTestId("image-to-pdf-submit")).toBeVisible();
     });
   });
 
@@ -125,6 +153,12 @@ test.describe("GUI Format & Conversion Tools", () => {
 
       // DPI buttons from pdf-to-image-settings.tsx
       await expect(page.getByText(/dpi|resolution/i).first()).toBeVisible();
+    });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/pdf-to-image");
+
+      await expect(page.getByTestId("pdf-to-image-submit")).toBeVisible();
     });
   });
 

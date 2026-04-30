@@ -32,15 +32,25 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.locator("#watermark-text-font-size")).toBeVisible();
     });
 
+    test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
+      await page.goto("/watermark-text");
+
+      const submitBtn = page.getByTestId("watermark-text-submit");
+      await expect(submitBtn).toBeDisabled();
+
+      await uploadTestImage(page);
+      await expect(submitBtn).toBeEnabled();
+    });
+
     test("processes watermark and shows download", async ({ loggedInPage: page }) => {
       await page.goto("/watermark-text");
       await uploadTestImage(page);
 
       await page.locator("#watermark-text-text").fill("Test Watermark");
-      await page.getByRole("button", { name: /add watermark|apply watermark/i }).click();
+      await page.getByTestId("watermark-text-submit").click();
       await waitForProcessing(page);
 
-      await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible({
+      await expect(page.getByTestId("watermark-text-download")).toBeVisible({
         timeout: 15_000,
       });
     });
@@ -85,12 +95,33 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
-    test("shows text input and styling controls after upload", async ({ loggedInPage: page }) => {
+    test("shows text input and font size slider after upload", async ({ loggedInPage: page }) => {
       await page.goto("/text-overlay");
       await uploadTestImage(page);
 
-      // Text input and position/font controls
-      await expect(page.getByText("Settings").first()).toBeVisible();
+      await expect(page.locator("#text-overlay-text")).toBeVisible();
+      await expect(page.locator("#text-overlay-text")).toHaveValue("Your Text Here");
+      await expect(page.locator("#text-overlay-font-size")).toBeVisible();
+    });
+
+    test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
+      await page.goto("/text-overlay");
+
+      const submitBtn = page.getByTestId("text-overlay-submit");
+      await expect(submitBtn).toBeDisabled();
+
+      await uploadTestImage(page);
+      await expect(submitBtn).toBeEnabled();
+    });
+
+    test("processes text overlay and shows download", async ({ loggedInPage: page }) => {
+      await page.goto("/text-overlay");
+      await uploadTestImage(page);
+
+      await page.getByTestId("text-overlay-submit").click();
+      await waitForProcessing(page);
+
+      await expect(page.getByTestId("text-overlay-download")).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -104,14 +135,15 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
-    test("shows overlay upload and position controls after upload", async ({
-      loggedInPage: page,
-    }) => {
+    test("shows overlay upload and position controls", async ({ loggedInPage: page }) => {
       await page.goto("/compose");
-      await uploadTestImage(page);
 
-      // Should have controls for overlay position and opacity
-      await expect(page.getByText(/overlay|position|opacity/i).first()).toBeVisible();
+      // Position and opacity controls visible in settings panel
+      await expect(page.getByText("X Position")).toBeVisible();
+      await expect(page.getByText("Y Position")).toBeVisible();
+      await expect(page.getByText("Opacity").first()).toBeVisible();
+      await expect(page.getByText("Blend Mode")).toBeVisible();
+      await expect(page.getByTestId("compose-submit")).toBeVisible();
     });
   });
 
@@ -143,19 +175,21 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.getByText(/border width|width/i).first()).toBeVisible();
     });
 
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/border");
+      await uploadTestImage(page);
+
+      await expect(page.getByTestId("border-submit")).toBeVisible();
+    });
+
     test("processes border and shows download", async ({ loggedInPage: page }) => {
       await page.goto("/border");
       await uploadTestImage(page);
 
-      await page.getByRole("button", { name: /apply border/i }).click();
+      await page.getByTestId("border-submit").click();
       await waitForProcessing(page);
 
-      await expect(
-        page
-          .getByRole("link", { name: /download/i })
-          .first()
-          .or(page.getByText(/invalid|error/i).first()),
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId("border-download")).toBeVisible({ timeout: 15_000 });
     });
   });
 });

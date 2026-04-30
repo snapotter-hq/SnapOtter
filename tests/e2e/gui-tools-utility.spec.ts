@@ -1,4 +1,4 @@
-import { expect, test, uploadTestImage } from "./helpers";
+import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // GUI E2E: Utility Tools
@@ -63,6 +63,13 @@ test.describe("GUI Utility Tools", () => {
       // Output format dropdown (Keep Original, JPEG, PNG, WebP, AVIF)
       await expect(page.getByText(/output format|format/i).first()).toBeVisible();
     });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/image-to-base64");
+      await uploadTestImage(page);
+
+      await expect(page.getByTestId("base64-submit")).toBeVisible();
+    });
   });
 
   // ========================================================================
@@ -79,7 +86,25 @@ test.describe("GUI Utility Tools", () => {
       await page.goto("/barcode-read");
       await uploadTestImage(page);
 
-      await expect(page.getByText("Settings").first()).toBeVisible();
+      await expect(page.getByTestId("barcode-read-submit")).toBeVisible();
+    });
+
+    test("processes scan and shows result or no-barcode message", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/barcode-read");
+      await uploadTestImage(page);
+
+      await page.getByTestId("barcode-read-submit").click();
+      await waitForProcessing(page);
+
+      // Our test image is a red square -- no barcode should be found
+      await expect(
+        page
+          .getByText(/no.*barcode|no.*found/i)
+          .first()
+          .or(page.getByText("Results").first()),
+      ).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -154,6 +179,13 @@ test.describe("GUI Utility Tools", () => {
 
       // Pattern input with default "image-{{index}}"
       await expect(page.getByText("Settings").first()).toBeVisible();
+    });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/bulk-rename");
+      await uploadTestImage(page);
+
+      await expect(page.getByTestId("bulk-rename-submit")).toBeVisible();
     });
   });
 });

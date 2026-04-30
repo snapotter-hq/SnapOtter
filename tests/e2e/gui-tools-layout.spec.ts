@@ -46,6 +46,12 @@ test.describe("GUI Layout Tools", () => {
       // Spacing & Style section is open by default
       await expect(page.getByText(/background/i).first()).toBeVisible();
     });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/collage");
+
+      await expect(page.getByTestId("collage-submit")).toBeVisible();
+    });
   });
 
   // ========================================================================
@@ -80,6 +86,13 @@ test.describe("GUI Layout Tools", () => {
       await uploadTestImage(page);
 
       await expect(page.getByText(/alignment|align/i).first()).toBeVisible();
+    });
+
+    test("submit button uses data-testid", async ({ loggedInPage: page }) => {
+      await page.goto("/stitch");
+      await uploadTestImage(page);
+
+      await expect(page.getByTestId("stitch-submit")).toBeVisible();
     });
   });
 
