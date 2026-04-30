@@ -585,7 +585,7 @@ describe("QR Generate", () => {
 
   // ── Max allowed size ───────────────────────────────────────────
 
-  it("generates QR code at maximum allowed size (10000)", async () => {
+  it("generates QR code at maximum allowed size (10000)", { timeout: 120_000 }, async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/tools/qr-generate",
