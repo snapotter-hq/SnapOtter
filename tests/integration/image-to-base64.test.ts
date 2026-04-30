@@ -788,6 +788,29 @@ describe("image-to-base64", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  // ── Animated GIF input ──────────────────────────────────────────
+
+  it("converts animated GIF to base64", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(1);
+    expect(json.results[0].base64.length).toBeGreaterThan(0);
+    expect(json.results[0].dataUri).toMatch(/^data:image\/.+;base64,/);
+  });
+
   // ── maxHeight=0 means no resize ──────────────────────────────────
 
   it("maxHeight=0 means no height resize (pass-through)", async () => {

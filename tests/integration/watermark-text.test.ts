@@ -518,6 +518,69 @@ describe("watermark-text", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  // ── HEIF input ───────────────────────────────────────────────────
+
+  it("handles HEIF input (motorcycle.heif)", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({ text: "HEIF Test" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  }, 60_000);
+
+  // ── Animated GIF input ──────────────────────────────────────────
+
+  it("handles animated GIF input", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({ text: "GIF Test" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
+  // ── SVG input ───────────────────────────────────────────────────
+
+  it("handles SVG input", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ text: "SVG Test" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-text",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+  });
+
   // ── Preserves image dimensions ───────────────────────────────────
 
   it("preserves image dimensions after watermark", async () => {

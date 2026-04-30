@@ -573,6 +573,72 @@ describe("Border", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
+  it("handles HEIF input (motorcycle.heif)", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      {
+        name: "settings",
+        content: JSON.stringify({ borderWidth: 10, borderColor: "#00FF00" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("handles SVG input", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+      {
+        name: "settings",
+        content: JSON.stringify({ borderWidth: 10, borderColor: "#FF0000" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("handles animated GIF input", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+      {
+        name: "settings",
+        content: JSON.stringify({ borderWidth: 5, borderColor: "#000000" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/border",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
   it("rejects negative border width", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },

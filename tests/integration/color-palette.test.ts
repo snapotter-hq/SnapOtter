@@ -400,6 +400,46 @@ describe("HEIF input", () => {
   });
 });
 
+// ── Animated GIF input ──────────────────────────────────────────
+describe("Animated GIF input", () => {
+  it("extracts palette from animated GIF", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body: payload, contentType } = makeFilePayload(GIF, "anim.gif", "image/gif");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+  });
+});
+
+// ── SVG input ───────────────────────────────────────────────────
+describe("SVG input", () => {
+  it("extracts palette from SVG image", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const { body: payload, contentType } = makeFilePayload(SVG, "icon.svg", "image/svg+xml");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+  });
+});
+
 // ── Filename preserved in response ──────────────────────────────
 describe("Filename tracking", () => {
   it("returns the original filename in the response", async () => {

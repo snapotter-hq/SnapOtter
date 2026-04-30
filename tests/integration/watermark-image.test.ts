@@ -483,6 +483,51 @@ describe("watermark-image", () => {
     expect(res.statusCode).toBe(401);
   });
 
+  // ── HEIF input ────────────────────────────────────────────────────
+
+  it("processes HEIF main image (motorcycle.heif)", async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "settings", content: JSON.stringify({ scale: 10 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+    expect(json.processedSize).toBeGreaterThan(0);
+  }, 60_000);
+
+  // ── Animated GIF input ──────────────────────────────────────────
+
+  it("processes animated GIF main image", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "settings", content: JSON.stringify({ scale: 20 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
   // ── WebP watermark image ─────────────────────────────────────────
 
   it("processes WebP watermark image", async () => {
