@@ -34,14 +34,14 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.0.0",
+    "@tailwindcss/vite": "^4.2.4",
     "@types/leaflet": "^1.9.21",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "tailwindcss": "^4.0.0",
+    "tailwindcss": "^4.2.4",
     "typescript": "^5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^6.4.2"
   },
   "license": "AGPL-3.0"
 }

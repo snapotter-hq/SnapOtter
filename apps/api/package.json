@@ -46,11 +46,11 @@
     "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.0.0",
-    "@types/pdfkit": "^0.17.5",
+    "@types/node": "^22.19.17",
+    "@types/pdfkit": "^0.17.6",
     "@types/potrace": "^2.1.5",
     "@types/qrcode": "^1.5.6",
-    "drizzle-kit": "^0.30.0",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0"
   },
   "license": "AGPL-3.0"
