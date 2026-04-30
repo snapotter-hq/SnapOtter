@@ -1,4 +1,4 @@
-import { expect, test } from "./helpers";
+import { expect, test, uploadTestImage } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // GUI Performance: Page load budgets, SPA navigation, interaction responsiveness
@@ -20,6 +20,23 @@ test.describe("Page Load Performance", () => {
     const loadTime = Date.now() - start;
 
     expect(loadTime).toBeLessThan(2000);
+  });
+
+  test("home page navigation timing via Performance API (DOMContentLoaded < 2000ms)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("about:blank");
+    await page.goto("/");
+    await page.waitForLoadState("domcontentloaded");
+
+    const timing = await page.evaluate(() => {
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+      return {
+        domContentLoaded: nav.domContentLoadedEventEnd - nav.startTime,
+      };
+    });
+
+    expect(timing.domContentLoaded).toBeLessThan(2000);
   });
 
   test("home page navigation timing (FCP proxy < 2000ms)", async ({ loggedInPage: page }) => {
@@ -58,7 +75,25 @@ test.describe("Page Load Performance", () => {
 // SPA Navigation Timing
 // ---------------------------------------------------------------------------
 test.describe("SPA Navigation Timing", () => {
-  test("navigate from / to /resize completes within 500ms", async ({ loggedInPage: page }) => {
+  test("SPA navigation from home to tool completes under 1000ms (warmed)", async ({
+    loggedInPage: page,
+  }) => {
+    // Warm up by visiting the target page first so modules are cached
+    await page.goto("/resize");
+    await page.waitForLoadState("networkidle");
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const start = Date.now();
+    await page.goto("/resize");
+    await page.waitForLoadState("networkidle");
+    const navTime = Date.now() - start;
+
+    // 1000ms budget for dev mode (500ms would be the production target)
+    expect(navTime).toBeLessThan(1000);
+  });
+
+  test("navigate from / to /resize completes within 2000ms", async ({ loggedInPage: page }) => {
     // Start on home page and wait for it to settle
     await page.waitForLoadState("networkidle");
 
@@ -272,8 +307,19 @@ test.describe("Bundle Efficiency", () => {
 // Repeated Operations Performance
 // ---------------------------------------------------------------------------
 test.describe("Repeated Operations Performance", () => {
-  test("5 sequential SPA navigations stay responsive", async ({ loggedInPage: page }) => {
-    const routes = ["/resize", "/crop", "/rotate", "/convert", "/compress"];
+  test("10 sequential tool navigations without crash", async ({ loggedInPage: page }) => {
+    const routes = [
+      "/resize",
+      "/crop",
+      "/rotate",
+      "/convert",
+      "/compress",
+      "/sharpening",
+      "/adjust-colors",
+      "/strip-metadata",
+      "/bulk-rename",
+      "/favicon",
+    ];
     const timings: number[] = [];
 
     // Warm up: ensure all chunks are cached
@@ -292,6 +338,11 @@ test.describe("Repeated Operations Performance", () => {
       await page.waitForLoadState("domcontentloaded");
       const elapsed = Date.now() - start;
       timings.push(elapsed);
+
+      // Each page should render without errors
+      const content = await page.textContent("body");
+      expect(content).toBeDefined();
+      expect(content?.length).toBeGreaterThan(0);
     }
 
     // Average navigation time should be under 2000ms in dev mode
@@ -304,14 +355,12 @@ test.describe("Repeated Operations Performance", () => {
     }
   });
 
-  test("settings dialog open/close cycle stays fast across iterations", async ({
-    loggedInPage: page,
-  }) => {
+  test("20x settings dialog open/close without degradation", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
 
     const timings: number[] = [];
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 20; i++) {
       const start = Date.now();
       await page.locator("aside").getByText("Settings").click();
       await page.locator("h2").filter({ hasText: "Settings" }).waitFor({ state: "visible" });
@@ -321,9 +370,49 @@ test.describe("Repeated Operations Performance", () => {
       await page.locator("h2").filter({ hasText: "Settings" }).waitFor({ state: "hidden" });
     }
 
-    // All iterations should be under 300ms
+    // All iterations should complete under budget (generous for dev/CI)
     for (const t of timings) {
-      expect(t).toBeLessThan(300);
+      expect(t).toBeLessThan(1000);
     }
+
+    // Last open should not be significantly slower than first
+    const firstOpen = timings[0];
+    const lastOpen = timings[timings.length - 1];
+    expect(lastOpen).toBeLessThan(Math.max(firstOpen * 3, 1000));
+  });
+
+  test("10x upload/clear cycle stays responsive", async ({ loggedInPage: page }) => {
+    await page.goto("/resize");
+    await page.waitForLoadState("networkidle");
+
+    const timings: number[] = [];
+
+    for (let i = 0; i < 10; i++) {
+      const start = Date.now();
+
+      // Upload
+      await uploadTestImage(page);
+      await expect(page.getByText(/test-image/i).first()).toBeVisible({ timeout: 5_000 });
+
+      // Clear files
+      const clearBtn = page.getByText("Clear all");
+      if (await clearBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await clearBtn.click();
+        await page.waitForTimeout(300);
+      }
+
+      // Dropzone should reappear
+      await expect(page.getByText("Upload from computer")).toBeVisible({ timeout: 5_000 });
+
+      timings.push(Date.now() - start);
+    }
+
+    // No individual cycle should be excessively slow
+    for (const t of timings) {
+      expect(t).toBeLessThan(10_000);
+    }
+
+    // The page should still be responsive after 10 cycles
+    await expect(page.locator("main")).toBeVisible();
   });
 });

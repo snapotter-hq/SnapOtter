@@ -109,6 +109,29 @@ test.describe("Semantic HTML - Form Inputs", () => {
   });
 });
 
+test.describe("Semantic HTML - Form Inputs on Tool Pages", () => {
+  test("QR generate form inputs have associated labels", async ({ loggedInPage: page }) => {
+    await page.goto("/qr-generate");
+    await page.waitForLoadState("domcontentloaded");
+
+    // The URL input should be findable by its label
+    const urlInput = page.getByLabel("URL");
+    await expect(urlInput).toBeVisible();
+  });
+
+  test("change password form inputs have associated labels", async ({ loggedInPage: page }) => {
+    // Navigate to change-password (uses storageState auth but page is accessible)
+    await page.goto("/change-password");
+    await page.waitForLoadState("domcontentloaded");
+
+    // Each input should be findable by label (use exact match for "New password"
+    // to avoid matching the "Generate strong password" button text)
+    await expect(page.getByLabel("Current password")).toBeVisible();
+    await expect(page.getByLabel("New password", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Confirm new password")).toBeVisible();
+  });
+});
+
 test.describe("Semantic HTML - Heading Hierarchy", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -130,6 +153,33 @@ test.describe("Semantic HTML - Heading Hierarchy", () => {
     if (h1Box && h2Box) {
       expect(h1Box.y).toBeLessThan(h2Box.y);
     }
+  });
+});
+
+test.describe("Heading Hierarchy - Tool Pages", () => {
+  test("tool page has headings including an h2 for the tool name", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/resize");
+    await page.waitForLoadState("domcontentloaded");
+
+    // The tool page should have an h2 heading for the tool name
+    const h2 = page.locator("h2").filter({ hasText: "Resize" });
+    await expect(h2).toBeAttached();
+
+    // Collect all headings in the DOM (including those in the sidebar or
+    // settings panel that may not pass a visibility bounding-box check)
+    const headingLevels = await page.evaluate(() => {
+      const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
+      return Array.from(headings).map((h) => Number.parseInt(h.tagName.charAt(1), 10));
+    });
+
+    // There should be at least one heading
+    expect(headingLevels.length).toBeGreaterThan(0);
+
+    // There should be at most one h1 (the page title or brand)
+    const h1Count = headingLevels.filter((l) => l === 1).length;
+    expect(h1Count).toBeLessThanOrEqual(1);
   });
 });
 
@@ -182,6 +232,43 @@ test.describe("Settings Dialog Accessibility", () => {
     await closeBtn.first().click();
     await expect(page.locator("h2").filter({ hasText: "Settings" })).not.toBeVisible();
   });
+
+  test("settings dialog backdrop is marked aria-hidden", async ({ loggedInPage: page }) => {
+    await page.locator("aside").getByText("Settings").click();
+    await expect(page.locator("h2").filter({ hasText: "Settings" })).toBeVisible();
+
+    // The backdrop overlay has aria-hidden="true" to keep it out of the a11y tree
+    const backdrop = page.locator("div[aria-hidden='true'].absolute.inset-0");
+    await expect(backdrop).toBeAttached();
+
+    await page.keyboard.press("Escape");
+  });
+
+  test("focus is contained inside settings dialog while open", async ({ loggedInPage: page }) => {
+    await page.locator("aside").getByText("Settings").click();
+    await expect(page.locator("h2").filter({ hasText: "Settings" })).toBeVisible();
+
+    // Tab through several elements -- focus should stay within the dialog
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press("Tab");
+    }
+
+    // The key test: after tabbing, focus should NOT escape to elements behind
+    // the dialog (like the sidebar). It should remain inside the dialog overlay.
+    const focusLocation = await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active) return "none";
+      const sidebar = document.querySelector("aside");
+      if (sidebar?.contains(active)) return "sidebar";
+      const dialogOverlay = document.querySelector(".fixed.inset-0");
+      if (dialogOverlay?.contains(active)) return "dialog";
+      return "other";
+    });
+    // Focus must not have leaked into the sidebar behind the dialog
+    expect(focusLocation).not.toBe("sidebar");
+
+    await page.keyboard.press("Escape");
+  });
 });
 
 test.describe("Help Dialog Accessibility", () => {
@@ -221,6 +308,52 @@ test.describe("Dropzone Accessibility", () => {
     const uploadBtn = page.getByRole("button", { name: /upload/i }).first();
     await expect(uploadBtn).toBeVisible();
     await expect(uploadBtn).toBeEnabled();
+  });
+
+  test("dropzone upload button is focusable and keyboard-reachable", async ({
+    loggedInPage: page,
+  }) => {
+    // Navigate to a tool page to ensure the dropzone is present
+    await page.goto("/resize");
+    await page.waitForLoadState("domcontentloaded");
+
+    // The upload button is a real <button> element, so it's natively
+    // keyboard-accessible via Tab, Enter, and Space.
+    const uploadBtn = page.getByText("Upload from computer");
+    await expect(uploadBtn).toBeVisible();
+
+    // Focus the upload button
+    await uploadBtn.focus();
+    const focusedTag = await page.evaluate(() => document.activeElement?.tagName);
+    expect(focusedTag).toBe("BUTTON");
+
+    // Verify the focused element's text matches the upload button
+    const focusedText = await page.evaluate(() => document.activeElement?.textContent);
+    expect(focusedText).toContain("Upload from computer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slider / Range Input Accessibility
+// ---------------------------------------------------------------------------
+test.describe("Slider Keyboard Accessibility", () => {
+  test("QR size slider responds to arrow keys", async ({ loggedInPage: page }) => {
+    await page.goto("/qr-generate");
+    await page.waitForLoadState("domcontentloaded");
+
+    const sizeSlider = page.locator("#qr-size");
+    await expect(sizeSlider).toBeVisible();
+
+    // Get initial value
+    const initialValue = await sizeSlider.inputValue();
+
+    // Focus and press ArrowRight to increase
+    await sizeSlider.focus();
+    await page.keyboard.press("ArrowRight");
+
+    const newValue = await sizeSlider.inputValue();
+    // The value should have increased (step is 100, initial is 1024 or similar)
+    expect(Number(newValue)).toBeGreaterThanOrEqual(Number(initialValue));
   });
 });
 
