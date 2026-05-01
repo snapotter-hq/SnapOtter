@@ -31,8 +31,7 @@ features:
 <div class="quick-start-banner">
 
 ```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest \
-  && printf "\n  🦦 SnapOtter\n  ────────────────────────────────────────\n\n  ➜  Open   http://localhost:1349\n  ➜  Login  admin / admin\n  ➜  Docs   https://docs.snapotter.com\n\n"
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
 </div>
