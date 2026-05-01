@@ -412,4 +412,299 @@ describe("Error handling", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("returns 400 for invalid settings JSON", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: EXIF_JPG },
+      { name: "settings", content: "not-json" },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Format-specific re-encoding paths ────���────────────────────
+describe("Format-specific re-encoding", () => {
+  it("re-encodes AVIF format after stripping", async () => {
+    // Create a small AVIF buffer from PNG using Sharp
+    const avifBuffer = await sharp(PNG).avif({ quality: 50 }).toBuffer();
+    const res = await postTool({ stripAll: true }, avifBuffer, "test.avif", "image/avif");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("handles default format case (non-standard format)", async () => {
+    // Using a GIF triggers the default case in the switch
+    const gifBuffer = await sharp(PNG).gif().toBuffer();
+    const res = await postTool({ stripAll: true }, gifBuffer, "test.gif", "image/gif");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("re-encodes TIFF format after stripping", async () => {
+    const tiffBuffer = await sharp(PNG).tiff().toBuffer();
+    const res = await postTool({ stripAll: true }, tiffBuffer, "test.tiff", "image/tiff");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Inspect endpoint: ICC profile parsing ──────────────────────
+describe("Inspect endpoint: ICC and XMP parsing", () => {
+  it("inspect returns ICC info when present", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test-with-exif.jpg",
+        contentType: "image/jpeg",
+        content: EXIF_JPG,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // ICC may or may not be present in the fixture, but the response should be valid
+    if (result.icc) {
+      expect(typeof result.icc).toBe("object");
+    }
+  });
+
+  it("inspect handles EXIF with GPS data", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test-with-exif.jpg",
+        contentType: "image/jpeg",
+        content: EXIF_JPG,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("test-with-exif.jpg");
+    // GPS may or may not be in fixture, but exif object should exist
+    if (result.exif) {
+      expect(typeof result.exif).toBe("object");
+    }
+  });
+
+  it("inspect returns empty metadata for image without any metadata", async () => {
+    const blankPng = readFileSync(join(FIXTURES, "test-blank.png"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "blank.png",
+        contentType: "image/png",
+        content: blankPng,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("blank.png");
+    expect(result.fileSize).toBeGreaterThan(0);
+    // No EXIF, ICC, or XMP expected
+    expect(result.exif).toBeUndefined();
+    expect(result.icc).toBeUndefined();
+    expect(result.xmp).toBeUndefined();
+  });
+
+  it("inspect handles empty file buffer", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.png",
+        contentType: "image/png",
+        content: Buffer.alloc(0),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no image/i);
+  });
+
+  it("inspect returns 422 for corrupt image that passes size check", async () => {
+    // Build a buffer with enough bytes to pass the length check
+    // but that Sharp cannot parse as valid image data
+    const corruptBuffer = Buffer.alloc(512, 0xab);
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "corrupt.jpg",
+        contentType: "image/jpeg",
+        content: corruptBuffer,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/failed to read/i);
+  });
+});
+
+// ── HEIC format handling ────────────────────────────────────────
+describe("HEIC format handling", () => {
+  it("strips metadata from HEIC input", { timeout: 120_000 }, async () => {
+    const heic = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool({ stripAll: true }, heic, "test.heic", "image/heic");
+    // HEIC decode may not be available
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.processedSize).toBeGreaterThan(0);
+    }
+  });
+
+  it("strips selective metadata from HEIC input", { timeout: 120_000 }, async () => {
+    const heic = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      { stripAll: false, stripExif: true, stripGps: true },
+      heic,
+      "photo.heic",
+      "image/heic",
+    );
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+    }
+  });
+});
+
+// ── Large file handling ────────────────────────────────────────
+describe("Large file handling", () => {
+  it("strips metadata from a large stress image", async () => {
+    const large = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool({ stripAll: true }, large, "stress-large.jpg", "image/jpeg");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Tiny file handling ─────────────────────────────────────────
+describe("Tiny file handling", () => {
+  it("strips metadata from a 1x1 pixel image", async () => {
+    const tiny = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ stripAll: true }, tiny, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("inspects a 1x1 pixel image", async () => {
+    const tiny = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "tiny.png",
+        contentType: "image/png",
+        content: tiny,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("tiny.png");
+    expect(result.fileSize).toBeGreaterThan(0);
+  });
+});
+
+// ── AVIF fixture re-encoding ─────────────────────────────────────
+describe("AVIF fixture re-encoding", () => {
+  it("re-encodes real AVIF fixture after stripping", async () => {
+    const avifFixture = readFileSync(join(FIXTURES, "formats", "sample.avif"));
+    const res = await postTool({ stripAll: true }, avifFixture, "sample.avif", "image/avif");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("heif");
+  });
+
+  it("selectively strips EXIF from AVIF fixture", async () => {
+    const avifFixture = readFileSync(join(FIXTURES, "formats", "sample.avif"));
+    const res = await postTool(
+      { stripAll: false, stripExif: true },
+      avifFixture,
+      "sample.avif",
+      "image/avif",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
 });

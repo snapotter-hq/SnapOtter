@@ -267,4 +267,190 @@ describe("seamCarve", () => {
     const result = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
     expect(result).toBeDefined();
   });
+
+  it("throws when image exceeds 25 MP", async () => {
+    const { seamCarve } = await importFresh();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          // 6000x5000 = 30 MP, exceeds 25 MP limit
+          metadata: vi.fn().mockResolvedValue({ width: 6000, height: 5000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
+      "Image is too large for content-aware resize",
+    );
+  });
+
+  it("throws when dimension reduction exceeds 75%", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    const { seamCarve } = await importFresh();
+    // Requesting width 100 from 800 is a 87.5% reduction (ratio 0.125 < 0.25)
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 100 })).rejects.toThrow(
+      "cannot reduce dimensions by more than 75%",
+    );
+  });
+
+  it("throws when height reduction exceeds 75%", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    const { seamCarve } = await importFresh();
+    // Requesting height 100 from 600 is an 83% reduction (ratio 0.167 < 0.25)
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { height: 100 })).rejects.toThrow(
+      "cannot reduce dimensions by more than 75%",
+    );
+  });
+
+  it("passes only width when height is not specified", async () => {
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 600 });
+
+    const calls = mockExecFileAsync.mock.calls;
+    const caireCall = calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCall).toBeDefined();
+    expect(caireCall![1]).toContain("-width");
+    expect(caireCall![1]).toContain("600");
+    expect(caireCall![1]).not.toContain("-height");
+  });
+
+  it("passes only height when width is not specified", async () => {
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { height: 400 });
+
+    const calls = mockExecFileAsync.mock.calls;
+    const caireCall = calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCall).toBeDefined();
+    expect(caireCall![1]).not.toContain("-width");
+    expect(caireCall![1]).toContain("-height");
+    expect(caireCall![1]).toContain("400");
+  });
+
+  it("does not pass -face when protectFaces is false or absent", async () => {
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { protectFaces: false });
+
+    const calls = mockExecFileAsync.mock.calls;
+    const caireCall = calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCall).toBeDefined();
+    expect(caireCall![1]).not.toContain("-face");
+  });
+
+  it("does not pass -blur and -sobel when not specified", async () => {
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+    const calls = mockExecFileAsync.mock.calls;
+    const caireCall = calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCall).toBeDefined();
+    expect(caireCall![1]).not.toContain("-blur");
+    expect(caireCall![1]).not.toContain("-sobel");
+  });
+
+  it("includes megapixels in the too-large error message", async () => {
+    const { seamCarve } = await importFresh();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockResolvedValue({ width: 6000, height: 5000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("30.0 MP");
+  });
+
+  it("cleans up temp files even when image is too large", async () => {
+    const { seamCarve } = await importFresh();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockResolvedValue({ width: 6000, height: 5000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow();
+
+    // rm is called for cleanup in finally block
+    expect(rm).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches the caire binary path after first discovery", async () => {
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+    // caire -help should only be called once (path is cached)
+    const helpCalls = mockExecFileAsync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-help"),
+    );
+    expect(helpCalls).toHaveLength(1);
+  });
+
+  it("falls back to default caire when CAIRE_PATH is not set and caire is in PATH", async () => {
+    const origCairePath = process.env.CAIRE_PATH;
+    delete process.env.CAIRE_PATH;
+
+    const { seamCarve } = await importFresh();
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+    // First call should try "caire" (the default PATH lookup)
+    expect(mockExecFileAsync.mock.calls[0][0]).toBe("caire");
+
+    if (origCairePath) process.env.CAIRE_PATH = origCairePath;
+  });
+
+  it("square mode uses shortest dimension for both width and height", async () => {
+    const { seamCarve } = await importFresh();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockResolvedValue({ width: 1200, height: 400 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { square: true });
+
+    const calls = mockExecFileAsync.mock.calls;
+    const caireCall = calls.find((c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-square"));
+    expect(caireCall).toBeDefined();
+    // shortest side is 400
+    expect(caireCall![1]).toContain("400");
+  });
 });

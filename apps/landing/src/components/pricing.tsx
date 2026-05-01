@@ -19,7 +19,7 @@ const freePlan = {
     "Air-gapped and offline ready",
     "Multi-user with team permissions",
     "Audit logging",
-    "Community support via GitHub",
+    "Community support via GitHub and Discord",
     "All updates included",
     "AGPL-3.0 licensed",
   ],

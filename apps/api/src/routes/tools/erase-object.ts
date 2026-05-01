@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { inpaint } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -9,8 +9,10 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 
@@ -30,8 +32,8 @@ const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif"
 
 const settingsSchema = z.object({
   format: z
-    .enum(["png", "jpg", "jpeg", "webp", "tiff", "gif", "avif", "heic", "heif"])
-    .default("png"),
+    .enum(["auto", "png", "jpg", "jpeg", "webp", "tiff", "gif", "avif", "heic", "heif"])
+    .default("auto"),
   quality: z.number().int().min(1).max(100).default(95),
 });
 
@@ -73,10 +75,13 @@ export function registerEraseObject(app: FastifyInstance) {
             maskBuffer = buf;
           } else {
             imageBuffer = buf;
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           }
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            clientJobId = raw;
+          }
         } else if (part.fieldname === "format") {
           format = (part.value as string) || "png";
         } else if (part.fieldname === "quality") {
@@ -108,30 +113,26 @@ export function registerEraseObject(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
     }
 
+    // Validate format and quality via Zod
+    const settingsResult = settingsSchema.safeParse({ format, quality });
+    if (!settingsResult.success) {
+      return reply.status(400).send({
+        error: "Invalid settings",
+        details: settingsResult.error.issues
+          .map((i) => (i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message))
+          .join("; "),
+      });
+    }
+    format = settingsResult.data.format;
+    quality = settingsResult.data.quality;
+
+    if (format === "auto") {
+      const detected = await resolveOutputFormat(imageBuffer, filename);
+      format = detected.format === "jpeg" ? "jpg" : detected.format;
+      quality = detected.quality;
+    }
+
     try {
-      // Validate format and quality via Zod
-      const settingsResult = settingsSchema.safeParse({ format, quality });
-      if (!settingsResult.success) {
-        return reply.status(400).send({
-          error: "Invalid settings",
-          details: settingsResult.error.issues
-            .map((i) => (i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message))
-            .join("; "),
-        });
-      }
-      format = settingsResult.data.format;
-      quality = settingsResult.data.quality;
-
-      request.log.info(
-        {
-          toolId: "erase-object",
-          imageSize: imageBuffer.length,
-          maskSize: maskBuffer.length,
-          format,
-        },
-        "Starting object erasure",
-      );
-
       // Decode HEIC/HEIF input via system decoder
       if (imageValidation.format === "heif") {
         imageBuffer = await decodeHeic(imageBuffer);
@@ -144,27 +145,56 @@ export function registerEraseObject(app: FastifyInstance) {
 
       // Auto-orient to fix EXIF rotation
       imageBuffer = await autoOrient(imageBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
+      return reply.status(422).send({
+        error: "Object erasing failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-
-      // Save input
+    const originalSize = imageBuffer.length;
+    const jobId = randomUUID();
+    const progressJobId = clientJobId || jobId;
+    let workspacePath: string;
+    try {
+      workspacePath = await createWorkspace(jobId);
       const inputPath = join(workspacePath, "input", filename);
       await writeFile(inputPath, imageBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "erase-object" }, "Workspace creation failed");
+      return reply.status(422).send({
+        error: "Object erasing failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      // Process
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
+    const log = request.log;
+    log.info(
+      {
+        toolId: "erase-object",
+        imageSize: originalSize,
+        maskSize: maskBuffer.length,
+        format,
+      },
+      "Starting object erasure",
+    );
 
+    // Reply immediately so the HTTP connection closes within proxy timeout limits.
+    // The result will be delivered via the SSE progress channel.
+    reply.status(202).send({ jobId: progressJobId, async: true });
+
+    const onProgress = (percent: number, stage: string) => {
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "processing",
+        stage,
+        percent,
+      });
+    };
+
+    // Fire-and-forget: processing happens after the response is sent
+    (async () => {
       const resultBuffer = await inpaint(
         imageBuffer,
         maskBuffer,
@@ -225,27 +255,29 @@ export function registerEraseObject(app: FastifyInstance) {
         }
       }
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
-      }
+      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId,
+          downloadUrl,
+          previewUrl,
+          originalSize,
+          processedSize: outputBuffer.length,
+        },
+      });
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-        previewUrl,
-        originalSize: imageBuffer.length,
-        processedSize: outputBuffer.length,
+      log.info({ toolId: "erase-object", jobId, downloadUrl }, "Object erasure complete");
+    })().catch((err) => {
+      log.error({ err, toolId: "erase-object" }, "Object erasing failed");
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "failed",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Object erasing failed",
       });
-    } catch (err) {
-      request.log.error({ err, toolId: "erase-object" }, "Object erasing failed");
-      return reply.status(422).send({
-        error: "Object erasing failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
+    });
   });
 }

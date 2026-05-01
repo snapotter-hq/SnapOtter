@@ -46,7 +46,17 @@ export const en = {
       description: "Edit EXIF, IPTC, XMP, GPS, keywords, and dates",
     },
     "bulk-rename": { name: "Bulk Rename", description: "Rename multiple files with patterns" },
-    "image-to-pdf": { name: "Image to PDF", description: "Combine images into a PDF document" },
+    "image-to-pdf": {
+      name: "Image to PDF",
+      description: "Combine images into a PDF document",
+      targetSizeLabel: "Target file size",
+      targetSizePlaceholder: "e.g. 2",
+      targetSizeHint: "Leave empty for maximum quality",
+      targetSizeMet: "Target met",
+      targetSizeNotMet: "Could not reach target. Smallest achievable:",
+      targetSizeTooSmall: "Target must be at least 50KB",
+      jpegQualityLabel: "JPEG quality used",
+    },
     "pdf-to-image": { name: "PDF to Image", description: "Convert PDF pages to images" },
     favicon: { name: "Favicon Generator", description: "Generate all favicon and app icon sizes" },
     "adjust-colors": {

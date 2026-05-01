@@ -1,5 +1,5 @@
 import { test as base, expect } from "@playwright/test";
-import { login } from "./helpers";
+import { login, openSettings } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
 
@@ -143,7 +143,7 @@ base.describe("RBAC Full — People Management UI", () => {
     "admin sees role dropdown with admin/editor/user options when adding members",
     async ({ page }) => {
       await page.goto("/");
-      await page.locator("aside").getByText("Settings").click();
+      await openSettings(page);
       await page.getByRole("button", { name: /people/i }).click();
 
       // Click "Add Members" to reveal the form
@@ -174,14 +174,14 @@ base.describe("RBAC Full — Roles Management UI", () => {
 
   base.test("admin sees Roles tab in settings", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     await expect(page.getByRole("button", { name: /^roles$/i })).toBeVisible();
   });
 
   base.test("roles section shows built-in roles with Built-in badge", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /^roles$/i }).click();
 
     // Wait for roles to load
@@ -207,14 +207,14 @@ base.describe("RBAC Full — Audit Log UI", () => {
 
   base.test("admin sees Audit Log tab in settings", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     await expect(page.getByRole("button", { name: /audit log/i })).toBeVisible();
   });
 
   base.test("audit log displays LOGIN_SUCCESS entries", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /audit log/i }).click();
 
     // Wait for audit log section to load
@@ -244,7 +244,7 @@ base.describe("RBAC Full — API Key Scoping UI", () => {
 
   base.test("API Keys section has permission scoping toggle", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /api keys/i }).click();
 
     // The scoping toggle text should be visible
@@ -295,7 +295,7 @@ base.describe("RBAC Full — Custom Role User", () => {
   base.test("custom role user only sees permitted tabs (no admin tabs)", async ({ page }) => {
     await login(page, CUSTOM_USER, CUSTOM_PASSWORD);
 
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Should see these tabs (available to all authenticated users or matching permissions)
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();

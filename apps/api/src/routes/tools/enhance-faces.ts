@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { enhanceFaces } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,6 +10,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
@@ -52,11 +53,14 @@ export function registerEnhanceFaces(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -75,27 +79,23 @@ export function registerEnhanceFaces(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
 
+    let settings: z.infer<typeof settingsSchema>;
     try {
-      let settings: z.infer<typeof settingsSchema>;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-        }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
       }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
 
-      const { model, strength, onlyCenterFace, sensitivity } = settings;
-      request.log.info(
-        { toolId: "enhance-faces", imageSize: fileBuffer.length, model, strength },
-        "Starting face enhancement",
-      );
+    const { model, strength, onlyCenterFace, sensitivity } = settings;
 
+    try {
       // Decode HEIC/HEIF input via system decoder
       if (validation.format === "heif") {
         fileBuffer = await decodeHeic(fileBuffer);
@@ -108,27 +108,51 @@ export function registerEnhanceFaces(app: FastifyInstance) {
 
       // Auto-orient to fix EXIF rotation before face detection
       fileBuffer = await autoOrient(fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "enhance-faces" }, "Input decoding failed");
+      return reply.status(422).send({
+        error: "Face enhancement failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-
-      // Save input
+    const originalSize = fileBuffer.length;
+    const jobId = randomUUID();
+    const progressJobId = clientJobId || jobId;
+    let workspacePath: string;
+    try {
+      workspacePath = await createWorkspace(jobId);
       const inputPath = join(workspacePath, "input", filename);
       await writeFile(inputPath, fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "enhance-faces" }, "Workspace creation failed");
+      return reply.status(422).send({
+        error: "Face enhancement failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      // Process
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
+    const log = request.log;
+    log.info(
+      { toolId: "enhance-faces", imageSize: originalSize, model, strength },
+      "Starting face enhancement",
+    );
 
+    // Reply immediately so the HTTP connection closes within proxy timeout limits.
+    // The result will be delivered via the SSE progress channel.
+    reply.status(202).send({ jobId: progressJobId, async: true });
+
+    const onProgress = (percent: number, stage: string) => {
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "processing",
+        stage,
+        percent,
+      });
+    };
+
+    // Fire-and-forget: processing happens after the response is sent
+    (async () => {
       const result = await enhanceFaces(
         fileBuffer,
         join(workspacePath, "output"),
@@ -152,38 +176,40 @@ export function registerEnhanceFaces(app: FastifyInstance) {
         // Non-fatal - frontend will show fallback
       }
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
-      }
-
       if (model !== "auto" && result.model !== model) {
-        request.log.warn(
+        log.warn(
           { toolId: "enhance-faces", requested: model, actual: result.model },
           `Face enhance model mismatch: requested ${model} but used ${result.model}`,
         );
       }
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-        previewUrl,
-        originalSize: fileBuffer.length,
-        processedSize: result.buffer.length,
-        facesDetected: result.facesDetected,
-        faces: result.faces,
-        model: result.model,
+      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId,
+          downloadUrl,
+          previewUrl,
+          originalSize,
+          processedSize: result.buffer.length,
+          facesDetected: result.facesDetected,
+          faces: result.faces,
+          model: result.model,
+        },
       });
-    } catch (err) {
-      request.log.error({ err, toolId: "enhance-faces" }, "Face enhancement failed");
-      return reply.status(422).send({
-        error: "Face enhancement failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+
+      log.info({ toolId: "enhance-faces", jobId, downloadUrl }, "Face enhancement complete");
+    })().catch((err) => {
+      log.error({ err, toolId: "enhance-faces" }, "Face enhancement failed");
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "failed",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Face enhancement failed",
       });
-    }
+    });
   });
 
   // Register in the pipeline/batch registry so this tool can be used

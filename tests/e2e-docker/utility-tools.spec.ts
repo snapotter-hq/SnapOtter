@@ -644,3 +644,146 @@ test.describe("Bulk Rename", () => {
     expect(json.error).toBeDefined();
   });
 });
+
+// ─── Image to Base64 ───────────────────────────────────────────────
+
+test.describe("Image to Base64", () => {
+  test("encode PNG to base64 returns data URI", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.results).toBeInstanceOf(Array);
+    expect(body.results.length).toBeGreaterThan(0);
+
+    const result = body.results[0];
+    expect(result.base64).toBeTruthy();
+    expect(result.dataUri).toContain("data:image/");
+    expect(result.mimeType).toBe("image/png");
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(150);
+  });
+
+  test("encode JPEG to base64", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.results[0].base64).toBeTruthy();
+    expect(body.results[0].mimeType).toContain("image/");
+  });
+
+  test("encode with maxWidth constraint", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ maxWidth: 50 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.results[0].width).toBeLessThanOrEqual(50);
+  });
+
+  test("encode with output format conversion", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ outputFormat: "jpeg", quality: 50 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  test("encode HEIC image to base64", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.results[0].base64).toBeTruthy();
+    expect(body.results[0].width).toBeGreaterThan(0);
+  });
+
+  test("overhead percent is calculated", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/image-to-base64", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(typeof body.results[0].overheadPercent).toBe("number");
+    expect(body.results[0].overheadPercent).toBeGreaterThan(0);
+  });
+});
+
+// ─── QR Read (from content fixtures) ───────────────────────────────
+
+test.describe("QR Read", () => {
+  test("read QR code from content fixture", async ({ request }) => {
+    const qrImage = contentFixture("qr-code.avif");
+    const res = await request.post("/api/v1/tools/barcode-read", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "qr-code.avif", mimeType: "image/avif", buffer: qrImage },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.barcodes).toBeInstanceOf(Array);
+    if (body.barcodes.length > 0) {
+      expect(body.barcodes[0].text).toBeTruthy();
+    }
+  });
+});
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("info without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/info", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("qr-generate without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/qr-generate", {
+      data: { text: "https://snapotter.app", size: 512 },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("color-palette without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/color-palette", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

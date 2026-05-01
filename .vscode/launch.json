@@ -1,0 +1,186 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // ══════════════════════════════════════════════════════════════════════
+    // Backend
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "API: Fastify (tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": ["watch", "src/index.ts"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "env": {
+        "PORT": "13490",
+        "NODE_ENV": "development"
+      },
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Frontend
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "Web: Vite Dev Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vite",
+      "args": ["--port", "1351"],
+      "cwd": "${workspaceFolder}/apps/web",
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Web: Debug in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:1351",
+      "webRoot": "${workspaceFolder}/apps/web/src",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
+        "webpack:///src/*": "${workspaceFolder}/apps/web/src/*"
+      }
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Vitest
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "Vitest: Current File",
+      "type": "node",
+      "request": "launch",
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${relativeFile}"],
+      "smartStep": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Vitest: All Tests",
+      "type": "node",
+      "request": "launch",
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run"],
+      "smartStep": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Vitest: Watch Mode",
+      "type": "node",
+      "request": "launch",
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["--watch", "${relativeFile}"],
+      "smartStep": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Playwright
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "Playwright: Current File",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/@playwright/test/cli.js",
+      "args": ["test", "${relativeFile}", "--workers=1"],
+      "cwd": "${workspaceFolder}",
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Playwright: Debug Current File",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/@playwright/test/cli.js",
+      "args": ["test", "${relativeFile}", "--workers=1", "--headed"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PWDEBUG": "1"
+      },
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Python Sidecar
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "Python: Dispatcher",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/packages/ai/python/dispatcher.py",
+      "cwd": "${workspaceFolder}/packages/ai",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/packages/ai",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Attach
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "name": "Attach: Node (port 9229)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Attach: Python (port 5678)",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "justMyCode": true
+    }
+  ],
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Compound (multi-process) Configurations
+  // ══════════════════════════════════════════════════════════════════════
+  "compounds": [
+    {
+      "name": "Full Stack: API + Web",
+      "configurations": ["API: Fastify (tsx)", "Web: Vite Dev Server"],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: API + Web + Chrome",
+      "configurations": ["API: Fastify (tsx)", "Web: Vite Dev Server", "Web: Debug in Chrome"],
+      "stopAll": true,
+      "presentation": {
+        "group": "compound",
+        "order": 1
+      }
+    }
+  ]
+}

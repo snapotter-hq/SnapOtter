@@ -244,3 +244,259 @@ describe("Error handling", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ── HEIC input handling ─────────────────────────────────────────
+describe("HEIC input", () => {
+  it("processes HEIC image with adaptive sharpening", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool({ method: "adaptive" }, HEIC, "photo.heic", "image/heic");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Edge size inputs ────────────────────────────────────────────
+describe("Edge size inputs", () => {
+  it("processes 1x1 pixel image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ method: "adaptive" }, TINY, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("processes stress-large.jpg", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { method: "unsharp-mask", amount: 150 },
+      LARGE,
+      "large.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Combined sharpening + denoise ───────────────────────────────
+describe("Combined sharpening + denoise", () => {
+  it("applies high-pass sharpening with strong denoise", async () => {
+    const res = await postTool({
+      method: "high-pass",
+      strength: 80,
+      kernelSize: 5,
+      denoise: "strong",
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("applies adaptive sharpening with light denoise", async () => {
+    const res = await postTool({
+      method: "adaptive",
+      sigma: 1.5,
+      denoise: "light",
+    });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Unsharp mask with denoise ──────────────────────────────────
+describe("Unsharp mask + denoise", () => {
+  it("applies unsharp-mask with medium denoise", async () => {
+    const res = await postTool({
+      method: "unsharp-mask",
+      amount: 150,
+      radius: 2.0,
+      threshold: 5,
+      denoise: "medium",
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Unauthenticated request ────────────────────────────────────
+describe("Authentication", () => {
+  it("rejects unauthenticated request", async () => {
+    const { body: payload, contentType } = makePayload({});
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/sharpening",
+      payload,
+      headers: { "content-type": contentType },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── Boundary parameters for adaptive ───────────────────────────
+describe("Adaptive boundary parameters", () => {
+  it("uses minimum sigma (0.5)", async () => {
+    const res = await postTool({ method: "adaptive", sigma: 0.5 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses maximum sigma (10)", async () => {
+    const res = await postTool({ method: "adaptive", sigma: 10 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses maximum m1, m2, x1, y2, y3 values", async () => {
+    const res = await postTool({
+      method: "adaptive",
+      sigma: 2.0,
+      m1: 10,
+      m2: 20,
+      x1: 10,
+      y2: 50,
+      y3: 50,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── Boundary parameters for unsharp mask ───────────────────────
+describe("Unsharp mask boundary parameters", () => {
+  it("uses maximum amount (1000)", async () => {
+    const res = await postTool({
+      method: "unsharp-mask",
+      amount: 1000,
+      radius: 1.0,
+      threshold: 0,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses minimum radius (0.1)", async () => {
+    const res = await postTool({
+      method: "unsharp-mask",
+      amount: 100,
+      radius: 0.1,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses maximum radius (5)", async () => {
+    const res = await postTool({
+      method: "unsharp-mask",
+      amount: 100,
+      radius: 5.0,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses maximum threshold (255)", async () => {
+    const res = await postTool({
+      method: "unsharp-mask",
+      threshold: 255,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rejects amount out of range (>1000)", async () => {
+    const res = await postTool({ method: "unsharp-mask", amount: 1001 });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── High-pass boundary parameters ──────────────────────────────
+describe("High-pass boundary parameters", () => {
+  it("uses minimum strength (0)", async () => {
+    const res = await postTool({ method: "high-pass", strength: 0, kernelSize: 3 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("uses maximum strength (100)", async () => {
+    const res = await postTool({ method: "high-pass", strength: 100, kernelSize: 3 });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rejects strength out of range (>100)", async () => {
+    const res = await postTool({ method: "high-pass", strength: 101 });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Denoise boundary: off ──────────────────────────────────────
+describe("Denoise off", () => {
+  it("explicitly sets denoise to off", async () => {
+    const res = await postTool({ denoise: "off" });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── HEIC with unsharp-mask method ──────────────────────────────
+describe("HEIC with different methods", () => {
+  it("processes HEIC with unsharp-mask", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      { method: "unsharp-mask", amount: 200 },
+      HEIC,
+      "photo.heic",
+      "image/heic",
+    );
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("processes HEIC with high-pass", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const res = await postTool(
+      { method: "high-pass", strength: 60 },
+      HEIC,
+      "photo.heic",
+      "image/heic",
+    );
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── HEIF input ──────────────────────────────────────────────────
+describe("HEIF input", () => {
+  it(
+    "processes HEIF image (motorcycle.heif)",
+    { timeout: 120_000 },
+    async () => {
+      const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+      const res = await postTool(
+        { method: "adaptive", sigma: 2.0 },
+        HEIF,
+        "photo.heif",
+        "image/heif",
+      );
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+    },
+    120_000,
+  );
+});
+
+// ── Animated GIF input ──────────────────────────────────────────
+describe("Animated GIF input", () => {
+  it("processes animated GIF", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const res = await postTool(
+      { method: "unsharp-mask", amount: 150 },
+      GIF,
+      "anim.gif",
+      "image/gif",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── SVG input ───────────────────────────────────────────────────
+describe("SVG input", () => {
+  it("processes SVG image", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const res = await postTool({ method: "adaptive" }, SVG, "icon.svg", "image/svg+xml");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+});

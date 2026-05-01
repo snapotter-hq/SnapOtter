@@ -1,9 +1,9 @@
-import { basename } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 const settingsSchema = z.object({
@@ -108,7 +108,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           if (buf.length > 0) {
             files.push({
               buffer: buf,
-              filename: basename(part.filename ?? `image-${files.length}`),
+              filename: sanitizeFilename(part.filename ?? `image-${files.length}`),
               originalSize: buf.length,
             });
           }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { upscale } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,8 +10,10 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -21,7 +23,7 @@ const settingsSchema = z.object({
   model: z.string().default("auto"),
   faceEnhance: z.boolean().default(false),
   denoise: z.union([z.number(), z.string()]).transform(Number).default(0),
-  format: z.string().default("png"),
+  format: z.string().default("auto"),
   quality: z.union([z.number(), z.string()]).transform(Number).default(95),
 });
 
@@ -57,11 +59,14 @@ export function registerUpscale(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -80,31 +85,32 @@ export function registerUpscale(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
 
+    let settings: z.infer<typeof settingsSchema>;
     try {
-      let settings: z.infer<typeof settingsSchema>;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-        }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
       }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
 
-      const scale = settings.scale;
-      const model = settings.model;
-      const faceEnhance = settings.faceEnhance;
-      const denoise = settings.denoise;
-      const format = settings.format;
-      const outputQuality = settings.quality;
-      request.log.info(
-        { toolId: "upscale", imageSize: fileBuffer.length, scale, model, format },
-        "Starting upscale",
-      );
+    const scale = settings.scale;
+    const model = settings.model;
+    const faceEnhance = settings.faceEnhance;
+    const denoise = settings.denoise;
+    let format = settings.format;
+    const outputQuality = settings.quality;
+
+    try {
+      if (format === "auto") {
+        const detected = await resolveOutputFormat(fileBuffer, filename);
+        format = detected.format === "jpeg" ? "jpg" : detected.format;
+      }
 
       // Decode HEIC/HEIF input via system decoder
       if (validation.format === "heif") {
@@ -118,33 +124,54 @@ export function registerUpscale(app: FastifyInstance) {
 
       // Auto-orient to fix EXIF rotation before upscaling
       fileBuffer = await autoOrient(fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
+      return reply.status(422).send({
+        error: "Upscaling failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-
-      // Save input
+    const originalSize = fileBuffer.length;
+    const jobId = randomUUID();
+    const progressJobId = clientJobId || jobId;
+    let workspacePath: string;
+    try {
+      workspacePath = await createWorkspace(jobId);
       const inputPath = join(workspacePath, "input", filename);
       await writeFile(inputPath, fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "upscale" }, "Workspace creation failed");
+      return reply.status(422).send({
+        error: "Upscaling failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      // Determine which format the Python sidecar should produce.
-      // Formats that need Node.js-side conversion (HEIC/HEIF via heif-enc,
-      // AVIF via Sharp) are produced as PNG first, then converted below.
-      const needsNodeConversion = ["heic", "heif", "avif"].includes(format);
-      const pythonFormat = needsNodeConversion ? "png" : format;
+    const log = request.log;
+    log.info(
+      { toolId: "upscale", imageSize: originalSize, scale, model, format },
+      "Starting upscale",
+    );
 
-      // Process
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
+    // Reply immediately so the HTTP connection closes within proxy timeout limits.
+    // The result will be delivered via the SSE progress channel.
+    reply.status(202).send({ jobId: progressJobId, async: true });
 
+    const needsNodeConversion = ["heic", "heif", "avif"].includes(format);
+    const pythonFormat = needsNodeConversion ? "png" : format;
+
+    const onProgress = (percent: number, stage: string) => {
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "processing",
+        stage,
+        percent,
+      });
+    };
+
+    // Fire-and-forget: processing happens after the response is sent
+    (async () => {
       const result = await upscale(
         fileBuffer,
         join(workspacePath, "output"),
@@ -152,7 +179,6 @@ export function registerUpscale(app: FastifyInstance) {
         onProgress,
       );
 
-      // Convert to final format if needed (HEIC/HEIF/AVIF)
       let outputBuffer = result.buffer;
       let finalFormat = result.format;
       if (needsNodeConversion) {
@@ -165,7 +191,6 @@ export function registerUpscale(app: FastifyInstance) {
         }
       }
 
-      // Save output with correct extension for the chosen format
       const EXT_MAP: Record<string, string> = {
         jpeg: "jpg",
         jpg: "jpg",
@@ -182,12 +207,10 @@ export function registerUpscale(app: FastifyInstance) {
       const outputPath = join(workspacePath, "output", outputFilename);
       await writeFile(outputPath, outputBuffer);
 
-      // Generate browser-compatible preview for non-previewable formats
       const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
       let previewUrl: string | undefined;
       if (!BROWSER_PREVIEWABLE.has(finalFormat)) {
         try {
-          // For HEIC/HEIF, decode first since Sharp can't read HEVC
           const previewInput =
             finalFormat === "heic" || finalFormat === "heif"
               ? await decodeHeic(outputBuffer)
@@ -197,42 +220,44 @@ export function registerUpscale(app: FastifyInstance) {
           await writeFile(previewPath, previewBuffer);
           previewUrl = `/api/v1/download/${jobId}/preview.webp`;
         } catch {
-          // Non-fatal - frontend will show fallback
+          // Non-fatal
         }
       }
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
-      }
-
       if (model !== "auto" && result.method !== model) {
-        request.log.warn(
+        log.warn(
           { toolId: "upscale", requested: model, actual: result.method },
           `Upscale model mismatch: requested ${model} but used ${result.method}`,
         );
       }
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-        previewUrl,
-        originalSize: fileBuffer.length,
-        processedSize: outputBuffer.length,
-        width: result.width,
-        height: result.height,
-        method: result.method,
+      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId,
+          downloadUrl,
+          previewUrl,
+          originalSize,
+          processedSize: outputBuffer.length,
+          width: result.width,
+          height: result.height,
+          method: result.method,
+        },
       });
-    } catch (err) {
-      request.log.error({ err, toolId: "upscale" }, "Upscaling failed");
-      return reply.status(422).send({
-        error: "Upscaling failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+
+      log.info({ toolId: "upscale", jobId, downloadUrl }, "Upscale complete");
+    })().catch((err) => {
+      log.error({ err, toolId: "upscale" }, "Upscaling failed");
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "failed",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Upscale failed",
       });
-    }
+    });
   });
 
   // Register in the pipeline/batch registry so this tool can be used
@@ -248,8 +273,20 @@ export function registerUpscale(app: FastifyInstance) {
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
       const result = await upscale(orientedBuffer, join(workspacePath, "output"), { scale });
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.png`;
-      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      let outputBuffer = result.buffer;
+      if (outputFormat.format !== "png") {
+        outputBuffer = await sharp(result.buffer)
+          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toBuffer();
+      }
+      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: outputFormat.contentType,
+      };
     },
   });
 }

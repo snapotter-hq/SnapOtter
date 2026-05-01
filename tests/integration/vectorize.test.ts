@@ -389,4 +389,384 @@ describe("vectorize", () => {
 
     expect(res.statusCode).toBe(401);
   });
+
+  it("works with HEIC input after decoding", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // HEIC may fail if system decoder missing
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toMatch(/\.svg$/);
+    }
+  });
+
+  it("rejects colorPrecision out of range", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ colorPrecision: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects invalid pathMode value", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pathMode: "bezier" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("color mode with all path modes produces valid SVG", async () => {
+    for (const pathMode of ["none", "polygon", "spline"] as const) {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        {
+          name: "settings",
+          content: JSON.stringify({ colorMode: "color", pathMode }),
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/vectorize",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+
+      const dlRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const svgContent = dlRes.rawPayload.toString("utf-8");
+      expect(svgContent).toContain("<svg");
+    }
+  });
+
+  it("handles WebP input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test.webp",
+        contentType: "image/webp",
+        content: readFileSync(join(FIXTURES, "test-50x50.webp")),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toMatch(/\.svg$/);
+  });
+
+  // ── Large file handling ───────────────────────────────────────
+
+  it("vectorizes a large stress image in bw mode", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ colorMode: "bw" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Empty file handling ───────────────────────────────────────
+
+  it("rejects empty file buffer", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.png",
+        contentType: "image/png",
+        content: Buffer.alloc(0),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Invert with color mode ─────────────────────────────────────
+
+  it("applies invert in bw mode and produces valid SVG", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ colorMode: "bw", invert: true, threshold: 100 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const svg = dlRes.rawPayload.toString("utf-8");
+    expect(svg).toContain("<svg");
+  });
+
+  // ── Corner threshold variations ────────────────────────────────
+
+  it("applies extreme corner threshold values", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ colorMode: "color", cornerThreshold: 180 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rejects cornerThreshold above max (181)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ cornerThreshold: 181 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Layer difference and filter speckle boundaries ─────────────
+
+  it("accepts minimum layerDifference and filterSpeckle", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          colorMode: "color",
+          layerDifference: 1,
+          filterSpeckle: 1,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("accepts maximum layerDifference and filterSpeckle", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          colorMode: "color",
+          layerDifference: 128,
+          filterSpeckle: 256,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── BW mode with polygon path mode ─────────────────────────────
+
+  it("bw mode with polygon path mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ colorMode: "bw", pathMode: "polygon", threshold: 128 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toMatch(/\.svg$/);
+  });
+
+  it("bw mode with none path mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ colorMode: "bw", pathMode: "none" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── HEIF input ───────────────────────────────────────────────
+
+  it("works with HEIF (sample.heif) input after decoding", { timeout: 180_000 }, async () => {
+    const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // HEIF may fail if system decoder missing
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toMatch(/\.svg$/);
+    }
+  });
+
+  // ── SVG input ────────────────────────────────────────────────
+
+  it("vectorizes SVG input (re-traces after rasterization)", async () => {
+    const SVG_BUF = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG_BUF },
+      { name: "settings", content: JSON.stringify({ colorMode: "bw" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // SVG may need rasterization first; accept success or processing error
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toMatch(/\.svg$/);
+    }
+  });
+
+  // ── Animated GIF input ───────────────────────────────────────
+
+  it("vectorizes animated GIF input", async () => {
+    const GIF_BUF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "animated.gif", contentType: "image/gif", content: GIF_BUF },
+      { name: "settings", content: JSON.stringify({ colorMode: "bw" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/vectorize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toMatch(/\.svg$/);
+    expect(json.processedSize).toBeGreaterThan(0);
+  });
 });

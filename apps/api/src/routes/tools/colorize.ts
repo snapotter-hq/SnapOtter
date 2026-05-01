@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { colorize } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,6 +10,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -55,11 +56,14 @@ export function registerColorize(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -78,28 +82,23 @@ export function registerColorize(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
 
+    let settings: z.infer<typeof settingsSchema>;
     try {
-      let settings: z.infer<typeof settingsSchema>;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-        }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
       }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
 
-      const { intensity, model } = settings;
+    const { intensity, model } = settings;
 
-      request.log.info(
-        { toolId: "colorize", imageSize: fileBuffer.length, intensity, model },
-        "Starting colorization",
-      );
-
+    try {
       // Decode HEIC/HEIF input
       if (validation.format === "heif") {
         fileBuffer = await decodeHeic(fileBuffer);
@@ -112,27 +111,51 @@ export function registerColorize(app: FastifyInstance) {
 
       // Auto-orient to fix EXIF rotation
       fileBuffer = await autoOrient(fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "colorize" }, "Input decoding failed");
+      return reply.status(422).send({
+        error: "Colorization failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-
-      // Save input
+    const originalSize = fileBuffer.length;
+    const jobId = randomUUID();
+    const progressJobId = clientJobId || jobId;
+    let workspacePath: string;
+    try {
+      workspacePath = await createWorkspace(jobId);
       const inputPath = join(workspacePath, "input", filename);
       await writeFile(inputPath, fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "colorize" }, "Workspace creation failed");
+      return reply.status(422).send({
+        error: "Colorization failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      // Progress callback
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
+    const log = request.log;
+    log.info(
+      { toolId: "colorize", imageSize: originalSize, intensity, model },
+      "Starting colorization",
+    );
 
+    // Reply immediately so the HTTP connection closes within proxy timeout limits.
+    // The result will be delivered via the SSE progress channel.
+    reply.status(202).send({ jobId: progressJobId, async: true });
+
+    const onProgress = (percent: number, stage: string) => {
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "processing",
+        stage,
+        percent,
+      });
+    };
+
+    // Fire-and-forget: processing happens after the response is sent
+    (async () => {
       // Process with Python sidecar
       const result = await colorize(
         fileBuffer,
@@ -172,38 +195,40 @@ export function registerColorize(app: FastifyInstance) {
         }
       }
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
-      }
-
       if (model !== "auto" && result.method !== model) {
-        request.log.warn(
+        log.warn(
           { toolId: "colorize", requested: model, actual: result.method },
           `Colorize model mismatch: requested ${model} but used ${result.method}`,
         );
       }
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-        previewUrl,
-        originalSize: fileBuffer.length,
-        processedSize: outputBuffer.length,
-        width: result.width,
-        height: result.height,
-        method: result.method,
+      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId,
+          downloadUrl,
+          previewUrl,
+          originalSize,
+          processedSize: outputBuffer.length,
+          width: result.width,
+          height: result.height,
+          method: result.method,
+        },
       });
-    } catch (err) {
-      request.log.error({ err, toolId: "colorize" }, "Colorization failed");
-      return reply.status(422).send({
-        error: "Colorization failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+
+      log.info({ toolId: "colorize", jobId, downloadUrl }, "Colorize complete");
+    })().catch((err) => {
+      log.error({ err, toolId: "colorize" }, "Colorization failed");
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "failed",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Colorization failed",
       });
-    }
+    });
   });
 
   // Register in the pipeline/batch registry

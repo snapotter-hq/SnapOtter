@@ -2397,6 +2397,10 @@ paths:
                     - `pageSize` (string, default "A4") — One of: A4, Letter, A3, A5
                     - `orientation` (string, default "portrait") — One of: portrait, landscape
                     - `margin` (number 0-500, default 20) — Page margin in points
+                    - `targetSize` (object, optional) — Target output file size
+                      - `value` (number, required) — Positive number (decimals allowed)
+                      - `unit` (string, required) — One of: KB, MB
+                      Minimum effective target is 50KB. When set, images are compressed as JPEG with quality auto-tuned to meet the target.
       responses:
         "200":
           description: Generated PDF (downloadUrl points to .pdf file)
@@ -2410,6 +2414,19 @@ paths:
                       pages:
                         type: integer
                         description: Number of images/pages in the PDF
+                      compression:
+                        type: object
+                        description: Present only when targetSize was specified
+                        properties:
+                          targetRequested:
+                            type: integer
+                            description: Target size in bytes
+                          targetMet:
+                            type: boolean
+                            description: Whether the target was achieved
+                          jpegQuality:
+                            type: integer
+                            description: Final JPEG quality used (10-95)
         "400":
           description: Invalid input
           content:

@@ -2,6 +2,7 @@ import { flip, rotate } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -15,6 +16,7 @@ export function registerRotate(app: FastifyInstance) {
     toolId: "rotate",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       let image = sharp(inputBuffer);
 
       // Apply rotation first
@@ -30,8 +32,10 @@ export function registerRotate(app: FastifyInstance) {
         });
       }
 
-      const buffer = await image.toBuffer();
-      return { buffer, filename, contentType: "image/png" };
+      const buffer = await image
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
+      return { buffer, filename, contentType: outputFormat.contentType };
     },
   });
 }

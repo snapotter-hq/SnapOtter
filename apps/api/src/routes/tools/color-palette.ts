@@ -1,6 +1,6 @@
-import { basename } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 /**
@@ -55,7 +55,7 @@ export function registerColorPalette(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         }
       }
     } catch (err) {

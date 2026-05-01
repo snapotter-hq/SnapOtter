@@ -12,6 +12,7 @@ Pre-imports heavy libraries at startup to eliminate cold-start latency.
 """
 import sys
 import json
+import gc
 import io
 import os
 import traceback
@@ -198,6 +199,20 @@ def _run_script_main(script_name, args):
 # ── Main loop ───────────────────────────────────────────────────────
 
 
+MAX_REQUESTS = int(os.environ.get("DISPATCHER_MAX_REQUESTS", "50"))
+
+
+def _cleanup_after_request():
+    """Free unreferenced objects and GPU memory after each request."""
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
+
 def main():
     # Signal readiness with GPU status
     gpu = False
@@ -207,7 +222,9 @@ def main():
     except ImportError as e:
         print(f"[dispatcher] GPU detection failed: {e}", file=sys.stderr, flush=True)
     print(json.dumps({"ready": True, "gpu": gpu}), file=sys.stderr, flush=True)
-    print(f"[dispatcher] Ready. GPU: {gpu}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
+    print(f"[dispatcher] Ready. GPU: {gpu}. Max requests: {MAX_REQUESTS}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
+
+    request_count = 0
 
     for line in sys.stdin:
         line = line.strip()
@@ -240,6 +257,14 @@ def main():
         # Write response as a single JSON line to stdout
         sys.stdout.write(json.dumps(response) + "\n")
         sys.stdout.flush()
+
+        _cleanup_after_request()
+        request_count += 1
+
+        if request_count >= MAX_REQUESTS:
+            print(f"[dispatcher] Reached max requests ({MAX_REQUESTS}), shutting down for restart",
+                  file=sys.stderr, flush=True)
+            break
 
 
 if __name__ == "__main__":

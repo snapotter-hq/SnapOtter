@@ -15,7 +15,7 @@ Self-hosted deployments should subscribe to [GitHub release notifications](https
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-To report a vulnerability, email **security@snapotter.local** with:
+To report a vulnerability, email **contact@snapotter.com** with:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce or a proof-of-concept

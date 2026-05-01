@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 
@@ -435,7 +436,7 @@ export function registerCollage(app: FastifyInstance) {
           if (buf.length > 0) {
             files.push({
               buffer: buf,
-              filename: basename(part.filename ?? `image-${files.length}`),
+              filename: sanitizeFilename(part.filename ?? `image-${files.length}`),
             });
           }
         } else if (part.fieldname === "settings") {
@@ -483,6 +484,10 @@ export function registerCollage(app: FastifyInstance) {
       const template = TEMPLATES.find((t) => t.id === settings.templateId);
       if (!template) {
         return reply.status(400).send({ error: `Unknown template: ${settings.templateId}` });
+      }
+
+      if (files.length > template.imageCount) {
+        files.length = template.imageCount;
       }
 
       // Determine output canvas size

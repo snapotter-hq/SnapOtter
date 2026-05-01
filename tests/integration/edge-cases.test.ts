@@ -534,3 +534,248 @@ describe("Unicode and special filenames", () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ZERO-BYTE FILES — ADDITIONAL TOOLS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Zero-byte file to info and border tools", () => {
+  it("rejects a zero-byte file to /api/v1/tools/info with 400", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", content: Buffer.alloc(0), contentType: "image/png" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBeDefined();
+  });
+
+  it("rejects a zero-byte file to /api/v1/tools/sharpening with 400", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", content: Buffer.alloc(0), contentType: "image/png" },
+      { name: "settings", content: JSON.stringify({ method: "adaptive" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/sharpening",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1x1 IMAGE — FLIP AND INFO
+// ═══════════════════════════════════════════════════════════════════════════
+describe("1x1 pixel image through rotate with flip", () => {
+  it("rotates and flips a 1x1 image horizontally", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+      { name: "settings", content: JSON.stringify({ angle: 0, flipHorizontal: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/rotate",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    // 0-degree rotation with flip is valid
+    expect([200, 400]).toContain(res.statusCode);
+  });
+
+  it("rotates and flips a 1x1 image vertically", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+      { name: "settings", content: JSON.stringify({ angle: 0, flipVertical: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/rotate",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect([200, 400]).toContain(res.statusCode);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MULTIPART WITHOUT FILE PART — ONLY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Missing file part in multipart request", () => {
+  it("rejects resize request with only settings and no file", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({ width: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/no image/i);
+  });
+
+  it("rejects pipeline execute with only pipeline definition and no file", async () => {
+    const pipelineDef = {
+      steps: [{ toolId: "resize", settings: { width: 100 } }],
+    };
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "pipeline", content: JSON.stringify(pipelineDef) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/no image/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WRONG EXTENSION — ADDITIONAL FORMAT MISMATCHES
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Wrong extension — additional format mismatches", () => {
+  it("handles JPEG data uploaded with .webp extension gracefully", async () => {
+    const jpgBuffer = readFileSync(join(FIXTURES, "test-100x100.jpg"));
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "actually-jpeg.webp",
+        content: jpgBuffer,
+        contentType: "image/webp",
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    // Sharp detects real format via magic bytes
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("handles WebP data uploaded with .png extension gracefully", async () => {
+    const webpBuffer = readFileSync(join(FIXTURES, "test-50x50.webp"));
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "actually-webp.png",
+        content: webpBuffer,
+        contentType: "image/png",
+      },
+      { name: "settings", content: JSON.stringify({ width: 30 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS WITH EXTREME STRING VALUES
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Settings with extreme values", () => {
+  it("handles resize with Number.MAX_SAFE_INTEGER as width without crashing", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: Number.MAX_SAFE_INTEGER }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    // May be rejected by validation (400), fail at processing (422), or
+    // even succeed if Sharp clamps — the key assertion is that it does not crash
+    expect([200, 400, 422]).toContain(res.statusCode);
+  });
+
+  it("handles deeply nested JSON in settings without crashing", async () => {
+    // Build 50-level deep object — should be rejected or flattened by Zod
+    let nested: Record<string, unknown> = { width: 100 };
+    for (let i = 0; i < 50; i++) {
+      nested = { [`level${i}`]: nested };
+    }
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "settings", content: JSON.stringify(nested) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    // Zod strips unknown keys; width is not present at top level so validation
+    // may fail or default to empty settings. Must not crash.
+    expect([200, 400, 422]).toContain(res.statusCode);
+  });
+
+  it("handles settings with very large JSON string (100KB)", async () => {
+    const bigSettings = {
+      width: 100,
+      padding: "X".repeat(100_000),
+    };
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "settings", content: JSON.stringify(bigSettings) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    // Zod strips the unknown 'padding' key; should succeed with width: 100
+    expect(res.statusCode).toBe(200);
+  });
+});

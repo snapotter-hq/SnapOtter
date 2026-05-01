@@ -31,15 +31,6 @@ async function fetchBundleStatuses(
   return data.bundles as BundleInfo[];
 }
 
-async function isBundleInstalled(
-  request: import("@playwright/test").APIRequestContext,
-  bundleId: string,
-): Promise<boolean> {
-  const bundles = await fetchBundleStatuses(request);
-  const bundle = bundles.find((b) => b.id === bundleId);
-  return bundle?.status === "installed";
-}
-
 // ─── Feature API tests ─────────────────────────────────────────────
 
 test.describe("Feature API", () => {
@@ -102,16 +93,6 @@ test.describe("Feature API", () => {
     expect(response.status()).toBe(404);
   });
 
-  test("POST uninstall returns 409 for not-installed bundle", async ({ request }) => {
-    const installed = await isBundleInstalled(request, "background-removal");
-    if (installed) {
-      test.skip();
-      return;
-    }
-    const response = await request.post("/api/v1/admin/features/background-removal/uninstall");
-    expect(response.status()).toBe(409);
-  });
-
   test("GET disk-usage returns totalBytes", async ({ request }) => {
     const token = await getToken(request);
     const response = await request.get("/api/v1/admin/features/disk-usage", {
@@ -123,20 +104,70 @@ test.describe("Feature API", () => {
   });
 });
 
-// ─── Tool route guard tests ─────────────────────────────────────────
+// ─── Tool route guard tests (serial: manages ocr bundle lifecycle) ──
 
 test.describe("Tool route guards", () => {
+  test.describe.configure({ mode: "serial" });
+
   const pngBuffer = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
     "base64",
   );
 
-  const aiTools = [
+  test.beforeAll(async ({ request }) => {
+    const token = await getToken(request);
+    const bundles = await fetchBundleStatuses(request);
+    const ocr = bundles.find((b) => b.id === "ocr");
+    if (ocr?.status === "installed") {
+      await request.post("/api/v1/admin/features/ocr/uninstall", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      for (let i = 0; i < 30; i++) {
+        const updated = await fetchBundleStatuses(request);
+        if (updated.find((b) => b.id === "ocr")?.status === "not_installed") break;
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  });
+
+  test.afterAll(async ({ request }) => {
+    const token = await getToken(request);
+    await request.post("/api/v1/admin/features/ocr/install", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    for (let i = 0; i < 60; i++) {
+      const updated = await fetchBundleStatuses(request);
+      if (updated.find((b) => b.id === "ocr")?.status === "installed") break;
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  });
+
+  // ocr bundle is uninstalled -- expect 501
+  test("ocr returns 501 FEATURE_NOT_INSTALLED with correct bundle", async ({ request }) => {
+    const response = await request.post("/api/v1/tools/ocr", {
+      multipart: {
+        file: {
+          name: "test.png",
+          mimeType: "image/png",
+          buffer: pngBuffer,
+        },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(response.status()).toBe(501);
+    const body = await response.json();
+    expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+    expect(body.feature).toBe("ocr");
+    expect(body.featureName).toBeTruthy();
+    expect(body.estimatedSize).toBeTruthy();
+  });
+
+  // All other AI tools have their bundles installed -- expect 200 (guard allows through)
+  const installedAiTools = [
     { tool: "remove-background", bundle: "background-removal" },
     { tool: "upscale", bundle: "upscale-enhance" },
     { tool: "blur-faces", bundle: "face-detection" },
     { tool: "erase-object", bundle: "object-eraser-colorize" },
-    { tool: "ocr", bundle: "ocr" },
     { tool: "colorize", bundle: "object-eraser-colorize" },
     { tool: "enhance-faces", bundle: "upscale-enhance" },
     { tool: "noise-removal", bundle: "upscale-enhance" },
@@ -145,13 +176,8 @@ test.describe("Tool route guards", () => {
     { tool: "passport-photo", bundle: "background-removal" },
   ];
 
-  for (const { tool, bundle } of aiTools) {
-    test(`${tool} returns 501 FEATURE_NOT_INSTALLED with correct bundle`, async ({ request }) => {
-      const installed = await isBundleInstalled(request, bundle);
-      if (installed) {
-        test.skip();
-        return;
-      }
+  for (const { tool } of installedAiTools) {
+    test(`${tool} returns 200 when bundle is installed`, async ({ request }) => {
       const response = await request.post(`/api/v1/tools/${tool}`, {
         multipart: {
           file: {
@@ -162,12 +188,7 @@ test.describe("Tool route guards", () => {
           settings: JSON.stringify({}),
         },
       });
-      expect(response.status()).toBe(501);
-      const body = await response.json();
-      expect(body.code).toBe("FEATURE_NOT_INSTALLED");
-      expect(body.feature).toBe(bundle);
-      expect(body.featureName).toBeTruthy();
-      expect(body.estimatedSize).toBeTruthy();
+      expect(response.status()).toBe(200);
     });
   }
 
@@ -185,23 +206,18 @@ test.describe("Tool route guards", () => {
     // Should succeed or fail with a processing error, NOT 501
     expect(response.status()).not.toBe(501);
   });
-});
 
-// ─── Batch and pipeline guard tests ─────────────────────────────────
+  // ─── Uninstall conflict (ocr is not installed at this point) ──────
 
-test.describe("Batch and pipeline guards", () => {
-  const pngBuffer = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
-    "base64",
-  );
+  test("POST uninstall returns 409 for not-installed bundle", async ({ request }) => {
+    const response = await request.post("/api/v1/admin/features/ocr/uninstall");
+    expect(response.status()).toBe(409);
+  });
+
+  // ─── Batch guard (ocr is not installed at this point) ─────────────
 
   test("batch endpoint returns 501 for uninstalled AI tool", async ({ request }) => {
-    const installed = await isBundleInstalled(request, "background-removal");
-    if (installed) {
-      test.skip();
-      return;
-    }
-    const response = await request.post("/api/v1/tools/remove-background/batch", {
+    const response = await request.post("/api/v1/tools/ocr/batch", {
       multipart: {
         "files[]": {
           name: "test.png",
@@ -215,48 +231,39 @@ test.describe("Batch and pipeline guards", () => {
     const body = await response.json();
     expect(body.code).toBe("FEATURE_NOT_INSTALLED");
   });
-});
 
-// ─── GUI tests (Playwright page interactions) ───────────────────────
+  // ─── GUI tests (ocr is not installed at this point) ───────────────
 
-test.describe("Feature install UI", () => {
-  test("uninstalled AI tool page shows install prompt", async ({ page, request }) => {
-    const installed = await isBundleInstalled(request, "background-removal");
-    if (installed) {
-      test.skip();
-      return;
-    }
-    await page.goto("/remove-background");
-    await expect(page.getByText("Background Removal")).toBeVisible({
+  test("uninstalled AI tool page shows install prompt", async ({ page }) => {
+    await page.goto("/ocr");
+    await expect(page.getByText("OCR")).toBeVisible({
       timeout: 10000,
     });
     await expect(page.getByText("additional download")).toBeVisible();
     await expect(page.getByRole("button", { name: /enable/i })).toBeVisible();
   });
 
+  test("AI tools show download badge in sidebar", async ({ page }) => {
+    await page.goto("/resize");
+    // Wait for the sidebar to load
+    await expect(page.locator("[data-testid='tool-panel']").or(page.locator("nav"))).toBeVisible({
+      timeout: 10000,
+    });
+    // The download icon should be visible near the OCR tool
+    const ocrLink = page.locator("a[href='/ocr']");
+    await expect(ocrLink).toBeVisible();
+  });
+});
+
+// ─── GUI tests (no bundle state dependency) ─────────────────────────
+
+test.describe("Feature install UI", () => {
   test("non-AI tool page loads normally", async ({ page }) => {
     await page.goto("/resize");
     // Should show the normal tool UI, not an install prompt
     await expect(page.getByText("additional download")).not.toBeVisible({
       timeout: 5000,
     });
-  });
-
-  test("AI tools show download badge in sidebar", async ({ page, request }) => {
-    const installed = await isBundleInstalled(request, "background-removal");
-    if (installed) {
-      test.skip();
-      return;
-    }
-    await page.goto("/resize");
-    // Wait for the sidebar to load
-    await expect(page.locator("[data-testid='tool-panel']").or(page.locator("nav"))).toBeVisible({
-      timeout: 10000,
-    });
-    // The download icon should be visible near AI tools
-    // Note: we can't easily test for the exact Download icon, but we can check the tool links exist
-    const removeBackgroundLink = page.locator("a[href='/remove-background']");
-    await expect(removeBackgroundLink).toBeVisible();
   });
 
   test("settings dialog has AI Features section", async ({ page }) => {

@@ -12,6 +12,7 @@ tmp/
 .env.cloudflare
 .env.*
 .DS_Store
+.playwright/
 .playwright-mcp/
 .vite/
 apps/api/data/
@@ -56,3 +57,4 @@ audit_report.md
 .mcp.json
 tests/benchmark/bench-limits-results-mac.jsonl
 .superpowers/
+scripts/setup-cloudflare-email.sh

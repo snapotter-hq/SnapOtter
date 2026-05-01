@@ -1,4 +1,4 @@
-import { APP_VERSION } from "@snapotter/shared";
+import { APP_VERSION, shouldShowConsent } from "@snapotter/shared";
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
@@ -82,9 +82,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     mustChangePassword,
     analyticsEnabled,
     analyticsConsentShownAt,
+    analyticsConsentRemindAt,
   } = useAuth();
   const storeConsent = useAnalyticsStore((s) => s.consent);
   const setStoreConsent = useAnalyticsStore((s) => s.setConsent);
+  const analyticsConfig = useAnalyticsStore((s) => s.config);
   const location = useLocation();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only hydrate on session load, not on store changes
@@ -98,7 +100,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       setStoreConsent({
         analyticsEnabled: analyticsEnabled ?? null,
         analyticsConsentShownAt: analyticsConsentShownAt ?? null,
-        analyticsConsentRemindAt: null,
+        analyticsConsentRemindAt: analyticsConsentRemindAt ?? null,
       });
     }
   }, [loading, analyticsEnabled, analyticsConsentShownAt, setStoreConsent]);
@@ -142,12 +144,19 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/change-password" replace />;
   }
 
-  // Check both session state (useAuth) and real-time store state.
-  // After the consent page calls acceptAnalytics(), the store updates immediately
-  // but useAuth won't re-fetch until the next session check.
-  const effectiveEnabled = storeConsent.analyticsEnabled ?? analyticsEnabled;
-  const effectiveShownAt = storeConsent.analyticsConsentShownAt ?? analyticsConsentShownAt;
-  if (authEnabled && effectiveEnabled === null && effectiveShownAt === null) {
+  const effectiveConsent = {
+    analyticsEnabled: storeConsent.analyticsEnabled ?? analyticsEnabled ?? null,
+    analyticsConsentShownAt:
+      storeConsent.analyticsConsentShownAt ?? analyticsConsentShownAt ?? null,
+    analyticsConsentRemindAt:
+      storeConsent.analyticsConsentRemindAt ?? analyticsConsentRemindAt ?? null,
+  };
+  const serverEnabled = analyticsConfig?.enabled ?? false;
+  if (
+    authEnabled &&
+    analyticsConfig !== null &&
+    shouldShowConsent(effectiveConsent, serverEnabled)
+  ) {
     return <Navigate to="/analytics-consent" replace />;
   }
 
@@ -174,22 +183,19 @@ export function App() {
   }, [fetchAnalyticsConfig]);
 
   useEffect(() => {
-    if (analyticsConfigLoaded && analyticsConfig?.enabled) {
-      initAnalytics(analyticsConfig);
-    }
-  }, [analyticsConfigLoaded, analyticsConfig]);
-
-  useEffect(() => {
     if (
       !analyticsConfigLoaded ||
       !analyticsConfig?.enabled ||
       analyticsConsent.analyticsEnabled !== true
     )
       return;
-    identify(analyticsConfig.instanceId, {
-      $set: { version: APP_VERSION },
-      $set_once: { instance_id: analyticsConfig.instanceId },
-    });
+    void (async () => {
+      await initAnalytics(analyticsConfig);
+      identify(analyticsConfig.instanceId, {
+        $set: { version: APP_VERSION },
+        $set_once: { instance_id: analyticsConfig.instanceId },
+      });
+    })();
   }, [analyticsConfigLoaded, analyticsConfig, analyticsConsent.analyticsEnabled]);
 
   return (

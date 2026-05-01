@@ -33,7 +33,10 @@ export default defineConfig({
     },
     exclude: [
       "tests/e2e/**",
+      "tests/e2e-docs/**",
+      "tests/e2e-landing/**",
       "tests/e2e-docker/**",
+      "tests/e2e-analytics/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/.{idea,git,cache,output,temp}/**",
@@ -106,6 +109,8 @@ export default defineConfig({
       react: path.join(webNodeModules, "react"),
       "react-dom": path.join(webNodeModules, "react-dom"),
       zustand: path.join(webNodeModules, "zustand"),
+      "posthog-js": path.join(webNodeModules, "posthog-js"),
+      "@sentry/react": path.join(webNodeModules, "@sentry/react"),
     },
   },
 });

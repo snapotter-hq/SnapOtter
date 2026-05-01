@@ -198,6 +198,17 @@ describe("detectFormat", () => {
       expect(format).not.toBe("avif");
     });
 
+    it("rejects ftyp box when buffer too short to read brand (< 12 bytes)", async () => {
+      // Buffer has ftyp at offset 4 but is only 8 bytes long -- too short for brand
+      const buf = Buffer.alloc(8);
+      buf[4] = 0x66;
+      buf[5] = 0x74;
+      buf[6] = 0x79;
+      buf[7] = 0x70; // "ftyp"
+      const format = await detectFormat(buf);
+      expect(format).not.toBe("avif");
+    });
+
     it("detects JXL ISOBMFF container magic bytes", async () => {
       const buf = Buffer.from([0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0, 0, 0, 0]);
       const format = await detectFormat(buf);

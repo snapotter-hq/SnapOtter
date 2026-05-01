@@ -191,7 +191,10 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       });
 
       try {
-        const result = await apiPost<{ jobId: string }>(`/v1/admin/features/${bundleId}/install`);
+        const result = await apiPost<{ jobId: string }>(
+          `/v1/admin/features/${bundleId}/install`,
+          {},
+        );
         listenToProgress(bundleId, result.jobId);
       } catch (err) {
         const installing = { ...get().installing };
@@ -209,7 +212,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
 
     uninstallBundle: async (bundleId: string) => {
       try {
-        await apiPost(`/v1/admin/features/${bundleId}/uninstall`);
+        await apiPost(`/v1/admin/features/${bundleId}/uninstall`, {});
         await refreshBundles();
       } catch (err) {
         set({

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -38,6 +39,7 @@ export function registerWatermarkText(app: FastifyInstance) {
     toolId: "watermark-text",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       const image = sharp(inputBuffer);
       const metadata = await image.metadata();
       const width = metadata.width ?? 800;
@@ -103,9 +105,11 @@ export function registerWatermarkText(app: FastifyInstance) {
 
       const svgBuffer = Buffer.from(svgOverlay);
       const result = await image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
-      const buffer = await result.toBuffer();
+      const buffer = await result
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
 
-      return { buffer, filename, contentType: "image/png" };
+      return { buffer, filename, contentType: outputFormat.contentType };
     },
   });
 }

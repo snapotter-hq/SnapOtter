@@ -481,4 +481,423 @@ describe("Barcode Read", () => {
     expect(result.barcodes).toHaveLength(0);
     expect(result.annotatedUrl).toBeNull();
   });
+
+  // ── Branch coverage: HEIC input (lines 49-152, ensureSharpCompat) ───
+
+  it("reads barcodes from a HEIC image", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("photo.heic");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+    // No barcodes in a plain image, but no errors either
+    expect(result.barcodes).toHaveLength(0);
+  });
+
+  // ── Branch coverage: invalid file validation (line 49-152) ──────────
+
+  it("rejects an invalid/corrupt image file", async () => {
+    const corruptBuffer = Buffer.from("this is not a valid image file at all");
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "corrupt.png", contentType: "image/png", content: corruptBuffer },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
+  });
+
+  // ── Branch coverage: large image handling ───────────────────────────
+
+  it("reads barcodes from a large stress image", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("large.jpg");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Branch coverage: no settings field (uses defaults) ──────────────
+
+  it("reads barcodes with no settings field (uses defaults)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "qr.png", contentType: "image/png", content: qrCodePng },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // Default tryHarder is true, should detect the QR code
+    expect(result.barcodes.length).toBeGreaterThanOrEqual(1);
+    expect(result.barcodes[0].text).toBe(QR_TEXT);
+  });
+
+  // ── Branch coverage: portrait HEIC (with exif orientation) ──────────
+
+  it("reads barcodes from portrait HEIC image", { timeout: 120_000 }, async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "portrait.heic",
+        contentType: "image/heic",
+        content: HEIC_PORTRAIT,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("portrait.heic");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Branch coverage: multiple barcodes in one image ─────────────────
+
+  it("detects multiple QR codes when composited together", async () => {
+    // Create an image with 2 QR codes side by side
+    const qrMeta = await sharp(qrCodePng).metadata();
+    const qrW = qrMeta.width ?? 400;
+    const qrH = qrMeta.height ?? 400;
+
+    const doubleQr = await sharp({
+      create: {
+        width: qrW * 2 + 20,
+        height: qrH,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    })
+      .composite([
+        { input: qrCodePng, left: 0, top: 0 },
+        { input: qrCodePng, left: qrW + 20, top: 0 },
+      ])
+      .png()
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "double-qr.png", contentType: "image/png", content: doubleQr },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // Should detect at least 1 QR code (2 if detection is good enough)
+    expect(result.barcodes.length).toBeGreaterThanOrEqual(1);
+    expect(result.annotatedUrl).toBeDefined();
+    expect(result.annotatedUrl).not.toBeNull();
+  });
+
+  // ── Branch coverage: blank image → no barcodes found (line 229) ─────
+
+  it("handles a blank white image gracefully", async () => {
+    const BLANK = readFileSync(join(FIXTURES, "test-blank.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "blank.png", contentType: "image/png", content: BLANK },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.barcodes).toHaveLength(0);
+    expect(result.annotatedUrl).toBeNull();
+    expect(result.previewUrl).toBeNull();
+  });
+
+  // ── Branch coverage: HEIF content format input ─────────────────────
+
+  it("reads barcodes from portrait HEIC image (additional format)", {
+    timeout: 120_000,
+  }, async () => {
+    const HEIC_PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo2.heic", contentType: "image/heic", content: HEIC_PORTRAIT },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("photo2.heic");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Branch coverage: tryHarder with empty settings object ──────────
+
+  it("reads barcodes with explicit empty settings (defaults applied)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "qr.png", contentType: "image/png", content: qrCodePng },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // Default tryHarder is true, should detect QR
+    expect(result.barcodes.length).toBeGreaterThanOrEqual(1);
+    expect(result.barcodes[0].text).toBe(QR_TEXT);
+  });
+
+  // ── Branch coverage: EXIF-oriented input ───────────────────────────
+
+  it("reads barcodes from EXIF-oriented image", async () => {
+    const EXIF = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "exif.jpg", contentType: "image/jpeg", content: EXIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("exif.jpg");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Branch coverage: WebP QR code with tryHarder false ─────────────
+
+  it("reads QR code from WebP with tryHarder false", async () => {
+    const webpQr = await sharp(qrCodePng).webp({ quality: 95 }).toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "qr.webp", contentType: "image/webp", content: webpQr },
+      { name: "settings", content: JSON.stringify({ tryHarder: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Branch coverage: portrait image with no barcode ────────────────
+
+  it("handles portrait JPEG with no barcodes", async () => {
+    const PORTRAIT = readFileSync(join(FIXTURES, "test-portrait.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "portrait.jpg", contentType: "image/jpeg", content: PORTRAIT },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("portrait.jpg");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+    expect(result.barcodes).toHaveLength(0);
+    expect(result.annotatedUrl).toBeNull();
+  });
+
+  // ── Branch coverage: barcode from resized QR (lower quality) ───────
+
+  it("reads QR code from lower-resolution version", async () => {
+    const smallQr = await sharp(qrCodePng).resize(100, 100).png().toBuffer();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "small-qr.png", contentType: "image/png", content: smallQr },
+      { name: "settings", content: JSON.stringify({ tryHarder: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(Array.isArray(result.barcodes)).toBe(true);
+    // May or may not detect at very small size, but should not error
+  });
+
+  // ── HEIF format input ─────────────────────────────────────────────
+
+  it("reads barcodes from a HEIF image", { timeout: 120_000 }, async () => {
+    const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("photo.heif");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── Animated GIF input ────────────────────────────────────────────
+
+  it("reads barcodes from an animated GIF", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("anim.gif");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
+
+  // ── SVG input ─────────────────────────────────────────────────────
+
+  it("reads barcodes from an SVG image", async () => {
+    const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.filename).toBe("icon.svg");
+    expect(Array.isArray(result.barcodes)).toBe(true);
+  });
 });

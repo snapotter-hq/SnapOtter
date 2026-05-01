@@ -121,7 +121,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<toolId>/batch \
 | `strip-metadata` | Strip Metadata | - |
 | `edit-metadata` | Edit Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk Rename | `pattern` (supports `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |
-| `image-to-pdf` | Image to PDF | `pageSize` (A4/Letter/…), `orientation`, `margin`, `fitMode` |
+| `image-to-pdf` | Image to PDF | `pageSize` (A4/Letter/...), `orientation`, `margin`, `targetSize` ({value, unit}) |
 | `favicon` | Favicon Generator | `padding`, `backgroundColor`, `borderRadius` - generates all standard sizes |
 
 ### Adjustments

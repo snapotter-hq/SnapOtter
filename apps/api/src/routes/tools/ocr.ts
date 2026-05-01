@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
 import { extractText } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -7,6 +6,7 @@ import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 
@@ -50,7 +50,7 @@ export function registerOcr(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
@@ -142,6 +142,17 @@ export function registerOcr(app: FastifyInstance) {
             onProgress,
           );
 
+          // If a higher-quality tier returns empty text but didn't crash,
+          // fall back to the next tier rather than returning nothing.
+          if (!result.text && tier !== fallbackChain[fallbackChain.length - 1]) {
+            request.log.warn(
+              { toolId: "ocr", quality: tier, engine: result.engine },
+              `OCR ${tier} returned empty text, falling back to next tier`,
+            );
+            if (onProgress) onProgress(15, "Retrying...");
+            continue;
+          }
+
           if (clientJobId) {
             updateSingleFileProgress({
               jobId: clientJobId,
@@ -151,7 +162,7 @@ export function registerOcr(app: FastifyInstance) {
           }
 
           const expectedEngine =
-            tier === "fast" ? "tesseract" : tier === "balanced" ? "paddleocr" : "paddleocr-vl";
+            tier === "fast" ? "tesseract" : tier === "balanced" ? "paddleocr-v5" : "paddleocr-vl";
           if (result.engine && result.engine !== expectedEngine) {
             request.log.warn(
               { toolId: "ocr", requested: tier, expected: expectedEngine, actual: result.engine },

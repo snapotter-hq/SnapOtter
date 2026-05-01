@@ -16,6 +16,8 @@ const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
 const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
 const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+const SVG = readFileSync(join(FIXTURES, "test-100x100.svg"));
+const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -448,5 +450,326 @@ describe("Error handling", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Preview endpoint: SVG sanitization ─────────────────────────
+describe("Preview endpoint SVG handling", () => {
+  it("preview sanitizes and processes SVG input", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ format: "webp", quality: 60 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/webp");
+    expect(res.headers["x-original-size"]).toBeDefined();
+    expect(res.headers["x-processed-size"]).toBeDefined();
+  });
+});
+
+// ── Preview endpoint: HEIC decoding ────────────────────────────
+describe("Preview endpoint HEIC handling", () => {
+  it("preview decodes and processes HEIC input", { timeout: 120_000 }, async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ format: "webp", quality: 60 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    // HEIC decode may fail if system decoder is missing
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      expect(res.headers["content-type"]).toContain("image/webp");
+    }
+  });
+});
+
+// ── Preview endpoint: invalid settings ─────────────────────────
+describe("Preview endpoint validation", () => {
+  it("preview returns 400 for invalid settings JSON", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not-json" },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/json/i);
+  });
+
+  it("preview returns 400 for invalid settings values", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ format: "bmp" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  it("preview returns 400 for invalid image file", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      { name: "settings", content: JSON.stringify({ format: "webp" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
+  });
+
+  it("preview works with default settings (no settings field)", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/webp");
+  });
+
+  it("preview returns correct output filename in header", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "myimage.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ format: "jpeg" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["x-output-filename"]).toContain("myimage.jpg");
+    expect(res.headers["content-type"]).toContain("image/jpeg");
+  });
+});
+
+// ── HEIC input handling ─────────────────────────────────────────
+describe("HEIC input", () => {
+  it("optimizes HEIC input to webp", { timeout: 120_000 }, async () => {
+    const res = await postTool({ format: "webp" }, HEIC, "test.heic", "image/heic");
+    // HEIC decode may not be available
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.downloadUrl).toContain(".webp");
+    }
+  });
+
+  it("optimizes HEIC input to jpeg", { timeout: 120_000 }, async () => {
+    const res = await postTool({ format: "jpeg" }, HEIC, "test.heic", "image/heic");
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toContain(".jpg");
+    }
+  });
+});
+
+// ── Large file handling ─────────────────────────────────────────
+describe("Large file handling", () => {
+  it("optimizes a large stress image", async () => {
+    const large = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const res = await postTool(
+      { format: "webp", quality: 60, maxWidth: 800 },
+      large,
+      "stress-large.jpg",
+      "image/jpeg",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+    expect(result.processedSize).toBeLessThan(large.length);
+  });
+});
+
+// ── Tiny file handling ──────────────────────────────────────────
+describe("Tiny file handling", () => {
+  it("optimizes a 1x1 pixel image", async () => {
+    const tiny = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const res = await postTool({ format: "webp" }, tiny, "tiny.png", "image/png");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Empty file handling ─────────────────────────────────────────
+describe("Empty file handling", () => {
+  it("returns 400 for empty file upload", async () => {
+    const res = await postTool({ format: "webp" }, Buffer.alloc(0), "empty.png", "image/png");
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ── Preview endpoint: format variations ──────────────────────────
+describe("Preview endpoint format variations", () => {
+  it("preview with AVIF output format", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ format: "avif", quality: 50 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/avif");
+  });
+
+  it("preview with maxWidth and maxHeight constraints", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ format: "webp", maxWidth: 50, maxHeight: 40 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const processed = await sharp(res.rawPayload).metadata();
+    expect(processed.width).toBeLessThanOrEqual(50);
+    expect(processed.height).toBeLessThanOrEqual(40);
+  });
+
+  it("preview with PNG output format", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ format: "png" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/png");
+    expect(res.headers["x-output-filename"]).toContain(".png");
+  });
+});
+
+// ── Unauthenticated request ────────────────────────────────────
+describe("Authentication", () => {
+  it("returns 401 for unauthenticated request", async () => {
+    const { body: payload, contentType } = makePayload({ format: "webp" });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/optimize-for-web",
+      payload,
+      headers: { "content-type": contentType },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── HEIF input handling ───────────────────────────────────────
+describe("HEIF input", () => {
+  it("optimizes HEIF (sample.heif) input to webp", { timeout: 120_000 }, async () => {
+    const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
+    const res = await postTool({ format: "webp" }, HEIF, "sample.heif", "image/heif");
+    // HEIF decode may not be available
+    expect([200, 422]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.downloadUrl).toContain(".webp");
+    }
+  });
+});
+
+// ── Animated GIF input ────────────────────────────────────────
+describe("Animated GIF input", () => {
+  it("optimizes animated GIF to webp", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const res = await postTool({ format: "webp" }, GIF, "animated.gif", "image/gif");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── File with no extension ──────────────────────────────────────
+describe("File naming edge cases", () => {
+  it("handles file without extension", async () => {
+    const res = await postTool({ format: "webp" }, PNG, "noext", "image/png");
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toContain(".webp");
   });
 });

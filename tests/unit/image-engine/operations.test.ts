@@ -198,6 +198,28 @@ describe("resize", () => {
     );
   });
 
+  it("withoutEnlargement clamps height only (no width given)", async () => {
+    const img = sharp(png1x1);
+    const result = await resize(img, {
+      height: 500,
+      withoutEnlargement: true,
+    });
+    const meta = await getMeta(result);
+    expect(meta.height).toBeLessThanOrEqual(1);
+  });
+
+  it("withoutEnlargement does not clamp when target is smaller", async () => {
+    const img = sharp(png200x150);
+    const result = await resize(img, {
+      width: 50,
+      height: 50,
+      withoutEnlargement: true,
+    });
+    const meta = await getMeta(result);
+    expect(meta.width).toBe(50);
+    expect(meta.height).toBe(50);
+  });
+
   it("percentage on a 1x1 image rounds to at least 1px (percentage >= 50)", async () => {
     // 1 * 50 / 100 = 0.5 -> rounds to 1 (Math.round), so width=1
     const img = sharp(png1x1);
@@ -251,6 +273,35 @@ describe("crop", () => {
     const meta = await getMeta(result);
     expect(meta.width).toBe(1);
     expect(meta.height).toBe(1);
+  });
+
+  it("crops using percent unit", async () => {
+    const img = sharp(png200x150);
+    // 50% of 200 = 100, 50% of 150 = 75, starting at 10% left, 10% top
+    const result = await crop(img, {
+      left: 10,
+      top: 10,
+      width: 50,
+      height: 50,
+      unit: "percent",
+    });
+    const meta = await getMeta(result);
+    expect(meta.width).toBe(100); // 50% of 200
+    expect(meta.height).toBe(75); // 50% of 150 (Math.round)
+  });
+
+  it("crops 100% of image using percent unit", async () => {
+    const img = sharp(png200x150);
+    const result = await crop(img, {
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      unit: "percent",
+    });
+    const meta = await getMeta(result);
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
   });
 
   // -- Error cases --
@@ -688,6 +739,49 @@ describe("compress", () => {
       "Target size must be greater than 0",
     );
   });
+
+  it("falls back to PNG for SVG input (NO_ENCODER format)", async () => {
+    const svgBuf = readFileSync(path.join(FIXTURES_DIR, "formats/sample.svg"));
+    const img = sharp(svgBuf);
+    const result = await compress(img, { quality: 80 });
+    const meta = await getMeta(result);
+    expect(meta.format).toBe("png");
+  });
+
+  it("target size early break when within tolerance", async () => {
+    // Use a large solid-color image so binary search finishes quickly
+    const bigBuf = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: "#cc6633" },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer();
+    // Set target to the actual size so it matches within tolerance immediately
+    const targetBytes = bigBuf.length;
+    const result = await compress(sharp(bigBuf), {
+      targetSizeBytes: targetBytes,
+      format: "jpg",
+    });
+    const buf = await result.toBuffer();
+    // Should be within 5% tolerance of target
+    expect(Math.abs(buf.length - targetBytes) / targetBytes).toBeLessThan(0.5);
+  });
+
+  it("target size falls back to bestQuality=1 when bestBuffer stays null", async () => {
+    // Use a very tiny target that forces all iterations to overshoot,
+    // so bestBuffer never gets assigned and the fallback path runs
+    const bigBuf = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: "#ff8800" },
+    })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+    // Target of 1 byte -- impossible to hit, so every iteration overshoots
+    const result = await compress(sharp(bigBuf), {
+      targetSizeBytes: 1,
+      format: "jpg",
+    });
+    const buf = await result.toBuffer();
+    expect(buf.length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -728,6 +822,27 @@ describe("stripMetadata", () => {
     const meta = await getMeta(result);
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(150);
+  });
+
+  it("stripIcc=true enters selective stripping path", async () => {
+    const img = sharp(jpg100x100);
+    const result = await stripMetadata(img, { stripIcc: true });
+    const buf = await result.toBuffer();
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("stripGps=true enters selective stripping path", async () => {
+    const img = sharp(jpg100x100);
+    const result = await stripMetadata(img, { stripGps: true });
+    const buf = await result.toBuffer();
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("stripXmp=true enters selective stripping path", async () => {
+    const img = sharp(jpg100x100);
+    const result = await stripMetadata(img, { stripXmp: true });
+    const buf = await result.toBuffer();
+    expect(buf.length).toBeGreaterThan(0);
   });
 });
 

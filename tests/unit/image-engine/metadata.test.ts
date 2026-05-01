@@ -219,6 +219,26 @@ describe("parseExif", () => {
     expect(result.image).toEqual({});
     expect(result.photo).toEqual({});
   });
+
+  it("parses GPSInfo section when GPS data is present", async () => {
+    // Create a JPEG with GPS EXIF data via withExif IFD3
+    const buf = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: "#808080" },
+    })
+      .withExif({
+        IFD0: { Artist: "GPS Test" },
+        IFD3: { GPSLatitudeRef: "N" },
+      })
+      .jpeg()
+      .toBuffer();
+    const metadata = await sharp(buf).metadata();
+    expect(metadata.exif).toBeTruthy();
+    const result = parseExif(metadata.exif!);
+    // The GPSInfo section should be populated with sanitized values
+    expect(typeof result.gps).toBe("object");
+    expect(Object.keys(result.gps).length).toBeGreaterThan(0);
+    expect(result.gps.GPSLatitudeRef).toBe("N");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { vectorize as vtrace } from "@neplex/vectorizer";
 import type { FastifyInstance } from "fastify";
 import potrace from "potrace";
@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 
@@ -62,7 +63,7 @@ export function registerVectorize(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "output").replace(/\.[^.]+$/, "");
+          filename = sanitizeFilename(part.filename ?? "output").replace(/\.[^.]+$/, "");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }

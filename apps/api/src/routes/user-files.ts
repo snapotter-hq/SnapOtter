@@ -30,6 +30,7 @@ import {
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { ensureSharpCompat } from "../lib/heic-converter.js";
+import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { getAuthUser, requireAuth } from "../plugins/auth.js";
 
@@ -123,7 +124,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (search) {
-        conditions.push(like(schema.userFiles.originalName, `%${search}%`));
+        const escaped = search.replace(/[%_\\]/g, "\\$&");
+        conditions.push(like(schema.userFiles.originalName, `%${escaped}%`));
       }
 
       const rows = db
@@ -185,29 +187,36 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
+      const safeBuffer = isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
+
       const safeName = sanitizeFilename(part.filename ?? "upload");
       const mimeType = formatToMime(validation.format);
 
       // Persist to disk
-      const storedName = await saveFile(buffer, safeName);
+      const storedName = await saveFile(safeBuffer, safeName);
 
       // Create DB record
       const id = randomUUID();
-      db.insert(schema.userFiles)
-        .values({
-          id,
-          userId,
-          originalName: safeName,
-          storedName,
-          mimeType,
-          size: buffer.length,
-          width: validation.width,
-          height: validation.height,
-          version: 1,
-          parentId: null,
-          toolChain: null,
-        })
-        .run();
+      try {
+        db.insert(schema.userFiles)
+          .values({
+            id,
+            userId,
+            originalName: safeName,
+            storedName,
+            mimeType,
+            size: safeBuffer.length,
+            width: validation.width,
+            height: validation.height,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+          })
+          .run();
+      } catch {
+        return reply.status(409).send({ error: "Failed to save file record" });
+      }
 
       const row = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
 
@@ -331,7 +340,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const stream = createReadStream(filePath);
       stream.on("error", () => {
-        reply.status(404).send({ error: "File not found on disk" });
+        if (!reply.raw.headersSent) {
+          reply.status(404).send({ error: "File not found on disk" });
+        }
       });
 
       return reply
@@ -352,11 +363,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     "/api/v1/files/:id/thumbnail",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
+
       const { id } = request.params;
 
       const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
 
-      if (!file) {
+      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
         return reply.status(404).send({ error: "File not found" });
       }
 
@@ -537,26 +551,33 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     const mimeType = formatToMime(validation.format) || extToMime(ext);
 
+    // Sanitize SVG results to prevent XXE, SSRF, and script injection
+    const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
+
     // Persist to disk
-    const storedName = await saveFile(fileBuffer, resultName);
+    const storedName = await saveFile(safeResultBuffer, resultName);
 
     // Create DB record
     const id = randomUUID();
-    db.insert(schema.userFiles)
-      .values({
-        id,
-        userId,
-        originalName: resultName,
-        storedName,
-        mimeType,
-        size: fileBuffer.length,
-        width: validation.width,
-        height: validation.height,
-        version: nextVersion,
-        parentId,
-        toolChain: JSON.stringify(newChain),
-      })
-      .run();
+    try {
+      db.insert(schema.userFiles)
+        .values({
+          id,
+          userId,
+          originalName: resultName,
+          storedName,
+          mimeType,
+          size: safeResultBuffer.length,
+          width: validation.width,
+          height: validation.height,
+          version: nextVersion,
+          parentId,
+          toolChain: JSON.stringify(newChain),
+        })
+        .run();
+    } catch {
+      return reply.status(409).send({ error: "Failed to save result record" });
+    }
 
     const row = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
 

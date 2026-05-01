@@ -268,3 +268,143 @@ describe("Concurrent requests with different image formats", () => {
     expect(new Set(ids).size).toBe(4);
   }, 30_000);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10 CONCURRENT COMPRESS REQUESTS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("10 concurrent compress requests", () => {
+  it("fires 10 simultaneous compress requests — all succeed with unique job IDs", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        app.inject(
+          buildToolRequest("compress", PNG_200x150, `compress-${i}.png`, {
+            quality: 30 + i * 5,
+          }),
+        ),
+      ),
+    );
+
+    for (const res of results) {
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.jobId).toBeDefined();
+      expect(json.downloadUrl).toBeDefined();
+    }
+
+    const jobIds = results.map((r) => JSON.parse(r.body).jobId);
+    expect(new Set(jobIds).size).toBe(10);
+  }, 60_000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMULTANEOUS BATCH + SINGLE REQUESTS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Simultaneous batch + single requests — no corruption", () => {
+  it("runs a batch resize and a single resize at the same time", async () => {
+    // Build batch request
+    const batchPayload = createMultipartPayload([
+      { name: "file", filename: "batch-a.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "file", filename: "batch-b.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "file", filename: "batch-c.jpg", content: JPG_100x100, contentType: "image/jpeg" },
+      { name: "settings", content: JSON.stringify({ width: 60 }) },
+    ]);
+
+    const [batchRes, singleRes] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: "/api/v1/tools/resize/batch",
+        headers: {
+          "content-type": batchPayload.contentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+        body: batchPayload.body,
+      }),
+      app.inject(buildToolRequest("resize", PNG_200x150, "single.png", { width: 40 })),
+    ]);
+
+    // Single request must succeed
+    expect(singleRes.statusCode).toBe(200);
+    const singleBody = JSON.parse(singleRes.body);
+    expect(singleBody.jobId).toBeDefined();
+    expect(singleBody.downloadUrl).toContain("resize");
+
+    // Batch request must succeed
+    expect(batchRes.statusCode).toBe(200);
+    expect(batchRes.headers["content-type"]).toBe("application/zip");
+  }, 60_000);
+
+  it("runs a batch compress and a single rotate at the same time — no cross-contamination", async () => {
+    const batchPayload = createMultipartPayload([
+      { name: "file", filename: "b1.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "file", filename: "b2.jpg", content: JPG_100x100, contentType: "image/jpeg" },
+      { name: "settings", content: JSON.stringify({ quality: 50 }) },
+    ]);
+
+    const [batchRes, rotateRes] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: "/api/v1/tools/compress/batch",
+        headers: {
+          "content-type": batchPayload.contentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+        body: batchPayload.body,
+      }),
+      app.inject(buildToolRequest("rotate", PNG_200x150, "rotate-single.png", { angle: 270 })),
+    ]);
+
+    expect(rotateRes.statusCode).toBe(200);
+    const rotateBody = JSON.parse(rotateRes.body);
+    expect(rotateBody.downloadUrl).toContain("rotate");
+
+    expect(batchRes.statusCode).toBe(200);
+    expect(batchRes.headers["content-type"]).toBe("application/zip");
+  }, 60_000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONCURRENT PIPELINE EXECUTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Concurrent pipeline executions", () => {
+  it("fires 5 simultaneous pipeline requests — all succeed", async () => {
+    const pipelineDef = {
+      steps: [
+        { toolId: "resize", settings: { width: 80 } },
+        { toolId: "compress", settings: { quality: 60 } },
+      ],
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, (_, i) => {
+        const payload = createMultipartPayload([
+          {
+            name: "file",
+            filename: `pipe-${i}.png`,
+            content: PNG_200x150,
+            contentType: "image/png",
+          },
+          { name: "pipeline", content: JSON.stringify(pipelineDef) },
+        ]);
+        return app.inject({
+          method: "POST",
+          url: "/api/v1/pipeline/execute",
+          headers: {
+            "content-type": payload.contentType,
+            authorization: `Bearer ${adminToken}`,
+          },
+          body: payload.body,
+        });
+      }),
+    );
+
+    for (const res of results) {
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.jobId).toBeDefined();
+      expect(json.stepsCompleted).toBe(2);
+    }
+
+    const jobIds = results.map((r) => JSON.parse(r.body).jobId);
+    expect(new Set(jobIds).size).toBe(5);
+  }, 120_000);
+});

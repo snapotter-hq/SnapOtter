@@ -94,6 +94,7 @@ export function useToolProcessor(toolId: string) {
 
       // Generate client job ID for SSE correlation
       const clientJobId = generateId();
+      let asyncMode = false;
 
       // For AI tools, open SSE before uploading
       if (isAiTool) {
@@ -104,8 +105,42 @@ export function useToolProcessor(toolId: string) {
           es.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
-              if (data.type === "single" && typeof data.percent === "number") {
-                // Scale server progress (0-100) into 15-100 range
+              if (data.type !== "single") return;
+
+              if (data.phase === "complete" && data.result) {
+                if (elapsedRef.current) clearInterval(elapsedRef.current);
+                if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+                es.close();
+                eventSourceRef.current = null;
+
+                const result = data.result as ProcessResult;
+                setWarning(result.warning ?? null);
+                useFileStore.getState().updateEntry(capturedIndex, {
+                  processedUrl: result.downloadUrl,
+                  processedPreviewUrl: result.previewUrl ?? null,
+                  processedFilename: null,
+                  status: "completed",
+                  originalSize: result.originalSize,
+                  processedSize: result.processedSize,
+                  ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                });
+                setProcessing(false);
+                setProgress(IDLE_PROGRESS);
+                return;
+              }
+
+              if (data.phase === "failed" && asyncMode) {
+                if (elapsedRef.current) clearInterval(elapsedRef.current);
+                if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+                es.close();
+                eventSourceRef.current = null;
+                setError(data.error || "Processing failed");
+                setProcessing(false);
+                setProgress(IDLE_PROGRESS);
+                return;
+              }
+
+              if (typeof data.percent === "number") {
                 const scaled = 15 + (data.percent / 100) * 85;
                 setProgress((prev) => ({
                   ...prev,
@@ -120,11 +155,13 @@ export function useToolProcessor(toolId: string) {
           };
 
           es.onerror = () => {
-            es.close();
-            eventSourceRef.current = null;
+            if (!asyncMode) {
+              es.close();
+              eventSourceRef.current = null;
+            }
           };
         } catch {
-          // EventSource creation failed — proceed without SSE
+          // EventSource creation failed -- proceed without SSE
         }
       }
 
@@ -209,6 +246,11 @@ export function useToolProcessor(toolId: string) {
       };
 
       xhr.onload = () => {
+        if (xhr.status === 202) {
+          asyncMode = true;
+          return;
+        }
+
         if (elapsedRef.current) clearInterval(elapsedRef.current);
         if (processingTimerRef.current) clearInterval(processingTimerRef.current);
         if (eventSourceRef.current) {
@@ -220,8 +262,6 @@ export function useToolProcessor(toolId: string) {
           try {
             const result: ProcessResult = JSON.parse(xhr.responseText);
             setWarning(result.warning ?? null);
-            // Write result to the entry that was being processed (captured at
-            // request time), not whatever entry happens to be selected now.
             useFileStore.getState().updateEntry(capturedIndex, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
@@ -261,7 +301,7 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        setError("Processing was interrupted \u2014 retry when reconnected");
+        setError("Processing was interrupted. Retry when reconnected.");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
       };

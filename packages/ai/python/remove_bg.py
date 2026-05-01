@@ -94,18 +94,23 @@ def main():
             input_data = f.read()
 
         emit_progress(30, "Analyzing image")
+        use_alpha_matting = device != "cpu"
         try:
             output_data = remove(
                 input_data,
                 session=session,
-                alpha_matting=True,
+                alpha_matting=use_alpha_matting,
                 alpha_matting_foreground_threshold=240,
                 alpha_matting_background_threshold=10,
             )
         except Exception as e:
-            raise RuntimeError(
-                f"Alpha matting failed: {e}. Try again without alpha matting or with a different model."
-            ) from e
+            if use_alpha_matting:
+                emit_progress(35, "Retrying without alpha matting")
+                output_data = remove(input_data, session=session, alpha_matting=False)
+            else:
+                raise RuntimeError(
+                    f"Background removal failed: {e}"
+                ) from e
 
         emit_progress(80, "Background removed")
 

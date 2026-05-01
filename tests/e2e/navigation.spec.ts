@@ -1,4 +1,4 @@
-import { expect, test } from "./helpers";
+import { expect, openSettings, test } from "./helpers";
 
 test.describe("Navigation", () => {
   test("sidebar Tools link goes to home", async ({ loggedInPage: page }) => {
@@ -26,7 +26,7 @@ test.describe("Navigation", () => {
   });
 
   test("sidebar Settings button opens settings dialog", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     // Settings dialog should appear with section headings
     await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Security" })).toBeVisible();

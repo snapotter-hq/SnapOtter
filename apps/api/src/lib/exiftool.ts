@@ -234,10 +234,12 @@ export function buildTagArgs(settings: EditMetadataSettings): string[] {
   if (settings.iptcState) args.push(`-IPTC:Province-State=${settings.iptcState}`);
   if (settings.iptcCountry) args.push(`-IPTC:Country-PrimaryLocationName=${settings.iptcCountry}`);
 
-  // Field removal
+  // Field removal -- only allow safe EXIF/IPTC/XMP tag names (alphanumeric, colon, hyphen)
   if (settings.fieldsToRemove && settings.fieldsToRemove.length > 0) {
     for (const field of settings.fieldsToRemove) {
-      args.push(`-${field}=`);
+      if (/^[A-Za-z0-9:_-]+$/.test(field)) {
+        args.push(`-${field}=`);
+      }
     }
   }
 

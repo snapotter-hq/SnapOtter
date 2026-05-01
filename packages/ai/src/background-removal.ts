@@ -10,6 +10,9 @@ export interface RemoveBackgroundOptions {
   backgroundColor?: string;
 }
 
+const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
+const OOM_FALLBACK_MODEL = "u2net";
+
 export async function removeBackground(
   inputBuffer: Buffer,
   outputDir: string,
@@ -20,29 +23,77 @@ export async function removeBackground(
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
 
-  const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+  const meta = await sharp(inputBuffer).metadata();
+  const origW = meta.width ?? 0;
+  const origH = meta.height ?? 0;
+  const longest = Math.max(origW, origH);
+  const needsDownscale = longest > MAX_REMBG_PX;
+
+  let pipeline = sharp(inputBuffer);
+  if (needsDownscale) {
+    pipeline = pipeline.resize({
+      width: origW >= origH ? MAX_REMBG_PX : undefined,
+      height: origH > origW ? MAX_REMBG_PX : undefined,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+  }
+  const pngBuffer = await pipeline.png().toBuffer();
   await writeFile(inputPath, pngBuffer);
+
   try {
-    const meta = await sharp(inputBuffer).metadata();
-    const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
+    const megapixels = (origW * origH) / 1_000_000;
     const baseTimeout = options.model?.startsWith("birefnet") ? 600000 : 300000;
     const timeout = Math.max(baseTimeout, megapixels * 30 * 1000);
+
+    const rawMask = await runAndParse(inputPath, outputPath, options, onProgress, timeout);
+
+    if (needsDownscale) {
+      return sharp(rawMask).resize({ width: origW, height: origH, fit: "fill" }).png().toBuffer();
+    }
+
+    return rawMask;
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+  }
+}
+
+async function runAndParse(
+  inputPath: string,
+  outputPath: string,
+  options: RemoveBackgroundOptions,
+  onProgress: ProgressCallback | undefined,
+  timeout: number,
+): Promise<Buffer> {
+  try {
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(options)],
       { onProgress, timeout },
     );
-
     const result = parseStdoutJson(stdout);
     if (!result.success) {
       throw new Error(result.error || "Background removal failed");
     }
+    return readFile(outputPath);
+  } catch (err) {
+    const isOom = err instanceof Error && err.message.includes("out of memory");
+    const canFallback = isOom && options.model !== OOM_FALLBACK_MODEL;
 
-    const outputBuffer = await readFile(outputPath);
-    return outputBuffer;
-  } finally {
-    // Clean up temp files
-    await unlink(inputPath).catch(() => {});
-    await unlink(outputPath).catch(() => {});
+    if (!canFallback) throw err;
+
+    onProgress?.(5, `Retrying with lighter model (${OOM_FALLBACK_MODEL})`);
+    const fallbackOpts = { ...options, model: OOM_FALLBACK_MODEL };
+    const { stdout } = await runPythonWithProgress(
+      "remove_bg.py",
+      [inputPath, outputPath, JSON.stringify(fallbackOpts)],
+      { onProgress, timeout: 300000 },
+    );
+    const result = parseStdoutJson(stdout);
+    if (!result.success) {
+      throw new Error(result.error || "Background removal failed");
+    }
+    return readFile(outputPath);
   }
 }

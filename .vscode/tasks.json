@@ -1,0 +1,282 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ══════════════════════════════════════════════════════════════════════
+    // Dev Servers
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "dev",
+      "detail": "Start all dev servers (turbo dev)",
+      "type": "shell",
+      "command": "pnpm dev",
+      "group": "none",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      }
+    },
+    {
+      "label": "dev:api",
+      "detail": "Start Fastify API server only",
+      "type": "shell",
+      "command": "pnpm --filter @snapotter/api dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      }
+    },
+    {
+      "label": "dev:web",
+      "detail": "Start Vite frontend only",
+      "type": "shell",
+      "command": "pnpm --filter @snapotter/web dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      }
+    },
+    {
+      "label": "dev:docs",
+      "detail": "Start VitePress docs server",
+      "type": "shell",
+      "command": "pnpm docs:dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      }
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Build
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "build",
+      "detail": "Build all workspaces (turbo build)",
+      "type": "shell",
+      "command": "pnpm build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "build:api",
+      "detail": "Build API workspace",
+      "type": "shell",
+      "command": "pnpm --filter @snapotter/api build",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "build:web",
+      "detail": "Build Web workspace",
+      "type": "shell",
+      "command": "pnpm --filter @snapotter/web build",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Type Check
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "typecheck",
+      "detail": "TypeScript check across monorepo",
+      "type": "shell",
+      "command": "pnpm typecheck",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Lint & Format
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "lint",
+      "detail": "Biome lint + format check",
+      "type": "shell",
+      "command": "pnpm lint",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "lint:fix",
+      "detail": "Biome auto-fix lint + format issues",
+      "type": "shell",
+      "command": "pnpm lint:fix",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Testing
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "test",
+      "detail": "Run all Vitest tests",
+      "type": "shell",
+      "command": "pnpm test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "test:unit",
+      "detail": "Unit tests only",
+      "type": "shell",
+      "command": "pnpm test:unit",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test:integration",
+      "detail": "Integration tests only",
+      "type": "shell",
+      "command": "pnpm test:integration",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test:watch",
+      "detail": "Vitest in watch mode",
+      "type": "shell",
+      "command": "pnpm test:watch",
+      "isBackground": true,
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test:coverage",
+      "detail": "Tests with coverage report",
+      "type": "shell",
+      "command": "pnpm test:coverage",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test:e2e",
+      "detail": "Playwright e2e tests",
+      "type": "shell",
+      "command": "pnpm test:e2e",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test:e2e:ui",
+      "detail": "Playwright e2e with interactive UI",
+      "type": "shell",
+      "command": "pnpm test:e2e:ui",
+      "isBackground": true,
+      "group": "test",
+      "problemMatcher": []
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Database
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "db:generate",
+      "detail": "Generate Drizzle migration from schema changes",
+      "type": "shell",
+      "command": "npx drizzle-kit generate",
+      "options": {
+        "cwd": "${workspaceFolder}/apps/api"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "db:migrate",
+      "detail": "Apply pending Drizzle migrations",
+      "type": "shell",
+      "command": "npx drizzle-kit migrate",
+      "options": {
+        "cwd": "${workspaceFolder}/apps/api"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "db:studio",
+      "detail": "Open Drizzle Studio (database browser)",
+      "type": "shell",
+      "command": "npx drizzle-kit studio",
+      "options": {
+        "cwd": "${workspaceFolder}/apps/api"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Docker
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "docker:build",
+      "detail": "Build Docker image",
+      "type": "shell",
+      "command": "docker build -f docker/Dockerfile -t snapotter:local .",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker:run",
+      "detail": "Run Docker container locally",
+      "type": "shell",
+      "command": "docker run --rm -p 1349:1349 -p 13490:13490 snapotter:local",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "docker:test",
+      "detail": "Run Docker integration tests",
+      "type": "shell",
+      "command": "pnpm test:docker",
+      "problemMatcher": []
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Utilities
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      "label": "clean",
+      "detail": "Clean all dist/build artifacts",
+      "type": "shell",
+      "command": "pnpm clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "install",
+      "detail": "Install all dependencies",
+      "type": "shell",
+      "command": "pnpm install",
+      "problemMatcher": []
+    }
+  ]
+}

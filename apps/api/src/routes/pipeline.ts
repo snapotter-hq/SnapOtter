@@ -26,6 +26,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { createWorkspace } from "../lib/workspace.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
@@ -138,8 +139,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       }
     }
 
-    // Normalize EXIF orientation before passing to pipeline steps
-    fileBuffer = await autoOrient(fileBuffer);
+    // Sanitize SVG input and normalize EXIF orientation
+    const isSvg = isSvgBuffer(fileBuffer);
+    if (isSvg) {
+      fileBuffer = sanitizeSvg(fileBuffer);
+    } else {
+      fileBuffer = await autoOrient(fileBuffer);
+    }
 
     // Parse and validate the pipeline definition
     if (!pipelineRaw) {
@@ -323,15 +329,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
     const id = randomUUID();
 
-    db.insert(schema.pipelines)
-      .values({
-        id,
-        userId: user.id,
-        name,
-        description: description ?? null,
-        steps: JSON.stringify(steps),
-      })
-      .run();
+    try {
+      db.insert(schema.pipelines)
+        .values({
+          id,
+          userId: user.id,
+          name,
+          description: description ?? null,
+          steps: JSON.stringify(steps),
+        })
+        .run();
+    } catch {
+      return reply.status(409).send({ error: "Failed to save pipeline" });
+    }
 
     return reply.status(201).send({
       id,
@@ -582,8 +592,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
             }
 
-            // Normalize EXIF orientation
-            currentBuffer = await autoOrient(currentBuffer);
+            // Sanitize SVG or normalize EXIF orientation
+            if (isSvgBuffer(currentBuffer)) {
+              currentBuffer = sanitizeSvg(currentBuffer);
+            } else {
+              currentBuffer = await autoOrient(currentBuffer);
+            }
 
             // Run through all pipeline steps sequentially
             for (let i = 0; i < pipeline.steps.length; i++) {

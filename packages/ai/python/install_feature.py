@@ -277,6 +277,45 @@ def download_url_model(model: dict, models_dir: str) -> None:
     os.rename(tmp_path, final_path)
 
 
+_matting_registered = False
+
+
+def _register_birefnet_matting() -> None:
+    """Register the custom BiRefNet-matting ONNX session.
+
+    This model is not built into rembg — it must be registered before
+    calling new_session("birefnet-matting").  The same registration is
+    done in remove_bg.py (runtime) and download_models.py (build-time).
+    """
+    global _matting_registered
+    if _matting_registered:
+        return
+    _matting_registered = True
+
+    import pooch
+    from rembg.sessions import sessions_class
+    from rembg.sessions.birefnet_general import BiRefNetSessionGeneral
+
+    class BiRefNetMattingSession(BiRefNetSessionGeneral):
+        @classmethod
+        def download_models(cls, *args, **kwargs):
+            fname = f"{cls.name(*args, **kwargs)}.onnx"
+            pooch.retrieve(
+                "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx",
+                None,
+                fname=fname,
+                path=cls.u2net_home(*args, **kwargs),
+                progressbar=True,
+            )
+            return os.path.join(cls.u2net_home(*args, **kwargs), fname)
+
+        @classmethod
+        def name(cls, *args, **kwargs):
+            return "birefnet-matting"
+
+    sessions_class.append(BiRefNetMattingSession)
+
+
 def download_rembg_session(model: dict, models_dir: str) -> None:
     """Download a rembg model by initializing a session."""
     args = model.get("args", [])
@@ -291,6 +330,7 @@ def download_rembg_session(model: dict, models_dir: str) -> None:
     os.environ["U2NET_HOME"] = u2net_dir
 
     from rembg import new_session
+    _register_birefnet_matting()
     new_session(model_name)
 
 

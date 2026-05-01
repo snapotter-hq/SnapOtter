@@ -87,5 +87,5 @@ async function compressToTargetSize(
       .toBuffer();
   }
 
-  return sharp(bestBuffer).toFormat(format, formatOpts(format, bestQuality));
+  return sharp(bestBuffer);
 }

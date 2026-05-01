@@ -1,15 +1,15 @@
-import { expect, test } from "./helpers";
+import { expect, openSettings, test } from "./helpers";
 
 test.describe("Settings Dialog", () => {
   test("opens from sidebar", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Settings dialog should appear with sections
     await expect(page.getByText("General").first()).toBeVisible();
   });
 
   test("General section shows user info", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Should show username and version info
     await expect(page.getByText(/admin/i).first()).toBeVisible();
@@ -17,14 +17,14 @@ test.describe("Settings Dialog", () => {
   });
 
   test("General section has logout button", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     const logoutBtn = page.getByRole("button", { name: /logout|log out/i });
     await expect(logoutBtn).toBeVisible();
   });
 
   test("Security section has change password form", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Navigate to Security section
     await page.getByText("Security").click();
@@ -34,7 +34,7 @@ test.describe("Settings Dialog", () => {
   });
 
   test("People section shows user list", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Navigate to People section
     await page.getByText("People").click();
@@ -54,7 +54,7 @@ test.describe("Settings Dialog", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.waitForTimeout(500);
 
     const apiKeysBtn = page.getByRole("button", { name: /api keys/i });
@@ -70,7 +70,7 @@ test.describe("Settings Dialog", () => {
   });
 
   test("About section shows app info", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Navigate to About section
     await page.getByText("About").click();
@@ -80,7 +80,7 @@ test.describe("Settings Dialog", () => {
   });
 
   test("System Settings section has configuration", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Navigate to System Settings section
     await page.getByText("System Settings").click();
@@ -90,7 +90,7 @@ test.describe("Settings Dialog", () => {
   });
 
   test("settings dialog can be closed", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await expect(page.getByText("General").first()).toBeVisible();
 
     // Close by clicking X or outside

@@ -9,7 +9,7 @@
 
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { shutdownDispatcher } from "@snapotter/ai";
 import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
@@ -67,7 +67,12 @@ function getDirSize(dirPath: string): number {
   if (!existsSync(dirPath)) return 0;
 
   let total = 0;
-  const entries = readdirSync(dirPath, { withFileTypes: true });
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dirPath, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
   for (const entry of entries) {
     const fullPath = join(dirPath, entry.name);
     if (entry.isDirectory()) {
@@ -202,9 +207,32 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
             duration_ms: Date.now() - installStartTime,
           });
         } else {
-          const errorDetail =
-            lastStderrLines.filter((l) => !l.startsWith("{")).join("\n") || stdoutBuffer.trim();
-          const errorMsg = errorDetail || `Install failed with exit code ${code}`;
+          // Extract the structured error from Python's fail() function first.
+          // fail() writes {"error": "..."} to stderr — prefer this over raw lines.
+          let errorMsg: string | undefined;
+          for (let i = lastStderrLines.length - 1; i >= 0; i--) {
+            const line = lastStderrLines[i];
+            if (line.startsWith("{")) {
+              try {
+                const parsed = JSON.parse(line) as Record<string, unknown>;
+                if (typeof parsed.error === "string") {
+                  errorMsg = parsed.error;
+                  break;
+                }
+              } catch {
+                // Not valid JSON
+              }
+            }
+          }
+          if (!errorMsg) {
+            const meaningful = lastStderrLines.filter(
+              (l) => !l.startsWith("{") && !l.includes("pthread_setaffinity_np"),
+            );
+            errorMsg =
+              meaningful.join("\n") ||
+              stdoutBuffer.trim() ||
+              `Install failed with exit code ${code}`;
+          }
           setInstallProgress(bundleId, null, errorMsg);
           updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
         }

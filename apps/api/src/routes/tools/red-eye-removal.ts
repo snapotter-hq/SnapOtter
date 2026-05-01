@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { removeRedEye } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -9,6 +9,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic, ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
@@ -53,11 +54,14 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            clientJobId = part.value as string;
+            const raw = part.value as string;
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+              clientJobId = raw;
+            }
           }
         }
       } catch (err) {
@@ -76,21 +80,23 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
+      let settings: z.infer<typeof settingsSchema>;
       try {
-        let settings: z.infer<typeof settingsSchema>;
-        try {
-          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-          const result = settingsSchema.safeParse(parsed);
-          if (!result.success) {
-            return reply
-              .status(400)
-              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-          }
-          settings = result.data;
-        } catch {
-          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
         }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
 
+      const { sensitivity, strength, format: outputFormat, quality } = settings;
+
+      try {
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
         }
@@ -100,39 +106,52 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
         }
 
-        const { sensitivity, strength, format: outputFormat, quality } = settings;
-        request.log.info(
-          {
-            toolId: "red-eye-removal",
-            imageSize: fileBuffer.length,
-            sensitivity,
-            strength,
-          },
-          "Starting red eye removal",
-        );
-
         fileBuffer = await autoOrient(fileBuffer);
+      } catch (err) {
+        request.log.error({ err, toolId: "red-eye-removal" }, "Input decoding failed");
+        return reply.status(422).send({
+          error: "Red eye removal failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
 
-        const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
-
-        // Save input
+      const originalSize = fileBuffer.length;
+      const jobId = randomUUID();
+      const progressJobId = clientJobId || jobId;
+      let workspacePath: string;
+      try {
+        workspacePath = await createWorkspace(jobId);
         const inputPath = join(workspacePath, "input", filename);
         await writeFile(inputPath, fileBuffer);
+      } catch (err) {
+        request.log.error({ err, toolId: "red-eye-removal" }, "Workspace creation failed");
+        return reply.status(422).send({
+          error: "Red eye removal failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
 
-        // Process
-        const jobIdForProgress = clientJobId;
-        const onProgress = jobIdForProgress
-          ? (percent: number, stage: string) => {
-              updateSingleFileProgress({
-                jobId: jobIdForProgress,
-                phase: "processing",
-                stage,
-                percent,
-              });
-            }
-          : undefined;
+      const log = request.log;
+      log.info(
+        { toolId: "red-eye-removal", imageSize: originalSize, sensitivity, strength },
+        "Starting red eye removal",
+      );
 
+      // Reply immediately so the HTTP connection closes within proxy timeout limits.
+      // The result will be delivered via the SSE progress channel.
+      reply.status(202).send({ jobId: progressJobId, async: true });
+
+      const onProgress = (percent: number, stage: string) => {
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "processing",
+          stage,
+          percent,
+        });
+      };
+
+      // Fire-and-forget: processing happens after the response is sent
+      (async () => {
         const result = await removeRedEye(
           fileBuffer,
           join(workspacePath, "output"),
@@ -151,29 +170,31 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
         const outputPath = join(workspacePath, "output", outputFilename);
         await writeFile(outputPath, result.buffer);
 
-        if (clientJobId) {
-          updateSingleFileProgress({
-            jobId: clientJobId,
-            phase: "complete",
-            percent: 100,
-          });
-        }
+        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "complete",
+          percent: 100,
+          result: {
+            jobId,
+            downloadUrl,
+            originalSize,
+            processedSize: result.buffer.length,
+            facesDetected: result.facesDetected,
+            eyesCorrected: result.eyesCorrected,
+          },
+        });
 
-        return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-          originalSize: fileBuffer.length,
-          processedSize: result.buffer.length,
-          facesDetected: result.facesDetected,
-          eyesCorrected: result.eyesCorrected,
+        log.info({ toolId: "red-eye-removal", jobId, downloadUrl }, "Red eye removal complete");
+      })().catch((err) => {
+        log.error({ err, toolId: "red-eye-removal" }, "Red eye removal failed");
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: err instanceof Error ? err.message : "Red eye removal failed",
         });
-      } catch (err) {
-        request.log.error({ err, toolId: "red-eye-removal" }, "Red eye removal failed");
-        return reply.status(422).send({
-          error: "Red eye removal failed",
-          details: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
+      });
     },
   );
 

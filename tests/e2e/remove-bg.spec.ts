@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "./helpers";
+import { expect, isAiSidecarRunning, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Remove Background tool - comprehensive e2e tests.
@@ -39,6 +39,9 @@ test.describe("Remove Background tool", () => {
         .waitFor({ state: "visible", timeout: 15_000 });
     } catch {
       test.skip(true, "background-removal feature bundle not installed");
+    }
+    if (!(await isAiSidecarRunning(page))) {
+      test.skip(true, "AI sidecar not running");
     }
   }
 

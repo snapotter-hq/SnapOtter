@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import {
   writeMetadata,
 } from "../../lib/exiftool.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -83,7 +84,7 @@ export function registerEditMetadata(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           }
         }
       } catch (err) {
@@ -124,7 +125,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }

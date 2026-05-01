@@ -55,7 +55,7 @@ test.describe("Analytics consent page", () => {
     expect(sessionData.user?.analyticsEnabled ?? true).toBe(true);
   });
 
-  test.skip("settings toggle works after accepting analytics", async ({ page }) => {
+  test("settings toggle works after accepting analytics", async ({ page }) => {
     // User already accepted in previous test — login should go straight to home
     await loginAndGetToHome(page);
     await expect(page).toHaveURL("/");

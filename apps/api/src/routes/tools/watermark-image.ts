@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 const settingsSchema = z.object({
@@ -34,7 +35,7 @@ export function registerWatermarkImage(app: FastifyInstance) {
             watermarkBuffer = buf;
           } else {
             mainBuffer = buf;
-            filename = part.filename ?? "image";
+            filename = sanitizeFilename(part.filename ?? "image");
           }
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;

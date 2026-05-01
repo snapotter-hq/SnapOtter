@@ -15,7 +15,7 @@ import { requireAuth } from "../plugins/auth.js";
 
 const settingsBodySchema = z.record(z.string().min(1), z.unknown());
 
-const HTML_TAG_PATTERN = /<[a-z/!][^>]*>/i;
+const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/settings — Get all settings as a key-value object

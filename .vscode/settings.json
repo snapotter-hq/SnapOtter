@@ -1,0 +1,165 @@
+{
+  // ── Editor Defaults ──────────────────────────────────────────────────
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.linkedEditing": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit"
+  },
+
+  // ── Biome ─────────────────────────────────────────────────────────────
+  "biome.enabled": true,
+  "biome.requireConfig": true,
+
+  // Disable competing formatters/linters
+  "prettier.enable": false,
+  "eslint.enable": false,
+
+  // ── Language-specific formatter overrides ──────────────────────────────
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python",
+    "editor.tabSize": 4
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.wordWrap": "on"
+  },
+  "[dockercompose]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "[yaml]": {
+    "editor.tabSize": 2
+  },
+
+  // ── TypeScript ────────────────────────────────────────────────────────
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.preferences.quoteStyle": "double",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.preferences.quoteStyle": "double",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // ── Tailwind CSS ──────────────────────────────────────────────────────
+  "tailwindCSS.emmetCompletions": true,
+  "tailwindCSS.includeLanguages": {
+    "typescriptreact": "html"
+  },
+  "tailwindCSS.classAttributes": ["class", "className", "ngClass", "variants"],
+  // v4 auto-detects from @import "tailwindcss" in CSS files; no configFile needed.
+
+  // ── Python (AI sidecar) ───────────────────────────────────────────────
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.extraPaths": ["packages/ai/python"],
+  "python.defaultInterpreterPath": "${workspaceFolder}/packages/ai/.venv/bin/python",
+
+  // ── Testing ───────────────────────────────────────────────────────────
+  "vitest.rootConfig": "vitest.config.ts",
+
+  // ── File Associations ─────────────────────────────────────────────────
+  "files.associations": {
+    "*.css": "tailwindcss",
+    ".env*": "dotenv",
+    "Dockerfile*": "dockerfile",
+    "*.yml": "yaml",
+    "*.yaml": "yaml"
+  },
+
+  // ── File Exclusions (Explorer) ────────────────────────────────────────
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.turbo": true
+  },
+
+  // ── Search Exclusions ─────────────────────────────────────────────────
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true,
+    "**/.turbo": true,
+    "**/playwright-report": true,
+    "**/test-results": true,
+    "**/blob-report": true,
+    "**/pnpm-lock.yaml": true,
+    "**/apps/api/drizzle": true,
+    "**/.pnpm-store": true,
+    "**/.worktrees": true
+  },
+
+  // ── File Watcher Exclusions ───────────────────────────────────────────
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/coverage/**": true,
+    "**/.turbo/**": true,
+    "**/playwright-report/**": true,
+    "**/test-results/**": true,
+    "**/blob-report/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.worktrees/**": true
+  },
+
+  // ── Emmet ─────────────────────────────────────────────────────────────
+  "emmet.includeLanguages": {
+    "typescriptreact": "html"
+  },
+
+  // ── Terminal ──────────────────────────────────────────────────────────
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.env.osx": {
+    "NODE_OPTIONS": ""
+  },
+
+  // ── Git ───────────────────────────────────────────────────────────────
+  "git.autofetch": true,
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+
+  // ── Misc ──────────────────────────────────────────────────────────────
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml, .npmrc, turbo.json",
+    "tsconfig.json": "tsconfig.*.json",
+    "tsconfig.base.json": "tsconfig.*.json",
+    "biome.json": ".editorconfig",
+    "vite.config.*": "postcss.config.*, tailwind.config.*",
+    ".gitignore": ".gitattributes, .dockerignore",
+    "Dockerfile": "docker-compose.yml, docker-compose.*.yml, .dockerignore",
+    "*.ts": "${capture}.test.ts, ${capture}.spec.ts",
+    "*.tsx": "${capture}.test.tsx, ${capture}.spec.tsx"
+  }
+}

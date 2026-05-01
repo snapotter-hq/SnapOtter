@@ -216,13 +216,23 @@ async function decodeBmp(buffer: Buffer): Promise<Buffer> {
 }
 
 async function decodeJxl(buffer: Buffer): Promise<Buffer> {
-  const cmd = await findMagickCmd();
   const id = randomUUID();
   const inputPath = join(tmpdir(), `jxl-in-${id}.jxl`);
   const outputPath = join(tmpdir(), `jxl-out-${id}.png`);
 
   try {
     await writeFile(inputPath, buffer);
+
+    // Try djxl first (from libjxl-tools) — works even when ImageMagick
+    // lacks a JXL delegate (common on Ubuntu stock packages).
+    try {
+      await execFileAsync("djxl", [inputPath, outputPath], { timeout: 120_000 });
+      return await readFile(outputPath);
+    } catch {
+      // djxl not available, fall back to ImageMagick
+    }
+
+    const cmd = await findMagickCmd();
     await execFileAsync(cmd, magickArgs(cmd, [inputPath, `png:${outputPath}`]), {
       timeout: 120_000,
     });

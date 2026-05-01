@@ -31,10 +31,15 @@ export async function noiseRemoval(
 
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
   await writeFile(inputPath, pngBuffer);
+
+  const meta = await sharp(pngBuffer).metadata();
+  const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
+  const timeout = Math.max(300_000, megapixels * 120_000);
+
   const { stdout } = await runPythonWithProgress(
     "noise_removal.py",
     [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress },
+    { onProgress, timeout },
   );
 
   const result = parseStdoutJson(stdout);

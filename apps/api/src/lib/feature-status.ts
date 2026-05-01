@@ -1,6 +1,8 @@
 import {
+  constants,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -133,16 +135,17 @@ interface LockData {
 }
 
 export function acquireInstallLock(bundleId: string): boolean {
-  if (existsSync(LOCK_PATH)) {
+  try {
+    const fd = openSync(LOCK_PATH, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL);
+    const lock: LockData = {
+      bundleId,
+      startedAt: new Date().toISOString(),
+    };
+    writeFileSync(fd, JSON.stringify(lock, null, 2), "utf-8");
+    return true;
+  } catch {
     return false;
   }
-
-  const lock: LockData = {
-    bundleId,
-    startedAt: new Date().toISOString(),
-  };
-  writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 2), "utf-8");
-  return true;
 }
 
 export function releaseInstallLock(): void {

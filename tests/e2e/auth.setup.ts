@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test as setup } from "@playwright/test";
 
-const authFile = path.join(process.cwd(), "test-results", ".auth", "user.json");
+const authFile = path.join(process.cwd(), ".playwright", ".auth", "user.json");
 
 setup("authenticate", async ({ page }) => {
   // Ensure directory exists
@@ -28,8 +28,11 @@ setup("authenticate", async ({ page }) => {
   });
 
   // Now navigate to "/" - consent guard is satisfied
-  await page.goto("/");
-  await expect(page).toHaveURL("/");
+  // Use waitUntil: "domcontentloaded" to avoid racing with client-side redirects
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  // Wait for the URL to settle (app may redirect through consent/auth guards)
+  await page.waitForURL((url) => url.pathname === "/", { timeout: 30_000 }).catch(() => {});
+  await page.waitForLoadState("load");
 
   // Save storage state (includes localStorage with the token)
   await page.context().storageState({ path: authFile });

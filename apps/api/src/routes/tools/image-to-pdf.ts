@@ -1,19 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
+
+const targetSizeSchema = z.object({
+  value: z.number().positive(),
+  unit: z.enum(["KB", "MB"]),
+});
 
 const settingsSchema = z.object({
   pageSize: z.enum(["A4", "Letter", "A3", "A5"]).default("A4"),
   orientation: z.enum(["portrait", "landscape"]).default("portrait"),
   margin: z.number().min(0).max(500).default(20),
+  targetSize: targetSizeSchema.optional(),
 });
 
 const PAGE_SIZES: Record<string, [number, number]> = {
@@ -22,6 +29,69 @@ const PAGE_SIZES: Record<string, [number, number]> = {
   A3: [841.89, 1190.55],
   A5: [419.53, 595.28],
 };
+
+function computeTargetBytes(targetSize: { value: number; unit: "KB" | "MB" }): number {
+  return targetSize.unit === "MB"
+    ? Math.round(targetSize.value * 1024 * 1024)
+    : Math.round(targetSize.value * 1024);
+}
+
+const MIN_TARGET_BYTES = 50 * 1024;
+
+async function compressImagesForTarget(
+  imageBuffers: Buffer[],
+  targetBytes: number,
+  pdfOverhead: number,
+): Promise<{ buffers: Buffer[]; quality: number; targetMet: boolean }> {
+  const budget = targetBytes - pdfOverhead;
+  if (budget <= 0) {
+    const buffers = await Promise.all(
+      imageBuffers.map((buf) => sharp(buf).jpeg({ quality: 10 }).toBuffer()),
+    );
+    return { buffers, quality: 10, targetMet: false };
+  }
+
+  let lo = 10;
+  let hi = 95;
+  let bestBuffers: Buffer[] | null = null;
+  let bestQuality = lo;
+
+  for (let i = 0; i < 8 && lo <= hi; i++) {
+    const mid = Math.round((lo + hi) / 2);
+    const compressed = await Promise.all(
+      imageBuffers.map((buf) => sharp(buf).jpeg({ quality: mid }).toBuffer()),
+    );
+    const totalSize = compressed.reduce((sum, b) => sum + b.length, 0);
+
+    if (totalSize <= budget) {
+      bestBuffers = compressed;
+      bestQuality = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  if (!bestBuffers) {
+    bestBuffers = await Promise.all(
+      imageBuffers.map((buf) => sharp(buf).jpeg({ quality: 10 }).toBuffer()),
+    );
+    bestQuality = 10;
+  }
+
+  const finalSize = bestBuffers.reduce((sum, b) => sum + b.length, 0);
+  return { buffers: bestBuffers, quality: bestQuality, targetMet: finalSize <= budget };
+}
+
+async function flattenAlpha(buf: Buffer): Promise<Buffer> {
+  const meta = await sharp(buf).metadata();
+  if (meta.hasAlpha) {
+    return sharp(buf)
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .toBuffer();
+  }
+  return buf;
+}
 
 export function registerImageToPdf(app: FastifyInstance) {
   app.post("/api/v1/tools/image-to-pdf", async (request, reply) => {
@@ -40,7 +110,7 @@ export function registerImageToPdf(app: FastifyInstance) {
           if (buf.length > 0) {
             files.push({
               buffer: buf,
-              filename: basename(part.filename ?? `image-${files.length}`),
+              filename: sanitizeFilename(part.filename ?? `image-${files.length}`),
             });
           }
         } else if (part.fieldname === "settings") {
@@ -72,6 +142,16 @@ export function registerImageToPdf(app: FastifyInstance) {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
     }
 
+    let targetBytes: number | null = null;
+    if (settings.targetSize) {
+      targetBytes = computeTargetBytes(settings.targetSize);
+      if (targetBytes < MIN_TARGET_BYTES) {
+        return reply.status(400).send({
+          error: "Target size must be at least 50KB",
+        });
+      }
+    }
+
     try {
       let [pageW, pageH] = PAGE_SIZES[settings.pageSize] ?? PAGE_SIZES.A4;
 
@@ -83,11 +163,11 @@ export function registerImageToPdf(app: FastifyInstance) {
       const contentW = pageW - margin * 2;
       const contentH = pageH - margin * 2;
 
-      // Create PDF
       const doc = new PDFDocument({
         size: [pageW, pageH],
         margin,
         autoFirstPage: false,
+        compress: targetBytes !== null,
       });
 
       const pdfChunks: Buffer[] = [];
@@ -97,34 +177,55 @@ export function registerImageToPdf(app: FastifyInstance) {
         doc.on("end", () => resolve(Buffer.concat(pdfChunks)));
       });
 
+      const preparedBuffers: Buffer[] = [];
       for (const file of files) {
+        const compatBuffer = await autoOrient(await ensureSharpCompat(file.buffer));
+        preparedBuffers.push(compatBuffer);
+      }
+
+      let imageBuffers: Buffer[];
+      let compression:
+        | { targetRequested: number; targetMet: boolean; jpegQuality: number }
+        | undefined;
+
+      if (targetBytes !== null) {
+        const flattened = await Promise.all(preparedBuffers.map(flattenAlpha));
+        const pdfOverhead = 2048 + files.length * 500;
+        const result = await compressImagesForTarget(flattened, targetBytes, pdfOverhead);
+        imageBuffers = result.buffers;
+        compression = {
+          targetRequested: targetBytes,
+          targetMet: result.targetMet,
+          jpegQuality: result.quality,
+        };
+      } else {
+        imageBuffers = await Promise.all(preparedBuffers.map((buf) => sharp(buf).png().toBuffer()));
+      }
+
+      for (let i = 0; i < imageBuffers.length; i++) {
         doc.addPage({ size: [pageW, pageH], margin });
 
-        // Decode HEIC/HEIF if needed, normalize EXIF orientation, then convert to PNG for PDFKit
-        const compatBuffer = await autoOrient(await ensureSharpCompat(file.buffer));
-        const pngBuffer = await sharp(compatBuffer).png().toBuffer();
-
-        const meta = await sharp(pngBuffer).metadata();
+        const imgBuf = imageBuffers[i];
+        const meta = await sharp(imgBuf).metadata();
         const imgW = meta.width ?? 100;
         const imgH = meta.height ?? 100;
 
-        // Scale to fit within content area
         const scale = Math.min(contentW / imgW, contentH / imgH, 1);
         const scaledW = imgW * scale;
         const scaledH = imgH * scale;
 
-        // Center on page
         const x = margin + (contentW - scaledW) / 2;
         const y = margin + (contentH - scaledH) / 2;
 
-        doc.image(pngBuffer, x, y, {
-          width: scaledW,
-          height: scaledH,
-        });
+        doc.image(imgBuf, x, y, { width: scaledW, height: scaledH });
       }
 
       doc.end();
       const pdfBuffer = await pdfDone;
+
+      if (compression && targetBytes !== null) {
+        compression.targetMet = pdfBuffer.length <= targetBytes;
+      }
 
       const jobId = randomUUID();
       const workspacePath = await createWorkspace(jobId);
@@ -138,6 +239,7 @@ export function registerImageToPdf(app: FastifyInstance) {
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: pdfBuffer.length,
         pages: files.length,
+        ...(compression ? { compression } : {}),
       });
     } catch (err) {
       return reply.status(422).send({

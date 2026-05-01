@@ -1,24 +1,29 @@
-import * as Sentry from "@sentry/react";
 import type { AnalyticsConfig } from "@snapotter/shared";
-import posthogJs from "posthog-js";
 
-let posthog: import("posthog-js").PostHog | null = null;
+type PostHogInstance = import("posthog-js").PostHog;
+
+let posthog: PostHogInstance | null = null;
 let initialized = false;
 let consentGranted = false;
 
 const FILE_EXT_PATTERN =
-  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|he[ic]f?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
+  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
 const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai|Users|home)\//g;
 
 function scrubString(str: string): string {
   return str.replace(FILE_EXT_PATTERN, ".[REDACTED]").replace(FILE_PATH_PATTERN, "/[REDACTED]/");
 }
 
-export function initAnalytics(config: AnalyticsConfig): void {
+export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   if (initialized || !config.enabled) return;
   initialized = true;
 
   try {
+    const posthogJs = (await import("posthog-js")).default;
+    if (!consentGranted) {
+      initialized = false;
+      return;
+    }
     posthog =
       posthogJs.init(config.posthogApiKey, {
         api_host: config.posthogHost,
@@ -35,11 +40,16 @@ export function initAnalytics(config: AnalyticsConfig): void {
         persistence: "localStorage",
       }) ?? null;
   } catch {
-    // SDK blocked or unavailable — use null provider
+    // SDK blocked or unavailable
   }
 
   try {
     if (config.sentryDsn) {
+      const Sentry = await import("@sentry/react");
+      if (!consentGranted) {
+        initialized = false;
+        return;
+      }
       Sentry.init({
         dsn: config.sentryDsn,
         sendDefaultPii: false,
@@ -81,8 +91,25 @@ export function initAnalytics(config: AnalyticsConfig): void {
   }
 }
 
+export function shutdownAnalytics(): void {
+  if (posthog) {
+    try {
+      posthog.opt_out_capturing();
+      posthog.reset();
+    } catch {
+      // never throw
+    }
+  }
+  posthog = null;
+  initialized = false;
+  consentGranted = false;
+}
+
 export function setAnalyticsConsent(enabled: boolean): void {
   consentGranted = enabled;
+  if (!enabled) {
+    shutdownAnalytics();
+  }
 }
 
 export function identify(instanceId: string, properties: Record<string, unknown>): void {

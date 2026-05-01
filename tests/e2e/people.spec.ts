@@ -1,5 +1,5 @@
 import { test as base, expect } from "@playwright/test";
-import { test as uiTest } from "./helpers";
+import { openSettings, test as uiTest } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
 
@@ -323,7 +323,7 @@ base.describe("People Management — API", () => {
 
 uiTest.describe("People Management — UI", () => {
   uiTest("People section displays user count and table", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /people/i }).click();
     await page.waitForTimeout(500);
 
@@ -342,7 +342,7 @@ uiTest.describe("People Management — UI", () => {
   });
 
   uiTest("Search filters users", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /people/i }).click();
     await page.waitForTimeout(500);
 
@@ -356,7 +356,7 @@ uiTest.describe("People Management — UI", () => {
   });
 
   uiTest("Add Members button is visible and interactive", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
     await page.getByRole("button", { name: /people/i }).click();
     await page.waitForTimeout(500);
 
@@ -380,7 +380,7 @@ uiTest.describe("People Management — UI", () => {
   uiTest(
     "Three-dot menu shows edit, reset password, and delete options",
     async ({ loggedInPage: page }) => {
-      await page.locator("aside").getByText("Settings").click();
+      await openSettings(page);
       await page.getByRole("button", { name: /people/i }).click();
       await page.waitForTimeout(500);
 

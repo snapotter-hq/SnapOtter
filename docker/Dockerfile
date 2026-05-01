@@ -148,6 +148,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     apt-get install -y --no-install-recommends \
     tini \
     imagemagick \
+    libjxl-tools \
     libraw-dev \
     libopenexr-dev \
     potrace \

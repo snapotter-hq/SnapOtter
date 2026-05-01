@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { basename, extname } from "node:path";
+import { extname } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -49,7 +50,7 @@ export function registerSplit(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "image");
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }

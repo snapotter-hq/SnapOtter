@@ -1,7 +1,7 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const authFile = path.join(__dirname, "test-results", ".auth", "user.json");
+const authFile = path.join(__dirname, ".playwright", ".auth", "user.json");
 const testDbPath = path.join(__dirname, "test-results", ".e2e-db", "snapotter.db");
 
 const TEST_WEB_PORT = 2349;
@@ -38,6 +38,24 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         storageState: authFile,
       },
+      dependencies: ["setup"],
+    },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: authFile,
+      },
+      testMatch: /gui-cross-browser\.spec\.ts/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "webkit",
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: authFile,
+      },
+      testMatch: /gui-cross-browser\.spec\.ts/,
       dependencies: ["setup"],
     },
   ],

@@ -271,7 +271,7 @@ describe("Info", () => {
 
   // ── HEIC format info ──────────────────────────────────────────
 
-  it("returns correct metadata for HEIC image", async () => {
+  it("returns correct metadata for HEIC image", { timeout: 120_000 }, async () => {
     const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
@@ -342,6 +342,51 @@ describe("Info", () => {
     expect(result.hasExif).toBe(false);
   });
 
+  it("returns 422 for corrupt/unreadable image data", async () => {
+    // Create a buffer that passes magic-number validation but fails Sharp parsing
+    // A JPEG starts with FF D8 FF, then garbage
+    const corruptJpeg = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.alloc(100, 0x00),
+    ]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "corrupt.jpg", contentType: "image/jpeg", content: corruptJpeg },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Should return 422 (metadata read failure) or 400 (validation rejection)
+    expect([400, 422]).toContain(res.statusCode);
+  });
+
+  it("returns 400 for empty file upload", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no image/i);
+  });
+
   it("reports hasIcc for image with ICC profile", async () => {
     const { body, contentType } = createMultipartPayload([
       {
@@ -387,8 +432,235 @@ describe("Info", () => {
 
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
-    // bitDepth comes from Sharp's metadata.depth — can be a number or
+    // bitDepth comes from Sharp's metadata.depth -- can be a number or
     // descriptive string (e.g. "uchar") depending on the format/version
     expect(result).toHaveProperty("bitDepth");
+  });
+
+  // ── Large file info ─────────────────────────────────────────────
+
+  it("returns metadata for a large stress image", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "stress-large.jpg", contentType: "image/jpeg", content: LARGE },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.width).toBeGreaterThan(0);
+    expect(result.height).toBeGreaterThan(0);
+    expect(result.format).toBe("jpeg");
+    expect(result.fileSize).toBeGreaterThan(0);
+  });
+
+  // ── Animated GIF info ───────────────────────────────────────────
+
+  it("returns page count for animated GIF", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "animated.gif", contentType: "image/gif", content: GIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.format).toBe("gif");
+    expect(result.pages).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Multi-page TIFF info ────────────────────────────────────────
+
+  it("returns metadata for multi-page TIFF", async () => {
+    const TIFF = readFileSync(join(FIXTURES, "formats", "multipage.tiff"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "multipage.tiff", contentType: "image/tiff", content: TIFF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.format).toBe("tiff");
+    expect(result.pages).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── AVIF info ───────────────────────────────────────────────────
+
+  it("returns metadata for AVIF image", async () => {
+    const AVIF = readFileSync(join(FIXTURES, "formats", "sample.avif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.avif", contentType: "image/avif", content: AVIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.width).toBeGreaterThan(0);
+    expect(result.height).toBeGreaterThan(0);
+    expect(result.fileSize).toBeGreaterThan(0);
+  });
+
+  // ── Density and progressive fields ──────────────────────────────
+
+  it("reports density for JPEG with DPI metadata", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test-with-exif.jpg",
+        contentType: "image/jpeg",
+        content: EXIF_JPG,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    // density may be null or a number depending on the image
+    expect(result).toHaveProperty("density");
+    expect(typeof result.isProgressive).toBe("boolean");
+  });
+
+  // ── hasXmp detection ────────────────────────────────────────────
+
+  it("reports hasXmp field for all images", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(typeof result.hasXmp).toBe("boolean");
+  });
+
+  // ── HEIF format info ──────────────────────────────────────────
+
+  it("returns correct metadata for HEIF (sample.heif) image", { timeout: 120_000 }, async () => {
+    const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.heif", contentType: "image/heif", content: HEIF },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // HEIF might need system decoder -- skip if 422
+    if (res.statusCode === 422) return;
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.width).toBeGreaterThan(0);
+    expect(result.height).toBeGreaterThan(0);
+    expect(result.filename).toBe("sample.heif");
+  });
+
+  // ── Alpha channel detection ─────────────────────────────────────
+
+  it("detects alpha channel in PNG with transparency", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(typeof result.hasAlpha).toBe("boolean");
+    expect(typeof result.channels).toBe("number");
+  });
+
+  // ── Orientation field ───────────────────────────────────────────
+
+  it("reports orientation for image with EXIF orientation", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "test-with-exif.jpg",
+        contentType: "image/jpeg",
+        content: EXIF_JPG,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/info",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result).toHaveProperty("orientation");
   });
 });

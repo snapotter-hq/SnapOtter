@@ -7,6 +7,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { createWorkspace, getWorkspacePath } from "../lib/workspace.js";
 
 /**
@@ -58,16 +59,19 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
+      const safeBuffer = isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
+
       // Sanitize filename
       const safeName = sanitizeFilename(part.filename ?? "upload");
 
       // Write to workspace input directory
       const filePath = join(inputDir, safeName);
-      await writeFile(filePath, buffer);
+      await writeFile(filePath, safeBuffer);
 
       uploadedFiles.push({
         name: safeName,
-        size: buffer.length,
+        size: safeBuffer.length,
         format: validation.format,
       });
     }

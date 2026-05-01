@@ -24,7 +24,7 @@ const envSchema = z.object({
   DB_PATH: z.string().default("./data/snapotter.db"),
   FILES_STORAGE_PATH: z.string().default("./data/files"),
   WORKSPACE_PATH: z.string().default("./tmp/workspace"),
-  DEFAULT_THEME: z.enum(["light", "dark"]).default("light"),
+  DEFAULT_THEME: z.enum(["light", "dark", "system"]).default("light"),
   DEFAULT_LOCALE: z.string().default("en"),
   APP_NAME: z.string().default("snapotter"),
   CORS_ORIGIN: z.string().default(""),

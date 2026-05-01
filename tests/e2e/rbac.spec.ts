@@ -1,5 +1,5 @@
 import { test as base, expect } from "@playwright/test";
-import { login } from "./helpers";
+import { login, openSettings } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
 
@@ -108,7 +108,7 @@ base.describe("RBAC - Admin sees all tabs", () => {
 
   base.test("admin sees all settings tabs", async ({ page }) => {
     await page.goto("/");
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /system settings/i })).toBeVisible();
@@ -138,7 +138,7 @@ base.describe("RBAC - User sees restricted tabs", () => {
   base.test("user role only sees permitted settings tabs", async ({ page }) => {
     await login(page, TEST_USER, TEST_PASSWORD);
 
-    await page.locator("aside").getByText("Settings").click();
+    await openSettings(page);
 
     // Should see these tabs
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
@@ -251,7 +251,7 @@ base.describe("RBAC - Editor sees collaborative tabs", () => {
     "editor sees general, security, api-keys, tools, about but not admin tabs",
     async ({ page }) => {
       await login(page, "editortest", "EditorTest1");
-      await page.locator("aside").getByText("Settings").click();
+      await openSettings(page);
 
       // Should see these
       await expect(page.getByRole("button", { name: /general/i })).toBeVisible();

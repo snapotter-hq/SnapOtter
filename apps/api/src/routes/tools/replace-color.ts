@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -73,13 +74,21 @@ export function registerReplaceColor(app: FastifyInstance) {
         }
       }
 
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      const ALPHA_FORMATS = new Set(["png", "webp", "avif", "tiff"]);
+      const needsAlpha = settings.makeTransparent;
+      const useFormat =
+        needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
+          ? { format: "png" as const, quality: 100, contentType: "image/png" }
+          : outputFormat;
+
       const buffer = await sharp(pixels, {
         raw: { width: info.width, height: info.height, channels: 4 },
       })
-        .png()
+        .toFormat(useFormat.format, { quality: useFormat.quality })
         .toBuffer();
 
-      return { buffer, filename, contentType: "image/png" };
+      return { buffer, filename, contentType: useFormat.contentType };
     },
   });
 }

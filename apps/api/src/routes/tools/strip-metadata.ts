@@ -1,8 +1,8 @@
-import { basename } from "node:path";
 import { parseExif, parseGps, parseXmp, stripMetadata } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -110,7 +110,7 @@ export function registerStripMetadata(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           }
         }
       } catch (err) {

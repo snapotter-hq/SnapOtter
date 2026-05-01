@@ -102,6 +102,11 @@ export default defineConfig({
         'AI-friendly docs available at <a href="/llms.txt">/llms.txt</a> · <a href="/llms-full.txt">/llms-full.txt</a>',
     },
 
+    socialLinks: [
+      { icon: "github", link: "https://github.com/snapotter-hq/snapotter" },
+      { icon: "discord", link: "https://discord.gg/hr3s7HPUsr" },
+    ],
+
     editLink: {
       pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",
       text: "Edit this page on GitHub",

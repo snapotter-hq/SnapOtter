@@ -406,6 +406,62 @@ describe("QR Generate", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
+  it("handles very long text (approaching max 2000 chars)", async () => {
+    const longText = "A".repeat(2000);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: longText,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("rejects text exceeding max length (2001 chars)", async () => {
+    const tooLong = "A".repeat(2001);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: tooLong,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("generates QR code at large size (2000)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "large size test",
+        size: 2000,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
   it("generates QR with transparent background (3-char hex)", async () => {
     const res = await app.inject({
       method: "POST",
@@ -464,5 +520,175 @@ describe("QR Generate", () => {
     const resultH = JSON.parse(resH.body);
     expect(resultL.processedSize).toBeGreaterThan(0);
     expect(resultH.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Unicode text ───────────────────────────────────────────────
+
+  it("generates QR code for Unicode text", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "Bonjour le monde! Hola mundo!",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  // ── Single character ───────────────────────────────────────────
+
+  it("generates QR code for a single character", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "X",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Same foreground and background ─────────────────────────────
+
+  it("generates QR code with identical foreground and background colors", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "same colors",
+        foreground: "#AABBCC",
+        background: "#AABBCC",
+      },
+    });
+
+    // Should still succeed even though QR is unreadable
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Max allowed size ───────────────────────────────────────────
+
+  it("generates QR code at maximum allowed size (10000)", { timeout: 120_000 }, async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "max size",
+        size: 10000,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  // ── Lowercase hex colors ───────────────────────────────────────
+
+  it("accepts lowercase hex colors", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "lowercase hex",
+        foreground: "#abcdef",
+        background: "#fedcba",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Mixed case hex colors ──────────────────────────────────────
+
+  it("accepts mixed case hex colors", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "mixed hex",
+        foreground: "#AbCdEf",
+        background: "#fEdCbA",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ── Download verifies correct size ─────────────────────────────
+
+  it("downloaded QR code has the exact requested size", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "size verify",
+        size: 256,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(256);
+    expect(meta.height).toBe(256);
+  });
+
+  // ── Invalid background color format ────────────────────────────
+
+  it("rejects invalid background color format", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "test",
+        background: "blue",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 });

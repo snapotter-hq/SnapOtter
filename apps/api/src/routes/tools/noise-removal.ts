@@ -9,6 +9,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace } from "../../lib/workspace.js";
@@ -56,11 +57,14 @@ export function registerNoiseRemoval(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = part.filename ?? "image";
+          filename = sanitizeFilename(part.filename ?? "image");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -79,55 +83,68 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
 
+    let parsed: z.infer<typeof settingsSchema>;
     try {
-      let parsed: z.infer<typeof settingsSchema>;
-      try {
-        const raw = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(raw);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-        }
-        parsed = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      const raw = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(raw);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
       }
+      parsed = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
 
-      request.log.info(
-        { toolId: "noise-removal", imageSize: fileBuffer.length, tier: parsed.tier },
-        "Starting noise removal",
-      );
-
-      // Decode HEIC/HEIF input via system decoder
+    try {
       if (validation.format === "heif") {
         fileBuffer = await decodeHeic(fileBuffer);
       }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
       if (needsCliDecode(validation.format)) {
         fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
       }
-
-      // Auto-orient to fix EXIF rotation before processing
       fileBuffer = await autoOrient(fileBuffer);
+    } catch (err) {
+      request.log.error({ err, toolId: "noise-removal" }, "Input decoding failed");
+      return reply.status(422).send({
+        error: "Noise removal failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
+    const originalSize = fileBuffer.length;
+    const jobId = randomUUID();
+    const progressJobId = clientJobId || jobId;
+    let workspacePath: string;
+    try {
+      workspacePath = await createWorkspace(jobId);
+    } catch (err) {
+      request.log.error({ err, toolId: "noise-removal" }, "Workspace creation failed");
+      return reply.status(422).send({
+        error: "Noise removal failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
 
-      // Progress callback
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
+    const log = request.log;
+    log.info(
+      { toolId: "noise-removal", imageSize: originalSize, tier: parsed.tier },
+      "Starting noise removal",
+    );
 
+    reply.status(202).send({ jobId: progressJobId, async: true });
+
+    const onProgress = (percent: number, stage: string) => {
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "processing",
+        stage,
+        percent,
+      });
+    };
+
+    (async () => {
       const result = await noiseRemoval(
         fileBuffer,
         join(workspacePath, "output"),
@@ -147,27 +164,29 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       const outputPath = join(workspacePath, "output", outputFilename);
       await writeFile(outputPath, result.buffer);
 
-      if (clientJobId) {
-        updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "complete",
-          percent: 100,
-        });
-      }
+      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId,
+          downloadUrl,
+          originalSize,
+          processedSize: result.buffer.length,
+        },
+      });
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-        originalSize: fileBuffer.length,
-        processedSize: result.buffer.length,
+      log.info({ toolId: "noise-removal", jobId, downloadUrl }, "Noise removal complete");
+    })().catch((err) => {
+      log.error({ err, toolId: "noise-removal" }, "Noise removal failed");
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "failed",
+        percent: 0,
+        error: err instanceof Error ? err.message : "Noise removal failed",
       });
-    } catch (err) {
-      request.log.error({ err, toolId: "noise-removal" }, "Noise removal failed");
-      return reply.status(422).send({
-        error: "Noise removal failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
+    });
   });
 
   // Register in the pipeline/batch registry so this tool can be used

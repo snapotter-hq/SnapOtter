@@ -163,6 +163,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      // Capture the original upload size before any decoding (HEIC, CLI)
+      // mutates fileBuffer into a larger intermediate PNG.
+      const uploadedSize = fileBuffer.length;
+
       // Validate the uploaded image
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
@@ -296,6 +300,29 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           result.filename = `${base}_${config.toolId}${ext}`;
         }
 
+        // Fix extension mismatch: when the output format differs from the
+        // original (e.g. SVG input -> PNG output), update the filename
+        // extension so the download endpoint serves the correct Content-Type.
+        const CONTENT_TYPE_TO_EXT: Record<string, string> = {
+          "image/jpeg": ".jpg",
+          "image/png": ".png",
+          "image/webp": ".webp",
+          "image/gif": ".gif",
+          "image/tiff": ".tiff",
+          "image/avif": ".avif",
+          "image/svg+xml": ".svg",
+          "image/bmp": ".bmp",
+          "image/heic": ".heic",
+          "image/heif": ".heif",
+        };
+        const expectedExt = CONTENT_TYPE_TO_EXT[result.contentType];
+        if (expectedExt) {
+          const currentExt = extname(result.filename).toLowerCase();
+          if (currentExt && currentExt !== expectedExt) {
+            result.filename = result.filename.slice(0, -currentExt.length) + expectedExt;
+          }
+        }
+
         // Create workspace and save output
         const jobId = randomUUID();
         const workspacePath = await createWorkspace(jobId);
@@ -395,7 +422,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           jobId,
           downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
           previewUrl,
-          originalSize: fileBuffer.length,
+          originalSize: uploadedSize,
           processedSize: result.buffer.length,
           savedFileId,
         });

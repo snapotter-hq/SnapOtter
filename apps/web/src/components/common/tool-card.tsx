@@ -1,6 +1,6 @@
 import type { Tool } from "@snapotter/shared";
 import { PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP } from "@snapotter/shared";
-import { Download, FileImage, Star } from "lucide-react";
+import { Clock, Download, FileImage, Loader2, Star } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ICON_MAP } from "@/lib/icon-map";
@@ -17,14 +17,17 @@ export function ToolCard({ tool }: ToolCardProps) {
 
   const isAiTool = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(tool.id);
   const bundles = useFeaturesStore((s) => s.bundles);
-  const isInstalled = useMemo(() => {
-    if (!isAiTool) return true;
+  const installing = useFeaturesStore((s) => s.installing);
+  const queued = useFeaturesStore((s) => s.queued);
+  const aiStatus = useMemo(() => {
+    if (!isAiTool) return "installed";
     const bundleId = TOOL_BUNDLE_MAP[tool.id];
-    if (!bundleId) return true;
+    if (!bundleId) return "installed";
+    if (queued.includes(bundleId)) return "queued";
+    if (installing[bundleId]) return "installing";
     const bundle = bundles.find((b) => b.id === bundleId);
-    return bundle?.status === "installed";
-  }, [isAiTool, tool.id, bundles]);
-  const showDownloadBadge = isAiTool && !isInstalled;
+    return bundle?.status === "installed" ? "installed" : "not_installed";
+  }, [isAiTool, tool.id, bundles, installing, queued]);
 
   return (
     <div className="group flex items-center gap-3 relative">
@@ -50,7 +53,11 @@ export function ToolCard({ tool }: ToolCardProps) {
             Experimental
           </span>
         )}
-        {showDownloadBadge && <Download className="h-3.5 w-3.5 text-muted-foreground" />}
+        {aiStatus === "not_installed" && <Download className="h-3.5 w-3.5 text-muted-foreground" />}
+        {aiStatus === "queued" && <Clock className="h-3.5 w-3.5 text-muted-foreground" />}
+        {aiStatus === "installing" && (
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+        )}
       </Link>
     </div>
   );

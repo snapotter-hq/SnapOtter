@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,6 +10,7 @@ import { applyEffects } from "../../lib/bg-effects.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace, getWorkspacePath } from "../../lib/workspace.js";
@@ -69,11 +70,14 @@ export function registerRemoveBackground(app: FastifyInstance) {
             const chunks: Buffer[] = [];
             for await (const chunk of part.file) chunks.push(chunk);
             fileBuffer = Buffer.concat(chunks);
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            clientJobId = part.value as string;
+            const raw = part.value as string;
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+              clientJobId = raw;
+            }
           }
         }
       } catch (err) {
@@ -92,21 +96,21 @@ export function registerRemoveBackground(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
+      let settings: z.infer<typeof settingsSchema>;
       try {
-        let settings: z.infer<typeof settingsSchema>;
-        try {
-          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-          const result = settingsSchema.safeParse(parsed);
-          if (!result.success) {
-            return reply
-              .status(400)
-              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-          }
-          settings = result.data;
-        } catch {
-          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
         }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
 
+      try {
         // Decode HEIC/HEIF before processing
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
@@ -123,31 +127,51 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         // Auto-orient to fix EXIF rotation
         fileBuffer = await autoOrient(fileBuffer);
+      } catch (err) {
+        request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
+        return reply.status(422).send({
+          error: "Background removal failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
 
-        request.log.info(
-          { toolId: "remove-background", imageSize: fileBuffer.length, model: settings.model },
-          "Starting background removal",
-        );
-        const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
-
-        // Save input
+      const originalSize = fileBuffer.length;
+      const jobId = randomUUID();
+      const progressJobId = clientJobId || jobId;
+      let workspacePath: string;
+      try {
+        workspacePath = await createWorkspace(jobId);
         const inputPath = join(workspacePath, "input", filename);
         await writeFile(inputPath, fileBuffer);
+      } catch (err) {
+        request.log.error({ err, toolId: "remove-background" }, "Workspace creation failed");
+        return reply.status(422).send({
+          error: "Background removal failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
 
-        // Progress callback
-        const jobIdForProgress = clientJobId;
-        const onProgress = jobIdForProgress
-          ? (percent: number, stage: string) => {
-              updateSingleFileProgress({
-                jobId: jobIdForProgress,
-                phase: "processing",
-                stage,
-                percent: Math.min(percent, 95),
-              });
-            }
-          : undefined;
+      const log = request.log;
+      log.info(
+        { toolId: "remove-background", imageSize: originalSize, model: settings.model },
+        "Starting background removal",
+      );
 
+      // Reply immediately so the HTTP connection closes within proxy timeout limits.
+      // The result will be delivered via the SSE progress channel.
+      reply.status(202).send({ jobId: progressJobId, async: true });
+
+      const onProgress = (percent: number, stage: string) => {
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "processing",
+          stage,
+          percent: Math.min(percent, 95),
+        });
+      };
+
+      // Fire-and-forget: processing happens after the response is sent
+      (async () => {
         // Phase 1: AI background removal -> transparent PNG
         const transparentResult = await removeBackground(
           fileBuffer,
@@ -162,33 +186,39 @@ export function registerRemoveBackground(app: FastifyInstance) {
         await writeFile(join(workspacePath, "output", maskFilename), transparentResult);
         await writeFile(join(workspacePath, "output", originalFilename), fileBuffer);
 
-        if (clientJobId) {
-          updateSingleFileProgress({
-            jobId: clientJobId,
-            phase: "complete",
-            percent: 100,
-          });
-        }
+        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(maskFilename)}`;
+        const maskUrl = `/api/v1/download/${jobId}/${encodeURIComponent(maskFilename)}`;
+        const originalUrl = `/api/v1/download/${jobId}/${encodeURIComponent(originalFilename)}`;
 
-        return reply.send({
-          jobId,
-          // The mask (transparent PNG) is the main preview
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(maskFilename)}`,
-          // Separate URLs for frontend CSS preview compositing
-          maskUrl: `/api/v1/download/${jobId}/${encodeURIComponent(maskFilename)}`,
-          originalUrl: `/api/v1/download/${jobId}/${encodeURIComponent(originalFilename)}`,
-          originalSize: fileBuffer.length,
-          processedSize: transparentResult.length,
-          filename,
-          model: settings.model,
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "complete",
+          percent: 100,
+          result: {
+            jobId,
+            downloadUrl,
+            maskUrl,
+            originalUrl,
+            originalSize,
+            processedSize: transparentResult.length,
+            filename,
+            model: settings.model,
+          },
         });
-      } catch (err) {
-        request.log.error({ err, toolId: "remove-background" }, "Background removal failed");
-        return reply.status(422).send({
-          error: "Background removal failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+
+        log.info(
+          { toolId: "remove-background", jobId, downloadUrl },
+          "Background removal complete",
+        );
+      })().catch((err) => {
+        log.error({ err, toolId: "remove-background" }, "Background removal failed");
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: err instanceof Error ? err.message : "Background removal failed",
         });
-      }
+      });
     },
   );
 
@@ -207,7 +237,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
             const chunks: Buffer[] = [];
             for await (const chunk of part.file) chunks.push(chunk);
             bgImageBuffer = Buffer.concat(chunks);
-            bgFilename = part.filename ?? "background";
+            bgFilename = sanitizeFilename(part.filename ?? "background");
           } else if (part.type === "field" && part.fieldname === "settings") {
             settingsRaw = part.value as string;
           }

@@ -1,6 +1,6 @@
-import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
-import { Download, Loader2 } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import { Clock, Download, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { MultiImageViewer } from "@/components/common/multi-image-viewer";
@@ -25,7 +25,7 @@ export function HomePage() {
   } = useFileStore();
   const navigate = useNavigate();
   const { fetch: fetchSettings, defaultToolView, loaded: settingsLoaded } = useSettingsStore();
-  const { fetch: fetchFeatures, isToolInstalled } = useFeaturesStore();
+  const { fetch: fetchFeatures, bundles, installing, queued } = useFeaturesStore();
 
   useEffect(() => {
     reset();
@@ -41,6 +41,19 @@ export function HomePage() {
       navigate("/fullscreen", { replace: true });
     }
   }, [settingsLoaded, defaultToolView, files.length, navigate]);
+
+  const getToolStatus = useMemo(() => {
+    return (toolId: string) => {
+      const isAi = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId);
+      if (!isAi) return "installed";
+      const bundleId = TOOL_BUNDLE_MAP[toolId];
+      if (!bundleId) return "installed";
+      if (queued.includes(bundleId)) return "queued";
+      if (installing[bundleId]) return "installing";
+      const bundle = bundles.find((b) => b.id === bundleId);
+      return bundle?.status === "installed" ? "installed" : "not_installed";
+    };
+  }, [bundles, installing, queued]);
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
@@ -96,8 +109,7 @@ export function HomePage() {
                 const Icon =
                   (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ??
                   ICON_MAP.FileImage;
-                const isAi = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(id);
-                const needsDownload = isAi && !isToolInstalled(id);
+                const status = getToolStatus(id);
                 return (
                   <button
                     key={id}
@@ -109,8 +121,14 @@ export function HomePage() {
                       <Icon className="h-4 w-4" />
                     </div>
                     <span className="text-xs font-medium text-foreground">{tool.name}</span>
-                    {needsDownload && (
+                    {status === "not_installed" && (
                       <Download className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                    )}
+                    {status === "queued" && (
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                    )}
+                    {status === "installing" && (
+                      <Loader2 className="h-3.5 w-3.5 text-muted-foreground ml-auto animate-spin" />
                     )}
                   </button>
                 );
@@ -139,8 +157,7 @@ export function HomePage() {
                       const Icon =
                         (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ??
                         ICON_MAP.FileImage;
-                      const isAi = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(tool.id);
-                      const needsDownload = isAi && !isToolInstalled(tool.id);
+                      const status = getToolStatus(tool.id);
                       return (
                         <button
                           key={tool.id}
@@ -150,8 +167,14 @@ export function HomePage() {
                         >
                           <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="text-sm">{tool.name}</span>
-                          {needsDownload && (
+                          {status === "not_installed" && (
                             <Download className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                          )}
+                          {status === "queued" && (
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                          )}
+                          {status === "installing" && (
+                            <Loader2 className="h-3.5 w-3.5 text-muted-foreground ml-auto animate-spin" />
                           )}
                         </button>
                       );

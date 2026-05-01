@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
 import {
   getBundleForTool,
@@ -15,6 +15,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { createWorkspace, getWorkspacePath } from "../../lib/workspace.js";
@@ -154,7 +155,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
             const chunks: Buffer[] = [];
             for await (const chunk of part.file) chunks.push(chunk);
             fileBuffer = Buffer.concat(chunks);
-            filename = basename(part.filename ?? "image");
+            filename = sanitizeFilename(part.filename ?? "image");
           } else if (part.fieldname === "clientJobId") {
             clientJobId = part.value as string;
           }
@@ -295,6 +296,27 @@ export function registerPassportPhoto(app: FastifyInstance) {
           details: err instanceof Error ? err.message : "Unknown error",
         });
       }
+    },
+  );
+
+  // ── Base route: return 501 so generic callers don't get 404 ──────
+  app.post(
+    "/api/v1/tools/passport-photo",
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const toolId = "passport-photo";
+      if (!isToolInstalled(toolId)) {
+        const bundle = getBundleForTool(toolId);
+        return reply.status(501).send({
+          error: "Feature not installed",
+          code: "FEATURE_NOT_INSTALLED",
+          feature: TOOL_BUNDLE_MAP[toolId],
+          featureName: bundle?.name ?? toolId,
+          estimatedSize: bundle?.estimatedSize ?? "unknown",
+        });
+      }
+      return reply.status(400).send({
+        error: "Use /api/v1/tools/passport-photo/analyze or /generate",
+      });
     },
   );
 

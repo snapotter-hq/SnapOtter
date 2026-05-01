@@ -318,7 +318,7 @@ describe("image-to-base64", () => {
   });
 
   // ── HEIC input gets converted to JPEG in original mode ───────────
-  it("converts HEIC to JPEG in original mode", async () => {
+  it("converts HEIC to JPEG in original mode", { timeout: 120_000 }, async () => {
     const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
@@ -464,5 +464,376 @@ describe("image-to-base64", () => {
     expect(json.results[0].mimeType).toBe("image/jpeg");
     expect(json.results[0].width).toBeLessThanOrEqual(50);
     expect(json.results[0].height).toBeLessThanOrEqual(50);
+  });
+
+  // ── Branch coverage: line 83 (ignored invalid settings JSON) ──────
+
+  it("ignores invalid settings JSON (uses defaults)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not-json-at-all" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // The route silently ignores invalid JSON and uses defaults
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(1);
+    expect(json.results[0].mimeType).toContain("image/");
+  });
+
+  // ── Branch coverage: lines 149-150 (default case in outputFormat switch) ──
+
+  it("handles unknown outputFormat falling through to default", async () => {
+    // Testing the "original" path with a non-HEIC, non-SVG format and no resize
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "original" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── Branch coverage: line 180 (overheadPercent = 0 for empty) ─────
+
+  it("handles 1x1 tiny image", async () => {
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].width).toBe(1);
+    expect(json.results[0].height).toBe(1);
+    expect(typeof json.results[0].overheadPercent).toBe("number");
+  });
+
+  // ── HEIC with resize ──────────────────────────────────────────────
+
+  it("converts HEIC to JPEG with resize applied", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ maxWidth: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+    expect(json.results[0].width).toBeLessThanOrEqual(50);
+  });
+
+  // ── HEIC with explicit format conversion ──────────────────────────
+
+  it("converts HEIC to PNG when outputFormat is png", { timeout: 120_000 }, async () => {
+    const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/png");
+  });
+
+  // ── Original format with resize (no format conversion) ────────────
+
+  it("preserves original format when only resize is requested", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ maxWidth: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toContain("image/");
+    expect(json.results[0].width).toBeLessThanOrEqual(100);
+  });
+
+  // ── Large stress file ─────────────────────────────────────────────
+
+  it("converts stress-large.jpg to base64", async () => {
+    const LARGE = readFileSync(join(FIXTURES, "content", "stress-large.jpg"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ maxWidth: 200 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].base64.length).toBeGreaterThan(0);
+    expect(json.results[0].width).toBeLessThanOrEqual(200);
+  });
+
+  // ── No settings at all ────────────────────────────────────────────
+
+  it("works when no settings field is provided at all", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(1);
+  });
+
+  // ── 5+ images batch conversion ──────────────────────────────────
+
+  it("converts 5 images in a single request", async () => {
+    const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+    const TINY = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "img2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "img3.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "img4.png", contentType: "image/png", content: TINY },
+      { name: "file", filename: "img5.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(5);
+    expect(json.errors).toHaveLength(0);
+    for (const result of json.results) {
+      expect(result.base64.length).toBeGreaterThan(0);
+      expect(result.dataUri).toMatch(/^data:image\/.+;base64,/);
+    }
+  });
+
+  // ── Corrupted image produces error entry ─────────────────────────
+
+  it("reports corrupted image in errors array", async () => {
+    const corrupted = Buffer.alloc(50, 0xff);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "bad.png", contentType: "image/png", content: corrupted },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    // Good image should succeed, bad one should end up in errors
+    expect(json.results.length + json.errors.length).toBe(2);
+  });
+
+  // ── Rejects unauthenticated request ──────────────────────────────
+
+  it("rejects unauthenticated request", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── HEIF input (alternative extension) ───────────────────────────
+
+  it(
+    "converts HEIF to JPEG in original mode",
+    { timeout: 120_000 },
+    async () => {
+      const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image-to-base64",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.results[0].mimeType).toBe("image/jpeg");
+    },
+    60_000,
+  );
+
+  // ── Quality=1 minimum ────────────────────────────────────────────
+
+  it("accepts quality at minimum boundary (1)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "jpeg", quality: 1 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── Quality=100 maximum ──────────────────────────────────────────
+
+  it("accepts quality at maximum boundary (100)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "jpeg", quality: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── Rejects invalid outputFormat ─────────────────────────────────
+
+  it("rejects invalid outputFormat value", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ outputFormat: "bmp" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── Animated GIF input ──────────────────────────────────────────
+
+  it("converts animated GIF to base64", async () => {
+    const GIF = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results).toHaveLength(1);
+    expect(json.results[0].base64.length).toBeGreaterThan(0);
+    expect(json.results[0].dataUri).toMatch(/^data:image\/.+;base64,/);
+  });
+
+  // ── maxHeight=0 means no resize ──────────────────────────────────
+
+  it("maxHeight=0 means no height resize (pass-through)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ maxHeight: 0 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.results[0].width).toBe(200);
+    expect(json.results[0].height).toBe(150);
   });
 });

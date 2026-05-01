@@ -1,6 +1,6 @@
 {
   "name": "snapotter",
-  "version": "1.15.11",
+  "version": "1.16.0",
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
@@ -20,6 +20,9 @@
     "test:all": "vitest run --coverage && playwright test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:landing": "playwright test --config playwright.landing.config.ts",
+    "test:e2e:docs": "playwright test --config playwright.docs.config.ts",
+    "test:e2e:analytics": "playwright test --config playwright.analytics-local.config.ts",
     "test:docker": "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
     "version:sync": "./scripts/sync-version.sh",
     "release": "semantic-release",

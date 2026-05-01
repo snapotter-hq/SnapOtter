@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -89,7 +89,7 @@ async function convertSvg(
       break;
   }
 
-  const baseName = basename(filename).replace(/\.svg$/i, "");
+  const baseName = sanitizeFilename(filename).replace(/\.svg$/i, "");
   return { buffer, filename: `${baseName}.${ext}`, ext };
 }
 
@@ -331,7 +331,7 @@ export function registerSvgToRaster(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = basename(part.filename ?? "output").replace(/\.svg$/i, "");
+          filename = sanitizeFilename(part.filename ?? "output").replace(/\.svg$/i, "");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }

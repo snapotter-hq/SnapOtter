@@ -32,6 +32,7 @@ import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useThemeStore } from "@/stores/theme-store";
 import { OtterLogo } from "../common/otter-logo";
 import { AiFeaturesSection } from "./ai-features-section";
 
@@ -367,6 +368,10 @@ function SystemSection() {
     setSaveMsg(null);
     try {
       await apiPut("/v1/settings", settings);
+      if (settings.defaultTheme) {
+        const theme = settings.defaultTheme as "light" | "dark" | "system";
+        useThemeStore.getState().setTheme(theme);
+      }
       setSaveMsg("Settings saved.");
     } catch {
       setSaveMsg("Failed to save settings.");

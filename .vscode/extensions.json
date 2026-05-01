@@ -1,0 +1,40 @@
+{
+  "recommendations": [
+    // ── Core: Linting & Formatting ──
+    "biomejs.biome",
+
+    // ── Languages ──
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+
+    // ── Frontend ──
+    "bradlc.vscode-tailwindcss",
+
+    // ── Testing ──
+    "vitest.explorer",
+    "ms-playwright.playwright",
+
+    // ── Infrastructure ──
+    "ms-azuretools.vscode-docker",
+
+    // ── GitHub ──
+    "GitHub.vscode-pull-request-github",
+    "GitHub.vscode-github-actions",
+
+    // ── DX Enhancements ──
+    "yoavbls.pretty-ts-errors",
+    "usernamehw.errorlens",
+    "eamodio.gitlens",
+    "vivaxy.vscode-conventional-commits",
+    "redhat.vscode-yaml",
+    "qwtel.sqlite-viewer",
+    "mikestead.dotenv",
+    "EditorConfig.EditorConfig"
+  ],
+  "unwantedRecommendations": [
+    // Conflicts with Biome
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint"
+  ]
+}

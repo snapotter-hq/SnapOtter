@@ -1,15 +1,7 @@
-import fs from "node:fs";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
-const SAMPLES_DIR = path.join(process.env.HOME ?? "/Users/sidd", "Downloads", "sample");
 const FIXTURES_DIR = path.join(process.cwd(), "tests", "fixtures");
-
-function getSampleImage(name: string): string {
-  const p = path.join(SAMPLES_DIR, name);
-  if (fs.existsSync(p)) return p;
-  throw new Error(`Sample image not found: ${p}`);
-}
 
 function getFixture(name: string): string {
   return path.join(FIXTURES_DIR, name);
@@ -207,17 +199,10 @@ test.describe("Batch processing fixes", () => {
   test("blur-faces processes multiple files", async ({ page }) => {
     await page.goto("/blur-faces");
 
-    // Use sample portraits
-    const portrait = path.join(
-      SAMPLES_DIR,
-      "free-photo-of-black-and-white-portrait-of-a-smiling-woman.jpeg",
-    );
-    if (!fs.existsSync(portrait)) {
-      test.skip();
-      return;
-    }
-
-    await uploadFiles(page, [portrait, getFixture("test-portrait.jpg")]);
+    await uploadFiles(page, [
+      getFixture("content/multi-face.webp"),
+      getFixture("content/portrait-color.jpg"),
+    ]);
 
     const processBtn = page.getByRole("button", { name: /blur|process/i });
     await expect(processBtn).toBeEnabled({ timeout: 5000 });
@@ -272,17 +257,8 @@ test.describe("Passport photo", () => {
   });
 
   test("passport photo works with real portrait", async ({ page }) => {
-    const portrait = path.join(
-      SAMPLES_DIR,
-      "free-photo-of-black-and-white-portrait-of-a-smiling-woman.jpeg",
-    );
-    if (!fs.existsSync(portrait)) {
-      test.skip();
-      return;
-    }
-
     await page.goto("/passport-photo");
-    await uploadFiles(page, [portrait]);
+    await uploadFiles(page, [getFixture("content/portrait-color.jpg")]);
 
     // Wait for face analysis (uses MediaPipe + rembg, can be slow on CPU)
     await page.waitForTimeout(5000);

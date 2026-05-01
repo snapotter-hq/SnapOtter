@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { basename, extname } from "node:path";
+import { extname } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 
 const settingsSchema = z.object({
   pattern: z.string().min(1).max(1000).default("image-{{index}}"),
@@ -31,7 +32,7 @@ export function registerBulkRename(app: FastifyInstance) {
           if (buf.length > 0) {
             files.push({
               buffer: buf,
-              filename: basename(part.filename ?? `file-${files.length}`),
+              filename: sanitizeFilename(part.filename ?? `file-${files.length}`),
             });
           }
         } else if (part.fieldname === "settings") {
@@ -89,7 +90,7 @@ export function registerBulkRename(app: FastifyInstance) {
             .replace(/\{\{padded\}\}/g, padded)
             .replace(/\{\{original\}\}/g, files[i].filename.replace(ext, "")) + ext;
 
-        archive.append(files[i].buffer, { name: basename(newName) });
+        archive.append(files[i].buffer, { name: sanitizeFilename(newName) });
       }
 
       await archive.finalize();

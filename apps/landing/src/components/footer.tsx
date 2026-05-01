@@ -24,6 +24,7 @@ const columns = [
     title: "Community",
     links: [
       { label: "GitHub", href: "https://github.com/snapotter-hq/snapotter" },
+      { label: "Discord", href: "https://discord.gg/hr3s7HPUsr" },
       {
         label: "Contributing",
         href: "https://github.com/snapotter-hq/snapotter/blob/main/CONTRIBUTING.md",

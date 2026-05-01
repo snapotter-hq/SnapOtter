@@ -149,4 +149,33 @@ export const test = base.extend<{ loggedInPage: Page }>({
   },
 });
 
+// ---------------------------------------------------------------------------
+// isAiSidecarRunning() — check if the Python AI dispatcher is ready
+// ---------------------------------------------------------------------------
+export async function isAiSidecarRunning(page: Page): Promise<boolean> {
+  try {
+    const response = await page.request.get("/api/v1/admin/health");
+    if (!response.ok()) return false;
+    const health = (await response.json()) as {
+      ai?: { dispatcher?: { ready?: boolean; running?: boolean } };
+    };
+    return health.ai?.dispatcher?.ready === true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// openSettings() — reliably open the Settings dialog across all viewports
+// ---------------------------------------------------------------------------
+export async function openSettings(page: Page): Promise<void> {
+  const sidebar = page.locator("aside");
+  if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await sidebar.getByText("Settings").click();
+  } else {
+    await page.getByRole("button", { name: /settings/i }).click();
+  }
+  await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
+}
+
 export { expect };

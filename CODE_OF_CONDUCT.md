@@ -41,7 +41,7 @@ Issues, Discussions, and any other channels managed by the SnapOtter project.
 ## Reporting
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to **snapotter.hq@gmail.com**. All complaints will be reviewed promptly
+reported to **contact@snapotter.com**. All complaints will be reviewed promptly
 and fairly. The maintainer is obligated to respect the privacy and security of
 the reporter of any incident.
 

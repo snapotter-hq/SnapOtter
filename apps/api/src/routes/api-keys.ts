@@ -72,17 +72,21 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     const keyPrefix = computeKeyPrefix(rawKey);
     const id = randomUUID();
 
-    db.insert(schema.apiKeys)
-      .values({
-        id,
-        userId: user.id,
-        keyHash,
-        keyPrefix,
-        name,
-        permissions: scopedPermissions ? JSON.stringify(scopedPermissions) : null,
-        expiresAt,
-      })
-      .run();
+    try {
+      db.insert(schema.apiKeys)
+        .values({
+          id,
+          userId: user.id,
+          keyHash,
+          keyPrefix,
+          name,
+          permissions: scopedPermissions ? JSON.stringify(scopedPermissions) : null,
+          expiresAt,
+        })
+        .run();
+    } catch {
+      return reply.status(409).send({ error: "Failed to create API key" });
+    }
 
     auditLog(request.log, "API_KEY_CREATED", { userId: user.id, keyId: id, keyName: name });
 

@@ -589,3 +589,57 @@ test.describe("Content-Aware Resize", () => {
     }
   });
 });
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("collage without token returns 401", async ({ request }) => {
+    const { body, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+      ],
+      [
+        {
+          name: "settings",
+          value: JSON.stringify({ templateId: "2-h-equal", width: 400 }),
+        },
+      ],
+    );
+    const res = await request.post("/api/v1/tools/collage", {
+      headers: { "Content-Type": contentType },
+      data: body,
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("stitch without token returns 401", async ({ request }) => {
+    const { body, contentType } = buildMultipart(
+      [
+        { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
+      ],
+      [{ name: "settings", value: JSON.stringify({ direction: "horizontal" }) }],
+    );
+    const res = await request.post("/api/v1/tools/stitch", {
+      headers: { "Content-Type": contentType },
+      data: body,
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("text-overlay without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/text-overlay", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({
+          text: "Test",
+          fontSize: 24,
+          color: "#FFFFFF",
+          position: "center",
+        }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

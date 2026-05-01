@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "./helpers";
+import { expect, isAiSidecarRunning, test } from "./helpers";
 
 function fixturePath(name: string): string {
   return path.join(process.cwd(), "tests", "fixtures", name);
@@ -21,6 +21,9 @@ test.describe("Blur Faces tool", () => {
       await page.getByTestId("blur-faces-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {
       test.skip(true, "face-detection feature bundle not installed");
+    }
+    if (!(await isAiSidecarRunning(page))) {
+      test.skip(true, "AI sidecar not running");
     }
   }
 

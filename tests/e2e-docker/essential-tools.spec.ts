@@ -456,3 +456,199 @@ test.describe("Compress", () => {
     expect(body.downloadUrl).toBeTruthy();
   });
 });
+
+// ─── Metadata (Info) ────────────────────────────────────────────────
+
+test.describe("Metadata", () => {
+  test("returns dimensions and format for PNG", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.width).toBe(200);
+    expect(body.height).toBe(150);
+    expect(body.format).toBe("png");
+    expect(body.fileSize).toBeGreaterThan(0);
+  });
+
+  test("returns dimensions for JPEG", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.width).toBe(100);
+    expect(body.height).toBe(100);
+    expect(body.format).toBe("jpeg");
+  });
+
+  test("returns EXIF data when present", async ({ request }) => {
+    const jpgExif = fixture("test-with-exif.jpg");
+    const res = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test-with-exif.jpg", mimeType: "image/jpeg", buffer: jpgExif },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.hasExif).toBe(true);
+  });
+
+  test("returns channel and alpha info", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.channels).toBeGreaterThan(0);
+    expect(typeof body.hasAlpha).toBe("boolean");
+    expect(body.colorSpace).toBeTruthy();
+  });
+});
+
+// ─── Color Adjustments ──────────────────────────────────────────────
+
+test.describe("Colors", () => {
+  test("adjust brightness", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/adjust-colors", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ brightness: 20 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  test("adjust contrast and saturation together", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/adjust-colors", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ contrast: 20, saturation: -10 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("convert to grayscale", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/adjust-colors", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ grayscale: true }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("negative brightness darkens image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/adjust-colors", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({ brightness: -30 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ─── Sharpening ─────────────────────────────────────────────────────
+
+test.describe("Sharpening", () => {
+  test("sharpen with default sigma", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/sharpening", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
+        settings: JSON.stringify({}),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+    expect(body.processedSize).toBeGreaterThan(0);
+  });
+
+  test("sharpen with explicit sigma", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/sharpening", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ sigma: 2.0 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+
+  test("sharpen HEIC image", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/sharpening", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
+        settings: JSON.stringify({ sigma: 1.5 }),
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.downloadUrl).toBeTruthy();
+  });
+});
+
+// ─── Auth Failure ──────────────────────────────────────────────────
+
+test.describe("Auth failure", () => {
+  test("resize without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/resize", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ width: 100 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("crop without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/crop", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ left: 0, top: 0, width: 50, height: 50 }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test("convert without token returns 401", async ({ request }) => {
+    const res = await request.post("/api/v1/tools/convert", {
+      multipart: {
+        file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
+        settings: JSON.stringify({ format: "jpg" }),
+      },
+    });
+    expect(res.status()).toBe(401);
+  });
+});

@@ -185,6 +185,12 @@ def run_paddleocr_vl(input_path):
 
         text_parts = []
         for res in output:
+            # PaddleOCR-VL 1.5+: markdown_texts holds the extracted text
+            if hasattr(res, "markdown") and isinstance(res.markdown, dict):
+                md_text = res.markdown.get("markdown_texts", "")
+                if md_text:
+                    text_parts.append(md_text)
+                    continue
             if hasattr(res, "parsing_res_list"):
                 for block in res.parsing_res_list:
                     content = block.get("block_content", "")

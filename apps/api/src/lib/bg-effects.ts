@@ -132,7 +132,7 @@ export async function compositeOnColor(subjectBuffer: Buffer, hexColor: string):
       width: meta.width,
       height: meta.height,
       channels: 4,
-      background: { r, g, b, alpha: 255 },
+      background: { r, g, b, alpha: 1 },
     },
   })
     .composite([{ input: subjectBuffer, blend: "over" }])
@@ -223,7 +223,7 @@ export async function applyEffects(
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
     background = await sharp({
-      create: { width, height, channels: 4, background: { r, g, b, alpha: 255 } },
+      create: { width, height, channels: 4, background: { r, g, b, alpha: 1 } },
     })
       .png()
       .toBuffer();

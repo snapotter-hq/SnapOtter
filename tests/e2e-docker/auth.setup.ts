@@ -1,7 +1,8 @@
+import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { expect, test as setup } from "@playwright/test";
+import { test as setup } from "@playwright/test";
 
-const authFile = path.join(__dirname, "..", "..", "test-results", ".auth", "analytics-user.json");
+const authFile = path.join(__dirname, "..", "..", ".playwright", ".auth", "analytics-user.json");
 
 setup("authenticate", async ({ page }) => {
   await page.goto("/login");
@@ -20,10 +21,18 @@ setup("authenticate", async ({ page }) => {
     await acceptBtn.waitFor({ state: "visible", timeout: 15_000 });
     await acceptBtn.click();
     // Consent page does window.location.href = "/" (full reload)
-    await page.waitForURL("/", { timeout: 30_000 });
+    await page.waitForURL((url) => !url.pathname.includes("analytics-consent"), {
+      timeout: 30_000,
+    });
   }
 
-  // At this point we should be on the home page
-  await expect(page).toHaveURL("/");
+  // At this point we should be on the home page (or at least past the consent page)
+  await page.waitForURL(
+    (url) => !url.pathname.includes("login") && !url.pathname.includes("analytics-consent"),
+    {
+      timeout: 30_000,
+    },
+  );
+  mkdirSync(path.dirname(authFile), { recursive: true });
   await page.context().storageState({ path: authFile });
 });

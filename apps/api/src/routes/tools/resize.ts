@@ -2,6 +2,7 @@ import { resize } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -17,10 +18,13 @@ export function registerResize(app: FastifyInstance) {
     toolId: "resize",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       const image = sharp(inputBuffer);
       const result = await resize(image, settings);
-      const buffer = await result.toBuffer();
-      return { buffer, filename, contentType: "image/png" };
+      const buffer = await result
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
+      return { buffer, filename, contentType: outputFormat.contentType };
     },
   });
 }

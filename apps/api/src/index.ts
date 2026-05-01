@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
-import { isGpuAvailable } from "@snapotter/ai";
+import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
@@ -53,6 +53,21 @@ function ensureInstanceId() {
 }
 
 ensureInstanceId();
+
+function ensureDefaultSettings() {
+  const defaults: Record<string, string> = {
+    defaultTheme: env.DEFAULT_THEME,
+    defaultLocale: env.DEFAULT_LOCALE,
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    const existing = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get();
+    if (!existing) {
+      db.insert(schema.settings).values({ key, value }).run();
+    }
+  }
+}
+
+ensureDefaultSettings();
 await initAnalytics();
 
 // Mark any jobs left in processing/queued from a previous unclean shutdown
@@ -69,13 +84,25 @@ const app = Fastify({
   routerOptions: { maxParamLength: 500 },
 });
 
+app.removeContentTypeParser("application/json");
+app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+  try {
+    const str = typeof body === "string" ? body : (body as Buffer).toString();
+    done(null, str.length > 0 ? JSON.parse(str) : {});
+  } catch (err) {
+    done(err as Error, undefined);
+  }
+});
+
 app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
   const statusCode = error.statusCode ?? 500;
   request.log.error(
     { err: error, url: request.url, method: request.method },
     "Unhandled request error",
   );
-  captureException(error);
+  if (statusCode >= 500) {
+    captureException(error, request);
+  }
   const isProduction = process.env.NODE_ENV === "production";
   reply.status(statusCode).send({
     error: statusCode >= 500 ? "Internal server error" : error.message,
@@ -207,7 +234,7 @@ app.get("/api/v1/admin/health", async (request, reply) => {
     storage: { mode: env.STORAGE_MODE, available: "N/A" },
     database: dbOk ? "ok" : "error",
     queue: { active: 0, pending: 0 },
-    ai: { gpu: isGpuAvailable() },
+    ai: { gpu: isGpuAvailable(), dispatcher: getDispatcherStatus() },
   };
 });
 
@@ -227,13 +254,17 @@ const cleanupCron = startCleanupCron();
 // Start
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  const gpu = isGpuAvailable();
+
+  const dispatcherResult = await initDispatcher();
+  const gpuLine = dispatcherResult.ready
+    ? dispatcherResult.gpu
+      ? "[INFO] GPU detected -- AI tools will use CUDA acceleration"
+      : "[WARN] No GPU detected -- AI tools will use CPU (slower)"
+    : "[WARN] AI sidecar did not start -- AI tools will use per-request Python (slower)";
   console.log(
     [
       `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
-      gpu
-        ? "[INFO] GPU detected — AI tools will use CUDA acceleration"
-        : "[WARN] No GPU detected — AI tools will use CPU (slower)",
+      gpuLine,
       `[INFO] Rate limit: ${env.RATE_LIMIT_PER_MIN > 0 ? `${env.RATE_LIMIT_PER_MIN}/min` : "disabled"}`,
       `[INFO] Upload limit: ${env.MAX_UPLOAD_SIZE_MB > 0 ? `${env.MAX_UPLOAD_SIZE_MB} MB` : "unlimited"}`,
       `[INFO] Trust proxy: ${env.TRUST_PROXY}`,

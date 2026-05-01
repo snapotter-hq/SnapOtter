@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -144,9 +145,20 @@ export function registerBorder(app: FastifyInstance) {
           .toBuffer();
       }
 
-      const buffer = await sharp(buf).png().toBuffer();
-      const outName = filename.replace(/\.[^.]+$/, ".png");
-      return { buffer, filename: outName, contentType: "image/png" };
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      const ALPHA_FORMATS = new Set(["png", "webp", "avif", "tiff"]);
+      const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
+
+      if (needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)) {
+        const buffer = await sharp(buf).png().toBuffer();
+        const outName = filename.replace(/\.[^.]+$/, ".png");
+        return { buffer, filename: outName, contentType: "image/png" };
+      }
+
+      const buffer = await sharp(buf)
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
+      return { buffer, filename, contentType: outputFormat.contentType };
     },
   });
 }

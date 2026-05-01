@@ -32,10 +32,14 @@ export interface SingleFileProgress {
   stage?: string;
   percent: number;
   error?: string;
+  result?: Record<string, unknown>;
 }
 
 /** In-memory store of job progress, keyed by jobId. */
 const jobProgressStore = new Map<string, JobProgress>();
+
+/** Terminal single-file events kept for SSE reconnect replay. */
+const singleFileCompletions = new Map<string, SingleFileProgress>();
 
 /** SSE listeners waiting for updates, keyed by jobId. */
 const listeners = new Map<string, Set<(data: JobProgress | SingleFileProgress) => void>>();
@@ -183,6 +187,16 @@ export function updateJobProgress(progress: JobProgress): void {
 export function updateSingleFileProgress(progress: Omit<SingleFileProgress, "type">): void {
   const event: SingleFileProgress = { ...progress, type: "single" };
   persistSingleFileProgress(progress);
+
+  if (progress.phase === "complete" || progress.phase === "failed") {
+    if (singleFileCompletions.size >= 10_000) {
+      const oldest = singleFileCompletions.keys().next().value;
+      if (oldest) singleFileCompletions.delete(oldest);
+    }
+    singleFileCompletions.set(progress.jobId, event);
+    setTimeout(() => singleFileCompletions.delete(progress.jobId), 120_000);
+  }
+
   const subs = listeners.get(progress.jobId);
   if (subs) {
     for (const cb of subs) {
@@ -226,6 +240,13 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
           reply.raw.end();
           return;
         }
+      }
+
+      const existingSingle = singleFileCompletions.get(jobId);
+      if (existingSingle) {
+        sendEvent(existingSingle);
+        reply.raw.end();
+        return;
       }
 
       // Subscribe to updates

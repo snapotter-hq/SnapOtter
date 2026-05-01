@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { basename, extname } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -7,6 +6,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { ensureSharpCompat } from "../../lib/heic-converter.js";
 
 const settingsSchema = z.object({}).passthrough();
@@ -39,7 +39,7 @@ export function registerFavicon(app: FastifyInstance) {
             chunks.push(chunk);
           }
           const buffer = Buffer.concat(chunks);
-          const filename = basename(part.filename ?? `image-${uploadedFiles.length + 1}`);
+          const filename = sanitizeFilename(part.filename ?? `image-${uploadedFiles.length + 1}`);
           uploadedFiles.push({ buffer, filename });
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
@@ -97,7 +97,7 @@ export function registerFavicon(app: FastifyInstance) {
       for (const file of uploadedFiles) {
         // Decode HEIC/HEIF if needed, then normalize EXIF orientation
         const decoded = await autoOrient(await ensureSharpCompat(file.buffer));
-        const stem = basename(file.filename, extname(file.filename));
+        const stem = sanitizeFilename(file.filename).replace(/\.[^.]+$/, "");
         // Single file: flat structure. Multiple files: per-image folders.
         const prefix = isSingleFile ? "" : `${stem}/`;
 
