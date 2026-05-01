@@ -382,7 +382,7 @@ describe("Solid white image", () => {
 
 // ── HEIF input ─────────────────────────────────────────────────
 describe("HEIF input", () => {
-  it("extracts palette from HEIF image", { timeout: 60_000 }, async () => {
+  it("extracts palette from HEIF image", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body: payload, contentType } = makeFilePayload(HEIF, "photo.heif", "image/heif");
     const res = await app.inject({

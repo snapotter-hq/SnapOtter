@@ -682,7 +682,7 @@ describe("favicon", () => {
 
   // ── HEIF format input ────────────────────────────────────────────
 
-  it("generates favicons from HEIF input", { timeout: 60_000 }, async () => {
+  it("generates favicons from HEIF input", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },

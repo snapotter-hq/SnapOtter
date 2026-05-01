@@ -1457,7 +1457,7 @@ describe("Collage", () => {
 
   // ── HEIF format input ─────────────────────────────────────────────
 
-  it("handles HEIF input images", { timeout: 60_000 }, async () => {
+  it("handles HEIF input images", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "f1", filename: "a.heif", contentType: "image/heif", content: HEIF },

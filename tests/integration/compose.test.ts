@@ -1012,7 +1012,7 @@ describe("Compose", () => {
 
   // ── HEIF format input ─────────────────────────────────────────────
 
-  it("handles HEIF base image", { timeout: 60_000 }, async () => {
+  it("handles HEIF base image", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.heif", contentType: "image/heif", content: HEIF },

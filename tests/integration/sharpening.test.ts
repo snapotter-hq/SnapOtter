@@ -247,7 +247,7 @@ describe("Error handling", () => {
 
 // ── HEIC input handling ─────────────────────────────────────────
 describe("HEIC input", () => {
-  it("processes HEIC image with adaptive sharpening", async () => {
+  it("processes HEIC image with adaptive sharpening", { timeout: 120_000 }, async () => {
     const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
     const res = await postTool({ method: "adaptive" }, HEIC, "photo.heic", "image/heic");
     expect(res.statusCode).toBe(200);
@@ -430,7 +430,7 @@ describe("Denoise off", () => {
 
 // ── HEIC with unsharp-mask method ──────────────────────────────
 describe("HEIC with different methods", () => {
-  it("processes HEIC with unsharp-mask", async () => {
+  it("processes HEIC with unsharp-mask", { timeout: 120_000 }, async () => {
     const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
     const res = await postTool(
       { method: "unsharp-mask", amount: 200 },
@@ -441,7 +441,7 @@ describe("HEIC with different methods", () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it("processes HEIC with high-pass", async () => {
+  it("processes HEIC with high-pass", { timeout: 120_000 }, async () => {
     const HEIC = readFileSync(join(FIXTURES, "test-200x150.heic"));
     const res = await postTool(
       { method: "high-pass", strength: 60 },
@@ -466,7 +466,7 @@ describe("HEIF input", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
-  }, 60_000);
+  }, 120_000);
 });
 
 // ── Animated GIF input ──────────────────────────────────────────

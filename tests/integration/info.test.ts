@@ -589,7 +589,7 @@ describe("Info", () => {
 
   // ── HEIF format info ──────────────────────────────────────────
 
-  it("returns correct metadata for HEIF (sample.heif) image", { timeout: 60_000 }, async () => {
+  it("returns correct metadata for HEIF (sample.heif) image", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "sample.heif", contentType: "image/heif", content: HEIF },

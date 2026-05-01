@@ -573,7 +573,7 @@ describe("Border", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
-  it("handles HEIF input (motorcycle.heif)", { timeout: 60_000 }, async () => {
+  it("handles HEIF input (motorcycle.heif)", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },

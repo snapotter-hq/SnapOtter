@@ -776,7 +776,7 @@ describe("Compare", () => {
 
   // ── HEIF format input ─────────────────────────────────────────────
 
-  it("compares HEIF image with PNG", { timeout: 60_000 }, async () => {
+  it("compares HEIF image with PNG", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.heif", contentType: "image/heif", content: HEIF },

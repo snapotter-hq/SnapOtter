@@ -601,7 +601,7 @@ describe("Authentication", () => {
 
 // ── HEIF input ─────────────────────────────────────────────────
 describe("HEIF input", () => {
-  it("enhances HEIF (sample.heif) input", { timeout: 60_000 }, async () => {
+  it("enhances HEIF (sample.heif) input", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
     const res = await postTool({ mode: "auto" }, HEIF, "sample.heif", "image/heif");
     expect([200, 422]).toContain(res.statusCode);

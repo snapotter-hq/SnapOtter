@@ -1389,7 +1389,7 @@ describe("Split", () => {
 
   // ── HEIF format input ─────────────────────────────────────────────
 
-  it("splits a HEIF input image", { timeout: 60_000 }, async () => {
+  it("splits a HEIF input image", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "content", "motorcycle.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },

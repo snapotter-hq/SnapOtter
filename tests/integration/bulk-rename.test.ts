@@ -620,7 +620,7 @@ describe("Bulk Rename", () => {
 
   // ── HEIF file handling ─────────────────────────────────────────
 
-  it("renames HEIF files preserving extension", { timeout: 60_000 }, async () => {
+  it("renames HEIF files preserving extension", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },

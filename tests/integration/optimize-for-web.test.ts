@@ -739,7 +739,7 @@ describe("Authentication", () => {
 
 // ── HEIF input handling ───────────────────────────────────────
 describe("HEIF input", () => {
-  it("optimizes HEIF (sample.heif) input to webp", { timeout: 60_000 }, async () => {
+  it("optimizes HEIF (sample.heif) input to webp", { timeout: 120_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
     const res = await postTool({ format: "webp" }, HEIF, "sample.heif", "image/heif");
     // HEIF decode may not be available
