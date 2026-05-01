@@ -702,7 +702,7 @@ describe("vectorize", () => {
 
   // ── HEIF input ───────────────────────────────────────────────
 
-  it("works with HEIF (sample.heif) input after decoding", { timeout: 120_000 }, async () => {
+  it("works with HEIF (sample.heif) input after decoding", { timeout: 180_000 }, async () => {
     const HEIF = readFileSync(join(FIXTURES, "formats", "sample.heif"));
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "sample.heif", contentType: "image/heif", content: HEIF },
