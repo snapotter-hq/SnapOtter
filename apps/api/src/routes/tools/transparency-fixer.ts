@@ -50,7 +50,7 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   }
 
   // Blur the alpha channel
-  const blurRadius = Math.max(1, Math.round(intensity / 20));
+  const blurRadius = Math.max(0.3, Math.round(intensity / 20));
   const blurredAlphaRaw = await sharp(alpha, {
     raw: { width: info.width, height: info.height, channels: 1 },
   })
@@ -63,6 +63,9 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   const result = Buffer.from(data);
   for (let i = 0; i < pixelCount; i++) {
     if (alpha[i] > 0 && blurredAlphaRaw[i] < threshold) {
+      result[i * 4] = 0;
+      result[i * 4 + 1] = 0;
+      result[i * 4 + 2] = 0;
       result[i * 4 + 3] = 0;
     }
   }
@@ -96,6 +99,9 @@ async function processTransparencyFix(
     const isOom = err instanceof Error && err.message.includes("out of memory");
     if (!isOom) throw err;
 
+    // removeBackground has its own internal u2net fallback on OOM.
+    // This route-level fallback provides an intermediate quality step
+    // (birefnet-general) before that kicks in on a second OOM.
     onProgress?.(5, `Retrying with fallback model (${FALLBACK_MODEL})`);
     resultBuffer = await removeBackground(
       inputBuffer,
