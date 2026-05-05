@@ -16,7 +16,7 @@ import { db, schema } from "../db/index.js";
 import { ensureSharpCompat } from "../lib/heic-converter.js";
 import { requirePermission } from "../permissions.js";
 
-const BRANDING_DIR = join(process.cwd(), "data", "branding");
+const BRANDING_DIR = join(env.FILES_STORAGE_PATH, "branding");
 const LOGO_PATH = join(BRANDING_DIR, "logo.png");
 const maxLogoSize = env.MAX_LOGO_SIZE_KB * 1024;
 

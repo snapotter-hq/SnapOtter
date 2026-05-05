@@ -132,6 +132,28 @@ describe("analytics lib", () => {
       expect(mockInit).toHaveBeenCalledOnce();
     });
 
+    it("retries initialization if first attempt throws", async () => {
+      setAnalyticsConsent(true);
+      mockInit.mockImplementationOnce(() => {
+        throw new Error("init failed");
+      });
+      await initAnalytics(enabledConfig);
+      expect(mockInit).toHaveBeenCalledOnce();
+
+      mockInit.mockClear();
+      mockInit.mockReturnValueOnce({
+        capture: mockCapture,
+        identify: mockIdentify,
+        startSessionRecording: mockStartSessionRecording,
+        opt_in_capturing: mockOptIn,
+        opt_out_capturing: mockOptOut,
+        reset: mockReset,
+        persistence: { disabled: false },
+      });
+      await initAnalytics(enabledConfig);
+      expect(mockInit).toHaveBeenCalledOnce();
+    });
+
     it("bails out if consent is revoked during async import", async () => {
       setAnalyticsConsent(true);
       const initPromise = initAnalytics(enabledConfig);

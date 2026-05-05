@@ -11,6 +11,7 @@ interface BundleProgress {
 interface FeaturesState {
   bundles: FeatureBundleState[];
   loaded: boolean;
+  loadError: boolean;
   installing: Record<string, BundleProgress>;
   errors: Record<string, string>;
   queued: string[];
@@ -149,6 +150,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   return {
     bundles: [],
     loaded: false,
+    loadError: false,
     installing: {},
     errors: {},
     queued: [],
@@ -156,13 +158,13 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     startTimes: {},
 
     fetch: async () => {
-      if (get().loaded) return;
+      if (get().loaded && !get().loadError) return;
       try {
         const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
-        set({ bundles: data.bundles, loaded: true });
+        set({ bundles: data.bundles, loaded: true, loadError: false });
         recoverActiveInstalls();
       } catch {
-        set({ loaded: true });
+        set({ loaded: true, loadError: true });
       }
     },
 

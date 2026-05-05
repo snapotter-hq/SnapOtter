@@ -16,12 +16,10 @@ function scrubString(str: string): string {
 
 export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   if (initialized || !config.enabled) return;
-  initialized = true;
 
   try {
     const posthogJs = (await import("posthog-js")).default;
     if (!consentGranted) {
-      initialized = false;
       return;
     }
     posthog =
@@ -39,15 +37,15 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         ip: false,
         persistence: "localStorage",
       }) ?? null;
-  } catch {
-    // SDK blocked or unavailable
+    initialized = true;
+  } catch (err) {
+    console.warn("[analytics] PostHog init failed:", err);
   }
 
   try {
     if (config.sentryDsn) {
       const Sentry = await import("@sentry/react");
       if (!consentGranted) {
-        initialized = false;
         return;
       }
       Sentry.init({
@@ -86,8 +84,8 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         },
       });
     }
-  } catch {
-    // Sentry blocked or unavailable
+  } catch (err) {
+    console.warn("[analytics] Sentry init failed:", err);
   }
 }
 

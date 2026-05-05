@@ -1697,6 +1697,7 @@ describe("useSettingsStore", () => {
       defaultToolView: "sidebar",
       defaultTheme: "light",
       loaded: false,
+      loadError: false,
     });
     localStorage.removeItem("snapotter-theme-user-set");
     mockApiGet.mockReset();
@@ -1765,8 +1766,8 @@ describe("useSettingsStore", () => {
     expect(useSettingsStore.getState().defaultTheme).toBe("light");
   });
 
-  it("fetch skips when already loaded", async () => {
-    useSettingsStore.setState({ loaded: true });
+  it("fetch skips when already loaded without error", async () => {
+    useSettingsStore.setState({ loaded: true, loadError: false });
     await useSettingsStore.getState().fetch();
     expect(mockApiGet).not.toHaveBeenCalled();
   });
@@ -1797,13 +1798,28 @@ describe("useSettingsStore", () => {
     expect(useSettingsStore.getState().defaultToolView).toBe("sidebar");
   });
 
-  it("fetch sets loaded=true on error", async () => {
+  it("fetch sets loaded=true and loadError=true on error", async () => {
     mockApiGet.mockRejectedValueOnce(new Error("Network error"));
 
     await useSettingsStore.getState().fetch();
 
     expect(useSettingsStore.getState().loaded).toBe(true);
+    expect(useSettingsStore.getState().loadError).toBe(true);
     expect(useSettingsStore.getState().disabledTools).toEqual([]);
+  });
+
+  it("fetch retries when loadError is true", async () => {
+    mockApiGet.mockRejectedValueOnce(new Error("Network error"));
+    await useSettingsStore.getState().fetch();
+    expect(useSettingsStore.getState().loadError).toBe(true);
+
+    mockApiGet.mockResolvedValueOnce({
+      settings: { disabledTools: JSON.stringify(["resize"]) },
+    });
+    await useSettingsStore.getState().fetch();
+
+    expect(useSettingsStore.getState().loadError).toBe(false);
+    expect(useSettingsStore.getState().disabledTools).toEqual(["resize"]);
   });
 });
 
@@ -1835,6 +1851,7 @@ describe("useFeaturesStore", () => {
     useFeaturesStore.setState({
       bundles: [],
       loaded: false,
+      loadError: false,
       installing: {},
       errors: {},
       queued: [],
@@ -1877,17 +1894,43 @@ describe("useFeaturesStore", () => {
     expect(s.loaded).toBe(true);
   });
 
-  it("fetch skips when already loaded", async () => {
-    useFeaturesStore.setState({ loaded: true });
+  it("fetch skips when already loaded without error", async () => {
+    useFeaturesStore.setState({ loaded: true, loadError: false });
     await useFeaturesStore.getState().fetch();
     expect(mockApiGet).not.toHaveBeenCalled();
   });
 
-  it("fetch sets loaded=true on error", async () => {
+  it("fetch sets loaded=true and loadError=true on error", async () => {
     mockApiGet.mockRejectedValueOnce(new Error("Network error"));
     await useFeaturesStore.getState().fetch();
     expect(useFeaturesStore.getState().loaded).toBe(true);
+    expect(useFeaturesStore.getState().loadError).toBe(true);
     expect(useFeaturesStore.getState().bundles).toEqual([]);
+  });
+
+  it("fetch retries when loadError is true", async () => {
+    mockApiGet.mockRejectedValueOnce(new Error("Network error"));
+    await useFeaturesStore.getState().fetch();
+    expect(useFeaturesStore.getState().loadError).toBe(true);
+
+    const bundles = [
+      {
+        id: "ai-rembg",
+        name: "AI Background Remover",
+        description: "Remove backgrounds",
+        status: "installed" as const,
+        installedVersion: "1.0.0",
+        estimatedSize: "500MB",
+        enablesTools: ["remove-bg"],
+        progress: null,
+        error: null,
+      },
+    ];
+    mockApiGet.mockResolvedValueOnce({ bundles });
+    await useFeaturesStore.getState().fetch();
+
+    expect(useFeaturesStore.getState().loadError).toBe(false);
+    expect(useFeaturesStore.getState().bundles).toEqual(bundles);
   });
 
   it("isToolInstalled returns true for tools whose bundle is installed", () => {

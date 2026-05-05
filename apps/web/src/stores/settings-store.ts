@@ -10,6 +10,7 @@ interface SettingsState {
   defaultToolView: "sidebar" | "fullscreen";
   defaultTheme: Theme;
   loaded: boolean;
+  loadError: boolean;
   fetch: () => Promise<void>;
 }
 
@@ -21,9 +22,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   defaultToolView: "sidebar",
   defaultTheme: "light",
   loaded: false,
+  loadError: false,
 
   fetch: async () => {
-    if (get().loaded) return;
+    if (get().loaded && !get().loadError) return;
     try {
       const data = await apiGet<{
         settings: Record<string, string>;
@@ -39,11 +41,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         defaultToolView: data.settings.defaultToolView === "fullscreen" ? "fullscreen" : "sidebar",
         defaultTheme,
         loaded: true,
+        loadError: false,
       });
 
       useThemeStore.getState().applyServerDefault(defaultTheme);
     } catch {
-      set({ loaded: true });
+      set({ loaded: true, loadError: true });
     }
   },
 }));

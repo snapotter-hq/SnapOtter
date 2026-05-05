@@ -2292,6 +2292,7 @@ function AuditLogSection() {
 function ToolsSection() {
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [showRestartBanner, setShowRestartBanner] = useState(false);
@@ -2302,8 +2303,9 @@ function ToolsSection() {
         setDisabledTools(
           data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
         );
+        setLoadFailed(false);
       })
-      .catch(() => {})
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -2424,11 +2426,17 @@ function ToolsSection() {
         </p>
       )}
 
+      {loadFailed && (
+        <div className="px-4 py-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-700 dark:text-red-400">
+          Failed to load tool settings. Saving is disabled to prevent data loss.
+        </div>
+      )}
+
       <div className="flex items-center gap-3 pt-2">
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loadFailed}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

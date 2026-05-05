@@ -10,6 +10,7 @@ import { db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { startCleanupCron } from "./lib/cleanup.js";
+import { buildCsp } from "./lib/csp.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { shutdownWorkerPool } from "./lib/worker-pool.js";
 import { requirePermission } from "./permissions.js";
@@ -127,10 +128,7 @@ app.addHook("onSend", async (_request, reply) => {
   reply.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   if (process.env.NODE_ENV === "production") {
     reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    const csp = _request.url.startsWith("/api/docs")
-      ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
-      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://tile.openstreetmap.org; connect-src 'self'; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-    reply.header("Content-Security-Policy", csp);
+    reply.header("Content-Security-Policy", buildCsp(_request.url.startsWith("/api/docs")));
   }
 });
 
