@@ -241,6 +241,14 @@ export const TOOLS: Tool[] = [
     icon: "Scaling",
     route: "/content-aware-resize",
   },
+  {
+    id: "transparency-fixer",
+    name: "Transparency Fixer",
+    description: "Fix fake transparent PNGs in one click",
+    category: "ai",
+    icon: "Wand2",
+    route: "/transparency-fixer",
+  },
   // Watermark & Overlay
   {
     id: "watermark-text",
@@ -1207,4 +1215,5 @@ export const PYTHON_SIDECAR_TOOLS = [
   "red-eye-removal",
   "restore-photo",
   "passport-photo",
+  "transparency-fixer",
 ] as const;
