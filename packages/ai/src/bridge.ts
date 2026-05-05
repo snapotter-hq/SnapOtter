@@ -266,6 +266,11 @@ function dispatcherRun(
   return new Promise((resolvePromise, rejectPromise) => {
     const timer = setTimeout(() => {
       pendingRequests.delete(id);
+      // Kill the stuck dispatcher so it restarts on the next request instead of
+      // blocking all subsequent AI operations behind the timed-out script.
+      if (dispatcher && !dispatcher.killed) {
+        dispatcher.kill("SIGTERM");
+      }
       rejectPromise(new Error("Python script timed out"));
     }, timeout);
 

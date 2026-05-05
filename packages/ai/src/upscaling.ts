@@ -1,7 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  isGpuAvailable,
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+} from "./bridge.js";
 
 export interface UpscaleOptions {
   scale?: number;
@@ -31,10 +36,19 @@ export async function upscale(
 
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
   await writeFile(inputPath, pngBuffer);
+
+  const meta = await sharp(pngBuffer).metadata();
+  const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
+  const scale = options.scale ?? 2;
+  const effectiveMp = megapixels * scale ** 2;
+  // CPU inference is ~50-100x slower than GPU; be generous for self-hosted NAS hardware
+  const rateMs = isGpuAvailable() ? 30_000 : 180_000;
+  const timeout = Math.max(600_000, effectiveMp * rateMs);
+
   const { stdout } = await runPythonWithProgress(
     "upscale.py",
     [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress },
+    { onProgress, timeout },
   );
 
   const result = parseStdoutJson(stdout);

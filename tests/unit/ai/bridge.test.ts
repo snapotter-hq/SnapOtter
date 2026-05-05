@@ -1557,6 +1557,25 @@ describe("bridge - dispatcher request timeout", () => {
     await expect(promise).rejects.toThrow("Python script timed out");
     vi.useRealTimers();
   });
+
+  it("kills the dispatcher on timeout so subsequent requests can proceed", async () => {
+    vi.useFakeTimers();
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const initPromise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    vi.advanceTimersByTime(100);
+    await initPromise;
+
+    const promise = runPythonWithProgress("stuck.py", [], { timeout: 2000 });
+
+    vi.advanceTimersByTime(3000);
+
+    await expect(promise).rejects.toThrow("Python script timed out");
+    expect(mock.process.kill).toHaveBeenCalledWith("SIGTERM");
+    vi.useRealTimers();
+  });
 });
 
 // ── Max consecutive crash threshold ─────────────────────────────────

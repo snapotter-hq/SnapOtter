@@ -5,6 +5,7 @@ vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
     png: vi.fn().mockReturnThis(),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+    metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
   }));
   return { default: mockSharp };
 });
@@ -17,10 +18,15 @@ vi.mock("node:fs/promises", () => ({
 vi.mock("../../../packages/ai/src/bridge.js", () => ({
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
+  isGpuAvailable: vi.fn().mockReturnValue(false),
 }));
 
 import sharp from "sharp";
-import { parseStdoutJson, runPythonWithProgress } from "../../../packages/ai/src/bridge.js";
+import {
+  isGpuAvailable,
+  parseStdoutJson,
+  runPythonWithProgress,
+} from "../../../packages/ai/src/bridge.js";
 import { upscale } from "../../../packages/ai/src/upscaling.js";
 
 const FAKE_INPUT = Buffer.from("fake-small-image");
@@ -46,8 +52,10 @@ beforeEach(() => {
       ({
         png: vi.fn().mockReturnThis(),
         toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+        metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
       }) as unknown as ReturnType<typeof sharp>,
   );
+  vi.mocked(isGpuAvailable).mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -255,6 +263,131 @@ describe("upscale", () => {
 
       const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       expect(options.onProgress).toBeUndefined();
+    });
+  });
+
+  describe("timeout calculation", () => {
+    it("passes a timeout to runPythonWithProgress", async () => {
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.timeout).toBeTypeOf("number");
+      expect(options.timeout).toBeGreaterThan(0);
+    });
+
+    it("uses minimum timeout of 600s for small images", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 100, height: 100 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+      expect(options.timeout).toBe(600_000);
+    });
+
+    it("scales timeout with image megapixels", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1500 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      vi.mocked(runPythonWithProgress).mockClear();
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      expect(timeout4x).toBeGreaterThan(timeout2x);
+    });
+
+    it("scales timeout with scale factor squared", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 1000, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      const timeout2x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      vi.mocked(runPythonWithProgress).mockClear();
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      const timeout4x = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      // 4x scale has 4x the effective megapixels vs 2x scale (16/4 = 4)
+      expect(timeout4x / timeout2x).toBe(4);
+    });
+
+    it("uses shorter timeout when GPU is available", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1500 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      const cpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      vi.mocked(runPythonWithProgress).mockClear();
+      vi.mocked(isGpuAvailable).mockReturnValue(true);
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      const gpuTimeout = vi.mocked(runPythonWithProgress).mock.calls[0][2].timeout!;
+
+      expect(gpuTimeout).toBeLessThan(cpuTimeout);
+    });
+
+    it("provides generous timeout for CPU upscale at high scale", async () => {
+      // Simulates user scenario: ~2MP image at 4x on CPU (Synology NAS)
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 1600, height: 1200 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+
+      // ~1.92MP * 16 (4^2) * 180_000ms = ~55 minutes. Must be well above 10 min.
+      expect(options.timeout).toBeGreaterThan(10 * 60 * 1000);
+    });
+
+    it("defaults scale to 2 when not provided", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 2000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
+      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+
+      // 4MP * 4 (2^2) * 180_000 = 2_880_000ms
+      expect(options.timeout).toBe(2_880_000);
     });
   });
 });
