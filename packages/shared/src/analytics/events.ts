@@ -14,6 +14,8 @@ export interface ToolUsedProperties {
   category: string;
   is_ai_tool: boolean;
   params?: Record<string, string | number | boolean>;
+  error_code?: string;
+  error_message?: string;
 }
 
 export interface SearchProperties {

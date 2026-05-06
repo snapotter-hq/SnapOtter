@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { useAuth } from "./hooks/use-auth";
-import { identify, initAnalytics } from "./lib/analytics";
+import { identify, initAnalytics, setAnalyticsConsent } from "./lib/analytics";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -190,11 +190,13 @@ export function App() {
     )
       return;
     void (async () => {
+      setAnalyticsConsent(true);
       await initAnalytics(analyticsConfig);
-      identify(analyticsConfig.instanceId, {
-        $set: { version: APP_VERSION },
-        $set_once: { instance_id: analyticsConfig.instanceId },
-      });
+      identify(
+        analyticsConfig.instanceId,
+        { version: APP_VERSION },
+        { instance_id: analyticsConfig.instanceId },
+      );
     })();
   }, [analyticsConfigLoaded, analyticsConfig, analyticsConsent.analyticsEnabled]);
 

@@ -8,10 +8,11 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
       throw new Error("Resize percentage must be greater than 0");
     }
     const metadata = await image.metadata();
-    const currentWidth = metadata.width ?? 0;
-    const currentHeight = metadata.height ?? 0;
-    width = Math.round(currentWidth * (percentage / 100));
-    height = Math.round(currentHeight * (percentage / 100));
+    if (!metadata.width || !metadata.height) {
+      throw new Error("Cannot determine image dimensions for percentage resize");
+    }
+    width = Math.max(1, Math.round(metadata.width * (percentage / 100)));
+    height = Math.max(1, Math.round(metadata.height * (percentage / 100)));
   }
 
   if (width !== undefined && width <= 0) {
@@ -26,10 +27,11 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
 
   if (withoutEnlargement) {
     const meta = await image.metadata();
-    const curW = meta.width ?? 0;
-    const curH = meta.height ?? 0;
-    if (width !== undefined && width > curW) width = curW;
-    if (height !== undefined && height > curH) height = curH;
+    if (!meta.width || !meta.height) {
+      throw new Error("Cannot determine image dimensions for resize clamping");
+    }
+    if (width !== undefined && width > meta.width) width = meta.width;
+    if (height !== undefined && height > meta.height) height = meta.height;
   }
 
   return image.resize({

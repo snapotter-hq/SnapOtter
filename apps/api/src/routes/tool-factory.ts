@@ -436,6 +436,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           duration_ms: Date.now() - startTime,
           category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
           is_ai_tool: getBundleForTool(config.toolId) !== null,
+          error_code: err instanceof Error ? err.constructor.name : "UnknownError",
+          error_message: message.slice(0, 200),
         });
         return reply.status(422).send({
           error: "Processing failed",

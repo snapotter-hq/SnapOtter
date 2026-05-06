@@ -319,7 +319,7 @@ describe("analytics lib", () => {
       setAnalyticsConsent(true);
       await initAnalytics(enabledConfig);
       identify("inst-1", { version: "1.0" });
-      expect(mockIdentify).toHaveBeenCalledWith("inst-1", { version: "1.0" });
+      expect(mockIdentify).toHaveBeenCalledWith("inst-1", { version: "1.0" }, undefined);
     });
 
     it("does not throw before initialization", () => {
@@ -382,7 +382,7 @@ describe("analytics lib", () => {
       track("phase1_event");
       expect(mockCapture).toHaveBeenCalledWith("phase1_event", undefined);
       identify("inst-1", { phase: 1 });
-      expect(mockIdentify).toHaveBeenCalledWith("inst-1", { phase: 1 });
+      expect(mockIdentify).toHaveBeenCalledWith("inst-1", { phase: 1 }, undefined);
 
       // Phase 2: Revoke consent mid-session
       setAnalyticsConsent(false);

@@ -5,13 +5,19 @@ import { z } from "zod";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  width: z.number().positive().optional(),
-  height: z.number().positive().optional(),
-  fit: z.enum(["contain", "cover", "fill", "inside", "outside"]).default("contain"),
-  withoutEnlargement: z.boolean().default(false),
-  percentage: z.number().positive().optional(),
-});
+const MAX_DIMENSION = 16383;
+
+const settingsSchema = z
+  .object({
+    width: z.number().int().positive().max(MAX_DIMENSION).optional(),
+    height: z.number().int().positive().max(MAX_DIMENSION).optional(),
+    fit: z.enum(["contain", "cover", "fill", "inside", "outside"]).default("contain"),
+    withoutEnlargement: z.boolean().default(false),
+    percentage: z.number().positive().optional(),
+  })
+  .refine((s) => s.width !== undefined || s.height !== undefined || s.percentage !== undefined, {
+    message: "At least one of width, height, or percentage is required",
+  });
 
 export function registerResize(app: FastifyInstance) {
   createToolRoute(app, {

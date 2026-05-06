@@ -851,7 +851,7 @@ describe("Tool processing", () => {
       expect(JSON.parse(res.body).error).toMatch(/json/i);
     });
 
-    it("returns 422 with empty settings (no dimensions given)", async () => {
+    it("returns 400 with empty settings (no dimensions given)", async () => {
       const { body: payload, contentType } = createMultipartPayload([
         { name: "file", filename: "defaults.png", contentType: "image/png", content: PNG_200x150 },
         { name: "settings", content: "{}" },
@@ -866,9 +866,7 @@ describe("Tool processing", () => {
         },
         payload,
       });
-      // All resize fields are optional at the Zod level, but Sharp needs at
-      // least width or height — so processing fails with 422
-      expect(res.statusCode).toBe(422);
+      expect(res.statusCode).toBe(400);
     });
 
     it("download URL from resize result is accessible", async () => {

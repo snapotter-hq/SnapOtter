@@ -229,13 +229,12 @@ describe("resize", () => {
     expect(meta.width).toBeGreaterThanOrEqual(0);
   });
 
-  it("percentage=1 on 1x1 yields width rounded to 0 and triggers error", async () => {
-    // 1 * 1/100 = 0.01 -> Math.round -> 0
-    // Then the check width <= 0 should throw
+  it("percentage=1 on 1x1 clamps to 1px minimum", async () => {
     const img = sharp(png1x1);
-    await expect(resize(img, { percentage: 1 })).rejects.toThrow(
-      "Resize width must be greater than 0",
-    );
+    const result = await resize(img, { percentage: 1 });
+    const meta = await result.toBuffer().then((b) => sharp(b).metadata());
+    expect(meta.width).toBe(1);
+    expect(meta.height).toBe(1);
   });
 });
 

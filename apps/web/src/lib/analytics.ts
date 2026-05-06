@@ -15,13 +15,10 @@ function scrubString(str: string): string {
 }
 
 export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
-  if (initialized || !config.enabled) return;
+  if (initialized || !config.enabled || !consentGranted) return;
 
   try {
     const posthogJs = (await import("posthog-js")).default;
-    if (!consentGranted) {
-      return;
-    }
     posthog =
       posthogJs.init(config.posthogApiKey, {
         api_host: config.posthogHost,
@@ -45,9 +42,6 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   try {
     if (config.sentryDsn) {
       const Sentry = await import("@sentry/react");
-      if (!consentGranted) {
-        return;
-      }
       Sentry.init({
         dsn: config.sentryDsn,
         sendDefaultPii: false,
@@ -110,10 +104,14 @@ export function setAnalyticsConsent(enabled: boolean): void {
   }
 }
 
-export function identify(instanceId: string, properties: Record<string, unknown>): void {
+export function identify(
+  instanceId: string,
+  properties: Record<string, unknown>,
+  propertiesSetOnce?: Record<string, unknown>,
+): void {
   if (!posthog || !consentGranted) return;
   try {
-    posthog.identify(instanceId, properties);
+    posthog.identify(instanceId, properties, propertiesSetOnce);
   } catch {
     // never throw
   }
