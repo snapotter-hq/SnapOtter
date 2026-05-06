@@ -56,17 +56,12 @@ export function QrGeneratePreview() {
         color: store.useCustomCornerColors ? store.cornerDotColor : undefined,
       },
       backgroundOptions: store.bgTransparent ? { color: "transparent" } : { color: store.bgColor },
-      ...(store.logoDataUrl
-        ? {
-            image: store.logoDataUrl,
-            imageOptions: {
-              hideBackgroundDots: store.hideBackgroundDots,
-              imageSize: store.logoSize,
-              margin: store.logoMargin,
-              crossOrigin: "anonymous" as const,
-            },
-          }
-        : {}),
+      image: store.logoDataUrl || "",
+      imageOptions: {
+        hideBackgroundDots: store.hideBackgroundDots,
+        imageSize: store.logoSize,
+        margin: store.logoMargin,
+      },
     };
   }, [
     data,

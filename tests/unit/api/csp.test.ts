@@ -64,4 +64,12 @@ describe("buildCsp", () => {
     const sources = parseDirective(buildCsp(false), "img-src");
     expect(sources).toContain("https://tile.openstreetmap.org");
   });
+
+  it.each([
+    true,
+    false,
+  ])("connect-src allows data: URIs for client-side blob operations (isDocs=%s)", (isDocs) => {
+    const sources = parseDirective(buildCsp(isDocs), "connect-src");
+    expect(sources).toContain("data:");
+  });
 });
