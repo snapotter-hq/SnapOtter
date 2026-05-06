@@ -1,5 +1,5 @@
 import type { FeatureBundleState } from "@snapotter/shared";
-import { AlertCircle, Download, Loader2, RotateCcw } from "lucide-react";
+import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -46,14 +46,17 @@ function formatTimeRemaining(ms: number): string {
 interface FeatureInstallPromptProps {
   bundle: FeatureBundleState;
   isAdmin: boolean;
+  toolName?: string;
 }
 
-export function FeatureInstallPrompt({ bundle, isAdmin }: FeatureInstallPromptProps) {
-  const { installBundle, clearError, installing, errors, startTimes } = useFeaturesStore();
+export function FeatureInstallPrompt({ bundle, isAdmin, toolName }: FeatureInstallPromptProps) {
+  const { installBundle, clearError, installing, errors, startTimes, queued } = useFeaturesStore();
   const progress = installing[bundle.id] ?? null;
   const error = errors[bundle.id] ?? null;
   const isInstalling = !!progress;
+  const isQueued = queued.includes(bundle.id);
   const startTime = startTimes[bundle.id] ?? null;
+  const displayName = toolName || bundle.name;
 
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * PROGRESS_MESSAGES.length),
@@ -99,7 +102,7 @@ export function FeatureInstallPrompt({ bundle, isAdmin }: FeatureInstallPromptPr
     <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-4">
       <Download className="h-16 w-16 text-muted-foreground" />
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold text-foreground">{bundle.name}</h2>
+        <h2 className="text-xl font-semibold text-foreground">{displayName}</h2>
         <p className="text-muted-foreground max-w-md">{bundle.description}</p>
         <p className="text-sm text-muted-foreground">
           This feature requires an additional download (~{bundle.estimatedSize})
@@ -139,13 +142,20 @@ export function FeatureInstallPrompt({ bundle, isAdmin }: FeatureInstallPromptPr
         </div>
       )}
 
-      {!isInstalling && !error && (
+      {isQueued && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Clock className="h-5 w-5" />
+          <span className="text-sm font-medium">Queued for installation...</span>
+        </div>
+      )}
+
+      {!isInstalling && !error && !isQueued && (
         <button
           type="button"
           onClick={handleInstall}
           className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
         >
-          Enable {bundle.name}
+          Enable {displayName}
         </button>
       )}
     </div>

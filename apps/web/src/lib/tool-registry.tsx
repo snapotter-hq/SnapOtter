@@ -298,6 +298,11 @@ const RestorePhotoSettings = lazy(() =>
     default: m.RestorePhotoSettings,
   })),
 );
+const TransparencyFixerSettings = lazy(() =>
+  import("@/components/tools/transparency-fixer-settings").then((m) => ({
+    default: m.TransparencyFixerSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -451,6 +456,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ],
   ["red-eye-removal", { displayMode: "before-after", Settings: RedEyeRemovalSettings }],
   ["restore-photo", { displayMode: "before-after", Settings: RestorePhotoSettings }],
+  ["transparency-fixer", { displayMode: "before-after", Settings: TransparencyFixerSettings }],
 ]);
 
 export function getToolRegistryEntry(toolId: string): ToolRegistryEntry | undefined {

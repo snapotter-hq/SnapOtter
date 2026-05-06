@@ -152,6 +152,7 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `restore-photo` | Photo Restoration | Multi-step pipeline | `mode` (auto/light/heavy), `scratchRemoval`, `faceEnhancement`, `fidelity`, `denoise`, `denoiseStrength`, `colorize` |
 | `passport-photo` | Passport Photo | MediaPipe landmarks | `country` (37 countries), `printLayout` (4x6/A4/none), `backgroundColor` |
 | `content-aware-resize` | Content-Aware Resize | Seam carving (caire) | `width`, `height`, `protectFaces`, `blurRadius`, `sobelThreshold`, `square` |
+| `transparency-fixer` | PNG Transparency Fixer | BiRefNet HR-matting | `defringe` (0-100), `outputFormat` (png/webp) |
 
 ### Watermark & Overlay
 

@@ -9,6 +9,7 @@ import {
   Columns2,
   Copy,
   Crop,
+  Droplets,
   Eraser,
   Eye,
   EyeOff,
@@ -237,6 +238,12 @@ const tools: { name: string; description: string; category: string; icon: Lucide
     category: "ai",
     icon: Scaling,
   },
+  {
+    name: "PNG Transparency Fixer",
+    description: "Fix fake transparent PNGs with AI matting",
+    category: "ai",
+    icon: Droplets,
+  },
   // Watermark & Overlay
   {
     name: "Text Watermark",
@@ -389,7 +396,7 @@ export function BentoGrid() {
       <div className="mx-auto max-w-6xl">
         <FadeIn>
           <h2 className="font-[family-name:var(--font-nunito)] text-center text-3xl font-bold tracking-tight md:text-4xl">
-            47 tools. Zero cloud dependency.
+            48 tools. Zero cloud dependency.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-center text-lg text-muted">
             Search to find exactly what you need. Every tool runs 100% locally.

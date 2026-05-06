@@ -31,7 +31,7 @@ A bridge layer that calls Python scripts for ML operations. On first use, the br
 
 **Models are not pre-loaded.** Each tool script loads its model weights from disk at request time and discards them when the request finishes. See [Resource footprint](#resource-footprint) for the full memory profile.
 
-Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN), face blur (MediaPipe), face enhancement (GFPGAN/CodeFormer), object erasing (LaMa ONNX), OCR (PaddleOCR/Tesseract), colorization (DDColor), noise removal, red eye removal, photo restoration, passport photo generation, and content-aware resize (Go caire binary).
+Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN), face blur (MediaPipe), face enhancement (GFPGAN/CodeFormer), object erasing (LaMa ONNX), OCR (PaddleOCR/Tesseract), colorization (DDColor), noise removal, red eye removal, photo restoration, passport photo generation, transparency fixing (BiRefNet HR-matting), and content-aware resize (Go caire binary).
 
 Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works fully offline.
 
@@ -43,7 +43,7 @@ Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), an
 
 ### API (`apps/api`)
 
-A Fastify v5 server exposing 47 tool routes (33 standard image operations + 14 AI-powered) that handles:
+A Fastify v5 server exposing 48 tool routes (33 standard image operations + 15 AI-powered) that handles:
 - File uploads, temporary workspace management, and persistent file storage
 - User file library with version chains (`user_files` table) -- each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
 - Tool execution (routes each tool request to the image engine or AI bridge)

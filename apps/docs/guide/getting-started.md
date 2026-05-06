@@ -64,14 +64,14 @@ pnpm dev
 
 ## What You Can Do
 
-### Image Processing (47 Tools)
+### Image Processing (48 Tools)
 
 | Category | Tools |
 |----------|-------|
 | **Essentials** | Resize, Crop, Rotate & Flip, Convert, Compress |
 | **Optimization** | Optimize for Web, Strip Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator |
 | **Adjustments** | Adjust Colors, Sharpening, Replace Color |
-| **AI Tools** | Remove Background, Upscale, Erase Object, OCR, Blur Faces, Smart Crop, Image Enhancement, Enhance Faces, Colorize, Noise Removal, Red Eye Removal, Restore Photo, Passport Photo, Content-Aware Resize |
+| **AI Tools** | Remove Background, Upscale, Erase Object, OCR, Blur Faces, Smart Crop, Image Enhancement, Enhance Faces, Colorize, Noise Removal, Red Eye Removal, Restore Photo, Passport Photo, Content-Aware Resize, PNG Transparency Fixer |
 | **Watermark & Overlay** | Text Watermark, Image Watermark, Text Overlay, Image Composition |
 | **Utilities** | Image Info, Compare, Find Duplicates, Color Palette, QR Code Generator, Barcode Reader, Image to Base64 |
 | **Layout** | Collage, Stitch, Split, Border & Frame |

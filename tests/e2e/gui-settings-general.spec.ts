@@ -289,7 +289,7 @@ test.describe("GUI Settings - Tools Tab (deep)", () => {
     // Each tool row has an enable/disable toggle (w-11 h-6 rounded-full)
     const toolToggles = page.locator("button.w-11.h-6");
     const count = await toolToggles.count();
-    // Should have many tools (SnapOtter has 47)
+    // Should have many tools (SnapOtter has 48)
     expect(count).toBeGreaterThan(10);
   });
 

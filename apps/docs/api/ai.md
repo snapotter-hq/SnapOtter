@@ -2,7 +2,7 @@
 
 The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
 
-14 AI tool routes. All models run locally - no internet required after initial model download.
+15 AI tool routes. All models run locally - no internet required after initial model download.
 
 ## Architecture
 
@@ -26,6 +26,7 @@ Node.js Tool Route
       ├─ noise_removal.py    (tiered denoising)
       ├─ red_eye_removal.py  (landmark + color analysis)
       ├─ restore.py          (scratch repair + enhancement + denoising)
+      ├─ transparency_fix.py (BiRefNet HR-matting + defringe)
       └─ seam_carving        (Go caire binary - not Python)
 ```
 
@@ -255,3 +256,27 @@ Intelligently resizes images by removing or adding low-energy seams, preserving 
 | `square` | boolean | false | Force square output |
 
 Max input edge before auto-downscaling: **1200 px**.
+
+## PNG Transparency Fixer
+
+**Function:** `fixTransparency`  
+**Tool route:** `transparency-fixer`  
+**Model:** BiRefNet HR-matting (2048x2048 resolution)
+
+Fixes "fake transparent" PNGs where the background was removed but left behind fringing, halos, or semi-transparent artifacts. Uses BiRefNet's high-resolution matting model to produce a clean alpha channel, then applies configurable defringe processing to remove color contamination along edges.
+
+**OOM fallback chain:** If BiRefNet HR-matting exceeds available memory, the tool automatically falls back to `birefnet-general`, then to `u2net`.
+
+**Feature bundle:** Background Removal (shared with Remove Background and Passport Photo).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `defringe` | number (0-100) | 30 | Edge defringe strength to remove color contamination |
+| `outputFormat` | `"png"` \| `"webp"` | `"png"` | Output image format |
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/transparency-fixer \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@fake-transparent.png" \
+  -F 'settings={"defringe":30,"outputFormat":"png"}'
+```

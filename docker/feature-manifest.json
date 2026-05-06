@@ -7,7 +7,7 @@
     "background-removal": {
       "name": "Background Removal",
       "description": "Remove image backgrounds with AI",
-      "estimatedSize": "3-4 GB",
+      "estimatedSize": "4-5 GB",
       "packages": {
         "common": ["rembg==2.0.62"],
         "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe==0.10.21"],
@@ -42,9 +42,14 @@
           "id": "rembg-birefnet-matting",
           "downloadFn": "rembg_session",
           "args": ["birefnet-matting"]
+        },
+        {
+          "id": "rembg-birefnet-hr-matting",
+          "downloadFn": "rembg_session",
+          "args": ["birefnet-hr-matting"]
         }
       ],
-      "enablesTools": ["remove-background", "passport-photo"]
+      "enablesTools": ["remove-background", "passport-photo", "transparency-fixer"]
     },
     "face-detection": {
       "name": "Face Detection",

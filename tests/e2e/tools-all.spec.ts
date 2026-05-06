@@ -41,6 +41,7 @@ const TOOLS_WITH_DROPZONE = [
   { id: "vectorize", name: "Image to SVG" },
   { id: "gif-tools", name: "GIF" },
   { id: "noise-removal", name: "Noise Removal" },
+  { id: "transparency-fixer", name: "PNG Transparency Fixer" },
 ];
 
 const TOOLS_WITHOUT_DROPZONE = [{ id: "qr-generate", name: "QR Code" }];
@@ -53,6 +54,7 @@ const AI_TOOL_IDS = new Set([
   "blur-faces",
   "smart-crop",
   "noise-removal",
+  "transparency-fixer",
 ]);
 
 test.describe("All tool pages render", () => {

@@ -316,6 +316,63 @@ def _register_birefnet_matting() -> None:
     sessions_class.append(BiRefNetMattingSession)
 
 
+_hr_matting_registered = False
+
+
+def _register_birefnet_hr_matting() -> None:
+    """Register the custom BiRefNet HR-matting ONNX session for 2048x2048 high-res matting.
+
+    Like _register_birefnet_matting(), this model is not built into rembg and
+    must be registered before calling new_session("birefnet-hr-matting").
+    """
+    global _hr_matting_registered
+    if _hr_matting_registered:
+        return
+    _hr_matting_registered = True
+
+    import numpy as np
+    import pooch
+    from PIL import Image
+    from rembg.sessions import sessions_class
+    from rembg.sessions.birefnet_general import BiRefNetSessionGeneral
+
+    class BiRefNetHRMattingSession(BiRefNetSessionGeneral):
+        @classmethod
+        def download_models(cls, *args, **kwargs):
+            fname = f"{cls.name(*args, **kwargs)}.onnx"
+            pooch.retrieve(
+                "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_HR-matting-epoch_135.onnx",
+                None,
+                fname=fname,
+                path=cls.u2net_home(*args, **kwargs),
+                progressbar=True,
+            )
+            return os.path.join(cls.u2net_home(*args, **kwargs), fname)
+
+        @classmethod
+        def name(cls, *args, **kwargs):
+            return "birefnet-hr-matting"
+
+        def predict(self, img, *args, **kwargs):
+            ort_outs = self.inner_session.run(
+                None,
+                self.normalize(
+                    img, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225), (2048, 2048)
+                ),
+            )
+            pred = ort_outs[0][:, 0, :, :]
+            ma = np.max(pred)
+            mi = np.min(pred)
+            denom = ma - mi
+            pred = (pred - mi) / denom if denom > 0 else pred * 0
+            pred = np.squeeze(pred)
+            mask = Image.fromarray((pred * 255).astype("uint8"), mode="L")
+            mask = mask.resize(img.size, Image.LANCZOS)
+            return [mask]
+
+    sessions_class.append(BiRefNetHRMattingSession)
+
+
 def download_rembg_session(model: dict, models_dir: str) -> None:
     """Download a rembg model by initializing a session."""
     args = model.get("args", [])
@@ -331,6 +388,7 @@ def download_rembg_session(model: dict, models_dir: str) -> None:
 
     from rembg import new_session
     _register_birefnet_matting()
+    _register_birefnet_hr_matting()
     new_session(model_name)
 
 

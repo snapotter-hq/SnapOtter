@@ -124,6 +124,10 @@ export const en = {
       description:
         "Create government-compliant passport, visa, and ID photos with auto face detection",
     },
+    "transparency-fixer": {
+      name: "PNG Transparency Fixer",
+      description: "Fix fake transparent PNGs in one click",
+    },
     "watermark-text": { name: "Text Watermark", description: "Add text watermark overlay" },
     "watermark-image": { name: "Image Watermark", description: "Overlay a logo as watermark" },
     "text-overlay": { name: "Text Overlay", description: "Add styled text to images" },
@@ -203,7 +207,7 @@ export const en = {
     regenerateKey: "Regenerate",
     copyKey: "Copy Key",
     aboutDescription:
-      "SnapOtter is a self-hosted, privacy-first image processing suite with 47 tools.",
+      "SnapOtter is a self-hosted, privacy-first image processing suite with 48 tools.",
     aboutLinks: "Links",
     github: "GitHub",
     documentation: "Documentation",

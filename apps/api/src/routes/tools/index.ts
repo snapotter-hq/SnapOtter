@@ -45,6 +45,7 @@ import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
 import { registerTextOverlay } from "./text-overlay.js";
+import { registerTransparencyFixer } from "./transparency-fixer.js";
 import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
 import { registerWatermarkImage } from "./watermark-image.js";
@@ -146,6 +147,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "passport-photo", register: registerPassportPhoto },
     { id: "red-eye-removal", register: registerRedEyeRemoval },
     { id: "restore-photo", register: registerRestorePhoto },
+    { id: "transparency-fixer", register: registerTransparencyFixer },
   ];
 
   let skipped = 0;

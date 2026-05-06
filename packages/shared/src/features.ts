@@ -25,8 +25,8 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "background-removal",
     name: "Background Removal",
     description: "Remove image backgrounds with AI",
-    estimatedSize: "3-4 GB",
-    enablesTools: ["remove-background", "passport-photo"],
+    estimatedSize: "4-5 GB",
+    enablesTools: ["remove-background", "passport-photo", "transparency-fixer"],
   },
   "face-detection": {
     id: "face-detection",

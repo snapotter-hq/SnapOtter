@@ -831,4 +831,131 @@ test.describe("GUI AI Tools", () => {
       ).toBeVisible({ timeout: 10_000 });
     });
   });
+
+  // ========================================================================
+  // TRANSPARENCY FIXER
+  // ========================================================================
+  test.describe("PNG Transparency Fixer", () => {
+    test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
+      await page.goto("/transparency-fixer");
+      await expect(page.getByText("PNG Transparency Fixer").first()).toBeVisible();
+      await expect(page.getByText("Upload from computer")).toBeVisible();
+    });
+
+    test("shows description text and submit button after upload", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      await expect(page.getByText("Upload a PNG with a fake transparent background")).toBeVisible();
+      await expect(page.getByTestId("transparency-fixer-submit")).toBeVisible();
+      await expect(page.getByTestId("transparency-fixer-submit")).toHaveText(/Fix Transparency/);
+    });
+
+    test("advanced section is collapsed by default", async ({ loggedInPage: page }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      // Advanced toggle should be visible
+      await expect(page.getByText("Advanced")).toBeVisible();
+
+      // Defringe slider and Output Format should NOT be visible
+      await expect(page.getByText("Defringe")).not.toBeVisible();
+      await expect(page.getByText("Output Format")).not.toBeVisible();
+    });
+
+    test("advanced section toggles open with defringe and output format", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      // Open advanced section
+      await page.getByText("Advanced").click();
+
+      // Defringe slider should be visible with default value 30
+      await expect(page.getByText("Defringe")).toBeVisible();
+      await expect(page.getByText("30")).toBeVisible();
+
+      // Output format dropdown should be visible
+      await expect(page.getByText("Output Format")).toBeVisible();
+      const formatSelect = page.locator("select");
+      await expect(formatSelect.first()).toBeVisible();
+      await expect(formatSelect.first()).toHaveValue("png");
+    });
+
+    test("defringe slider is interactive", async ({ loggedInPage: page }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      // Open advanced section
+      await page.getByText("Advanced").click();
+
+      // The slider should exist and be interactive
+      const slider = page.locator("input[type='range']").first();
+      await expect(slider).toBeVisible();
+      await expect(slider).toHaveAttribute("min", "0");
+      await expect(slider).toHaveAttribute("max", "100");
+    });
+
+    test("output format dropdown allows switching to WebP", async ({ loggedInPage: page }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      // Open advanced section
+      await page.getByText("Advanced").click();
+
+      const formatSelect = page.locator("select").first();
+      await formatSelect.selectOption("webp");
+      await expect(formatSelect).toHaveValue("webp");
+
+      // Switch back to PNG
+      await formatSelect.selectOption("png");
+      await expect(formatSelect).toHaveValue("png");
+    });
+
+    test("submit button disabled without file, enabled with file", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/transparency-fixer");
+
+      const submitBtn = page.getByTestId("transparency-fixer-submit");
+      await expect(submitBtn).toBeDisabled();
+
+      await uploadTestImage(page);
+      await expect(submitBtn).toBeEnabled();
+      await expect(submitBtn).toHaveText(/Fix Transparency/);
+    });
+
+    test("shows multi-file text for batch upload", async ({ loggedInPage: page }) => {
+      await page.goto("/transparency-fixer");
+      // Upload multiple files
+      const fileChooserPromise = page.waitForEvent("filechooser");
+      await page.locator("[class*='border-dashed']").first().click();
+      const fileChooser = await fileChooserPromise;
+      const path = await import("node:path");
+      const fixtures = path.join(process.cwd(), "tests", "fixtures");
+      await fileChooser.setFiles([
+        path.join(fixtures, "test-200x150.png"),
+        path.join(fixtures, "test-100x100.jpg"),
+      ]);
+      await page.waitForTimeout(500);
+
+      await expect(page.getByTestId("transparency-fixer-submit")).toHaveText(
+        /Fix Transparency \(2 files\)/,
+      );
+    });
+
+    test.skip("shows feature-not-installed warning when AI sidecar is down", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/transparency-fixer");
+      await uploadTestImage(page);
+
+      await expect(
+        page.locator("text=/not installed|Feature.*not|is not available/i").first(),
+      ).toBeVisible({ timeout: 10_000 });
+    });
+  });
 });

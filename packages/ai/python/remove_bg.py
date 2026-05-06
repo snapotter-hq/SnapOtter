@@ -17,6 +17,7 @@ ALLOWED_MODELS = {
     "birefnet-portrait",
     "birefnet-general",
     "birefnet-matting",
+    "birefnet-hr-matting",
 }
 
 _matting_registered = False
@@ -51,6 +52,57 @@ def _register_matting_session(sessions_class):
 
     sessions_class.append(BiRefNetMattingSession)
 
+_hr_matting_registered = False
+
+def _register_hr_matting_session(sessions_class):
+    """Register the BiRefNet HR-matting ONNX session for 2048x2048 high-res matting."""
+    global _hr_matting_registered
+    if _hr_matting_registered:
+        return
+    _hr_matting_registered = True
+
+    import os
+    import numpy as np
+    import pooch
+    from PIL import Image
+    from rembg.sessions.birefnet_general import BiRefNetSessionGeneral
+
+    class BiRefNetHRMattingSession(BiRefNetSessionGeneral):
+        @classmethod
+        def download_models(cls, *args, **kwargs):
+            fname = f"{cls.name(*args, **kwargs)}.onnx"
+            pooch.retrieve(
+                "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_HR-matting-epoch_135.onnx",
+                None,
+                fname=fname,
+                path=cls.u2net_home(*args, **kwargs),
+                progressbar=True,
+            )
+            return os.path.join(cls.u2net_home(*args, **kwargs), fname)
+
+        @classmethod
+        def name(cls, *args, **kwargs):
+            return "birefnet-hr-matting"
+
+        def predict(self, img, *args, **kwargs):
+            ort_outs = self.inner_session.run(
+                None,
+                self.normalize(
+                    img, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225), (2048, 2048)
+                ),
+            )
+            pred = ort_outs[0][:, 0, :, :]
+            ma = np.max(pred)
+            mi = np.min(pred)
+            denom = ma - mi
+            pred = (pred - mi) / denom if denom > 0 else pred * 0
+            pred = np.squeeze(pred)
+            mask = Image.fromarray((pred * 255).astype("uint8"), mode="L")
+            mask = mask.resize(img.size, Image.LANCZOS)
+            return [mask]
+
+    sessions_class.append(BiRefNetHRMattingSession)
+
 
 def main():
     input_path = sys.argv[1]
@@ -73,6 +125,7 @@ def main():
 
         # Register BiRefNet-matting (Ultra quality) if not already present
         _register_matting_session(sessions_class)
+        _register_hr_matting_session(sessions_class)
 
         emit_progress(10, "Loading model")
 

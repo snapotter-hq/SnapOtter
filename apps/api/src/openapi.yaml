@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 1.15.9
   description: |
-    REST API for SnapOtter, a self-hosted image processing platform with 47 tools.
+    REST API for SnapOtter, a self-hosted image processing platform with 48 tools.
 
     ## Authentication
 
@@ -3224,6 +3224,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/transparency-fixer:
+    post:
+      tags: [Tools]
+      summary: Fix fake transparency
+      description: |
+        Fix "fake transparent" PNGs that have fringing, halos, or semi-transparent
+        artifacts from a previous background removal. Uses BiRefNet HR-matting
+        (2048x2048) to produce a clean alpha channel with configurable defringe
+        processing. Falls back to birefnet-general, then u2net on OOM. Requires
+        the background-removal feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PNG image with fake or damaged transparency
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `defringe` (number 0-100, default 30) — Edge defringe strength to remove color contamination
+                    - `outputFormat` (string, default "png") — One of: png, webp
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Image with corrected transparency
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      width:
+                        type: integer
+                      height:
+                        type: integer
+                      model:
+                        type: string
+                        description: AI model that was used (may differ from default due to OOM fallback)
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
 
   /api/v1/tools/upscale:
     post:

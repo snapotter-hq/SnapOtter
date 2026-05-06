@@ -37,16 +37,20 @@ test.describe("Landing Homepage", () => {
 
   test("how-it-works section renders Docker command", async ({ page }) => {
     await expect(page.getByText("Get started in seconds")).toBeVisible();
-    await expect(
-      page.getByText("docker run -d --name SnapOtter", { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByText("docker run -d --name SnapOtter", { exact: false })).toBeVisible();
   });
 
   test("why-choose section renders all 9 benefit cards", async ({ page }) => {
     await expect(page.getByText("Built different. On purpose.")).toBeVisible();
     const cards = [
-      "No Signup", "No Uploads", "Forever Free", "No Limits",
-      "Batch Processing", "Lightning Fast", "Open Source", "REST API",
+      "No Signup",
+      "No Uploads",
+      "Forever Free",
+      "No Limits",
+      "Batch Processing",
+      "Lightning Fast",
+      "Open Source",
+      "REST API",
       "Pipeline Automation",
     ];
     for (const card of cards) {
@@ -55,9 +59,9 @@ test.describe("Landing Homepage", () => {
   });
 
   test("bento grid renders with search and tool count", async ({ page }) => {
-    await expect(page.getByText("47 tools. Zero cloud dependency.")).toBeVisible();
+    await expect(page.getByText("48 tools. Zero cloud dependency.")).toBeVisible();
     await expect(page.getByPlaceholder("Search tools...")).toBeVisible();
-    await expect(page.getByText(/Showing 47 of 47 tools/)).toBeVisible();
+    await expect(page.getByText(/Showing 48 of 48 tools/)).toBeVisible();
   });
 
   test("enterprise section renders feature cards", async ({ page }) => {
