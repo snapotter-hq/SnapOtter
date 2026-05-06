@@ -3,7 +3,7 @@ const SENTRY_ORIGINS = ["https://*.ingest.us.sentry.io"];
 const SCALAR_FONT_ORIGIN = "https://fonts.scalar.com";
 
 export function buildCsp(isDocs: boolean): string {
-  const connectSrc = ["'self'", ...POSTHOG_ORIGINS, ...SENTRY_ORIGINS].join(" ");
+  const connectSrc = ["'self'", "data:", ...POSTHOG_ORIGINS, ...SENTRY_ORIGINS].join(" ");
   const fontSrc = isDocs ? `'self' data: ${SCALAR_FONT_ORIGIN}` : "'self' data:";
   const scriptSrc = isDocs
     ? "'self' 'unsafe-inline' https://us-assets.i.posthog.com"

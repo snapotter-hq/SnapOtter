@@ -548,6 +548,28 @@ describe("useQrStore", () => {
     expect(useQrStore.getState().logoDataUrl).toBeNull();
   });
 
+  it("setLogoFile with a File reads it as a data URL", async () => {
+    const file = new File(["fake-png-data"], "logo.png", { type: "image/png" });
+    useQrStore.getState().setLogoFile(file);
+    await vi.waitFor(() => {
+      expect(useQrStore.getState().logoDataUrl).not.toBeNull();
+    });
+    const s = useQrStore.getState();
+    expect(s.logoFile).toBe(file);
+    expect(s.logoDataUrl).toMatch(/^data:/);
+  });
+
+  it("setLogoFile(null) after a file clears both fields", async () => {
+    const file = new File(["fake-png-data"], "logo.png", { type: "image/png" });
+    useQrStore.getState().setLogoFile(file);
+    await vi.waitFor(() => {
+      expect(useQrStore.getState().logoDataUrl).not.toBeNull();
+    });
+    useQrStore.getState().setLogoFile(null);
+    expect(useQrStore.getState().logoFile).toBeNull();
+    expect(useQrStore.getState().logoDataUrl).toBeNull();
+  });
+
   it("reset restores all defaults", () => {
     useQrStore.getState().setContentType("wifi");
     useQrStore.getState().setTextData("changed");
