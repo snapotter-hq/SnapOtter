@@ -1,0 +1,64 @@
+<!-- Screenshot this at 1200x630 and save as public/og-image.png -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px;
+    background: #0c0a09;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .orb { position: absolute; border-radius: 50%; pointer-events: none; }
+  .orb-1 {
+    top: -100px; right: -100px; width: 400px; height: 400px;
+    background: radial-gradient(circle, #f59e0b15, transparent 70%);
+  }
+  .orb-2 {
+    bottom: -80px; left: 20%; width: 300px; height: 300px;
+    background: radial-gradient(circle, #3b82f610, transparent 70%);
+  }
+  .content { text-align: center; position: relative; z-index: 1; }
+  .logo { width: 64px; height: 64px; margin: 0 auto 24px; }
+  .title {
+    font-size: 56px; font-weight: 800; color: #fafaf9;
+    letter-spacing: -2px; line-height: 1.1; margin-bottom: 16px;
+  }
+  .title .accent {
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .subtitle { font-size: 22px; color: #a8a29e; margin-bottom: 32px; }
+  .stats { display: flex; gap: 32px; justify-content: center; }
+  .stat { text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #f59e0b; }
+  .stat-label { font-size: 14px; color: #78716c; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="content">
+    <img src="../../public/logo.png" alt="" class="logo" />
+    <div class="title">Self-Hosted Image<br><span class="accent">Processing Platform</span></div>
+    <div class="subtitle">Open source. 100% offline. Your data stays yours.</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">48</div>
+        <div class="stat-label">Image Tools</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">15</div>
+        <div class="stat-label">AI Models</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Cloud Dependencies</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
