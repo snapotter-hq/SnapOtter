@@ -33,6 +33,37 @@ async function enableContentAware(page: import("@playwright/test").Page) {
 }
 
 test.describe("Content-Aware Resize", () => {
+  test("direct /content-aware-resize route loads tool page (regression #131)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/content-aware-resize");
+
+    // Must NOT show "Tool not found"
+    await expect(page.getByText("Tool not found")).not.toBeVisible();
+
+    // Must show the tool name and content-aware controls
+    await expect(page.getByText("Content-Aware Resize")).toBeVisible();
+    await expect(page.getByText("Resize to square")).toBeVisible();
+    await expect(page.getByText("Protect faces")).toBeVisible();
+    await expect(page.getByText("Smoothing")).toBeVisible();
+    await expect(page.getByText("Edge sensitivity")).toBeVisible();
+  });
+
+  test("direct route submit disabled without file", async ({ loggedInPage: page }) => {
+    await page.goto("/content-aware-resize");
+    await expect(page.getByTestId("content-aware-resize-submit")).toBeDisabled();
+  });
+
+  test("direct route submit enables with width and file", async ({ loggedInPage: page }) => {
+    await page.goto("/content-aware-resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
+
+    const widthInput = page.locator("input[placeholder='Auto']").first();
+    await widthInput.fill("150");
+
+    await expect(page.getByTestId("content-aware-resize-submit")).toBeEnabled();
+  });
+
   test("content-aware toggle reveals seam carving controls", async ({ loggedInPage: page }) => {
     await page.goto("/resize");
 

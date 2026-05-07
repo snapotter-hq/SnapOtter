@@ -163,11 +163,18 @@ vi.mock("@/components/tools/red-eye-removal-settings", () => ({
 vi.mock("@/components/tools/restore-photo-settings", () => ({
   RestorePhotoSettings: () => null,
 }));
+vi.mock("@/components/tools/transparency-fixer-settings", () => ({
+  TransparencyFixerSettings: () => null,
+}));
+vi.mock("@/components/tools/content-aware-resize-settings", () => ({
+  ContentAwareResizeSettings: () => null,
+}));
 
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
 
+import { TOOLS } from "@snapotter/shared";
 import type { DisplayMode } from "@/lib/tool-registry";
 import { getToolRegistryEntry, toolRegistry } from "@/lib/tool-registry";
 
@@ -211,6 +218,7 @@ describe("toolRegistry", () => {
       "passport-photo",
       "red-eye-removal",
       "restore-photo",
+      "content-aware-resize",
     ];
     for (const id of aiTools) {
       expect(toolRegistry.has(id), `missing AI tool: ${id}`).toBe(true);
@@ -324,6 +332,19 @@ describe("toolRegistry", () => {
     const split = toolRegistry.get("split");
     expect(split?.displayMode).toBe("interactive-split");
   });
+
+  it("every tool in shared TOOLS[] has a matching registry entry", () => {
+    const missing: string[] = [];
+    for (const tool of TOOLS) {
+      if (!toolRegistry.has(tool.id)) {
+        missing.push(tool.id);
+      }
+    }
+    expect(
+      missing,
+      `Tools defined in TOOLS[] but missing from toolRegistry: ${missing.join(", ")}`,
+    ).toEqual([]);
+  });
 });
 
 // ==========================================================================
@@ -359,6 +380,13 @@ describe("getToolRegistryEntry", () => {
     expect(entry).toBeDefined();
     expect(entry?.displayMode).toBe("no-dropzone");
     expect(entry?.ResultsPanel).toBeDefined();
+  });
+
+  it("returns entry for content-aware-resize with side-by-side display (regression #131)", () => {
+    const entry = getToolRegistryEntry("content-aware-resize");
+    expect(entry).toBeDefined();
+    expect(entry?.displayMode).toBe("side-by-side");
+    expect(entry?.Settings).toBeDefined();
   });
 });
 

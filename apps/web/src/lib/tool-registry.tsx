@@ -72,6 +72,11 @@ export interface ToolRegistryEntry {
 const ResizeSettings = lazy(() =>
   import("@/components/tools/resize-settings").then((m) => ({ default: m.ResizeSettings })),
 );
+const ContentAwareResizeSettings = lazy(() =>
+  import("@/components/tools/content-aware-resize-settings").then((m) => ({
+    default: m.ContentAwareResizeSettings,
+  })),
+);
 const CropSettings = lazy(() =>
   import("@/components/tools/crop-settings").then((m) => ({ default: m.CropSettings })),
 );
@@ -457,6 +462,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ["red-eye-removal", { displayMode: "before-after", Settings: RedEyeRemovalSettings }],
   ["restore-photo", { displayMode: "before-after", Settings: RestorePhotoSettings }],
   ["transparency-fixer", { displayMode: "before-after", Settings: TransparencyFixerSettings }],
+  ["content-aware-resize", { displayMode: "side-by-side", Settings: ContentAwareResizeSettings }],
 ]);
 
 export function getToolRegistryEntry(toolId: string): ToolRegistryEntry | undefined {
