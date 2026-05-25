@@ -10,7 +10,7 @@
   "devDependencies": {
     "tsx": "^4.22.1",
     "vitepress": "^1.1.4",
-    "vitepress-plugin-llms": "^1.12.2"
+    "vitepress-plugin-llms": "^1.13.0"
   },
   "license": "AGPL-3.0"
 }
