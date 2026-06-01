@@ -8,7 +8,7 @@
     "docs:preview": "vitepress preview ."
   },
   "devDependencies": {
-    "tsx": "^4.22.1",
+    "tsx": "^4.22.4",
     "vitepress": "^1.1.4",
     "vitepress-plugin-llms": "^1.12.2"
   },
