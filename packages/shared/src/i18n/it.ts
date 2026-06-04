@@ -31,7 +31,7 @@ export const it: TranslationKeys = {
     actions: "Azioni",
     create: "Crea",
     or: "o",
-    goHome: "Vai alla home",
+    goHome: "Vai alla Home",
     somethingWentWrong: "Qualcosa e andato storto",
     unexpectedError: "Si e verificato un errore imprevisto.",
     retry: "Riprova",
@@ -45,7 +45,7 @@ export const it: TranslationKeys = {
     utilities: "Utilita",
     layout: "Layout e composizione",
     format: "Formato e conversione",
-    ai: "Strumenti AI",
+    ai: "Strumenti IA",
   },
   tools: {
     resize: {
@@ -114,19 +114,19 @@ export const it: TranslationKeys = {
     },
     "remove-background": {
       name: "Rimuovi sfondo",
-      description: "Rimozione dello sfondo con AI",
+      description: "Rimozione dello sfondo con IA",
     },
     upscale: {
       name: "Ingrandimento immagine",
-      description: "Miglioramento con super-risoluzione AI",
+      description: "Miglioramento con super-risoluzione IA",
     },
     "erase-object": {
       name: "Cancella oggetti",
-      description: "Rimuovi oggetti indesiderati con l'AI",
+      description: "Rimuovi oggetti indesiderati con l'IA",
     },
     ocr: {
       name: "OCR / Estrazione testo",
-      description: "Estrai testo dalle immagini con precisione basata sull'AI",
+      description: "Estrai testo dalle immagini con precisione basata sull'IA",
     },
     "blur-faces": {
       name: "Sfocatura volti / dati sensibili",
@@ -134,7 +134,7 @@ export const it: TranslationKeys = {
     },
     "enhance-faces": {
       name: "Miglioramento volti",
-      description: "Restaura e migliora i volti con l'AI",
+      description: "Restaura e migliora i volti con l'IA",
     },
     "smart-crop": {
       name: "Ritaglio intelligente",
@@ -147,15 +147,15 @@ export const it: TranslationKeys = {
     },
     "noise-removal": {
       name: "Rimozione rumore",
-      description: "Rimozione del rumore e della grana con AI",
+      description: "Rimozione del rumore e della grana con IA",
     },
     "red-eye-removal": {
       name: "Rimozione occhi rossi",
-      description: "Rilevamento e correzione degli occhi rossi con AI per foto con flash",
+      description: "Rilevamento e correzione degli occhi rossi con IA per foto con flash",
     },
     "restore-photo": {
       name: "Restauro fotografico",
-      description: "Ripara graffi, strappi e danni nelle vecchie foto con l'AI",
+      description: "Ripara graffi, strappi e danni nelle vecchie foto con l'IA",
     },
     "content-aware-resize": {
       name: "Ridimensionamento intelligente",
@@ -163,12 +163,12 @@ export const it: TranslationKeys = {
         "Ridimensiona le immagini in modo intelligente preservando il contenuto importante",
     },
     "ai-canvas-expand": {
-      name: "Espansione canvas AI",
-      description: "Espandi il canvas con riempimento generato dall'AI",
+      name: "Espansione canvas IA",
+      description: "Espandi il canvas con riempimento generato dall'IA",
     },
     colorize: {
-      name: "Colorizzazione AI",
-      description: "Converti le foto in bianco e nero a colori usando modelli di deep learning AI",
+      name: "Colorizzazione IA",
+      description: "Converti le foto in bianco e nero a colori usando modelli di deep learning IA",
     },
     "passport-photo": {
       name: "Foto tessera",
@@ -764,7 +764,7 @@ export const it: TranslationKeys = {
       scratchRemoval: "Rimozione graffi",
       scratchRemovalDesc: "Rileva e ripara graffi, strappi e macchie",
       faceEnhancement: "Miglioramento volti",
-      faceEnhancementDesc: "Restaura volti degradati con CodeFormer AI",
+      faceEnhancementDesc: "Restaura volti degradati con CodeFormer IA",
       faceFidelity: "Fedelta del volto",
       enhanced: "Migliorato",
       faithful: "Fedele",
@@ -772,7 +772,7 @@ export const it: TranslationKeys = {
       noiseReductionDesc: "Rimuovi grana e rumore dalle vecchie foto",
       denoiseStrength: "Intensita riduzione rumore",
       autoColorize: "Colorizza automaticamente",
-      autoColorizeDesc: "Aggiungi colore alle foto B&N usando DDColor AI",
+      autoColorizeDesc: "Aggiungi colore alle foto B&N usando DDColor IA",
       colorizeStrength: "Intensita colorizzazione",
       vivid: "Vivido",
       submit: "Restaura foto",
@@ -798,7 +798,7 @@ export const it: TranslationKeys = {
       fast: "Veloce",
       balanced: "Bilanciato",
       highQuality: "Alta qualita",
-      fastDesc: "Anteprima veloce, meno passaggi AI",
+      fastDesc: "Anteprima veloce, meno passaggi IA",
       balancedDesc: "Buona qualita, velocita moderata",
       highQualityDesc: "Migliori risultati, piu lento",
       extendToAspectRatio: "Estendi al rapporto d'aspetto",
@@ -813,7 +813,7 @@ export const it: TranslationKeys = {
       progressLabel: "Estensione canvas",
     },
     colorize: {
-      aiModel: "Modello AI",
+      aiModel: "Modello IA",
       fast: "Veloce",
       fastDesc: "Risultati rapidi",
       balanced: "Bilanciato",
@@ -1715,7 +1715,7 @@ export const it: TranslationKeys = {
       "Funziona completamente offline.",
       "Elaborazione in blocco illimitata.",
       "51 strumenti per le immagini.",
-      "15 modelli AI. Il tuo hardware.",
+      "15 modelli IA. Il tuo hardware.",
       "Velocissimo. Basato su Sharp.",
       "Pronto per reti isolate.",
       "Un solo contenitore Docker.",
