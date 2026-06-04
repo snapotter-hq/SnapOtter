@@ -108,6 +108,8 @@ export default defineConfig({
       sharp: path.join(apiNodeModules, "sharp"),
       "openid-client": path.join(apiNodeModules, "openid-client"),
       "opentype.js": path.join(apiNodeModules, "opentype.js"),
+      "posthog-node": path.join(apiNodeModules, "posthog-node"),
+      "@sentry/node": path.join(apiNodeModules, "@sentry/node"),
       react: path.join(webNodeModules, "react"),
       "react-dom": path.join(webNodeModules, "react-dom"),
       "react-router-dom": path.join(webNodeModules, "react-router-dom"),

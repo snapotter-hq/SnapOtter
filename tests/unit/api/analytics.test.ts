@@ -52,11 +52,11 @@ vi.mock("drizzle-orm", () => ({
   eq: () => "mocked-eq",
 }));
 
-vi.mock("../../../apps/api/node_modules/posthog-node", () => ({
+vi.mock("posthog-node", () => ({
   PostHog: MockPostHog,
 }));
 
-vi.mock("../../../apps/api/node_modules/@sentry/node", () => ({
+vi.mock("@sentry/node", () => ({
   init: mockSentryInit,
   captureException: mockSentryCapture,
   close: mockSentryClose,
