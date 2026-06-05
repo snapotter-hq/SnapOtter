@@ -62,37 +62,17 @@ jobs:
         run: |
           ARCHIVE_NAME="snapotter-v0.0.0-test-linux-${ARCH}.tar.gz"
 
-          # Collect paths, including workspace node_modules only if they exist
-          PATHS=(
-            apps/api/src
-            apps/api/drizzle
-            apps/api/static
-            apps/api/package.json
-            apps/api/tsconfig.json
-            apps/web/dist
-            apps/web/package.json
-            packages/shared/src
-            packages/shared/package.json
-            packages/shared/tsconfig.json
-            packages/image-engine/src
-            packages/image-engine/package.json
-            packages/image-engine/tsconfig.json
-            packages/ai/src
-            packages/ai/python
-            packages/ai/package.json
-            packages/ai/tsconfig.json
-            docker/feature-manifest.json
-            node_modules
-            package.json
-            pnpm-workspace.yaml
-            pnpm-lock.yaml
-            tsconfig.base.json
-          )
-          for ws in apps/api packages/shared packages/image-engine packages/ai; do
-            [ -d "$ws/node_modules" ] && PATHS+=("$ws/node_modules")
-          done
+          # Remove files not needed at runtime (web source replaced by dist/)
+          rm -rf apps/web/src apps/web/public apps/web/index.html apps/web/tsconfig.json
+          rm -rf apps/landing apps/docs apps/demo
+          rm -rf tests .github .husky scripts
+          rm -rf .releaserc.json biome.json .editorconfig .gitattributes
+          rm -f CHANGELOG.md LICENSE README.md CONTRIBUTING.md SECURITY.md
 
-          tar czf "/tmp/${ARCHIVE_NAME}" --transform='s,^,snapotter/,' "${PATHS[@]}"
+          tar czf "/tmp/${ARCHIVE_NAME}" --transform='s,^,snapotter/,' \
+            --exclude='.git' \
+            --exclude='.gitignore' \
+            .
           echo "Archive: ${ARCHIVE_NAME}"
           echo "Size: $(du -sh /tmp/${ARCHIVE_NAME} | cut -f1)"
           echo "File count: $(tar tzf /tmp/${ARCHIVE_NAME} | wc -l)"
@@ -147,9 +127,9 @@ jobs:
 
           echo ""
           echo "=== Startup verification ==="
-          grep -q "Server listening" /tmp/startup.log && echo "PASS: Server started successfully" || echo "FAIL: Server did not start"
-          grep -q "Tool routes:" /tmp/startup.log && echo "PASS: Tool routes registered" || echo "FAIL: Tool routes missing"
-          grep -q "Database initialized" /tmp/startup.log && echo "PASS: Database initialized" || echo "FAIL: Database not initialized"
+          grep -q "Server listening" /tmp/startup.log && echo "PASS: Server started successfully" || { echo "FAIL: Server did not start"; cat /tmp/startup.log; exit 1; }
+          grep -q "Tool routes:" /tmp/startup.log && echo "PASS: Tool routes registered" || { echo "FAIL: Tool routes missing"; exit 1; }
+          grep -q "Database initialized" /tmp/startup.log && echo "PASS: Database initialized" || { echo "FAIL: Database not initialized"; exit 1; }
 
       - name: Upload test archive as artifact
         uses: actions/upload-artifact@v4
