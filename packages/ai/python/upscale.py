@@ -129,10 +129,13 @@ def main():
                         num_grow_ch=32,
                         scale=4,
                     )
+                    tile_size = 512
                     upsampler = RealESRGANer(
                         scale=4,
                         model_path=REALESRGAN_MODEL_PATH,
                         model=ai_model,
+                        tile=tile_size,
+                        tile_pad=10,
                         half=use_gpu,
                         device=device,
                     )
@@ -140,7 +143,22 @@ def main():
 
                     img_array = np.array(img.convert("RGB"))
                     emit_progress(30, "Enhancing image with AI")
-                    output_array, _ = upsampler.enhance(img_array, outscale=scale)
+
+                    try:
+                        output_array, _ = upsampler.enhance(img_array, outscale=scale)
+                    except RuntimeError as oom_err:
+                        if "out of memory" not in str(oom_err).lower():
+                            raise
+                        torch.cuda.empty_cache()
+                        print(
+                            f"[upscale] OOM with tile={tile_size}, retrying with tile=256",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        emit_progress(35, "Retrying with smaller tiles")
+                        upsampler.tile = 256
+                        output_array, _ = upsampler.enhance(img_array, outscale=scale)
+
                     emit_progress(80, "AI enhancement complete")
                     result = Image.fromarray(output_array)
                     method = "realesrgan"
@@ -161,12 +179,31 @@ def main():
                             channel_multiplier=2,
                             bg_upsampler=upsampler,
                         )
-                        _, _, face_output = face_enhancer.enhance(
-                            img_array,
-                            has_aligned=False,
-                            only_center_face=False,
-                            paste_back=True,
-                        )
+                        try:
+                            _, _, face_output = face_enhancer.enhance(
+                                img_array,
+                                has_aligned=False,
+                                only_center_face=False,
+                                paste_back=True,
+                            )
+                        except RuntimeError as oom_err:
+                            if "out of memory" not in str(oom_err).lower():
+                                raise
+                            torch.cuda.empty_cache()
+                            print(
+                                "[upscale] OOM during face enhance, retrying with tile=256",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                            emit_progress(84, "Retrying face enhancement")
+                            upsampler.tile = 256
+                            face_enhancer.bg_upsampler = upsampler
+                            _, _, face_output = face_enhancer.enhance(
+                                img_array,
+                                has_aligned=False,
+                                only_center_face=False,
+                                paste_back=True,
+                            )
                         result = Image.fromarray(face_output)
                         emit_progress(88, "Face enhancement complete")
 
