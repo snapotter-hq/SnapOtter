@@ -66,18 +66,22 @@ jobs:
             apps/api/src \
             apps/api/drizzle \
             apps/api/static \
+            apps/api/node_modules \
             apps/api/package.json \
             apps/api/tsconfig.json \
             apps/web/dist \
             apps/web/package.json \
             packages/shared/src \
+            packages/shared/node_modules \
             packages/shared/package.json \
             packages/shared/tsconfig.json \
             packages/image-engine/src \
+            packages/image-engine/node_modules \
             packages/image-engine/package.json \
             packages/image-engine/tsconfig.json \
             packages/ai/src \
             packages/ai/python \
+            packages/ai/node_modules \
             packages/ai/package.json \
             packages/ai/tsconfig.json \
             docker/feature-manifest.json \
