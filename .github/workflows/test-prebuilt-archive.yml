@@ -111,6 +111,31 @@ jobs:
           echo "=== Verify tsx is available ==="
           ls snapotter/apps/api/node_modules/.bin/tsx && echo "tsx binary: OK"
 
+      - name: Debug pnpm symlink structure
+        run: |
+          cd /tmp/extract-test/snapotter
+          echo "=== apps/api/node_modules/@snapotter ==="
+          ls -la apps/api/node_modules/@snapotter/ 2>/dev/null || echo "not found"
+          echo ""
+          echo "=== apps/api/node_modules/.bin/tsx ==="
+          ls -la apps/api/node_modules/.bin/tsx 2>/dev/null || echo "not found"
+          file apps/api/node_modules/.bin/tsx 2>/dev/null || true
+          echo ""
+          echo "=== apps/api/node_modules/tsx ==="
+          ls -la apps/api/node_modules/tsx 2>/dev/null || echo "not found"
+          echo ""
+          echo "=== root node_modules/.pnpm/tsx* ==="
+          ls -d node_modules/.pnpm/tsx@* 2>/dev/null || echo "not found"
+          echo ""
+          echo "=== root node_modules/.pnpm/node_modules/tsx ==="
+          ls -la node_modules/.pnpm/node_modules/tsx 2>/dev/null || echo "not found"
+          echo ""
+          echo "=== Can resolve tsx from root? ==="
+          node -e "console.log(require.resolve('tsx/dist/cli.mjs'))" 2>&1 || echo "cannot resolve from root"
+          echo ""
+          echo "=== Can resolve tsx from apps/api? ==="
+          cd apps/api && node -e "console.log(require.resolve('tsx/dist/cli.mjs'))" 2>&1 || echo "cannot resolve from api"
+
       - name: Start API from extracted archive
         run: |
           cd /tmp/extract-test/snapotter
@@ -123,7 +148,7 @@ jobs:
           FILES_STORAGE_PATH=/tmp/so-test-files \
           DATA_DIR=/tmp/so-test-data \
           AUTH_ENABLED=false \
-          timeout 15 pnpm --filter @snapotter/api run start 2>&1 | tee /tmp/startup.log || true
+          timeout 15 node node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs apps/api/src/index.ts 2>&1 | tee /tmp/startup.log || true
 
           echo ""
           echo "=== Startup verification ==="
