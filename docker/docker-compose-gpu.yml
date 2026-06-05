@@ -10,7 +10,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: snapotter:latest
+    image: snapotter/snapotter:latest
     container_name: SnapOtter
     ports:
       # For internet-facing deployments, bind to localhost only:
