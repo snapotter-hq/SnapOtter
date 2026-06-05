@@ -10,8 +10,8 @@
       "estimatedSize": "4-5 GB",
       "packages": {
         "common": ["rembg==2.0.62"],
-        "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe==0.10.21"],
-        "arm64": ["onnxruntime==1.20.1", "mediapipe==0.10.18"]
+        "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe>=0.10.21"],
+        "arm64": ["onnxruntime==1.20.1", "mediapipe>=0.10.18"]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -57,8 +57,8 @@
       "estimatedSize": "200-300 MB",
       "packages": {
         "common": [],
-        "amd64": ["mediapipe==0.10.21"],
-        "arm64": ["mediapipe==0.10.18"]
+        "amd64": ["mediapipe>=0.10.21"],
+        "arm64": ["mediapipe>=0.10.18"]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -135,17 +135,19 @@
       "description": "AI upscaling, face enhancement, and noise removal",
       "estimatedSize": "4-5 GB",
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "huggingface-hub", "einops"],
+        "common": ["codeformer-pip==0.0.4", "huggingface-hub", "einops", "setuptools<75"],
         "amd64": [
           "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
+          "basicsr==1.4.2",
           "realesrgan==0.3.0",
-          "mediapipe==0.10.21"
+          "mediapipe>=0.10.21"
         ],
-        "arm64": ["lpips", "realesrgan==0.3.0", "mediapipe==0.10.18"]
+        "arm64": ["lpips", "basicsr==1.4.2", "realesrgan==0.3.0", "mediapipe>=0.10.18"]
       },
       "pipFlags": {
-        "codeformer-pip==0.0.4": "--no-deps"
+        "codeformer-pip==0.0.4": "--no-deps",
+        "basicsr==1.4.2": "--no-build-isolation"
       },
       "postInstall": ["numpy==1.26.4"],
       "models": [
@@ -209,18 +211,26 @@
       "description": "Restore old or damaged photos",
       "estimatedSize": "800 MB - 1 GB",
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "huggingface-hub"],
+        "common": ["codeformer-pip==0.0.4", "huggingface-hub", "setuptools<75"],
         "amd64": [
           "onnxruntime-gpu==1.20.1",
-          "mediapipe==0.10.21",
+          "mediapipe>=0.10.21",
           "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
+          "basicsr==1.4.2",
           "realesrgan==0.3.0"
         ],
-        "arm64": ["onnxruntime==1.20.1", "mediapipe==0.10.18", "lpips", "realesrgan==0.3.0"]
+        "arm64": [
+          "onnxruntime==1.20.1",
+          "mediapipe>=0.10.18",
+          "lpips",
+          "basicsr==1.4.2",
+          "realesrgan==0.3.0"
+        ]
       },
       "pipFlags": {
-        "codeformer-pip==0.0.4": "--no-deps"
+        "codeformer-pip==0.0.4": "--no-deps",
+        "basicsr==1.4.2": "--no-build-isolation"
       },
       "postInstall": ["numpy==1.26.4"],
       "models": [

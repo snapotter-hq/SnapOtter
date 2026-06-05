@@ -1,0 +1,149 @@
+name: Test Pre-built Archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-archive:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.4 --activate
+
+      - name: Full install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web frontend
+        run: pnpm --filter @snapotter/web build
+
+      - name: Record full node_modules size
+        run: |
+          echo "=== Full node_modules (dev+prod) ==="
+          du -sh node_modules
+          du -sh apps/*/node_modules packages/*/node_modules 2>/dev/null || true
+
+      - name: Prune to production dependencies
+        run: |
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          pnpm install --prod --frozen-lockfile
+
+      - name: Record prod node_modules size
+        run: |
+          echo "=== Prod-only node_modules ==="
+          du -sh node_modules
+          du -sh apps/*/node_modules packages/*/node_modules 2>/dev/null || true
+
+      - name: Create archive
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          ARCHIVE_NAME="snapotter-v0.0.0-test-linux-${ARCH}.tar.gz"
+          tar czf "/tmp/${ARCHIVE_NAME}" \
+            --transform='s,^,snapotter/,' \
+            apps/api/src \
+            apps/api/drizzle \
+            apps/api/static \
+            apps/api/package.json \
+            apps/api/tsconfig.json \
+            apps/web/dist \
+            apps/web/package.json \
+            packages/shared/src \
+            packages/shared/package.json \
+            packages/shared/tsconfig.json \
+            packages/image-engine/src \
+            packages/image-engine/package.json \
+            packages/image-engine/tsconfig.json \
+            packages/ai/src \
+            packages/ai/python \
+            packages/ai/package.json \
+            packages/ai/tsconfig.json \
+            docker/feature-manifest.json \
+            node_modules \
+            package.json \
+            pnpm-workspace.yaml \
+            pnpm-lock.yaml \
+            tsconfig.base.json
+          echo "Archive: ${ARCHIVE_NAME}"
+          echo "Size: $(du -sh /tmp/${ARCHIVE_NAME} | cut -f1)"
+          echo "File count: $(tar tzf /tmp/${ARCHIVE_NAME} | wc -l)"
+
+      - name: Extract and verify structure
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p /tmp/extract-test
+          cd /tmp/extract-test
+          tar xzf "/tmp/snapotter-v0.0.0-test-linux-${ARCH}.tar.gz"
+
+          echo "=== Top-level structure ==="
+          ls -la snapotter/
+
+          echo ""
+          echo "=== Verify key files ==="
+          test -d snapotter/apps/api/src && echo "API source: OK"
+          test -d snapotter/apps/api/drizzle && echo "Migrations: OK"
+          test -d snapotter/apps/api/static && echo "Static assets: OK"
+          test -d snapotter/apps/web/dist && echo "Built frontend: OK"
+          test -d snapotter/packages/shared/src && echo "Shared source: OK"
+          test -d snapotter/packages/image-engine/src && echo "Image engine source: OK"
+          test -d snapotter/packages/ai/src && echo "AI source: OK"
+          test -d snapotter/packages/ai/python && echo "Python scripts: OK"
+          test -f snapotter/docker/feature-manifest.json && echo "Feature manifest: OK"
+          test -d snapotter/node_modules && echo "node_modules: OK"
+
+          echo ""
+          echo "=== Verify workspace symlinks resolve ==="
+          ls snapotter/apps/api/node_modules/@snapotter/shared/src/index.ts && echo "shared symlink: OK"
+          ls snapotter/apps/api/node_modules/@snapotter/image-engine/src/index.ts && echo "image-engine symlink: OK"
+          ls snapotter/apps/api/node_modules/@snapotter/ai/src/index.ts && echo "ai symlink: OK"
+
+          echo ""
+          echo "=== Verify tsx is available ==="
+          ls snapotter/apps/api/node_modules/.bin/tsx && echo "tsx binary: OK"
+
+      - name: Start API from extracted archive
+        run: |
+          cd /tmp/extract-test/snapotter
+          mkdir -p /tmp/so-test-ws /tmp/so-test-files /tmp/so-test-data
+
+          PORT=19999 \
+          NODE_ENV=production \
+          DB_PATH=/tmp/so-test.db \
+          WORKSPACE_PATH=/tmp/so-test-ws \
+          FILES_STORAGE_PATH=/tmp/so-test-files \
+          DATA_DIR=/tmp/so-test-data \
+          AUTH_ENABLED=false \
+          timeout 15 pnpm --filter @snapotter/api run start 2>&1 | tee /tmp/startup.log || true
+
+          echo ""
+          echo "=== Startup verification ==="
+          grep -q "Server listening" /tmp/startup.log && echo "PASS: Server started successfully" || echo "FAIL: Server did not start"
+          grep -q "Tool routes:" /tmp/startup.log && echo "PASS: Tool routes registered" || echo "FAIL: Tool routes missing"
+          grep -q "Database initialized" /tmp/startup.log && echo "PASS: Database initialized" || echo "FAIL: Database not initialized"
+
+      - name: Upload test archive as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapotter-test-linux-${{ matrix.arch }}
+          path: /tmp/snapotter-v0.0.0-test-linux-${{ matrix.arch }}.tar.gz
+          retention-days: 1
