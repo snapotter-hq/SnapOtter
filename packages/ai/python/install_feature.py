@@ -460,7 +460,25 @@ def download_hf_snapshot(model: dict, models_dir: str) -> None:
     if target_file:
         kwargs["allow_patterns"] = [target_file]
 
-    snapshot_download(**kwargs)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            snapshot_download(**kwargs)
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                delay = 10 * (2 ** attempt)
+                sys.stderr.write(
+                    f"HuggingFace download failed for {model.get('id', repo_id)} "
+                    f"(attempt {attempt + 1}/{max_retries}), retrying in {delay}s: {e}\n"
+                )
+                sys.stderr.flush()
+                time.sleep(delay)
+            else:
+                raise RuntimeError(
+                    f"Failed to download {model.get('id', repo_id)} from "
+                    f"HuggingFace repo {repo_id} after {max_retries} attempts: {e}"
+                )
 
     # Verify file size if applicable
     if target_file and min_size > 0:
