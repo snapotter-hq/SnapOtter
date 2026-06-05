@@ -2,6 +2,8 @@ name: Test Pre-built Archive
 
 on:
   workflow_dispatch:
+  push:
+    branches: [test/prebuilt-archive]
 
 permissions:
   contents: read
