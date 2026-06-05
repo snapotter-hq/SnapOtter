@@ -237,11 +237,22 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
       };
 
+      // Send keepalive comments every 20s to prevent reverse proxies
+      // (Caddy, Nginx, ALBs) from killing idle SSE connections.
+      const keepaliveInterval = setInterval(() => {
+        try {
+          reply.raw.write(": keepalive\n\n");
+        } catch {
+          clearInterval(keepaliveInterval);
+        }
+      }, 20_000);
+
       // If the job already has progress, send it immediately
       const existing = jobProgressStore.get(jobId);
       if (existing) {
         sendEvent({ ...existing, type: "batch" });
         if (existing.status === "completed" || existing.status === "failed") {
+          clearInterval(keepaliveInterval);
           reply.raw.end();
           return;
         }
@@ -250,6 +261,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       const existingSingle = singleFileCompletions.get(jobId);
       if (existingSingle) {
         sendEvent(existingSingle);
+        clearInterval(keepaliveInterval);
         reply.raw.end();
         return;
       }
@@ -268,6 +280,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
           ("phase" in data && (data.phase === "complete" || data.phase === "failed"))
         ) {
           ended = true;
+          clearInterval(keepaliveInterval);
           const subs = listeners.get(jobId);
           if (subs) {
             subs.delete(callback);
@@ -281,6 +294,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
 
       // Clean up on client disconnect
       request.raw.on("close", () => {
+        clearInterval(keepaliveInterval);
         const subs = listeners.get(jobId);
         if (subs) {
           subs.delete(callback);

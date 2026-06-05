@@ -9,6 +9,7 @@ interface FilesPageState {
   activeTab: "recent" | "upload";
   searchQuery: string;
   loading: boolean;
+  uploadProgress: number | null;
   error: string | null;
 
   fetchFiles: () => Promise<void>;
@@ -29,6 +30,7 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   activeTab: "recent",
   searchQuery: "",
   loading: false,
+  uploadProgress: null,
   error: null,
 
   fetchFiles: async () => {
@@ -43,14 +45,32 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   },
 
   uploadFiles: async (files) => {
-    set({ loading: true, error: null });
-    try {
-      await apiUploadUserFiles(files);
-      await get().fetchFiles();
-      set({ activeTab: "recent" });
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Upload failed", loading: false });
+    set({ loading: true, error: null, uploadProgress: 0 });
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await apiUploadUserFiles(files, (percent) => {
+          set({ uploadProgress: percent });
+        });
+        set({ uploadProgress: null });
+        await get().fetchFiles();
+        set({ activeTab: "recent" });
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error("Upload failed");
+        if (attempt === 0 && lastError instanceof TypeError) {
+          set({ uploadProgress: 0 });
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        break;
+      }
     }
+    set({
+      error: lastError?.message ?? "Upload failed",
+      loading: false,
+      uploadProgress: null,
+    });
   },
 
   deleteChecked: async () => {

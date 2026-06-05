@@ -237,26 +237,56 @@ export async function apiGetFileDetails(id: string): Promise<UserFileDetail> {
   return { ...res.file, versions: res.versions };
 }
 
-export async function apiUploadUserFiles(
+export function apiUploadUserFiles(
   files: File[],
+  onProgress?: (percent: number) => void,
 ): Promise<{ files: Array<{ id: string; originalName: string; size: number; version: number }> }> {
-  const formData = new FormData();
-  for (const f of files) formData.append("files", f);
-  let res: Response;
-  try {
-    res = await fetch("/api/v1/files/upload", {
-      method: "POST",
-      headers: formatHeaders(),
-      body: formData,
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    for (const f of files) formData.append("files", f);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/v1/files/upload");
+    xhr.timeout = 120_000;
+
+    const headers = formatHeaders();
+    headers.forEach((value, key) => {
+      if (key.toLowerCase() !== "content-type") {
+        xhr.setRequestHeader(key, value);
+      }
     });
-  } catch (error) {
-    if (error instanceof TypeError) {
-      useConnectionStore.getState().setDisconnected();
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
     }
-    throw error;
-  }
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-  return res.json();
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("Invalid server response"));
+        }
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      useConnectionStore.getState().setDisconnected();
+      reject(new TypeError("Network error"));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error("Upload timed out"));
+    };
+
+    xhr.send(formData);
+  });
 }
 
 export async function apiDeleteUserFiles(ids: string[]): Promise<{ deleted: number }> {

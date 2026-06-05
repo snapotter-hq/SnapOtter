@@ -330,7 +330,7 @@ describe("useFilesPageStore", () => {
 
     await useFilesPageStore.getState().uploadFiles([file]);
 
-    expect(mockApiUploadUserFiles).toHaveBeenCalledWith([file]);
+    expect(mockApiUploadUserFiles).toHaveBeenCalledWith([file], expect.any(Function));
     expect(mockApiListFiles).toHaveBeenCalled();
     expect(useFilesPageStore.getState().activeTab).toBe("recent");
   });

@@ -367,6 +367,22 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+### Caddy
+
+```caddyfile
+images.example.com {
+    reverse_proxy localhost:1349 {
+        flush_interval -1
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+        }
+    }
+}
+```
+
+`flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs). The extended timeouts allow large file uploads to complete without Caddy closing the connection early.
+
 ### Cloudflare Tunnels
 
 ```bash

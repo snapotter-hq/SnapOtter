@@ -119,7 +119,7 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
     if (valid.length === 0) return;
 
     setFiles(valid.map((d) => d.file));
-    navigate("/");
+    navigate("/", { state: { fromLibrary: true } });
 
     // Set serverFileId on each entry so tool processing creates new versions
     setTimeout(() => {

@@ -216,35 +216,75 @@ describe("apiListFiles", () => {
 // apiUploadUserFiles
 // ==========================================================================
 describe("apiUploadUserFiles", () => {
+  let xhrInstances: Array<Record<string, unknown>>;
+  let OriginalXHR: typeof XMLHttpRequest;
+
   beforeEach(() => {
     fetchMock.mockReset();
     storageMap.clear();
+    xhrInstances = [];
+    OriginalXHR = globalThis.XMLHttpRequest;
+
+    const MockXHR = vi.fn().mockImplementation(() => {
+      const instance: Record<string, unknown> = {
+        open: vi.fn(),
+        send: vi.fn(),
+        setRequestHeader: vi.fn(),
+        upload: {},
+        readyState: 4,
+        status: 200,
+        responseText: "",
+        timeout: 0,
+        onload: null,
+        onerror: null,
+        ontimeout: null,
+      };
+      xhrInstances.push(instance);
+      return instance;
+    });
+    vi.stubGlobal("XMLHttpRequest", MockXHR);
+  });
+
+  afterEach(() => {
+    vi.stubGlobal("XMLHttpRequest", OriginalXHR);
   });
 
   it("sends files as FormData to upload endpoint", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
-    fetchMock.mockReturnValueOnce(
-      okJson({ files: [{ id: "1", originalName: "img.png", size: 7, version: 1 }] }),
-    );
+    const responseData = { files: [{ id: "1", originalName: "img.png", size: 7, version: 1 }] };
 
-    const result = await apiUploadUserFiles([file]);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/files/upload");
-    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    const promise = apiUploadUserFiles([file]);
+    const xhr = xhrInstances[0];
+    expect(xhr.open).toHaveBeenCalledWith("POST", "/api/v1/files/upload");
+
+    xhr.status = 200;
+    xhr.responseText = JSON.stringify(responseData);
+    (xhr.onload as () => void)();
+
+    const result = await promise;
     expect(result.files).toHaveLength(1);
   });
 
   it("throws on non-ok response", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
-    fetchMock.mockReturnValueOnce(
-      Promise.resolve({ ok: false, status: 413, json: () => Promise.reject(new Error("no")) }),
-    );
-    await expect(apiUploadUserFiles([file])).rejects.toThrow("Upload failed: 413");
+
+    const promise = apiUploadUserFiles([file]);
+    const xhr = xhrInstances[0];
+    xhr.status = 413;
+    xhr.responseText = "";
+    (xhr.onload as () => void)();
+
+    await expect(promise).rejects.toThrow("Upload failed: 413");
   });
 
-  it("triggers disconnected on TypeError", async () => {
+  it("triggers disconnected on network error", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
-    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
-    await expect(apiUploadUserFiles([file])).rejects.toThrow("Failed to fetch");
+
+    const promise = apiUploadUserFiles([file]);
+    const xhr = xhrInstances[0];
+    (xhr.onerror as () => void)();
+
+    await expect(promise).rejects.toThrow("Network error");
   });
 });
 

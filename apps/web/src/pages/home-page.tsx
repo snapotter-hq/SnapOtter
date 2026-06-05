@@ -1,7 +1,7 @@
 import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import { Clock, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { MultiImageViewer } from "@/components/common/multi-image-viewer";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -29,12 +29,17 @@ export function HomePage() {
     currentEntry,
   } = useFileStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const { fetch: fetchSettings, defaultToolView, loaded: settingsLoaded } = useSettingsStore();
   const { fetch: fetchFeatures, bundles, installing, queued } = useFeaturesStore();
 
   useEffect(() => {
-    reset();
-  }, [reset]);
+    if (location.state?.fromLibrary) {
+      navigate(".", { replace: true, state: {} });
+    } else {
+      reset();
+    }
+  }, [reset, location.state, navigate]);
 
   useEffect(() => {
     fetchSettings();

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useFilesPageStore } from "@/stores/files-page-store";
 
 export function FileUploadArea() {
-  const { uploadFiles, loading } = useFilesPageStore();
+  const { uploadFiles, loading, uploadProgress } = useFilesPageStore();
   const [dragging, setDragging] = useState(false);
 
   function handleDragOver(e: React.DragEvent) {
@@ -46,7 +46,12 @@ export function FileUploadArea() {
         )}
       >
         {loading ? (
-          <div className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            {uploadProgress !== null && uploadProgress > 0 && (
+              <span className="text-xs font-medium text-primary">{uploadProgress}%</span>
+            )}
+          </div>
         ) : (
           <Upload className="h-10 w-10 text-muted-foreground" />
         )}
@@ -54,7 +59,9 @@ export function FileUploadArea() {
           <p className="text-sm font-medium text-foreground">
             {loading ? "Uploading..." : "Drop images here"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">or click to select files</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {loading ? "" : "or click to select files"}
+          </p>
         </div>
         <input
           type="file"
