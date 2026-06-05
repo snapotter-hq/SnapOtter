@@ -69,6 +69,66 @@ jobs:
             --notes-file /tmp/release-notes.md
           echo "Release notes updated successfully."
 
+  prebuilt:
+    name: Archive (${{ matrix.arch }})
+    needs: release
+    if: needs.release.outputs.new_version
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: v${{ needs.release.outputs.new_version }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Build web frontend
+        run: pnpm --filter @snapotter/web build
+
+      - name: Prune to production dependencies
+        run: |
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          npm pkg delete scripts.prepare
+          pnpm install --prod --frozen-lockfile
+
+      - name: Create archive
+        env:
+          VERSION: ${{ needs.release.outputs.new_version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          rm -rf apps/web/src apps/web/public apps/web/index.html apps/web/tsconfig.json
+          rm -rf apps/landing apps/docs apps/demo
+          rm -rf tests .github .husky scripts
+          rm -rf .releaserc.json biome.json .editorconfig .gitattributes
+          rm -rf .git .gitignore
+          rm -f CHANGELOG.md LICENSE README.md CONTRIBUTING.md SECURITY.md
+
+          ARCHIVE_NAME="snapotter-v${VERSION}-linux-${ARCH}.tar.gz"
+          cd ..
+          mv SnapOtter snapotter
+          tar czf "/tmp/${ARCHIVE_NAME}" snapotter/
+          mv snapotter SnapOtter
+          cd SnapOtter
+
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
+          echo "Archive: ${ARCHIVE_NAME} ($(du -sh /tmp/${ARCHIVE_NAME} | cut -f1))"
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: gh release upload "v${VERSION}" "/tmp/${archive_name}" --clobber
+
   docker:
     name: Build (${{ matrix.platform }})
     needs: release
