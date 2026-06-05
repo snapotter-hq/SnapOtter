@@ -61,35 +61,38 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           ARCHIVE_NAME="snapotter-v0.0.0-test-linux-${ARCH}.tar.gz"
-          tar czf "/tmp/${ARCHIVE_NAME}" \
-            --transform='s,^,snapotter/,' \
-            apps/api/src \
-            apps/api/drizzle \
-            apps/api/static \
-            apps/api/node_modules \
-            apps/api/package.json \
-            apps/api/tsconfig.json \
-            apps/web/dist \
-            apps/web/package.json \
-            packages/shared/src \
-            packages/shared/node_modules \
-            packages/shared/package.json \
-            packages/shared/tsconfig.json \
-            packages/image-engine/src \
-            packages/image-engine/node_modules \
-            packages/image-engine/package.json \
-            packages/image-engine/tsconfig.json \
-            packages/ai/src \
-            packages/ai/python \
-            packages/ai/node_modules \
-            packages/ai/package.json \
-            packages/ai/tsconfig.json \
-            docker/feature-manifest.json \
-            node_modules \
-            package.json \
-            pnpm-workspace.yaml \
-            pnpm-lock.yaml \
+
+          # Collect paths, including workspace node_modules only if they exist
+          PATHS=(
+            apps/api/src
+            apps/api/drizzle
+            apps/api/static
+            apps/api/package.json
+            apps/api/tsconfig.json
+            apps/web/dist
+            apps/web/package.json
+            packages/shared/src
+            packages/shared/package.json
+            packages/shared/tsconfig.json
+            packages/image-engine/src
+            packages/image-engine/package.json
+            packages/image-engine/tsconfig.json
+            packages/ai/src
+            packages/ai/python
+            packages/ai/package.json
+            packages/ai/tsconfig.json
+            docker/feature-manifest.json
+            node_modules
+            package.json
+            pnpm-workspace.yaml
+            pnpm-lock.yaml
             tsconfig.base.json
+          )
+          for ws in apps/api packages/shared packages/image-engine packages/ai; do
+            [ -d "$ws/node_modules" ] && PATHS+=("$ws/node_modules")
+          done
+
+          tar czf "/tmp/${ARCHIVE_NAME}" --transform='s,^,snapotter/,' "${PATHS[@]}"
           echo "Archive: ${ARCHIVE_NAME}"
           echo "Size: $(du -sh /tmp/${ARCHIVE_NAME} | cut -f1)"
           echo "File count: $(tar tzf /tmp/${ARCHIVE_NAME} | wc -l)"
