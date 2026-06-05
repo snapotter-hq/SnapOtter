@@ -107,6 +107,38 @@ RUN set -e; \
     fi
 
 # ============================================
+# Stage 2b: Build libheif (HEIC/HEIF tools)
+# ============================================
+# Distro packages ship libheif 1.15-1.17 which cannot decode iPhone HEIC
+# files with multiple auxiliary images (depth maps, HDR gain maps).
+# Build libheif >= 1.19 from source for the fix (GitHub #183).
+# Base images match production to avoid shared-library ABI mismatches.
+FROM debian:bookworm AS libheif-base-arm64
+FROM ubuntu:24.04 AS libheif-base-amd64
+
+ARG TARGETARCH
+FROM libheif-base-${TARGETARCH} AS libheif-builder
+
+ARG LIBHEIF_VERSION=1.21.2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake pkg-config gcc g++ make curl ca-certificates \
+    libde265-dev libx265-dev libjpeg-dev libpng-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL "https://github.com/strukturag/libheif/releases/download/v${LIBHEIF_VERSION}/libheif-${LIBHEIF_VERSION}.tar.gz" \
+      | tar xz \
+    && cmake -B build -S "libheif-${LIBHEIF_VERSION}" \
+      -DCMAKE_INSTALL_PREFIX=/opt/libheif \
+      -DWITH_EXAMPLES=ON \
+      -DWITH_GDK_PIXBUF=OFF \
+      -DWITH_AOM_DECODER=OFF \
+      -DWITH_AOM_ENCODER=OFF \
+      -DWITH_DAV1D=OFF \
+    && cmake --build build -j$(nproc) \
+    && cmake --install build
+
+# ============================================
 # Stage 3: Platform-specific base images
 # Pin tags to specific major.minor for reproducible builds.
 # ============================================
@@ -156,7 +188,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     libopenjp2-tools \
     curl \
     gosu \
-    libheif-examples \
+    libde265-0 \
     libimage-exiftool-perl \
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
@@ -170,11 +202,10 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
        fi \
-    && if apt-cache show libheif-plugin-libde265 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libheif-plugin-libde265; \
-       fi \
-    && if apt-cache show libheif-plugin-x265 >/dev/null 2>&1; then \
-         apt-get install -y --no-install-recommends libheif-plugin-x265; \
+    && if apt-cache show libx265-199 >/dev/null 2>&1; then \
+         apt-get install -y --no-install-recommends libx265-199; \
+       elif apt-cache show libx265-209 >/dev/null 2>&1; then \
+         apt-get install -y --no-install-recommends libx265-209; \
        fi \
     && if apt-cache show libcublas-12-6 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libcublas-12-6; \
@@ -193,6 +224,11 @@ RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
 
 # Caire binary (content-aware seam carving)
 COPY --from=caire-builder /tmp/caire /usr/local/bin/caire
+
+# libheif tools (heif-convert, heif-dec, heif-enc) built from source
+COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
+COPY --from=libheif-builder /opt/libheif/lib/ /usr/local/lib/
+RUN ldconfig
 
 # Python venv - Base packages (rarely change, cached aggressively)
 # Uses pre-built manylinux wheels where available; gcc/g++ above covers the rest.
