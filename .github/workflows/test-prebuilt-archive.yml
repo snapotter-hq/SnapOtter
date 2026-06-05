@@ -47,8 +47,7 @@ jobs:
       - name: Prune to production dependencies
         run: |
           rm -rf node_modules apps/*/node_modules packages/*/node_modules
-          pnpm install --prod --frozen-lockfile --ignore-scripts
-          pnpm rebuild
+          HUSKY=0 pnpm install --prod --frozen-lockfile
 
       - name: Record prod node_modules size
         run: |
