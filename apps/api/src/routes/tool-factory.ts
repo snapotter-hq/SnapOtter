@@ -108,6 +108,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
   app.post(
     `/api/v1/tools/${config.toolId}`,
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";

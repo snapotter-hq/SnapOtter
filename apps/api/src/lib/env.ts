@@ -81,7 +81,7 @@ const envSchema = z
     COOKIE_SECRET: z.string().default(""),
     ANALYTICS_ENABLED: z
       .enum(["true", "false"])
-      .default("true")
+      .default("false")
       .transform((v) => v === "true"),
     ANALYTICS_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1.0),
     POSTHOG_API_KEY: z.string().default("phc_CVHjGivwWVzh76M5EjijTwP5LpiqWie3EbCzXU7w2Smy"),

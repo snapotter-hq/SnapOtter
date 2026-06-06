@@ -28,10 +28,10 @@ describe("analytics env var validation", () => {
 
   // ── ANALYTICS_ENABLED ───────────────────────────────────────────────────
 
-  it("ANALYTICS_ENABLED defaults to true", async () => {
+  it("ANALYTICS_ENABLED defaults to false", async () => {
     const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
     const env = loadEnv();
-    expect(env.ANALYTICS_ENABLED).toBe(true);
+    expect(env.ANALYTICS_ENABLED).toBe(false);
   });
 
   it("ANALYTICS_ENABLED='false' transforms to boolean false", async () => {

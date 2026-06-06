@@ -153,7 +153,9 @@ function makeMockConfig(
 function createMockApp() {
   const routes: Record<string, (req: unknown, reply: unknown) => Promise<unknown>> = {};
   return {
-    post: vi.fn((path: string, handler: (req: unknown, reply: unknown) => Promise<unknown>) => {
+    post: vi.fn((...args: unknown[]) => {
+      const path = args[0] as string;
+      const handler = args[args.length - 1] as (req: unknown, reply: unknown) => Promise<unknown>;
       routes[path] = handler;
     }),
     routes,
@@ -235,7 +237,11 @@ describe("createToolRoute", () => {
       const app = createMockApp();
       const id = uniqueId();
       createToolRoute(app as never, makeMockConfig(id));
-      expect(app.post).toHaveBeenCalledWith(`/api/v1/tools/${id}`, expect.any(Function));
+      expect(app.post).toHaveBeenCalledWith(
+        `/api/v1/tools/${id}`,
+        expect.any(Object),
+        expect.any(Function),
+      );
     });
 
     it("adds the tool config to the registry", () => {

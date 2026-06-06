@@ -28,6 +28,15 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // Decode numeric entities so obfuscated URIs (e.g. &#106;avascript:) are visible.
   svg = decodeNumericEntities(svg);
 
+  // ── Pre-processing: normalize whitespace/null bytes inside href values ──
+  // Catches obfuscated schemes like "java\nscript:", "java\x00script:", "java\tscript:"
+  // by stripping control characters (0x00-0x1F) and DEL (0x7F) from href attribute values.
+  svg = svg.replace(/((?:xlink:)?href\s*=\s*["'])([^"']*)(["'])/gi, (_m, prefix, value, suffix) => {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control-char stripping for security
+    const cleaned = value.replace(/[\x00-\x1f\x7f]/g, "");
+    return `${prefix}${cleaned}${suffix}`;
+  });
+
   // Remove DOCTYPE (XXE prevention, including internal subsets)
   svg = svg.replace(/<!DOCTYPE[^>[]*(?:\[[^\]]*\])?>/gi, "");
   // Remove XML processing instructions except <?xml version...?>
@@ -64,6 +73,12 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // ── Block <use> with external href (before generic href blocking) ──
   svg = svg.replace(/<use\b[^>]*href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
   svg = svg.replace(/<use\b[^>]*xlink:href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
+
+  // ── Block <feImage> with external href (SSRF via SVG filter) ──
+  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
+  svg = svg.replace(/<feImage\b[^>]*xlink:href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
+  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']file:[^"']*["'][^>]*\/?>/gi, "");
+  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']data:[^"']*["'][^>]*\/?>/gi, "");
 
   // ── Block dangerous URI schemes in href attributes ──
   svg = svg.replace(/xlink:href\s*=\s*["']https?:\/\//gi, 'xlink:href="data:,');

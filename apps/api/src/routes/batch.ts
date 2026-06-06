@@ -34,6 +34,7 @@ interface ParsedFile {
 export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/tools/:toolId/batch",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { toolId: string } }>, reply: FastifyReply) => {
       const { toolId } = request.params;
 
