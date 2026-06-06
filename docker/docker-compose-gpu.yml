@@ -51,6 +51,15 @@ services:
       # - OIDC_USERNAME_CLAIM=preferred_username
       # - OIDC_CLOCK_TOLERANCE=30
       # - COOKIE_SECRET=
+      #
+      # Docker secrets (_FILE convention): mount secrets as files instead of
+      # passing them as plain-text env vars. Supported for sensitive vars only.
+      # - DEFAULT_PASSWORD_FILE=/run/secrets/snapotter_password
+      # - S3_ACCESS_KEY_ID_FILE=/run/secrets/s3_access_key
+      # - S3_SECRET_ACCESS_KEY_FILE=/run/secrets/s3_secret_key
+      # - OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc_secret
+      # - COOKIE_SECRET_FILE=/run/secrets/cookie_secret
+      # - SNAPOTTER_LICENSE_KEY_FILE=/run/secrets/license_key
     restart: unless-stopped
     # --- Security hardening ---
     mem_limit: 8g
@@ -90,6 +99,13 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+# Uncomment to use Docker secrets (requires Docker Swarm or compose v2.23+):
+# secrets:
+#   snapotter_password:
+#     file: ./secrets/snapotter_password.txt
+#   oidc_secret:
+#     file: ./secrets/oidc_secret.txt
 
 volumes:
   SnapOtter-data:

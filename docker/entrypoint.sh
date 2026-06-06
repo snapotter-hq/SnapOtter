@@ -1,6 +1,44 @@
 #!/bin/sh
 set -e
 
+# --- Docker secret file convention (_FILE suffix) ---
+# For each supported var, if VAR_FILE is set, read the secret from that file
+# path into VAR. This lets users mount Docker/Kubernetes secrets instead of
+# passing credentials as plain-text environment variables.
+#
+# Supported: DEFAULT_PASSWORD, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
+#            OIDC_CLIENT_SECRET, COOKIE_SECRET, SNAPOTTER_LICENSE_KEY
+resolve_file_env() {
+  var="$1"
+  file_var="${var}_FILE"
+  eval current_val="\"\${${var}:-}\""
+  eval file_path="\"\${${file_var}:-}\""
+
+  if [ -z "$file_path" ]; then
+    return
+  fi
+
+  if [ -n "$current_val" ]; then
+    echo "WARNING: Both $var and $file_var are set. $file_var takes precedence." >&2
+  fi
+
+  if [ ! -f "$file_path" ] || [ ! -r "$file_path" ]; then
+    echo "ERROR: $file_var points to '$file_path' but the file does not exist or is not readable." >&2
+    exit 1
+  fi
+
+  # Command substitution strips trailing newlines (standard for secret files)
+  export "$var"="$(cat "$file_path")"
+  unset "$file_var"
+}
+
+resolve_file_env DEFAULT_PASSWORD
+resolve_file_env S3_ACCESS_KEY_ID
+resolve_file_env S3_SECRET_ACCESS_KEY
+resolve_file_env OIDC_CLIENT_SECRET
+resolve_file_env COOKIE_SECRET
+resolve_file_env SNAPOTTER_LICENSE_KEY
+
 # Apply auth defaults at runtime so they are never baked into image layers.
 # Users can override any of these via -e flags at docker run time.
 export AUTH_ENABLED="${AUTH_ENABLED:-true}"
