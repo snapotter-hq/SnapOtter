@@ -1,6 +1,7 @@
 // apps/web/src/components/editor/common/fill-dialog.tsx
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn, generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
@@ -44,6 +45,7 @@ function resolveColor(
 }
 
 export function FillDialog({ open, onClose }: FillDialogProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState<FillContent>("foreground");
   const [customColor, setCustomColor] = useState("#ff0000");
   const [opacity, setOpacity] = useState(100);
@@ -119,7 +121,7 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
       <div
         className="w-80 rounded-lg bg-card border border-border shadow-xl p-4"
         role="dialog"
-        aria-label="Fill"
+        aria-label={t.a11y.fill}
       >
         <h3 className="text-sm font-semibold text-foreground mb-3">Fill</h3>
 

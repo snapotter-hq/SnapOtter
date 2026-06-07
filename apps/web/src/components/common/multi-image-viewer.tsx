@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useFileStore } from "@/stores/file-store";
 
 const BROWSER_PREVIEWABLE_EXTS = new Set([
@@ -24,6 +25,7 @@ function canBrowserPreview(url: string): boolean {
 }
 
 export function MultiImageViewer() {
+  const { t } = useTranslation();
   const { entries, selectedIndex, setSelectedIndex, navigateNext, navigatePrev } = useFileStore();
 
   const handleKeyDown = useCallback(
@@ -65,7 +67,7 @@ export function MultiImageViewer() {
 
   return (
     <section
-      aria-label="Image viewer"
+      aria-label={t.a11y.imageViewer}
       className="flex flex-col w-full h-full min-h-0"
       onKeyDown={hasMultiple ? handleKeyDown : undefined}
       tabIndex={hasMultiple ? 0 : undefined}
@@ -76,7 +78,7 @@ export function MultiImageViewer() {
             type="button"
             onClick={navigatePrev}
             className="absolute left-3 z-10 w-8 h-8 rounded-full bg-background/80 border border-border shadow-sm flex items-center justify-center hover:bg-background transition-colors"
-            aria-label="Previous image"
+            aria-label={t.a11y.previousImage}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -120,7 +122,7 @@ export function MultiImageViewer() {
             type="button"
             onClick={navigateNext}
             className="absolute right-3 z-10 w-8 h-8 rounded-full bg-background/80 border border-border shadow-sm flex items-center justify-center hover:bg-background transition-colors"
-            aria-label="Next image"
+            aria-label={t.a11y.nextImage}
           >
             <ChevronRight className="h-4 w-4" />
           </button>

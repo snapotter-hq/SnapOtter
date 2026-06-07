@@ -134,7 +134,7 @@ export function BeforeAfterSlider({
       <div
         ref={containerRef}
         role="slider"
-        aria-label="Before/after comparison slider"
+        aria-label={t.a11y.beforeAfterSlider}
         aria-valuenow={Math.round(position)}
         aria-valuemin={0}
         aria-valuemax={100}

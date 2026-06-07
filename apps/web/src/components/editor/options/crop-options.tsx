@@ -1,6 +1,7 @@
 import { ArrowLeftRight, Check, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ASPECT_RATIOS } from "@/components/editor/tools/crop-tool";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -9,6 +10,7 @@ import { useEditorStore } from "@/stores/editor-store";
 // ---------------------------------------------------------------------------
 
 export function CropOptions() {
+  const { t } = useTranslation();
   const cropState = useEditorStore((s) => s.cropState);
   const setCropState = useEditorStore((s) => s.setCropState);
   const applyCrop = useEditorStore((s) => s.applyCrop);
@@ -123,7 +125,7 @@ export function CropOptions() {
         type="button"
         onClick={handleSwap}
         title="Swap dimensions"
-        aria-label="Swap dimensions"
+        aria-label={t.a11y.swapDimensions}
         className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -150,7 +152,7 @@ export function CropOptions() {
         type="button"
         onClick={handleApply}
         title="Apply Crop (Enter)"
-        aria-label="Apply Crop"
+        aria-label={t.a11y.applyCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded bg-primary px-2.5 text-xs text-primary-foreground",
           "hover:bg-primary/90 transition-colors",
@@ -163,7 +165,7 @@ export function CropOptions() {
         type="button"
         onClick={handleCancel}
         title="Cancel Crop (Escape)"
-        aria-label="Cancel Crop"
+        aria-label={t.a11y.cancelCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded border border-border px-2.5 text-xs",
           "text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",

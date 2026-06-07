@@ -1,9 +1,11 @@
 import { Lock, Unlock, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeImage = useEditorStore((s) => s.resizeImage);
 
@@ -68,7 +70,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t.common.close}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />

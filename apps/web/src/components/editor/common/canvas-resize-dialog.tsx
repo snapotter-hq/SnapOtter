@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { AnchorPosition } from "@/types/editor";
@@ -21,6 +22,7 @@ const ANCHOR_POSITIONS: AnchorPosition[] = [
 ];
 
 export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeCanvas = useEditorStore((s) => s.resizeCanvas);
 
@@ -57,7 +59,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t.common.close}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />

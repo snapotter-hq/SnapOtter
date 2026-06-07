@@ -68,7 +68,7 @@ export function FilesPage() {
             <div
               role="dialog"
               aria-modal="true"
-              aria-label="File Details"
+              aria-label={t.a11y.fileDetails}
               className="fixed inset-0 z-50 bg-black/50"
               onClick={(e) => {
                 if (e.target === e.currentTarget) setShowDetails(false);

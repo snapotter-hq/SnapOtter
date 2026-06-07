@@ -205,7 +205,7 @@ export function Dropzone({
 
   return (
     <section
-      aria-label="File drop zone"
+      aria-label={t.a11y.fileDropZone}
       onDragEnter={handleDrag}
       onDragOver={handleDrag}
       onDragLeave={handleDrag}

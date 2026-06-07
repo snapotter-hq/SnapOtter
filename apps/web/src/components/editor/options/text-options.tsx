@@ -11,6 +11,7 @@ import {
   Underline,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { TextAttrs } from "@/types/editor";
@@ -131,6 +132,7 @@ function NumberInput({
 // ---------------------------------------------------------------------------
 
 function FontDropdown({ value, onChange }: { value: string; onChange: (name: string) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const fonts = useMemo(() => getAllFonts(), []);
@@ -162,7 +164,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        aria-label="Font family"
+        aria-label={t.a11y.fontFamily}
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex items-center gap-1.5 h-7 px-2 rounded border border-border bg-background",
@@ -231,6 +233,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
 // ---------------------------------------------------------------------------
 
 export function TextOptions() {
+  const { t } = useTranslation();
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const objects = useEditorStore((s) => s.objects);
 
@@ -409,7 +412,7 @@ export function TextOptions() {
         />
         <input
           type="color"
-          aria-label="Text color"
+          aria-label={t.a11y.textColor}
           value={attrs.fill}
           onChange={(e) => updateSelected({ fill: e.target.value })}
           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"

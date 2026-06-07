@@ -22,6 +22,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -80,6 +81,7 @@ interface HistoryEntry {
 }
 
 export function HistoryPanel() {
+  const { t } = useTranslation();
   const lastAction = useEditorStore((s) => s.lastAction);
 
   // Force re-render when history changes by subscribing to history version
@@ -170,7 +172,7 @@ export function HistoryPanel() {
               ? "text-muted-foreground hover:text-foreground hover:bg-muted"
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
-          aria-label="Undo"
+          aria-label={t.a11y.undo}
           title="Undo (Ctrl+Z)"
         >
           <Undo2 size={14} />
@@ -185,7 +187,7 @@ export function HistoryPanel() {
               ? "text-muted-foreground hover:text-foreground hover:bg-muted"
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
-          aria-label="Redo"
+          aria-label={t.a11y.redo}
           title="Redo (Ctrl+Shift+Z)"
         >
           <Redo2 size={14} />

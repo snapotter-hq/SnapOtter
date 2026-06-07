@@ -4,7 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useTheme } from "@/hooks/use-theme";
 
 function LanguageSelector() {
-  const { locale, setLocale, supportedLocales } = useTranslation();
+  const { t, locale, setLocale, supportedLocales } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -52,7 +52,7 @@ function LanguageSelector() {
                   stroke="currentColor"
                   strokeWidth="2"
                   role="img"
-                  aria-label="Selected"
+                  aria-label={t.a11y.selected}
                 >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>

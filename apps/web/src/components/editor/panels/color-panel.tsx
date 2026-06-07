@@ -3,6 +3,7 @@
 import { ArrowLeftRight, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { ColorSwatch } from "../common/color-swatch";
@@ -108,6 +109,7 @@ function ColorInputFields({
   color: string;
   onColorChange: (hex: string) => void;
 }) {
+  const { t } = useTranslation();
   const rgb = hexToRgb(color);
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
@@ -130,7 +132,7 @@ function ColorInputFields({
           )}
           maxLength={7}
           spellCheck={false}
-          aria-label="Hex color value"
+          aria-label={t.a11y.hexColorValue}
           data-testid="color-hex-input"
         />
       </div>
@@ -296,6 +298,7 @@ function ColorPickerPopover({
 // --- Main component ---
 
 export function ColorPanel() {
+  const { t } = useTranslation();
   const foregroundColor = useEditorStore((s) => s.foregroundColor);
   const backgroundColor = useEditorStore((s) => s.backgroundColor);
   const recentColors = useEditorStore((s) => s.recentColors);
@@ -362,7 +365,7 @@ export function ColorPanel() {
               pickerTarget === "bg" ? "border-primary ring-1 ring-primary" : "border-border",
             )}
             style={{ backgroundColor: backgroundColor }}
-            aria-label="Background color"
+            aria-label={t.a11y.backgroundColor}
             data-testid="bg-color-swatch"
           />
           {/* Foreground swatch (top-left, overlapping) */}
@@ -374,7 +377,7 @@ export function ColorPanel() {
               pickerTarget === "fg" ? "border-primary ring-1 ring-primary" : "border-border",
             )}
             style={{ backgroundColor: foregroundColor }}
-            aria-label="Foreground color"
+            aria-label={t.a11y.foregroundColor}
             data-testid="fg-color-swatch"
           />
 
@@ -388,7 +391,7 @@ export function ColorPanel() {
               "bg-card/80 hover:bg-muted",
             )}
             title="Swap colors (X)"
-            aria-label="Swap foreground and background colors"
+            aria-label={t.a11y.swapColors}
             data-testid="swap-colors"
           >
             <ArrowLeftRight size={10} />
@@ -404,7 +407,7 @@ export function ColorPanel() {
               "bg-card/80 hover:bg-muted",
             )}
             title="Reset colors (D)"
-            aria-label="Reset to default black and white"
+            aria-label={t.a11y.resetColors}
             data-testid="reset-colors"
           >
             <RotateCcw size={10} />
@@ -426,7 +429,7 @@ export function ColorPanel() {
             )}
             maxLength={7}
             spellCheck={false}
-            aria-label="Foreground color hex value"
+            aria-label={t.a11y.foregroundHex}
             data-testid="foreground-hex-input"
           />
         </div>

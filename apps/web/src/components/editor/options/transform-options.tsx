@@ -1,6 +1,7 @@
 import { Check, FlipHorizontal2, FlipVertical2, Lock, Unlock, X } from "lucide-react";
 import { useCallback } from "react";
 import type { TransformToolApi } from "@/components/editor/tools/transform-tool";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ function NumericInput({
 }
 
 export function TransformOptions({ api }: { api: TransformToolApi }) {
+  const { t } = useTranslation();
   const {
     values,
     lockedAspect,
@@ -132,7 +134,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
         type="button"
         onClick={flipHorizontal}
         title="Flip Horizontal"
-        aria-label="Flip Horizontal"
+        aria-label={t.a11y.flipHorizontal}
         className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
         <FlipHorizontal2 className="h-4 w-4" />
@@ -141,7 +143,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
         type="button"
         onClick={flipVertical}
         title="Flip Vertical"
-        aria-label="Flip Vertical"
+        aria-label={t.a11y.flipVertical}
         className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
         <FlipVertical2 className="h-4 w-4" />

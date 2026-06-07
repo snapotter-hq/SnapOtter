@@ -1,9 +1,11 @@
 // apps/web/src/components/editor/common/loading-overlay.tsx
 import { X } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function LoadingOverlay() {
+  const { t } = useTranslation();
   const loadingState = useEditorStore((s) => s.loadingState);
   const setLoadingState = useEditorStore((s) => s.setLoadingState);
 
@@ -43,7 +45,7 @@ export function LoadingOverlay() {
             type="button"
             onClick={() => setLoadingState(null)}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-1"
-            aria-label="Cancel operation"
+            aria-label={t.a11y.cancelOperation}
           >
             <X size={12} />
             Cancel

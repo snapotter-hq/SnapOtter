@@ -60,7 +60,7 @@ export function WelcomeScreen() {
   return (
     <>
       <section
-        aria-label="Image drop zone"
+        aria-label={t.a11y.imageDropZone}
         className="absolute inset-0 flex items-center justify-center z-10"
         onDrop={handleDrop}
         onDragOver={handleDragOver}

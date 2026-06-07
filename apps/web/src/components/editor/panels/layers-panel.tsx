@@ -14,6 +14,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { EditorLayer, ObjectEffects } from "@/types/editor";
@@ -80,6 +81,7 @@ const DEFAULT_STROKE: NonNullable<ObjectEffects["stroke"]> = {
 // ---------------------------------------------------------------------------
 
 export function LayersPanel() {
+  const { t } = useTranslation();
   const layers = useEditorStore((s) => s.layers);
   const activeLayerId = useEditorStore((s) => s.activeLayerId);
   const objects = useEditorStore((s) => s.objects);
@@ -167,7 +169,11 @@ export function LayersPanel() {
       </div>
 
       {/* Layer list */}
-      <div className="flex-1 overflow-y-auto py-1 min-h-0" role="listbox" aria-label="Layers">
+      <div
+        className="flex-1 overflow-y-auto py-1 min-h-0"
+        role="listbox"
+        aria-label={t.a11y.layers}
+      >
         {displayLayers.map((layer) => {
           const realIndex = layers.findIndex((l) => l.id === layer.id);
           return (
@@ -202,7 +208,7 @@ export function LayersPanel() {
           onClick={addLayer}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           title="New Layer (Ctrl+Shift+N)"
-          aria-label="Add layer"
+          aria-label={t.a11y.addLayer}
           data-testid="add-layer-btn"
         >
           <Plus size={16} />
@@ -217,7 +223,7 @@ export function LayersPanel() {
           disabled={layers.length <= 1}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           title="Delete Layer"
-          aria-label="Delete layer"
+          aria-label={t.a11y.deleteLayer}
           data-testid="delete-layer-btn"
         >
           <Trash2 size={16} />

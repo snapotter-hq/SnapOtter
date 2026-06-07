@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
@@ -63,6 +64,7 @@ function getMimeType(format: ExportFormat): string {
 }
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const markClean = useEditorStore((s) => s.markClean);
 
@@ -454,7 +456,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
-            aria-label="Close"
+            aria-label={t.common.close}
           >
             <X size={16} />
           </button>

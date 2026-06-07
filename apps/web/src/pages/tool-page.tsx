@@ -706,7 +706,7 @@ export function ToolPage() {
             type="button"
             onClick={navigatePrev}
             className="absolute left-3 z-10 w-8 h-8 rounded-full bg-background/80 border border-border shadow-sm flex items-center justify-center hover:bg-background transition-colors"
-            aria-label="Previous image"
+            aria-label={t.a11y.previousImage}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -716,7 +716,7 @@ export function ToolPage() {
             type="button"
             onClick={navigateNext}
             className="absolute right-3 z-10 w-8 h-8 rounded-full bg-background/80 border border-border shadow-sm flex items-center justify-center hover:bg-background transition-colors"
-            aria-label="Next image"
+            aria-label={t.a11y.nextImage}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -810,7 +810,7 @@ export function ToolPage() {
 
           {/* Main area: image viewer (full height) */}
           <section
-            aria-label="Image area"
+            aria-label={t.a11y.imageArea}
             className="flex-1 flex flex-col min-h-0 min-w-0"
             onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
             tabIndex={hasMultiple ? 0 : undefined}
@@ -861,7 +861,7 @@ export function ToolPage() {
 
         {/* Main area: image viewer */}
         <section
-          aria-label="Image area"
+          aria-label={t.a11y.imageArea}
           className="flex-1 flex flex-col min-h-0 min-w-0"
           onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
           tabIndex={hasMultiple ? 0 : undefined}

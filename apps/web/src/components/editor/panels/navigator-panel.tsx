@@ -2,6 +2,7 @@
 
 import { Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 const THUMBNAIL_MAX_HEIGHT = 80;
@@ -10,6 +11,7 @@ const MIN_ZOOM = 0.01;
 const MAX_ZOOM = 64;
 
 export function NavigatorPanel() {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -245,7 +247,7 @@ export function NavigatorPanel() {
           type="button"
           onClick={() => setZoom(Math.max(MIN_ZOOM, zoom / 1.2))}
           className="p-0.5 text-muted-foreground hover:text-foreground"
-          aria-label="Zoom out"
+          aria-label={t.a11y.zoomOut}
         >
           <Minus size={12} />
         </button>
@@ -262,7 +264,7 @@ export function NavigatorPanel() {
           type="button"
           onClick={() => setZoom(Math.min(MAX_ZOOM, zoom * 1.2))}
           className="p-0.5 text-muted-foreground hover:text-foreground"
-          aria-label="Zoom in"
+          aria-label={t.a11y.zoomIn}
         >
           <Plus size={12} />
         </button>

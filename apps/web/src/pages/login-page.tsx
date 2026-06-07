@@ -38,7 +38,7 @@ function RotatingPhrase() {
 }
 
 function LanguageSelector() {
-  const { locale, setLocale, supportedLocales } = useTranslation();
+  const { t, locale, setLocale, supportedLocales } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -74,7 +74,7 @@ function LanguageSelector() {
           strokeLinecap="round"
           strokeLinejoin="round"
           role="img"
-          aria-label="Language"
+          aria-label={t.a11y.language}
         >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
@@ -112,7 +112,7 @@ function LanguageSelector() {
                   strokeLinejoin="round"
                   className="text-primary shrink-0"
                   role="img"
-                  aria-label="Selected"
+                  aria-label={t.a11y.selected}
                 >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>

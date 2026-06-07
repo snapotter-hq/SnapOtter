@@ -83,6 +83,7 @@ export function CollagePreview() {
 
 /** Dropzone for initial image upload. */
 function UploadArea() {
+  const { t } = useTranslation();
   const addImages = useCollageStore((s) => s.addImages);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -118,7 +119,7 @@ function UploadArea() {
 
   return (
     <section
-      aria-label="File drop zone"
+      aria-label={t.a11y.fileDropZone}
       onDragEnter={handleDrag}
       onDragOver={handleDrag}
       onDragLeave={handleDrag}
@@ -322,6 +323,7 @@ function CollageCell({
   gridRow: string;
   backgroundColor: string;
 }) {
+  const { t } = useTranslation();
   const store = useCollageStore();
   const cellRef = useRef<HTMLDivElement>(null);
   const [controlsVisible, setControlsVisible] = useState(false);
@@ -507,7 +509,7 @@ function CollageCell({
       {isSelected && image && !isLoading && (
         <div
           role="toolbar"
-          aria-label="Image controls"
+          aria-label={t.a11y.imageControls}
           className="absolute top-1.5 right-1.5 flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -541,7 +543,7 @@ function CollageCell({
             ref={setDragRef}
             {...listeners}
             {...attributes}
-            aria-label="Drag to reorder"
+            aria-label={t.a11y.dragToReorder}
             className="bg-black/50 backdrop-blur-sm text-white rounded p-1 cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
           >
             <GripVertical className="h-3.5 w-3.5" />
@@ -553,7 +555,7 @@ function CollageCell({
       {isSelected && image && !isLoading && (
         <div
           role="toolbar"
-          aria-label="Zoom controls"
+          aria-label={t.a11y.zoomControls}
           className={cn(
             "absolute bottom-0 left-0 right-0 flex items-center gap-2 px-3 py-2 bg-black/50 backdrop-blur-sm transition-opacity duration-300",
             controlsVisible ? "opacity-100" : "opacity-0",

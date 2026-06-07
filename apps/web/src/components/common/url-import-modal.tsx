@@ -115,7 +115,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
           <button
             type="button"
             onClick={handleClose}
-            aria-label="Close"
+            aria-label={t.common.close}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
           >
             <X className="h-4 w-4" />

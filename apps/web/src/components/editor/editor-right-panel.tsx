@@ -1,5 +1,6 @@
 // apps/web/src/components/editor/editor-right-panel.tsx
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { AdjustmentsPanel } from "./panels/adjustments-panel";
@@ -15,6 +16,7 @@ const TABS = [
 ];
 
 export function EditorRightPanel() {
+  const { t } = useTranslation();
   const visible = useEditorStore((s) => s.rightPanelVisible);
   const activeTab = useEditorStore((s) => s.rightPanelTab);
   const setTab = useEditorStore((s) => s.setRightPanelTab);
@@ -27,7 +29,7 @@ export function EditorRightPanel() {
         type="button"
         onClick={togglePanel}
         className="flex items-center justify-center w-6 bg-card border-l border-border"
-        aria-label="Expand panel"
+        aria-label={t.a11y.expandPanel}
       >
         <ChevronRight size={14} className="text-muted-foreground rotate-180" />
       </button>
@@ -63,7 +65,7 @@ export function EditorRightPanel() {
           type="button"
           onClick={togglePanel}
           className="px-1.5 py-2 text-muted-foreground hover:text-foreground"
-          aria-label="Collapse panel"
+          aria-label={t.a11y.collapsePanel}
         >
           <ChevronRight size={14} />
         </button>

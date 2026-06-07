@@ -1,6 +1,7 @@
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
@@ -48,6 +49,7 @@ function parseSvgDimensions(file: File): Promise<SvgDims | null> {
 }
 
 export function SvgToRasterSettings() {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("svg-to-raster");
@@ -322,13 +324,13 @@ export function SvgToRasterSettings() {
             type="button"
             onClick={() => setBgColor("#ffffff")}
             className={`w-8 h-8 rounded border-2 bg-white ${bgColor === "#ffffff" ? "border-primary" : "border-border"}`}
-            aria-label="White background"
+            aria-label={t.a11y.whiteBackground}
           />
           <button
             type="button"
             onClick={() => setBgColor("#000000")}
             className={`w-8 h-8 rounded border-2 bg-black ${bgColor === "#000000" ? "border-primary" : "border-border"}`}
-            aria-label="Black background"
+            aria-label={t.a11y.blackBackground}
           />
           <input
             type="color"
