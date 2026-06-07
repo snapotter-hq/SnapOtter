@@ -1,7 +1,8 @@
 import { APP_VERSION } from "@snapotter/shared";
 import { BookOpen, ExternalLink, Github, Keyboard, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 
 interface HelpDialogProps {
@@ -25,6 +26,8 @@ const SHORTCUTS = [
 
 export function HelpDialog({ open, onClose }: HelpDialogProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -44,10 +47,18 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
         onClick={onClose}
       />
 
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85dvh] flex flex-col overflow-hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-dialog-title"
+        className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85dvh] flex flex-col overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-foreground">{t.help.heading}</h2>
+          <h2 id="help-dialog-title" className="text-lg font-semibold text-foreground">
+            {t.help.heading}
+          </h2>
           <button
             type="button"
             onClick={onClose}

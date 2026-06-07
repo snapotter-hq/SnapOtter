@@ -1,6 +1,7 @@
 import { Check, FolderOpen, ImageIcon, Loader2, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import {
   apiListFiles,
   formatHeaders,
@@ -64,6 +65,8 @@ interface FileLibraryModalProps {
 
 export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
   const [files, setFiles] = useState<UserFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -149,11 +152,17 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
         className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-default"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg max-h-[80dvh] bg-background border border-border rounded-xl shadow-xl flex flex-col mx-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="file-library-title"
+        className="relative z-10 w-full max-w-lg max-h-[80dvh] bg-background border border-border rounded-xl shadow-xl flex flex-col mx-4"
+      >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
           <FolderOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground flex-1">
+          <h2 id="file-library-title" className="text-sm font-semibold text-foreground flex-1">
             {t.automate.importFromLibrary}
           </h2>
           <button

@@ -26,9 +26,10 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
 import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
 import { format, plural } from "@/lib/format";
@@ -127,6 +128,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const { t } = useTranslation();
   const isMobile = useMobile();
   const NAV_ITEMS = useNavItems();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const mobileDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open && !isMobile);
+  useFocusTrap(mobileDialogRef, open && isMobile);
 
   const visibleNavItems = NAV_ITEMS.filter(
     (item) =>
@@ -148,10 +153,18 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div
+        ref={mobileDialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title-mobile"
+        className="fixed inset-0 z-50 flex flex-col bg-background"
+      >
         {/* Mobile header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-          <h2 className="text-sm font-semibold text-foreground">{t.settings.heading}</h2>
+          <h2 id="settings-dialog-title-mobile" className="text-sm font-semibold text-foreground">
+            {t.settings.heading}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -212,14 +225,18 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
       {/* Dialog */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="settings-dialog-title"
         className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-3xl h-[85dvh] flex overflow-hidden"
       >
         {/* Sidebar nav */}
         <div className="w-48 border-r border-border bg-muted/30 p-3 space-y-1 shrink-0">
           <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="text-sm font-semibold text-foreground">{t.settings.heading}</h2>
+            <h2 id="settings-dialog-title" className="text-sm font-semibold text-foreground">
+              {t.settings.heading}
+            </h2>
           </div>
           {visibleNavItems.map((item) => (
             <button

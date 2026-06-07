@@ -1,6 +1,7 @@
 import { Globe, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection-store";
@@ -30,6 +31,8 @@ export function AppLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const mobileSidebarRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(mobileSidebarRef, mobileSidebarOpen);
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const isMobile = useMobile();
   const connectionStatus = useConnectionStore((s) => s.status);
@@ -58,7 +61,13 @@ export function AppLayout({
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm cursor-default"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border shadow-xl animate-in slide-in-from-left">
+          <div
+            ref={mobileSidebarRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.a11y.openSidebar}
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border shadow-xl animate-in slide-in-from-left"
+          >
             <div className="flex items-center justify-between p-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <OtterLogo className="h-5 w-5 text-primary" />

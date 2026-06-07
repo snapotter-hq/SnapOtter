@@ -1,6 +1,7 @@
 import { AlertCircle, Check, Clock, Link, Loader2, RotateCw, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { type UrlImportEntry, useUrlImport } from "@/hooks/use-url-import";
 import { format } from "@/lib/format";
 import { extractUrls } from "@/lib/url-parser";
@@ -45,6 +46,8 @@ function filenameFromUrl(url: string): string {
 
 export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -104,14 +107,18 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
 
       {/* Modal card */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="url-import-title"
         className="relative z-10 w-full max-w-lg bg-background border border-border rounded-xl shadow-xl flex flex-col mx-4"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
           <Link className="h-5 w-5 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground flex-1">{t.urlImport.title}</h2>
+          <h2 id="url-import-title" className="text-sm font-semibold text-foreground flex-1">
+            {t.urlImport.title}
+          </h2>
           <button
             type="button"
             onClick={handleClose}
