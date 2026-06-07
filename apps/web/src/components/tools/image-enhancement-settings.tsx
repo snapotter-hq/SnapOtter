@@ -337,6 +337,8 @@ export function ImageEnhancementControls({
         </div>
         <button
           type="button"
+          role="switch"
+          aria-checked={deepEnhance}
           onClick={() => setDeepEnhance(!deepEnhance)}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
             deepEnhance ? "bg-primary" : "bg-muted"

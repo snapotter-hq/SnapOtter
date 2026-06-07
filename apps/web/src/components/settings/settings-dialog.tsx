@@ -2813,6 +2813,9 @@ function ToolsSection() {
                     </div>
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={!isDisabled}
+                      aria-label={getToolName(t, tool.id, tool.name)}
                       onClick={() => toggleTool(tool.id)}
                       className={cn(
                         "w-11 h-6 rounded-full transition-colors relative shrink-0 ms-3",
