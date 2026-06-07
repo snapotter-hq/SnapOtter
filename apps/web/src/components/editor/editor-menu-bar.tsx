@@ -404,7 +404,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
           className={cn(
             "flex items-center justify-between px-3 py-1 text-xs cursor-default select-none rounded-sm",
             item.disabled
-              ? "text-muted-foreground/50"
+              ? "text-muted-foreground"
               : "text-foreground hover:bg-accent hover:text-accent-foreground",
           )}
           data-testid={`menu-item-${toTestId(item.label)}`}
@@ -436,7 +436,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
         className={cn(
           "flex items-center justify-between w-full px-3 py-1 text-xs cursor-default select-none rounded-sm text-start",
           item.disabled
-            ? "text-muted-foreground/50 pointer-events-none"
+            ? "text-muted-foreground pointer-events-none"
             : "text-foreground hover:bg-accent hover:text-accent-foreground",
         )}
         disabled={item.disabled}

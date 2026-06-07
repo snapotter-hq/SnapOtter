@@ -157,7 +157,7 @@ function groupByRegion(): Map<PassportRegion, PassportSpec[]> {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );
@@ -326,7 +326,7 @@ function CountryOption({
     >
       <span>{spec.flag}</span>
       <span className="flex-1 text-start">{spec.name}</span>
-      <span className="text-muted-foreground/60 tabular-nums text-[10px]">
+      <span className="text-muted-foreground tabular-nums text-[10px]">
         {formatDimensions(doc)}
       </span>
       {selected && <Check className="h-3 w-3 text-primary shrink-0" />}
@@ -656,7 +656,7 @@ export function PassportPhotoSettings() {
                   if (!specs || specs.length === 0) return null;
                   return (
                     <div key={region}>
-                      <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                      <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {REGION_LABELS[region]}
                       </p>
                       {specs.map((spec) => (

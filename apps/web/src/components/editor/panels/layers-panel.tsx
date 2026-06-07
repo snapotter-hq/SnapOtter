@@ -529,7 +529,7 @@ function LayerRow({
             className="w-full h-full object-cover"
           />
         ) : (
-          <Layers size={12} className="text-muted-foreground/50" />
+          <Layers size={12} className="text-muted-foreground" />
         )}
       </div>
 
@@ -679,7 +679,7 @@ function LayerEffectsSection({
 }) {
   return (
     <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1">
         Layer Effects
       </p>
 

@@ -175,7 +175,7 @@ export function HomePage() {
               <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
                 <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
                 <p className="text-sm text-muted-foreground">{t.homePage.generatingPreview}</p>
-                <p className="text-xs text-muted-foreground/60">{selectedFileName}</p>
+                <p className="text-xs text-muted-foreground">{selectedFileName}</p>
               </div>
             ) : originalBlobUrl ? (
               <ImageViewer
@@ -357,7 +357,7 @@ export function HomePage() {
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
               <p className="text-sm text-muted-foreground">{t.homePage.generatingPreview}</p>
-              <p className="text-xs text-muted-foreground/60">{selectedFileName}</p>
+              <p className="text-xs text-muted-foreground">{selectedFileName}</p>
             </div>
           ) : originalBlobUrl ? (
             <ImageViewer

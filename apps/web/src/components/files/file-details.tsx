@@ -44,7 +44,7 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
   if (failed) {
     return (
       <div className={cn("flex items-center justify-center bg-muted/50", className)}>
-        <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+        <ImageIcon className="h-8 w-8 text-muted-foreground" />
       </div>
     );
   }

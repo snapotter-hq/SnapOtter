@@ -239,7 +239,7 @@ export function Dropzone({
           <p className={cn("font-medium", compact ? "text-sm" : "text-base", "text-foreground/80")}>
             {t.dropzone.dropPrompt}
           </p>
-          <p className="text-sm text-muted-foreground/70">{t.dropzone.browseOrPaste}</p>
+          <p className="text-sm text-muted-foreground">{t.dropzone.browseOrPaste}</p>
         </div>
         <button
           type="button"
@@ -256,7 +256,7 @@ export function Dropzone({
           <Upload className="h-4 w-4" />
           {t.common.upload}
         </button>
-        <p className="text-xs text-muted-foreground/50">
+        <p className="text-xs text-muted-foreground">
           {acceptDescription ?? t.dropzone.defaultFormats}
         </p>
 

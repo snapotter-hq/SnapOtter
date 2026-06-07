@@ -81,7 +81,7 @@ export function SplitCanvas() {
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
         <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
         <p className="text-sm text-muted-foreground">Generating preview...</p>
-        <p className="text-xs text-muted-foreground/60">{filename}</p>
+        <p className="text-xs text-muted-foreground">{filename}</p>
       </div>
     );
   }
@@ -91,7 +91,7 @@ export function SplitCanvas() {
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-4">
         <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
         <p className="text-sm text-muted-foreground">Loading preview...</p>
-        <p className="text-xs text-muted-foreground/60">{filename}</p>
+        <p className="text-xs text-muted-foreground">{filename}</p>
       </div>
     );
   }

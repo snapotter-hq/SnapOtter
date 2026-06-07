@@ -36,7 +36,7 @@ export function ToolCard({ tool }: ToolCardProps) {
     <div className="group flex items-center gap-3 relative">
       <button
         type="button"
-        className="opacity-0 group-hover:opacity-100 transition-opacity absolute -left-5"
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity absolute -left-7 p-2"
         title={t.toolCard.addToFavourites}
         aria-label={t.toolCard.addToFavourites}
       >

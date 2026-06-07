@@ -118,7 +118,7 @@ function FileSelectionInfo({
             >
               {isSelected && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
               <span className="truncate flex-1 min-w-0">{file.name}</span>
-              <span className="shrink-0 text-[10px] text-muted-foreground/70">
+              <span className="shrink-0 text-[10px] text-muted-foreground">
                 {getFileFormat(file.name)}
               </span>
               <span className="shrink-0 text-[10px] tabular-nums">{formatFileSize(file.size)}</span>
@@ -643,7 +643,7 @@ export function ToolPage() {
         <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
           <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
           <p className="text-sm text-muted-foreground">{t.toolPage.generatingPreview}</p>
-          <p className="text-xs text-muted-foreground/60">{selectedFileName}</p>
+          <p className="text-xs text-muted-foreground">{selectedFileName}</p>
         </div>
       );
     }

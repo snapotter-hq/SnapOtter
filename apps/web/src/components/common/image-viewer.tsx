@@ -257,7 +257,7 @@ export function ImageViewer({
           <div className="flex flex-col items-center justify-center gap-3 text-center">
             <FileImage className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Preview not available</p>
-            <p className="text-xs text-muted-foreground/60">{filename}</p>
+            <p className="text-xs text-muted-foreground">{filename}</p>
           </div>
         ) : bgPreview?.backgroundSrc || bgPreview?.containerBackground ? (
           /* Layered bg-removal preview: background layer + subject layer */

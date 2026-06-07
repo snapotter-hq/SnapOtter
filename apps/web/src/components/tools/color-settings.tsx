@@ -428,7 +428,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );
@@ -457,7 +457,7 @@ function SliderControl({
       <div className="flex justify-between items-center">
         <label htmlFor={id} className={`text-xs ${color || "text-muted-foreground"}`}>
           {label}
-          {hint && <span className="text-[10px] text-muted-foreground/60 ms-1">({hint})</span>}
+          {hint && <span className="text-[10px] text-muted-foreground ms-1">({hint})</span>}
         </label>
         <span className="text-xs font-mono text-foreground tabular-nums w-8 text-end">{value}</span>
       </div>

@@ -44,6 +44,7 @@ export function Sidebar({
   expanded = false,
 }: SidebarProps) {
   const location = useLocation();
+  const { t } = useTranslation();
   const { topItems, bottomItems } = useNavItems();
 
   const renderItem = (item: SidebarItem, isActive: boolean) => {
@@ -101,11 +102,11 @@ export function Sidebar({
 
   if (expanded) {
     return (
-      <div className="flex flex-col p-3 gap-1">
+      <nav aria-label={t.a11y.navigationMenu} className="flex flex-col p-3 gap-1">
         {topItems.map((item) => renderItem(item, location.pathname === item.href))}
         <div className="border-t border-border my-2" />
         {bottomItems.map((item) => renderItem(item, false))}
-      </div>
+      </nav>
     );
   }
 
@@ -115,9 +116,9 @@ export function Sidebar({
         <OtterLogo className="h-7 w-7 text-primary" />
       </div>
       <div className="border-t border-border w-10 mb-2" />
-      <div className="flex flex-col gap-1 flex-1">
+      <nav aria-label={t.a11y.navigationMenu} className="flex flex-col gap-1 flex-1">
         {topItems.map((item) => renderItem(item, location.pathname === item.href))}
-      </div>
+      </nav>
       <div className="border-t border-border w-10 my-2" />
       <div className="flex flex-col gap-1">
         {bottomItems.map((item) => renderItem(item, false))}

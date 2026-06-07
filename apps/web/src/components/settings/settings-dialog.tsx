@@ -183,7 +183,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               type="button"
               onClick={() => setSection(item.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0",
+                "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0",
                 section === item.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground",

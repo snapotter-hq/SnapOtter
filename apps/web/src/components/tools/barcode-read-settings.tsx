@@ -56,7 +56,7 @@ function getBadgeColor(type: string): string {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );
@@ -260,7 +260,7 @@ export function BarcodeReadSettings() {
         <span className="text-sm text-muted-foreground">Thorough scan</span>
         <span
           title="Spends more time analyzing the image. Enable for small, damaged, or low-contrast barcodes."
-          className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground/60 text-[10px] cursor-help"
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground text-[10px] cursor-help"
         >
           ?
         </span>
@@ -335,7 +335,7 @@ export function BarcodeReadSettings() {
               )}
 
               {fileResult.barcodes.length === 0 ? (
-                <p className="text-xs text-muted-foreground/60 italic py-1">No barcodes found</p>
+                <p className="text-xs text-muted-foreground italic py-1">No barcodes found</p>
               ) : (
                 fileResult.barcodes.map((barcode) => {
                   const idx = globalIndex++;

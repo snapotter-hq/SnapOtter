@@ -99,7 +99,7 @@ export function ColorizeSettings() {
           onChange={(e) => setIntensity(Number(e.target.value))}
           className="w-full mt-0.5"
         />
-        <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+        <p className="text-[10px] text-muted-foreground mt-0.5">
           Lower values produce more muted, vintage-style colors.
         </p>
       </div>
@@ -152,7 +152,7 @@ export function ColorizeSettings() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );

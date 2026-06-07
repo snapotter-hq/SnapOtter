@@ -54,9 +54,7 @@ export function AnalyticsConsentPage() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground/60">
-          {t.analytics.consentChangeable}
-        </p>
+        <p className="text-center text-xs text-muted-foreground">{t.analytics.consentChangeable}</p>
 
         <div className="flex gap-2.5">
           <button

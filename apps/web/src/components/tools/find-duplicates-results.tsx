@@ -266,7 +266,7 @@ export function FindDuplicatesResults() {
   if (!results) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-        <Search className="h-10 w-10 text-muted-foreground/50" />
+        <Search className="h-10 w-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           Choose a detection mode and click "Scan" to find duplicates.
         </p>

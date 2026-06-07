@@ -72,7 +72,7 @@ export function TransparencyFixerControls({
       <button
         type="button"
         onClick={() => setAdvancedOpen(!advancedOpen)}
-        className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground w-full pt-1"
+        className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
       >
         {advancedOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         Advanced
@@ -100,7 +100,7 @@ export function TransparencyFixerControls({
 
           {/* Output Format dropdown */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Output Format
             </p>
             <select

@@ -158,7 +158,7 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
           onChange={(e) => setDenoise(Number(e.target.value))}
           className="w-full mt-1"
         />
-        <p className="text-[11px] text-muted-foreground/70 mt-1">
+        <p className="text-[11px] text-muted-foreground mt-1">
           Smooths out grain and noise. Higher values remove more noise but may soften details.
         </p>
       </div>

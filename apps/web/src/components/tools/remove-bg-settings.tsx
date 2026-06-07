@@ -73,7 +73,7 @@ const GRADIENT_PRESETS = [
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );
@@ -425,7 +425,7 @@ export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgCont
       <button
         type="button"
         onClick={() => setEffectsOpen(!effectsOpen)}
-        className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground w-full pt-1"
+        className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
       >
         {effectsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         Effects

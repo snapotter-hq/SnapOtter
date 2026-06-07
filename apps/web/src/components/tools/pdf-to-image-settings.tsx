@@ -207,7 +207,7 @@ export function PdfToImageSettings() {
             className="w-full mt-1.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           />
         ) : (
-          <p className="text-xs text-muted-foreground/60 mt-1">{DPI_LABELS[store.dpi] ?? ""}</p>
+          <p className="text-xs text-muted-foreground mt-1">{DPI_LABELS[store.dpi] ?? ""}</p>
         )}
       </div>
 

@@ -92,7 +92,7 @@ export function EnhanceFacesControls({
           onChange={(e) => setStrength(Number(e.target.value))}
           className="w-full mt-1"
         />
-        <div className="flex justify-between text-[10px] text-muted-foreground/70 mt-0.5">
+        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
           <span>Subtle</span>
           <span>Maximum</span>
         </div>
@@ -110,7 +110,7 @@ export function EnhanceFacesControls({
             />
             <span className="text-sm text-foreground">Only enhance main face</span>
           </label>
-          <p className="text-[11px] text-muted-foreground/70 ms-6 mt-0.5">
+          <p className="text-[11px] text-muted-foreground ms-6 mt-0.5">
             For portraits - ignores background faces
           </p>
         </div>
@@ -133,7 +133,7 @@ export function EnhanceFacesControls({
           onChange={(e) => setSensitivity(Number(e.target.value))}
           className="w-full mt-1"
         />
-        <div className="flex justify-between text-[10px] text-muted-foreground/70 mt-0.5">
+        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
           <span>Fewer faces</span>
           <span>More faces</span>
         </div>

@@ -34,7 +34,7 @@ const ENHANCE_DEFAULTS: Record<OcrQuality, boolean> = {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-1">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-1">
       {children}
     </p>
   );
@@ -253,7 +253,7 @@ export function OcrSettings() {
         </span>
         <span
           title="Automatically deskews, enhances contrast, removes noise, and upscales the image before scanning for better accuracy."
-          className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground/60 text-[10px] cursor-help"
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground text-[10px] cursor-help"
         >
           <Info className="h-2.5 w-2.5" />
         </span>
@@ -264,7 +264,7 @@ export function OcrSettings() {
         <button
           type="button"
           onClick={() => setLangOpen(!langOpen)}
-          className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground w-full pt-1"
+          className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
         >
           {langOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Language

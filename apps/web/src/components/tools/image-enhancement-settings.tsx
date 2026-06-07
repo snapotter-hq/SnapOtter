@@ -285,7 +285,7 @@ export function ImageEnhancementControls({
       )}
 
       {/* Mode selector */}
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {t.toolSettings.imageEnhancement.enhancementMode}
       </p>
       <div className="grid grid-cols-3 gap-1">
@@ -309,7 +309,7 @@ export function ImageEnhancementControls({
       {/* Intensity slider */}
       <div className="pt-1">
         <div className="flex justify-between items-center">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {t.toolSettings.imageEnhancement.intensity}
           </p>
           <span className="text-xs font-mono text-foreground tabular-nums">{intensity}%</span>
@@ -360,7 +360,7 @@ export function ImageEnhancementControls({
 
       {analysis && !analyzing && (
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {t.toolSettings.imageEnhancement.detectedIssues}
           </p>
           {analysis.issues.length === 0 ? (
@@ -412,7 +412,7 @@ export function ImageEnhancementControls({
                     style={{ width: `${score}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-muted-foreground/60 w-10 shrink-0">{label}</span>
+                <span className="text-[10px] text-muted-foreground w-10 shrink-0">{label}</span>
               </div>
             ))}
           </div>
