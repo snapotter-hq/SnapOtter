@@ -184,7 +184,6 @@ export async function ensureDefaultAdmin(): Promise<void> {
 // ── Login attempt limit ──────────────────────────────────────────
 
 function getLoginAttemptLimit(): number {
-  if (env.RATE_LIMIT_PER_MIN > 1000) return env.RATE_LIMIT_PER_MIN;
   const row = db
     .select()
     .from(schema.settings)
