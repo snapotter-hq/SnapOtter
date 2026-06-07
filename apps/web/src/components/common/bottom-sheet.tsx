@@ -1,6 +1,7 @@
 import { useDrag } from "@use-gesture/react";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 
 interface BottomSheetProps {
   open: boolean;
@@ -17,6 +18,7 @@ export function BottomSheet({
   children,
   maxHeight = "70dvh",
 }: BottomSheetProps) {
+  const { t } = useTranslation();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [translateY, setTranslateY] = useState(0);
 
@@ -94,6 +96,7 @@ export function BottomSheet({
               type="button"
               onClick={handleDismiss}
               className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={t.common.close}
             >
               <X className="h-4 w-4" />
             </button>

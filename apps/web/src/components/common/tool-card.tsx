@@ -38,6 +38,7 @@ export function ToolCard({ tool }: ToolCardProps) {
         type="button"
         className="opacity-0 group-hover:opacity-100 transition-opacity absolute -left-5"
         title={t.toolCard.addToFavourites}
+        aria-label={t.toolCard.addToFavourites}
       >
         <Star className="h-3 w-3 text-muted-foreground hover:text-yellow-500" />
       </button>
@@ -58,10 +59,26 @@ export function ToolCard({ tool }: ToolCardProps) {
             {t.common.experimental}
           </span>
         )}
-        {aiStatus === "not_installed" && <Download className="h-3.5 w-3.5 text-muted-foreground" />}
-        {aiStatus === "queued" && <Clock className="h-3.5 w-3.5 text-muted-foreground" />}
+        {aiStatus === "not_installed" && (
+          <>
+            <Download className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">{t.a11y.notInstalled}</span>
+          </>
+        )}
+        {aiStatus === "queued" && (
+          <>
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">{t.a11y.queued}</span>
+          </>
+        )}
         {aiStatus === "installing" && (
-          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+          <>
+            <Loader2
+              className="h-3.5 w-3.5 text-muted-foreground animate-spin"
+              aria-hidden="true"
+            />
+            <span className="sr-only">{t.a11y.installing}</span>
+          </>
         )}
       </Link>
     </div>

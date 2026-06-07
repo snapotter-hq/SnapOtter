@@ -175,7 +175,7 @@ export function HtmlToImageSettings() {
         disabled={(store.mode === "url" ? !store.url : !store.htmlContent) || store.capturing}
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
       >
-        {store.capturing && <Loader2 className="h-4 w-4 animate-spin" />}
+        {store.capturing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {store.capturing ? ts.capturing : ts.submit}
       </button>
     </form>

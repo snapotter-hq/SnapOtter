@@ -133,7 +133,7 @@ export function InfoSettings() {
         disabled={!hasFile || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
+        {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing ? ts.reading : ts.readInfo}
       </button>
 

@@ -30,7 +30,7 @@ export function AppLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { locale, setLocale, supportedLocales } = useTranslation();
+  const { t, locale, setLocale, supportedLocales } = useTranslation();
   const isMobile = useMobile();
   const connectionStatus = useConnectionStore((s) => s.status);
   const bannerVisible = connectionStatus !== "connected";
@@ -70,6 +70,7 @@ export function AppLayout({
                 type="button"
                 onClick={() => setMobileSidebarOpen(false)}
                 className="p-2.5 rounded-lg hover:bg-muted"
+                aria-label={t.a11y.closeSidebar}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -118,6 +119,7 @@ export function AppLayout({
             type="button"
             onClick={() => setMobileSidebarOpen(true)}
             className="p-2.5 -ms-1 rounded-lg hover:bg-muted"
+            aria-label={t.a11y.openSidebar}
           >
             <Menu className="h-5 w-5" />
           </button>

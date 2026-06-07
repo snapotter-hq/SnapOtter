@@ -19,6 +19,7 @@ export function SearchBar({ value, onChange, placeholder }: SearchBarProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={resolvedPlaceholder}
+        aria-label={resolvedPlaceholder}
         className="w-full ps-10 pe-4 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
       />
     </div>

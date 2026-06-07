@@ -1,6 +1,7 @@
 import { useGesture } from "@use-gesture/react";
 import { FileImage, Maximize, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,7 @@ export function ImageViewer({
   imageWrapperStyle,
   imageWrapperChildren,
 }: ImageViewerProps) {
+  const { t } = useTranslation();
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
   const [naturalHeight, setNaturalHeight] = useState<number | null>(null);
@@ -203,6 +205,7 @@ export function ImageViewer({
           disabled={zoom <= ZOOM_STEPS[0]}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
           title="Zoom out"
+          aria-label={t.a11y.zoomOut}
         >
           <ZoomOut className="h-4 w-4" />
         </button>
@@ -215,6 +218,7 @@ export function ImageViewer({
           disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
           title="Zoom in"
+          aria-label={t.a11y.zoomIn}
         >
           <ZoomIn className="h-4 w-4" />
         </button>
@@ -224,6 +228,7 @@ export function ImageViewer({
           onClick={fitToContainer}
           className={`px-2 py-1 rounded text-xs ${fitMode === "fit" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
           title="Fit to view"
+          aria-label={t.a11y.fitToView}
         >
           <Maximize className="h-3.5 w-3.5" />
         </button>
@@ -232,6 +237,7 @@ export function ImageViewer({
           onClick={actualSize}
           className={`px-2 py-1 rounded text-xs ${fitMode === "actual" && zoom === 100 ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
           title="Actual size (100%)"
+          aria-label={t.a11y.actualSize}
         >
           <Minimize2 className="h-3.5 w-3.5" />
         </button>

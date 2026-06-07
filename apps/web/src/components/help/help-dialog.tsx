@@ -52,6 +52,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={t.a11y.closeHelp}
           >
             <X className="h-4 w-4" />
           </button>

@@ -299,7 +299,7 @@ function BundleCard({
               disabled
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium opacity-50"
             >
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               {t.settings.aiFeatures.installing}
             </button>
           )}

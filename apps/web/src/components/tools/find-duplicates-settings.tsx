@@ -309,7 +309,7 @@ export function FindDuplicatesSettings() {
             disabled={!hasFiles || scanning}
             className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {scanning && <Loader2 className="h-4 w-4 animate-spin" />}
+            {scanning && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {scanning
               ? uploadProgress < 100
                 ? `Uploading... ${uploadProgress}%`

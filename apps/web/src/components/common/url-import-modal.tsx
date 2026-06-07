@@ -190,7 +190,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                 >
                   {adding ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       {t.urlImport.adding}
                     </>
                   ) : (
@@ -215,7 +215,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                 >
                   {importing ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       {t.urlImport.adding}
                     </>
                   ) : (

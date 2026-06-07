@@ -156,6 +156,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             type="button"
             onClick={onClose}
             className="p-2.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={t.a11y.closeSettings}
           >
             <X className="h-5 w-5" />
           </button>
@@ -244,6 +245,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             type="button"
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={t.a11y.closeSettings}
           >
             <X className="h-4 w-4" />
           </button>
@@ -464,7 +466,7 @@ function GeneralSection() {
           disabled={saving}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
           {t.settings.general.saveButton}
         </button>
         {saveMsg && (
@@ -651,7 +653,7 @@ function SystemSection() {
           disabled={saving}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
           {t.settings.system.saveButton}
         </button>
         {saveMsg && (
@@ -803,7 +805,7 @@ function SecuritySection() {
             disabled={submitting}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
             {t.settings.security.changePasswordButton}
           </button>
         </div>
@@ -1188,7 +1190,7 @@ function PeopleSection() {
               disabled={adding || atLimit}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {adding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {adding && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
               {t.common.create}
             </button>
             <button
@@ -1440,6 +1442,7 @@ function PeopleSection() {
                   }}
                   className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   title="Actions"
+                  aria-label={t.common.actions}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>
@@ -1603,7 +1606,11 @@ function ApiKeysSection() {
           disabled={generating}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+          {generating ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Key className="h-4 w-4" aria-hidden="true" />
+          )}
           {t.settings.apiKeys.generateButton}
         </button>
       </div>
@@ -1678,6 +1685,7 @@ function ApiKeysSection() {
               onClick={() => copyKey(newKey)}
               className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
               title="Copy"
+              aria-label={t.common.copy}
             >
               {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             </button>
@@ -1718,6 +1726,7 @@ function ApiKeysSection() {
                 onClick={() => deleteKey(k.id)}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                 title="Delete key"
+                aria-label={t.a11y.deleteKey}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -1895,7 +1904,7 @@ function TeamsSection() {
               disabled={creating}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
               {t.common.create}
             </button>
             <button
@@ -2359,6 +2368,7 @@ function RolesSection() {
                       }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Edit role"
+                      aria-label={t.a11y.editRole}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -2367,6 +2377,7 @@ function RolesSection() {
                       onClick={() => handleDelete(role)}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                       title="Delete role"
+                      aria-label={t.a11y.deleteRole}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -2780,7 +2791,7 @@ function ToolsSection() {
           disabled={saving || loadFailed}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
           {t.settings.tools.saveButton}
         </button>
         <span className="text-xs text-muted-foreground">

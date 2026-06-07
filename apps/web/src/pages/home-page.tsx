@@ -141,11 +141,25 @@ export function HomePage() {
                     {getToolName(t, tool.id, tool.name)}
                   </span>
                   {status === "not_installed" && (
-                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                    <>
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <span className="sr-only">{t.a11y.notInstalled}</span>
+                    </>
                   )}
-                  {status === "queued" && <Clock className="h-3.5 w-3.5 text-muted-foreground" />}
+                  {status === "queued" && (
+                    <>
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <span className="sr-only">{t.a11y.queued}</span>
+                    </>
+                  )}
                   {status === "installing" && (
-                    <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+                    <>
+                      <Loader2
+                        className="h-3.5 w-3.5 text-muted-foreground animate-spin"
+                        aria-hidden="true"
+                      />
+                      <span className="sr-only">{t.a11y.installing}</span>
+                    </>
                   )}
                 </button>
               );
@@ -233,13 +247,31 @@ export function HomePage() {
                       {getToolName(t, tool.id, tool.name)}
                     </span>
                     {status === "not_installed" && (
-                      <Download className="h-3.5 w-3.5 text-muted-foreground ms-auto" />
+                      <>
+                        <Download
+                          className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">{t.a11y.notInstalled}</span>
+                      </>
                     )}
                     {status === "queued" && (
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground ms-auto" />
+                      <>
+                        <Clock
+                          className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">{t.a11y.queued}</span>
+                      </>
                     )}
                     {status === "installing" && (
-                      <Loader2 className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin" />
+                      <>
+                        <Loader2
+                          className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">{t.a11y.installing}</span>
+                      </>
                     )}
                   </button>
                 );
@@ -279,13 +311,31 @@ export function HomePage() {
                           <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="text-sm">{getToolName(t, tool.id, tool.name)}</span>
                           {status === "not_installed" && (
-                            <Download className="h-3.5 w-3.5 text-muted-foreground ms-auto" />
+                            <>
+                              <Download
+                                className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                                aria-hidden="true"
+                              />
+                              <span className="sr-only">{t.a11y.notInstalled}</span>
+                            </>
                           )}
                           {status === "queued" && (
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground ms-auto" />
+                            <>
+                              <Clock
+                                className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                                aria-hidden="true"
+                              />
+                              <span className="sr-only">{t.a11y.queued}</span>
+                            </>
                           )}
                           {status === "installing" && (
-                            <Loader2 className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin" />
+                            <>
+                              <Loader2
+                                className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin"
+                                aria-hidden="true"
+                              />
+                              <span className="sr-only">{t.a11y.installing}</span>
+                            </>
                           )}
                         </button>
                       );
