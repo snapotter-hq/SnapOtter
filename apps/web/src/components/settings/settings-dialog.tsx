@@ -445,6 +445,7 @@ function GeneralSection() {
         <select
           value={defaultToolView}
           onChange={(e) => setDefaultToolView(e.target.value)}
+          aria-label={t.settings.general.defaultToolViewLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
         >
           <option value="sidebar">{t.settings.general.sidebarOption}</option>
@@ -459,6 +460,7 @@ function GeneralSection() {
         <select
           value={locale}
           onChange={(e) => setLocale(e.target.value)}
+          aria-label={t.settings.system.languageLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
         >
           {supportedLocales.map((l) => (
@@ -572,6 +574,7 @@ function SystemSection() {
           type="number"
           value={settings.fileUploadLimitMb || "100"}
           onChange={(e) => updateSetting("fileUploadLimitMb", e.target.value)}
+          aria-label={t.settings.system.fileUploadLimitLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
         />
@@ -584,6 +587,7 @@ function SystemSection() {
         <select
           value={settings.defaultTheme || "system"}
           onChange={(e) => updateSetting("defaultTheme", e.target.value)}
+          aria-label={t.settings.system.defaultThemeLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
         >
           <option value="light">{t.settings.system.lightOption}</option>
@@ -599,6 +603,7 @@ function SystemSection() {
         <select
           value={settings.defaultLocale || "en"}
           onChange={(e) => updateSetting("defaultLocale", e.target.value)}
+          aria-label={t.settings.system.languageLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
         >
           {SUPPORTED_LOCALES.map((l) => (
@@ -617,6 +622,7 @@ function SystemSection() {
           type="number"
           value={settings.loginAttemptLimit || "5"}
           onChange={(e) => updateSetting("loginAttemptLimit", e.target.value)}
+          aria-label={t.settings.system.loginAttemptLimitLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
           max={100}
@@ -636,6 +642,7 @@ function SystemSection() {
           type="number"
           value={settings.tempFileMaxAgeHours || "24"}
           onChange={(e) => updateSetting("tempFileMaxAgeHours", e.target.value)}
+          aria-label={t.settings.fileManagement.maxAge}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
         />
@@ -646,6 +653,9 @@ function SystemSection() {
       >
         <button
           type="button"
+          role="switch"
+          aria-checked={settings.startupCleanup !== "false"}
+          aria-label={t.settings.fileManagement.startupCleanup}
           onClick={() =>
             updateSetting("startupCleanup", settings.startupCleanup === "false" ? "true" : "false")
           }
@@ -750,13 +760,19 @@ function SecuritySection() {
 
         <div className="space-y-3 max-w-sm">
           <div className="relative">
+            <label htmlFor="current-password" className="sr-only">
+              {t.settings.security.currentPasswordPlaceholder}
+            </label>
             <input
+              id="current-password"
               type={showCurrent ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder={t.settings.security.currentPasswordPlaceholder}
               className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
               required
+              aria-invalid={message?.type === "error" || undefined}
+              aria-describedby={message ? "password-change-error" : undefined}
             />
             <button
               type="button"
@@ -768,13 +784,19 @@ function SecuritySection() {
           </div>
 
           <div className="relative">
+            <label htmlFor="new-password" className="sr-only">
+              {t.settings.security.newPasswordPlaceholder}
+            </label>
             <input
+              id="new-password"
               type={showNew ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder={t.settings.security.newPasswordPlaceholder}
               className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
               required
+              aria-invalid={message?.type === "error" || undefined}
+              aria-describedby={message ? "password-change-error" : undefined}
             />
             <button
               type="button"
@@ -786,13 +808,19 @@ function SecuritySection() {
           </div>
 
           <div className="relative">
+            <label htmlFor="confirm-password" className="sr-only">
+              {t.settings.security.confirmPasswordPlaceholder}
+            </label>
             <input
+              id="confirm-password"
               type={showConfirm ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder={t.settings.security.confirmPasswordPlaceholder}
               className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
               required
+              aria-invalid={message?.type === "error" || undefined}
+              aria-describedby={message ? "password-change-error" : undefined}
             />
             <button
               type="button"
@@ -806,6 +834,8 @@ function SecuritySection() {
 
           {message && (
             <p
+              id="password-change-error"
+              role="alert"
               className={cn(
                 "text-sm",
                 message.type === "error"
@@ -1117,16 +1147,26 @@ function PeopleSection() {
             {t.settings.people.newMemberHeading}
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              type="text"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
-              placeholder={t.settings.people.usernamePlaceholder}
-              required
-              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
-            />
-            <div className="flex items-center gap-1.5">
+            <div>
+              <label htmlFor="new-user-username" className="sr-only">
+                {t.settings.people.usernamePlaceholder}
+              </label>
               <input
+                id="new-user-username"
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder={t.settings.people.usernamePlaceholder}
+                required
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="new-user-password" className="sr-only">
+                {t.auth.password}
+              </label>
+              <input
+                id="new-user-password"
                 type={showGeneratedPw ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => {
@@ -1242,7 +1282,11 @@ function PeopleSection() {
               {t.settings.people.copyPasswordWarning}
             </p>
           )}
-          {addError && <p className="text-sm text-destructive">{addError}</p>}
+          {addError && (
+            <p role="alert" className="text-sm text-destructive">
+              {addError}
+            </p>
+          )}
         </form>
       )}
 
@@ -1615,6 +1659,7 @@ function ApiKeysSection() {
           value={keyName}
           onChange={(e) => setKeyName(e.target.value)}
           placeholder={t.settings.apiKeys.keyNamePlaceholder}
+          aria-label={t.settings.apiKeys.keyNamePlaceholder}
           className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-48"
         />
         <button
@@ -2853,6 +2898,9 @@ function AnalyticsSection() {
           </span>
           <button
             type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label={t.analytics.settingsTitle}
             onClick={() => toggleAnalytics(!enabled)}
             className={cn(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",

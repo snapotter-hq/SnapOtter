@@ -329,6 +329,9 @@ export function VectorizeSettings() {
         <span className="text-xs text-muted-foreground">Invert Colors</span>
         <button
           type="button"
+          role="switch"
+          aria-checked={invert}
+          aria-label={t.toolSettings.vectorize.invertColors}
           onClick={() => updateSetting(setInvert)(!invert)}
           className={`w-9 h-5 rounded-full transition-colors ${invert ? "bg-primary" : "bg-muted"}`}
         >
