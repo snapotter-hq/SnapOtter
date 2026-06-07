@@ -811,9 +811,9 @@ export function ToolPage() {
             <div className="p-2 rounded-lg bg-primary text-primary-foreground">
               <IconComponent className="h-5 w-5" />
             </div>
-            <h2 className="font-semibold text-lg text-foreground flex-1">
+            <h1 className="font-semibold text-lg text-foreground flex-1">
               {getToolName(t, tool.id, tool.name)}
-            </h2>
+            </h1>
             <button
               type="button"
               onClick={() => setMobileSettingsOpen(!mobileSettingsOpen)}
@@ -869,9 +869,9 @@ export function ToolPage() {
             <div className="p-2 rounded-lg bg-primary text-primary-foreground">
               <IconComponent className="h-5 w-5" />
             </div>
-            <h2 className="font-semibold text-lg text-foreground">
+            <h1 className="font-semibold text-lg text-foreground">
               {getToolName(t, tool.id, tool.name)}
-            </h2>
+            </h1>
           </div>
 
           {renderSettingsContent()}

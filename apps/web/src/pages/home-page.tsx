@@ -99,6 +99,7 @@ export function HomePage() {
   if (isMobile && hasFile) {
     return (
       <AppLayout showToolPanel={false} onFiles={handleFiles}>
+        <h1 className="sr-only">{t.nav.tools}</h1>
         <div className="flex flex-col h-full w-full">
           {/* File info bar */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
@@ -196,6 +197,7 @@ export function HomePage() {
   // File uploaded — desktop: tool selector on left, image preview on right
   return (
     <AppLayout showToolPanel={false} onFiles={handleFiles}>
+      <h1 className="sr-only">{t.nav.tools}</h1>
       <div className="flex h-full w-full">
         {/* Left panel: Tool selector */}
         <div className="w-64 lg:w-80 border-r border-border overflow-y-auto shrink-0">

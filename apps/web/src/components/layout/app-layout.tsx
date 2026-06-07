@@ -134,7 +134,10 @@ export function AppLayout({
 
       {showToolPanel && !isMobile && <ToolPanel />}
 
-      <main className={cn("flex-1 flex flex-col overflow-hidden", isMobile && "pt-12 pb-20")}>
+      <main
+        id="main-content"
+        className={cn("flex-1 flex flex-col overflow-hidden", isMobile && "pt-12 pb-20")}
+      >
         <div className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
           {children || <Dropzone onFiles={onFiles} onUrlImport={onUrlImport} accept="image/*" />}
         </div>

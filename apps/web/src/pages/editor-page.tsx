@@ -151,6 +151,7 @@ export function EditorPage() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
+      <h1 className="sr-only">{t.editor.welcome.heading}</h1>
       <EditorMenuBar
         onNewDocument={() => setShowNewDocument(true)}
         onOpenImage={handleOpenImage}

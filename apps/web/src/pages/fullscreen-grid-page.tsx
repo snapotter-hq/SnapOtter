@@ -138,6 +138,7 @@ export function FullscreenGridPage() {
 
       {/* Grid */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <h1 className="sr-only">{t.nav.tools}</h1>
         {activeCategories.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <Search className="h-12 w-12 mx-auto mb-4 opacity-30" />
