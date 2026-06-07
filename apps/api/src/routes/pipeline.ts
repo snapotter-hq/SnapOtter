@@ -19,6 +19,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { autoOrient } from "../lib/auto-orient.js";
+import { getSecurityHeaders } from "../lib/csp.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
@@ -91,7 +92,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         } else if (part.fieldname === "pipeline") {
           pipelineRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -476,7 +480,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         } else if (part.fieldname === "pipeline") {
           pipelineRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -732,6 +739,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       "Transfer-Encoding": "chunked",
       "X-Job-Id": jobId,
       "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
+      ...getSecurityHeaders(),
     });
 
     const archive = archiver("zip", { zlib: { level: 5 } });

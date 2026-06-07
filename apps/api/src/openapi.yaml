@@ -59,6 +59,31 @@ components:
       scheme: bearer
       description: Session token from login or API key (prefixed with si_)
 
+  responses:
+    RateLimited:
+      description: Too many requests. The client has exceeded the rate limit.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit window resets
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests per time window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in current window
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Rate limit exceeded
+
   schemas:
     Error:
       type: object

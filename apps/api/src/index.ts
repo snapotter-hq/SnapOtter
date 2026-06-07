@@ -137,8 +137,10 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, b
   try {
     const str = typeof body === "string" ? body : (body as Buffer).toString();
     done(null, str.length > 0 ? JSON.parse(str) : {});
-  } catch (err) {
-    done(err as Error, undefined);
+  } catch {
+    const parseErr = new Error("Malformed JSON in request body") as Error & { statusCode: number };
+    parseErr.statusCode = 400;
+    done(parseErr, undefined);
   }
 });
 
@@ -186,6 +188,13 @@ await app.register(rateLimit, {
   max: env.RATE_LIMIT_PER_MIN,
   timeWindow: "1 minute",
   allowList: (request) => !request.url.startsWith("/api/"),
+});
+
+// Block TRACE method (returns 401 instead of 405 without this)
+app.addHook("onRequest", async (request, reply) => {
+  if (request.method === "TRACE") {
+    return reply.status(405).send({ error: "Method not allowed" });
+  }
 });
 
 // Multipart upload support

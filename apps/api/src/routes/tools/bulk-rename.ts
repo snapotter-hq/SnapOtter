@@ -3,6 +3,7 @@ import { extname } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 
@@ -72,6 +73,7 @@ export function registerBulkRename(app: FastifyInstance) {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="renamed-${jobId.slice(0, 8)}.zip"`,
         "Transfer-Encoding": "chunked",
+        ...getSecurityHeaders(),
       });
 
       const archive = archiver("zip", { zlib: { level: 5 } });

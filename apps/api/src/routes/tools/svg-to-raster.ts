@@ -7,6 +7,7 @@ import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { getSecurityHeaders } from "../../lib/csp.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -129,7 +130,10 @@ export function registerSvgToRaster(app: FastifyInstance) {
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {
@@ -321,6 +325,7 @@ export function registerSvgToRaster(app: FastifyInstance) {
       "Transfer-Encoding": "chunked",
       "X-Job-Id": jobId,
       "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
+      ...getSecurityHeaders(),
     });
 
     const archive = archiver("zip", { zlib: { level: 5 } });

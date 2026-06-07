@@ -57,7 +57,10 @@ export function registerOcr(app: FastifyInstance) {
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
-          clientJobId = part.value as string;
+          const raw = part.value as string;
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+            clientJobId = raw;
+          }
         }
       }
     } catch (err) {

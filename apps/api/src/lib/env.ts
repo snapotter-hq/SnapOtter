@@ -44,9 +44,9 @@ const envSchema = z
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     MAX_WORKER_THREADS: z.coerce.number().default(0),
     PROCESSING_TIMEOUT_S: z.coerce.number().default(0),
-    MAX_PIPELINE_STEPS: z.coerce.number().default(0),
+    MAX_PIPELINE_STEPS: z.coerce.number().default(20),
     MAX_CANVAS_PIXELS: z.coerce.number().default(0),
-    MAX_SVG_SIZE_MB: z.coerce.number().default(0),
+    MAX_SVG_SIZE_MB: z.coerce.number().default(50),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),
@@ -55,7 +55,7 @@ const envSchema = z
     LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(30),
     TRUST_PROXY: z
       .enum(["true", "false"])
-      .default("true")
+      .default("false")
       .transform((v) => v === "true"),
     OIDC_ENABLED: z
       .enum(["true", "false"])

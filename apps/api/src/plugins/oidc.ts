@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as oidc from "openid-client";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { auditLog } from "../lib/audit.js";
+import { auditLog, sanitizeAuditInput } from "../lib/audit.js";
 import { createSessionToken } from "./auth.js";
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -229,7 +229,9 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         { error: query.error, description: query.error_description },
         "OIDC IdP returned error",
       );
-      auditLog(request.log, "OIDC_LOGIN_FAILED", { reason: query.error });
+      auditLog(request.log, "OIDC_LOGIN_FAILED", {
+        reason: sanitizeAuditInput(String(query.error)),
+      });
       return redirectToLogin(reply, "oidc_auth_failed");
     }
 
@@ -370,7 +372,10 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
     // 4d. No user found and no auto-create
     if (!userId) {
       request.log.warn({ sub, email }, "OIDC user not authorized");
-      auditLog(request.log, "OIDC_LOGIN_FAILED", { reason: "user_not_authorized", sub });
+      auditLog(request.log, "OIDC_LOGIN_FAILED", {
+        reason: "user_not_authorized",
+        sub: sanitizeAuditInput(String(sub)),
+      });
       return redirectToLogin(reply, "oidc_user_not_authorized");
     }
 

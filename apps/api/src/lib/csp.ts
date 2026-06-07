@@ -25,3 +25,15 @@ export function buildCsp(isDocs: boolean): string {
 
   return `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://tile.openstreetmap.org; connect-src ${connectSrc}; font-src ${fontSrc}; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`;
 }
+
+export function getSecurityHeaders(): Record<string, string> {
+  return {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "0",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": buildCsp(false),
+  };
+}

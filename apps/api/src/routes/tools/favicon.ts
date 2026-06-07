@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -146,6 +147,7 @@ export function registerFavicon(app: FastifyInstance) {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="favicons-${jobId.slice(0, 8)}.zip"`,
         "Transfer-Encoding": "chunked",
+        ...getSecurityHeaders(),
       });
 
       const archive = archiver("zip", { zlib: { level: 5 } });

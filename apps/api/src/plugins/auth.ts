@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { auditLog } from "../lib/audit.js";
+import { auditLog, sanitizeAuditInput } from "../lib/audit.js";
 import { getPermissions, requirePermission } from "../permissions.js";
 
 const scryptAsync = promisify(scrypt);
@@ -221,13 +221,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .get();
 
       if (!user || !user.passwordHash) {
-        auditLog(request.log, "LOGIN_FAILED", { username: body.username, reason: "unknown_user" });
+        auditLog(request.log, "LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "unknown_user",
+        });
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
       const valid = await verifyPassword(body.password, user.passwordHash);
       if (!valid) {
-        auditLog(request.log, "LOGIN_FAILED", { username: body.username, reason: "bad_password" });
+        auditLog(request.log, "LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "bad_password",
+        });
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 

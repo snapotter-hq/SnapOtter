@@ -11,6 +11,7 @@
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
+import { getSecurityHeaders } from "../lib/csp.js";
 
 export interface JobProgress {
   jobId: string;
@@ -230,6 +231,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
+        ...getSecurityHeaders(),
       });
 
       // Helper to send an SSE message

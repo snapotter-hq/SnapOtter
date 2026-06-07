@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
 
+const MAX_AUDIT_INPUT_LENGTH = 200;
+
+export function sanitizeAuditInput(raw: string): string {
+  return raw.replace(/[<>&"']/g, "").slice(0, MAX_AUDIT_INPUT_LENGTH) || "(empty)";
+}
+
 type AuditEvent =
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILED"
