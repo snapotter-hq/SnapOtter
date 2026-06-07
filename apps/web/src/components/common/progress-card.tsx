@@ -22,7 +22,11 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
   const sublabel = [stage, `${elapsed}s`].filter(Boolean).join(" · ");
 
   return (
-    <div className="bg-muted/80 border border-border rounded-xl p-3 space-y-2.5">
+    <div
+      role="status"
+      aria-live="polite"
+      className="bg-muted/80 border border-border rounded-xl p-3 space-y-2.5"
+    >
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           {icon}

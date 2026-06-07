@@ -27,6 +27,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useMobile } from "@/hooks/use-mobile";
 import { formatFileSize } from "@/lib/download";
+import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { getToolName } from "@/lib/tool-i18n";
 import { getToolRegistryEntry } from "@/lib/tool-registry";
@@ -202,6 +203,13 @@ export function ToolPage() {
   const hasMultiple = entries.length > 1;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < entries.length - 1;
+
+  const liveMessage = useMemo(() => {
+    if (!currentEntry) return "";
+    if (currentEntry.status === "completed" && processedUrl) return t.a11y.processingComplete;
+    if (currentEntry.status === "failed") return t.a11y.processingFailed;
+    return "";
+  }, [currentEntry, processedUrl, t.a11y.processingComplete, t.a11y.processingFailed]);
 
   const handleImageKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -722,7 +730,14 @@ export function ToolPage() {
           </button>
         )}
         {hasMultiple && (
-          <div className="absolute top-3 right-3 z-10 bg-background/80 border border-border px-2 py-0.5 rounded-full text-xs text-muted-foreground tabular-nums">
+          <div
+            role="status"
+            aria-label={format(t.a11y.imageNOfTotal, {
+              n: selectedIndex + 1,
+              total: entries.length,
+            })}
+            className="absolute top-3 right-3 z-10 bg-background/80 border border-border px-2 py-0.5 rounded-full text-xs text-muted-foreground tabular-nums"
+          >
             {selectedIndex + 1} / {entries.length}
           </div>
         )}
@@ -815,6 +830,9 @@ export function ToolPage() {
             onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
             tabIndex={hasMultiple ? 0 : undefined}
           >
+            <div aria-live="polite" aria-atomic="true" className="sr-only">
+              {liveMessage}
+            </div>
             <div className="flex-1 relative flex items-center justify-center p-4 min-h-0 min-w-0">
               {renderNavArrows()}
               {renderImageArea()}
@@ -866,6 +884,9 @@ export function ToolPage() {
           onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
           tabIndex={hasMultiple ? 0 : undefined}
         >
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {liveMessage}
+          </div>
           <div className="flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0">
             {renderNavArrows()}
             {renderImageArea()}
