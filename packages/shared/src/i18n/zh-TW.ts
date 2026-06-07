@@ -860,6 +860,8 @@ export const zhTW: TranslationKeys = {
       submit: "加入文字",
       submitBatch: "加入文字（{count}個檔案）",
       progressLabel: "正在加入文字覆疊",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "上傳覆疊影像",
@@ -901,6 +903,13 @@ export const zhTW: TranslationKeys = {
       hasExif: "有EXIF",
       hasIcc: "有ICC",
       hasXmp: "有XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "上傳第二張影像",

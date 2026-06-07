@@ -281,9 +281,9 @@ describe("toolRegistry (expanded)", () => {
       expect(entry?.displayMode).toBe("no-comparison");
     });
 
-    it("info uses before-after display", () => {
+    it("info uses no-comparison display", () => {
       const entry = getToolRegistryEntry("info");
-      expect(entry?.displayMode).toBe("before-after");
+      expect(entry?.displayMode).toBe("no-comparison");
     });
 
     it("compare uses before-after display", () => {
@@ -291,9 +291,9 @@ describe("toolRegistry (expanded)", () => {
       expect(entry?.displayMode).toBe("before-after");
     });
 
-    it("color-palette uses before-after display", () => {
+    it("color-palette uses no-comparison display", () => {
       const entry = getToolRegistryEntry("color-palette");
-      expect(entry?.displayMode).toBe("before-after");
+      expect(entry?.displayMode).toBe("no-comparison");
     });
 
     it("barcode-read uses before-after display", () => {

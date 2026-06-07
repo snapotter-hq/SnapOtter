@@ -913,6 +913,8 @@ export const es: TranslationKeys = {
       submit: "Agregar texto",
       submitBatch: "Agregar texto ({count} archivos)",
       progressLabel: "Agregando texto superpuesto",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Subir imagen de superposicion",
@@ -955,6 +957,13 @@ export const es: TranslationKeys = {
       hasExif: "Tiene EXIF",
       hasIcc: "Tiene ICC",
       hasXmp: "Tiene XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Subir segunda imagen",

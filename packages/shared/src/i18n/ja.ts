@@ -884,6 +884,8 @@ export const ja: TranslationKeys = {
       submit: "テキスト追加",
       submitBatch: "テキスト追加（{count}ファイル）",
       progressLabel: "テキストオーバーレイを追加中",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "オーバーレイ画像をアップロード",
@@ -926,6 +928,13 @@ export const ja: TranslationKeys = {
       hasExif: "EXIF",
       hasIcc: "ICC",
       hasXmp: "XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "2枚目の画像をアップロード",

@@ -862,6 +862,8 @@ export const zhCN: TranslationKeys = {
       submit: "添加文字",
       submitBatch: "添加文字（{count} 个文件）",
       progressLabel: "正在添加文字叠加",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "上传叠加图片",
@@ -903,6 +905,13 @@ export const zhCN: TranslationKeys = {
       hasExif: "含 EXIF",
       hasIcc: "含 ICC",
       hasXmp: "含 XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "上传第二张图片",

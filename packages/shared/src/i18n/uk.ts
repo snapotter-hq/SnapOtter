@@ -928,6 +928,8 @@ export const uk: TranslationKeys = {
       submit: "Додати текст",
       submitBatch: "Додати текст ({count} файлів)",
       progressLabel: "Додавання тексту",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Завантажити зображення для накладання",
@@ -969,6 +971,13 @@ export const uk: TranslationKeys = {
       hasExif: "EXIF",
       hasIcc: "ICC",
       hasXmp: "XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Завантажити друге зображення",

@@ -6,6 +6,7 @@ import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 export function ColorPaletteSettings() {
   const { t } = useTranslation();
+  const ts = t.toolSettings["color-palette"];
   const { files, processing, error, setProcessing, setError } = useFileStore();
   const [colors, setColors] = useState<string[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -35,7 +36,7 @@ export function ColorPaletteSettings() {
       const data = await res.json();
       setColors(data.colors);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed");
+      setError(err instanceof Error ? err.message : ts.extracting);
     } finally {
       setProcessing(false);
     }
@@ -61,7 +62,7 @@ export function ColorPaletteSettings() {
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {processing ? "Extracting..." : "Extract Colors"}
+        {processing ? ts.extracting : ts.submit}
       </button>
 
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -69,7 +70,7 @@ export function ColorPaletteSettings() {
       {colors.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">
-            Dominant Colors ({colors.length})
+            {ts.dominantColors} ({colors.length})
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {colors.map((color, i) => (

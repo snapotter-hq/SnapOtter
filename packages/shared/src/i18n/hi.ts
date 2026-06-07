@@ -915,6 +915,8 @@ export const hi: TranslationKeys = {
       submit: "टेक्स्ट जोड़ें",
       submitBatch: "टेक्स्ट जोड़ें ({count} फाइलें)",
       progressLabel: "टेक्स्ट ओवरले जोड़ा जा रहा है",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "ओवरले इमेज अपलोड करें",
@@ -956,6 +958,13 @@ export const hi: TranslationKeys = {
       hasExif: "EXIF डेटा",
       hasIcc: "ICC डेटा",
       hasXmp: "XMP डेटा",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "दूसरी इमेज अपलोड करें",

@@ -159,14 +159,22 @@ async function processMeme(
       .composite([{ input: svgBuffer }])
       .toBuffer();
   } else {
-    // No text -- just pass the image through
     result = await sharp(imageBuffer).toBuffer();
   }
+
+  const outputMeta = await sharp(result).metadata();
+  const detectedFormat = outputMeta.format ?? "png";
+  const mimeMap: Record<string, string> = {
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+  };
 
   return {
     buffer: result,
     filename,
-    contentType: "image/png",
+    contentType: mimeMap[detectedFormat] ?? "image/png",
   };
 }
 

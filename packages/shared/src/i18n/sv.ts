@@ -925,6 +925,8 @@ export const sv: TranslationKeys = {
       submit: "Lagg till text",
       submitBatch: "Lagg till text ({count} filer)",
       progressLabel: "Lagger till textoverlay",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Ladda upp overlagringsbild",
@@ -966,6 +968,13 @@ export const sv: TranslationKeys = {
       hasExif: "Har EXIF",
       hasIcc: "Har ICC",
       hasXmp: "Har XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Ladda upp andra bilden",

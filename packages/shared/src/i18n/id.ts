@@ -927,6 +927,8 @@ export const id: TranslationKeys = {
       submit: "Tambah Teks",
       submitBatch: "Tambah Teks ({count} file)",
       progressLabel: "Menambahkan overlay teks",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Unggah Gambar Overlay",
@@ -968,6 +970,13 @@ export const id: TranslationKeys = {
       hasExif: "Memiliki EXIF",
       hasIcc: "Memiliki ICC",
       hasXmp: "Memiliki XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Unggah Gambar Kedua",

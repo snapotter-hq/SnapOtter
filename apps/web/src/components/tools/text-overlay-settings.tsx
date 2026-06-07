@@ -15,7 +15,9 @@ export function TextOverlayControls({
   settings: initialSettings,
   onChange,
 }: TextOverlayControlsProps) {
-  const [text, setText] = useState("Your Text Here");
+  const { t } = useTranslation();
+  const ts = t.toolSettings["text-overlay"];
+  const [text, setText] = useState(ts.defaultText);
   const [fontSize, setFontSize] = useState(48);
   const [color, setColor] = useState("#FFFFFF");
   const [position, setPosition] = useState<"top" | "center" | "bottom">("bottom");
@@ -60,7 +62,7 @@ export function TextOverlayControls({
     <div className="space-y-4">
       <div>
         <label htmlFor="text-overlay-text" className="text-xs text-muted-foreground">
-          Text
+          {ts.text}
         </label>
         <input
           id="text-overlay-text"
@@ -74,7 +76,7 @@ export function TextOverlayControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="text-overlay-font-size" className="text-xs text-muted-foreground">
-            Font Size
+            {ts.fontSize}
           </label>
           <span className="text-xs font-mono text-foreground">{fontSize}px</span>
         </div>
@@ -91,7 +93,7 @@ export function TextOverlayControls({
 
       <div>
         <label htmlFor="text-overlay-color" className="text-xs text-muted-foreground">
-          Text Color
+          {ts.color}
         </label>
         <input
           id="text-overlay-color"
@@ -104,7 +106,7 @@ export function TextOverlayControls({
 
       <div>
         <label htmlFor="text-overlay-position" className="text-xs text-muted-foreground">
-          Position
+          {ts.position}
         </label>
         <select
           id="text-overlay-position"
@@ -112,9 +114,9 @@ export function TextOverlayControls({
           onChange={(e) => setPosition(e.target.value as "top" | "center" | "bottom")}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="top">Top</option>
-          <option value="center">Center</option>
-          <option value="bottom">Bottom</option>
+          <option value="top">{ts.top}</option>
+          <option value="center">{ts.center}</option>
+          <option value="bottom">{ts.bottom}</option>
         </select>
       </div>
 
@@ -125,7 +127,7 @@ export function TextOverlayControls({
           onChange={(e) => setShadow(e.target.checked)}
           className="rounded"
         />
-        Drop Shadow
+        {ts.shadow}
       </label>
 
       <label className="flex items-center gap-2 text-sm text-foreground">
@@ -135,13 +137,13 @@ export function TextOverlayControls({
           onChange={(e) => setBackgroundBox(e.target.checked)}
           className="rounded"
         />
-        Background Box
+        {ts.backgroundBox}
       </label>
 
       {backgroundBox && (
         <div>
           <label htmlFor="text-overlay-box-color" className="text-xs text-muted-foreground">
-            Box Color
+            {ts.backgroundColor}
           </label>
           <input
             id="text-overlay-box-color"
@@ -158,6 +160,7 @@ export function TextOverlayControls({
 
 export function TextOverlaySettings() {
   const { t } = useTranslation();
+  const ts = t.toolSettings["text-overlay"];
   const { files } = useFileStore();
   const {
     processFiles,
@@ -199,7 +202,7 @@ export function TextOverlaySettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Adding text"
+          label={ts.progressLabel}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -212,7 +215,7 @@ export function TextOverlaySettings() {
           disabled={!hasFile || processing || !settings.text}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `Apply Overlay (${files.length} files)` : "Apply Overlay"}
+          {files.length > 1 ? format(ts.submitBatch, { count: files.length }) : ts.submit}
         </button>
       )}
 
@@ -224,7 +227,7 @@ export function TextOverlaySettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {ts.download}
         </a>
       )}
     </div>

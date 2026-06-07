@@ -929,6 +929,8 @@ export const tr: TranslationKeys = {
       submit: "Metin Ekle",
       submitBatch: "Metin Ekle ({count} dosya)",
       progressLabel: "Metin kaplaması ekleniyor",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Kaplama Görüntüsü Yükle",
@@ -970,6 +972,13 @@ export const tr: TranslationKeys = {
       hasExif: "EXIF Verisi",
       hasIcc: "ICC Verisi",
       hasXmp: "XMP Verisi",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "İkinci Görüntüyü Yükle",

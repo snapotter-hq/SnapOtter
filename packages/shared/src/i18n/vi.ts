@@ -927,6 +927,8 @@ export const vi: TranslationKeys = {
       submit: "Thêm văn bản",
       submitBatch: "Thêm văn bản ({count} tệp)",
       progressLabel: "Đang thêm lớp phủ văn bản",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Tải lên ảnh lớp phủ",
@@ -968,6 +970,13 @@ export const vi: TranslationKeys = {
       hasExif: "Có EXIF",
       hasIcc: "Có ICC",
       hasXmp: "Có XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Tải lên ảnh thứ hai",

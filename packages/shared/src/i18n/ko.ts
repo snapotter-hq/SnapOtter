@@ -870,6 +870,8 @@ export const ko: TranslationKeys = {
       submit: "텍스트 추가",
       submitBatch: "텍스트 추가 ({count}개 파일)",
       progressLabel: "텍스트 오버레이 추가 중",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "오버레이 이미지 업로드",
@@ -911,6 +913,13 @@ export const ko: TranslationKeys = {
       hasExif: "EXIF",
       hasIcc: "ICC",
       hasXmp: "XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "두 번째 이미지 업로드",

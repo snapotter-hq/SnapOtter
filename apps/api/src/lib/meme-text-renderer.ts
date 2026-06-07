@@ -39,8 +39,8 @@ const FONT_DIR = join(import.meta.dirname, "../../static/fonts");
 
 const FONT_MAP: Record<string, string> = {
   anton: "Anton-Regular.ttf",
-  "arial-black": "Anton-Regular.ttf",
-  "comic-sans": "Anton-Regular.ttf",
+  "arial-black": "ArchivoBlack-Regular.ttf",
+  "comic-sans": "ComicNeue-Bold.ttf",
   montserrat: "Montserrat-Black.ttf",
   "bebas-neue": "BebasNeue-Regular.ttf",
   "permanent-marker": "PermanentMarker-Regular.ttf",

@@ -931,6 +931,8 @@ export const de: TranslationKeys = {
       submit: "Text hinzufuegen",
       submitBatch: "Text hinzufuegen ({count} Dateien)",
       progressLabel: "Textueberlagerung wird hinzugefuegt",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Overlay-Bild hochladen",
@@ -973,6 +975,13 @@ export const de: TranslationKeys = {
       hasExif: "Hat EXIF",
       hasIcc: "Hat ICC",
       hasXmp: "Hat XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Zweites Bild hochladen",

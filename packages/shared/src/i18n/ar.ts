@@ -919,6 +919,8 @@ export const ar: TranslationKeys = {
       submit: "إضافة نص",
       submitBatch: "إضافة نص ({count} ملف)",
       progressLabel: "جاري إضافة النص",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "رفع صورة التراكب",
@@ -960,6 +962,13 @@ export const ar: TranslationKeys = {
       hasExif: "بيانات EXIF",
       hasIcc: "بيانات ICC",
       hasXmp: "بيانات XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "رفع الصورة الثانية",

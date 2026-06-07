@@ -68,3 +68,4 @@ scripts/setup-cloudflare-email.sh
 apps/videos
 remotion/
 demo
+pentest-results/

@@ -929,6 +929,8 @@ export const nl: TranslationKeys = {
       submit: "Tekst toevoegen",
       submitBatch: "Tekst toevoegen ({count} bestanden)",
       progressLabel: "Tekstoverlay toevoegen",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Overlay-afbeelding uploaden",
@@ -970,6 +972,13 @@ export const nl: TranslationKeys = {
       hasExif: "Heeft EXIF",
       hasIcc: "Heeft ICC",
       hasXmp: "Heeft XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Tweede afbeelding uploaden",

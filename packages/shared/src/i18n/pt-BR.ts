@@ -926,6 +926,8 @@ export const ptBR: TranslationKeys = {
       submit: "Adicionar texto",
       submitBatch: "Adicionar texto ({count} arquivos)",
       progressLabel: "Adicionando texto sobreposto",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "Enviar imagem de sobreposicao",
@@ -967,6 +969,13 @@ export const ptBR: TranslationKeys = {
       hasExif: "Tem EXIF",
       hasIcc: "Tem ICC",
       hasXmp: "Tem XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "Enviar segunda imagem",

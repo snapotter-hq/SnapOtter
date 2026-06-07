@@ -417,7 +417,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
   ],
 
   // Utilities
-  ["info", { displayMode: "before-after", Settings: InfoSettings }],
+  ["info", { displayMode: "no-comparison", Settings: InfoSettings }],
   ["compare", { displayMode: "before-after", Settings: CompareSettings }],
   [
     "find-duplicates",
@@ -427,7 +427,7 @@ export const toolRegistry = new Map<string, ToolRegistryEntry>([
       ResultsPanel: FindDuplicatesResults,
     },
   ],
-  ["color-palette", { displayMode: "before-after", Settings: ColorPaletteSettings }],
+  ["color-palette", { displayMode: "no-comparison", Settings: ColorPaletteSettings }],
   [
     "qr-generate",
     { displayMode: "no-dropzone", Settings: QrGenerateSettings, ResultsPanel: QrGeneratePreview },

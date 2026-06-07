@@ -908,6 +908,8 @@ export const th: TranslationKeys = {
       submit: "เพิ่มข้อความ",
       submitBatch: "เพิ่มข้อความ ({count} ไฟล์)",
       progressLabel: "กำลังเพิ่มข้อความซ้อนทับ",
+      download: "Download",
+      defaultText: "Your Text Here",
     },
     compose: {
       uploadOverlay: "อัปโหลดภาพซ้อนทับ",
@@ -949,6 +951,13 @@ export const th: TranslationKeys = {
       hasExif: "มี EXIF",
       hasIcc: "มี ICC",
       hasXmp: "มี XMP",
+      readInfo: "Read Info",
+      reading: "Reading...",
+      channelStats: "Channel Stats",
+      yes: "Yes",
+      no: "No",
+      na: "N/A",
+      failedToRead: "Failed to read info",
     },
     compare: {
       uploadSecondImage: "อัปโหลดภาพที่สอง",
