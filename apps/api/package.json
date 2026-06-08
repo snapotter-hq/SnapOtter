@@ -52,7 +52,7 @@
     "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.19.19",
+    "@types/node": "^22.19.20",
     "@types/opentype.js": "^1.3.10",
     "@types/pdfkit": "^0.17.6",
     "@types/potrace": "^2.1.5",
