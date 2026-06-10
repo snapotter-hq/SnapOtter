@@ -16,7 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
-      contents: read
+      # The action writes signatures/cla.json to the cla-signatures branch;
+      # read-only contents made it fail with "Resource not accessible".
+      contents: write
       pull-requests: write
       statuses: write
     steps:
