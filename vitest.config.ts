@@ -59,6 +59,15 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
+      // Ratchet: measured 2026-06-10 at lines 77.7 / branches 83.7 /
+      // functions 86.5 over unit+integration. Raise when coverage rises;
+      // never lower without a written reason.
+      thresholds: {
+        lines: 75,
+        branches: 81,
+        functions: 84,
+        statements: 75,
+      },
       include: [
         "packages/image-engine/src/**",
         "apps/api/src/**",
