@@ -3,8 +3,8 @@ import { defineConfig } from "drizzle-kit";
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DB_PATH || "./data/snapotter.db",
+    url: process.env.DATABASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter",
   },
 });

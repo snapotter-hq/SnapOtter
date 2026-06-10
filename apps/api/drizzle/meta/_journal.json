@@ -1,96 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1774119039901,
-      "tag": "0000_clammy_madelyne_pryor",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1774125684700,
-      "tag": "0001_amusing_omega_red",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1774357742003,
-      "tag": "0002_pale_silver_sable",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1774598000000,
-      "tag": "0003_add_team_to_users",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1774372393588,
-      "tag": "0004_married_forgotten_one",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1774700000000,
-      "tag": "0005_add_teams_table",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1745366400000,
-      "tag": "0006_rbac_revamp",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1745366500000,
-      "tag": "0007_custom_roles",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1745366600000,
-      "tag": "0008_api_key_expiration",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1776855591000,
-      "tag": "0009_analytics_consent",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1778300000000,
-      "tag": "0010_remove_branding",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1778669228893,
-      "tag": "0011_whole_karen_page",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "6",
-      "when": 1778669300000,
-      "tag": "0012_make_password_hash_nullable",
+      "version": "7",
+      "when": 1781103398348,
+      "tag": "0000_postgres_baseline",
       "breakpoints": true
     }
   ]
