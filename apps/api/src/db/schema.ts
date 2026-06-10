@@ -65,9 +65,9 @@ export const jobs = pgTable("jobs", {
   type: text("type").notNull(),
   status: jobStatus("status").notNull().default("queued"),
   progress: real("progress").notNull().default(0),
-  inputFiles: jsonb("input_files").notNull(),
+  inputFiles: jsonb("input_files").$type<{ totalFiles: number } | unknown[]>().notNull(),
   outputPath: text("output_path"),
-  settings: jsonb("settings"),
+  settings: jsonb("settings").$type<Record<string, unknown>>(),
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -83,7 +83,7 @@ export const apiKeys = pgTable("api_keys", {
   keyHash: text("key_hash").notNull(),
   keyPrefix: text("key_prefix"),
   name: text("name").notNull().default("Default API Key"),
-  permissions: jsonb("permissions"),
+  permissions: jsonb("permissions").$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -96,7 +96,7 @@ export const pipelines = pgTable("pipelines", {
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  steps: jsonb("steps").notNull(), // JSON array of { toolId, settings }
+  steps: jsonb("steps").$type<{ toolId: string; settings: Record<string, unknown> }[]>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -109,7 +109,7 @@ export const auditLog = pgTable("audit_log", {
   action: text("action").notNull(),
   targetType: text("target_type"),
   targetId: text("target_id"),
-  details: jsonb("details"),
+  details: jsonb("details").$type<Record<string, unknown>>(),
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -120,7 +120,7 @@ export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
   description: text("description").notNull().default(""),
-  permissions: jsonb("permissions").notNull(),
+  permissions: jsonb("permissions").$type<string[]>().notNull(),
   isBuiltin: boolean("is_builtin").notNull().default(false),
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -142,7 +142,7 @@ export const userFiles = pgTable("user_files", {
   height: integer("height"),
   version: integer("version").notNull().default(1),
   parentId: text("parent_id"),
-  toolChain: jsonb("tool_chain"),
+  toolChain: jsonb("tool_chain").$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),

@@ -296,6 +296,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       // Walk the full version chain using a recursive CTE.
       // First find the root ancestor, then collect all descendants.
+      //
+      // Postgres conversion notes (raw sqlite.prepare CTE below):
+      //   1. tool_chain arrives as parsed jsonb (string[] | null), do NOT re-add JSON.parse
+      //   2. created_at arrives as timestamptz (Date/ISO string), remove the `* 1000` epoch-seconds conversion
+      //   3. Update ChainRow: tool_chain becomes string[] | null, created_at becomes string
       interface ChainRow {
         id: string;
         original_name: string;
@@ -595,7 +600,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const nextVersion = parent.version + 1;
 
     // Build the tool chain: append the new toolId to the parent's chain
-    const existingChain: string[] = parent.toolChain ? (parent.toolChain as string[]) : [];
+    const existingChain: string[] = parent.toolChain ?? [];
     const newChain = toolId ? [...existingChain, toolId] : existingChain;
 
     // Determine the original filename (preserve parent's name, update extension)

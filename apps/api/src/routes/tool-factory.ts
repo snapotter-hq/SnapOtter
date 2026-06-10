@@ -464,7 +464,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               .get();
             if (parent) {
               const newVersion = parent.version + 1;
-              const parentChain: string[] = parent.toolChain ? (parent.toolChain as string[]) : [];
+              const parentChain: string[] = parent.toolChain ?? [];
               const newToolChain = [...parentChain, config.toolId];
               const storedName = await saveFile(result.buffer, result.filename);
               // Get image dimensions from the processed output
