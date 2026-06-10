@@ -1,72 +1,32 @@
+import { TOOL_DISPLAY_MODES } from "../../apps/web/src/lib/tool-display-modes";
+import { TOOLS } from "../../packages/shared/src/constants";
+import { TOOL_BUNDLE_MAP } from "../../packages/shared/src/features";
 import { expect, test, uploadTestImage } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Test that EVERY tool page loads, shows correct name, and has the right UI.
-// This covers the full 37-tool catalog from the PRD.
+// Every tool page must load, show its name, and render the right UI shell.
+// Generated from the shared TOOLS catalog + the display-mode map, so a newly
+// added tool is covered automatically and a missing registry entry fails here.
 // ---------------------------------------------------------------------------
 
-const TOOLS_WITH_DROPZONE = [
-  { id: "resize", name: "Resize" },
-  { id: "crop", name: "Crop" },
-  { id: "rotate", name: "Rotate" },
-  { id: "convert", name: "Convert" },
-  { id: "compress", name: "Compress" },
-  { id: "strip-metadata", name: "Remove Metadata" },
-  { id: "edit-metadata", name: "Edit Metadata" },
-  { id: "bulk-rename", name: "Bulk Rename" },
-  { id: "image-to-pdf", name: "Image to PDF" },
-  { id: "favicon", name: "Favicon" },
-  { id: "adjust-colors", name: "Adjust Colors" },
-  { id: "replace-color", name: "Replace" },
-  { id: "remove-background", name: "Remove Background" },
-  { id: "upscale", name: "Upscal" },
-  { id: "erase-object", name: "Object Eraser" },
-  { id: "ocr", name: "OCR" },
-  { id: "blur-faces", name: "Face" },
-  { id: "smart-crop", name: "Smart Crop" },
-  { id: "watermark-text", name: "Text Watermark" },
-  { id: "watermark-image", name: "Image Watermark" },
-  { id: "text-overlay", name: "Text Overlay" },
-  { id: "compose", name: "Image Composition" },
-  { id: "info", name: "Image Info" },
-  { id: "compare", name: "Image Compare" },
-  { id: "find-duplicates", name: "Find Duplicates" },
-  { id: "color-palette", name: "Color Palette" },
-  { id: "barcode-read", name: "Barcode" },
-  { id: "collage", name: "Collage", customDropzone: true },
-  { id: "stitch", name: "Stitch" },
-  { id: "split", name: "Image Splitting" },
-  { id: "border", name: "Border" },
-  { id: "svg-to-raster", name: "SVG to Raster" },
-  { id: "vectorize", name: "Image to SVG" },
-  { id: "gif-tools", name: "GIF" },
-  { id: "noise-removal", name: "Noise Removal" },
-  { id: "transparency-fixer", name: "PNG Transparency Fixer" },
-];
-
-const TOOLS_WITHOUT_DROPZONE = [{ id: "qr-generate", name: "QR Code" }];
-
-const AI_TOOL_IDS = new Set([
-  "remove-background",
-  "upscale",
-  "erase-object",
-  "ocr",
-  "blur-faces",
-  "smart-crop",
-  "noise-removal",
-  "transparency-fixer",
-]);
+const NO_DROPZONE_MODES = new Set(["no-dropzone"]);
 
 test.describe("All tool pages render", () => {
-  for (const tool of TOOLS_WITH_DROPZONE) {
-    test(`${tool.name} (/${tool.id}) loads with dropzone`, async ({ loggedInPage: page }) => {
+  for (const tool of TOOLS) {
+    const displayMode = TOOL_DISPLAY_MODES[tool.id];
+    const isAiTool = tool.id in TOOL_BUNDLE_MAP;
+
+    test(`${tool.name} (/${tool.id}) renders its UI shell`, async ({ loggedInPage: page }) => {
+      expect(displayMode, `tool "${tool.id}" missing from tool-display-modes.ts`).toBeTruthy();
+
       await page.goto(`/${tool.id}`);
 
-      // Tool name should be visible
+      // Tool name should be visible (header renders the shared TOOLS name)
       await expect(page.getByText(tool.name, { exact: false }).first()).toBeVisible();
 
-      // AI tools may show install prompt instead of dropzone when feature is not installed
-      if (AI_TOOL_IDS.has(tool.id)) {
+      // AI tools may show an install prompt instead of a dropzone when the
+      // model bundle is not installed.
+      if (isAiTool) {
         const uploadVisible = await page.getByText("Upload from computer").isVisible();
         if (!uploadVisible) {
           await expect(
@@ -76,41 +36,24 @@ test.describe("All tool pages render", () => {
         }
       }
 
-      // Should show dropzone (some tools like collage use custom upload text)
-      const uploadText = (tool as any).customDropzone
-        ? page.getByText(/upload/i).first()
-        : page.getByText("Upload from computer");
-      await expect(uploadText).toBeVisible();
-
-      // Collage has a custom layout (no Files/Settings headings)
-      if (!(tool as any).customDropzone) {
-        // Should show Files section
-        await expect(page.getByText("Files").first()).toBeVisible();
-
-        // Should show Settings section
+      if (NO_DROPZONE_MODES.has(displayMode)) {
+        // Custom-input tools (meme-generator, qr-generate, collage, html-to-image,
+        // pdf-to-image) render their own input UI; just require the settings panel.
         await expect(page.getByText("Settings").first()).toBeVisible();
+        return;
       }
-    });
-  }
 
-  for (const tool of TOOLS_WITHOUT_DROPZONE) {
-    test(`${tool.name} (/${tool.id}) loads without dropzone`, async ({ loggedInPage: page }) => {
-      await page.goto(`/${tool.id}`);
-
-      // Tool name should be visible
-      await expect(page.getByText(tool.name, { exact: false }).first()).toBeVisible();
-
-      // Should show settings
+      // Standard dropzone tools
+      await expect(page.getByText("Upload from computer")).toBeVisible();
+      await expect(page.getByText("Files").first()).toBeVisible();
       await expect(page.getByText("Settings").first()).toBeVisible();
-
-      // Should NOT show the file upload dropzone
-      await expect(page.getByText("Upload from computer")).not.toBeVisible();
     });
   }
 });
 
 test.describe("Tool pages accept file upload", () => {
-  // Test a representative subset (testing all 35 would be very slow)
+  // Representative subset across display modes (uploading on all tools would
+  // be slow; per-tool processing flows live in gui-tools-*.spec.ts)
   const REPRESENTATIVE_TOOLS = [
     "resize",
     "compress",
