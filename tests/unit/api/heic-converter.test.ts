@@ -59,14 +59,17 @@ describe("decodeHeic", () => {
     const heicBuf = await readFile(join(FIXTURES, "formats/sample.heic"));
     const { tmpdir } = await import("node:os");
     const { readdirSync } = await import("node:fs");
-    const before = readdirSync(tmpdir()).filter(
-      (f) => f.startsWith("heic-in-") || f.startsWith("heic-out-"),
+    const beforeSet = new Set(
+      readdirSync(tmpdir()).filter((f) => f.startsWith("heic-in-") || f.startsWith("heic-out-")),
     );
     await decodeHeic(heicBuf);
     const after = readdirSync(tmpdir()).filter(
       (f) => f.startsWith("heic-in-") || f.startsWith("heic-out-"),
     );
-    expect(after.length).toBeLessThanOrEqual(before.length);
+    // Only check that files created during THIS call were cleaned up.
+    // Other concurrent test workers may create temp files in the same dir.
+    const leftover = after.filter((f) => !beforeSet.has(f));
+    expect(leftover).toHaveLength(0);
   });
 });
 
