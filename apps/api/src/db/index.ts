@@ -15,6 +15,9 @@ pool.on("error", (err) => {
 export const db = drizzle(pool, { schema });
 export { pool, schema };
 
+let ended = false;
 export async function closeDb(): Promise<void> {
+  if (ended) return;
+  ended = true;
   await pool.end();
 }

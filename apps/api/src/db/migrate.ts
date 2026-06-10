@@ -5,7 +5,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { pool } from "./index.js";
 
-const MIGRATION_LOCK_KEY = 7_421_001; // arbitrary app-wide advisory lock id
+// Advisory lock IDs: pick any unique int32. Reserve 7_421_xxx for SnapOtter app locks.
+const MIGRATION_LOCK_KEY = 7_421_001;
 
 export async function runMigrations(): Promise<void> {
   const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "../../drizzle");

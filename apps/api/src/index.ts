@@ -43,7 +43,16 @@ import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 
 // Run before anything else
-await runMigrations();
+try {
+  await runMigrations();
+} catch (err) {
+  const safeUrl = env.DATABASE_URL.replace(/:\/\/[^@]*@/, "://***@");
+  console.error(
+    `FATAL: Cannot connect to Postgres at ${safeUrl}. Is the database running? (docker compose up, or set DATABASE_URL)`,
+  );
+  console.error(err);
+  process.exit(1);
+}
 console.log("Database initialized");
 
 if (env.AUTH_ENABLED) {
