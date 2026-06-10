@@ -40,5 +40,8 @@ scripts
 .vscode
 .idea
 
+# Archived SQLite migrations (superseded by Postgres)
+apps/api/drizzle-sqlite-legacy
+
 # Test images
 test-*.png
