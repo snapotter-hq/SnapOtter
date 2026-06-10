@@ -21,6 +21,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import {
+  drainPersistQueue,
   recoverStaleJobs,
   updateJobProgress,
   updateSingleFileProgress,
@@ -60,6 +61,8 @@ const flushPersist = async (
     await new Promise((r) => setTimeout(r, 200));
     return;
   }
+  // Drain any pending persist writes before polling the DB
+  await drainPersistQueue(jobId);
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
@@ -406,7 +409,7 @@ describe("updateJobProgress direct calls", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -427,7 +430,7 @@ describe("updateJobProgress direct calls", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     // Update progress
     updateJobProgress({
@@ -501,7 +504,7 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 50,
       stage: "encoding",
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -555,7 +558,7 @@ describe("updateSingleFileProgress direct calls", () => {
       phase: "processing",
       percent: 50,
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     // Update to complete
     updateSingleFileProgress({
@@ -580,7 +583,7 @@ describe("updateSingleFileProgress direct calls", () => {
       phase: "processing",
       percent: 25,
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     // Update to failed
     updateSingleFileProgress({
@@ -608,7 +611,7 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 25,
       stage: "analyzing",
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     // Update
     updateSingleFileProgress({
@@ -617,7 +620,7 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 75,
       stage: "encoding",
     });
-    await flushPersist();
+    await flushPersist(jobId, ["processing"]);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();

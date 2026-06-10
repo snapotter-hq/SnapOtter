@@ -53,7 +53,14 @@ const listeners = new Map<string, Set<(data: JobProgress | SingleFileProgress) =
  * overwritten by a late-arriving "processing" write.  Without this, the
  * async Postgres round-trips can re-order concurrent writes.
  */
+// TODO(phase-2): delete when progress persistence moves to BullMQ job events.
 const persistQueues = new Map<string, Promise<void>>();
+
+/** Await any pending persist writes for a specific job (used by tests). */
+export async function drainPersistQueue(jobId: string): Promise<void> {
+  const pending = persistQueues.get(jobId);
+  if (pending) await pending;
+}
 
 function enqueuePersist(jobId: string, fn: () => Promise<void>): void {
   const prev = persistQueues.get(jobId) ?? Promise.resolve();

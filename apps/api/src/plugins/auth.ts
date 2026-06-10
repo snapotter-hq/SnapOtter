@@ -189,6 +189,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
  *  - Roles already exist from a previous boot
  *  - Roles were imported by the 1.x SQLite-to-Postgres data migrator
  */
+// Must match ROLE_PERMISSIONS in permissions.ts (the 1.x post-0010 state).
 export async function ensureBuiltinRoles(): Promise<void> {
   const builtinRoles = [
     {
@@ -207,7 +208,6 @@ export async function ensureBuiltinRoles(): Promise<void> {
         "settings:write",
         "users:manage",
         "teams:manage",
-        "branding:manage",
         "features:manage",
         "system:health",
         "audit:read",
