@@ -2,6 +2,7 @@
 # Test infrastructure - run with:
 #   docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit
 ###############################################################################
+name: snapotter-test
 services:
   # ── Unit + Integration tests ─────────────────────────────────────────────
   test-unit:

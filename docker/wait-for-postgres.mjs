@@ -6,4 +6,4 @@ const socket = connect(Number(url.port || 5432), url.hostname, () => {
   process.exit(0);
 });
 socket.on("error", () => process.exit(1));
-setTimeout(() => process.exit(1), 3000);
+setTimeout(() => process.exit(1), 3000).unref();

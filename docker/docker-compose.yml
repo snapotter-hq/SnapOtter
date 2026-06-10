@@ -38,7 +38,8 @@ services:
       - TRUST_PROXY=${TRUST_PROXY:-true}
       - DATABASE_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
-      # 1.x upgrade: uncomment to import the old database from the data volume on first boot
+      # 1.x upgrade: uncomment to import the old SQLite database on first boot;
+      # re-comment after the migration succeeds.
       # - SQLITE_MIGRATE_PATH=/data/snapotter.db
       # OIDC Authentication (optional)
       # - EXTERNAL_URL=https://photos.example.com
