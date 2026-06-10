@@ -67,10 +67,10 @@ describe("custom roles", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "customroleuser", password: "CustomRole1", role: "reviewer" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "customroleuser"))
-      .run();
+      .where(eq(schema.users.username, "customroleuser"));
 
     const loginRes = await testApp.app.inject({
       method: "POST",

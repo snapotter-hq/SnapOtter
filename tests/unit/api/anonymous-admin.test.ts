@@ -14,6 +14,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     delete: () => ({ where: () => ({ run: vi.fn() }) }),
     update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     users: { id: {}, username: {}, role: {} },
     sessions: { id: {}, userId: {} },
@@ -67,11 +69,11 @@ describe("anonymous user when AUTH_ENABLED=false", () => {
     expect(capturedUser?.username).toBe("anonymous");
   });
 
-  it("anonymous admin has settings:write permission", () => {
-    expect(hasPermission("admin", "settings:write")).toBe(true);
+  it("anonymous admin has settings:write permission", async () => {
+    expect(await hasPermission("admin", "settings:write")).toBe(true);
   });
 
-  it("anonymous admin has all admin permissions", () => {
+  it("anonymous admin has all admin permissions", async () => {
     const adminPerms = [
       "tools:use",
       "files:own",
@@ -90,7 +92,7 @@ describe("anonymous user when AUTH_ENABLED=false", () => {
     ] as const;
 
     for (const perm of adminPerms) {
-      expect(hasPermission("admin", perm)).toBe(true);
+      expect(await hasPermission("admin", perm)).toBe(true);
     }
   });
 
@@ -101,7 +103,7 @@ describe("anonymous user when AUTH_ENABLED=false", () => {
     const req = { user } as never;
     const reply = { status: vi.fn().mockReturnThis(), send: vi.fn() } as never;
 
-    const result = requirePermission("settings:write")(req, reply);
+    const result = await requirePermission("settings:write")(req, reply);
     expect(result).toEqual(user);
     expect((reply as { status: ReturnType<typeof vi.fn> }).status).not.toHaveBeenCalled();
   });

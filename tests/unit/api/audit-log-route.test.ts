@@ -29,6 +29,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       }),
     }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     auditLog: {
       action: {},

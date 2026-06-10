@@ -46,10 +46,10 @@ describe("audit log", () => {
         role: "user",
       },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "auditnoread"))
-      .run();
+      .where(eq(schema.users.username, "auditnoread"));
 
     const loginRes = await testApp.app.inject({
       method: "POST",

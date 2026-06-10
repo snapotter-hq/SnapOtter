@@ -13,9 +13,14 @@ const mockInsertRun = vi.fn();
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     insert: () => ({
-      values: () => ({ run: mockInsertRun }),
+      values: (...args: unknown[]) => {
+        mockInsertRun(...args);
+        return Promise.resolve();
+      },
     }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     auditLog: {},
   },
@@ -42,8 +47,8 @@ describe("auditLog", () => {
     vi.clearAllMocks();
   });
 
-  it("logs to the structured logger with audit flag", () => {
-    auditLog(mockLogger as never, "LOGIN_SUCCESS", { userId: "u1", username: "alice" });
+  it("logs to the structured logger with audit flag", async () => {
+    await auditLog(mockLogger as never, "LOGIN_SUCCESS", { userId: "u1", username: "alice" });
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
     const [logData, logMessage] = mockLogger.info.mock.calls[0];
@@ -53,8 +58,8 @@ describe("auditLog", () => {
     expect(logMessage).toBe("[AUDIT] LOGIN_SUCCESS");
   });
 
-  it("inserts a record into the database", () => {
-    auditLog(mockLogger as never, "USER_CREATED", {
+  it("inserts a record into the database", async () => {
+    await auditLog(mockLogger as never, "USER_CREATED", {
       adminId: "admin-1",
       targetUserId: "new-user-1",
     });
@@ -62,8 +67,8 @@ describe("auditLog", () => {
     expect(mockInsertRun).toHaveBeenCalledTimes(1);
   });
 
-  it("extracts actorId from userId field first", () => {
-    auditLog(mockLogger as never, "FILE_UPLOADED", {
+  it("extracts actorId from userId field first", async () => {
+    await auditLog(mockLogger as never, "FILE_UPLOADED", {
       userId: "u1",
       adminId: "a1",
     });
@@ -75,16 +80,16 @@ describe("auditLog", () => {
     expect(logData.adminId).toBe("a1");
   });
 
-  it("falls back to adminId when userId is absent", () => {
-    auditLog(mockLogger as never, "ROLE_CREATED", { adminId: "admin-1", roleName: "editor" });
+  it("falls back to adminId when userId is absent", async () => {
+    await auditLog(mockLogger as never, "ROLE_CREATED", { adminId: "admin-1", roleName: "editor" });
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
     const logData = mockLogger.info.mock.calls[0][0];
     expect(logData.adminId).toBe("admin-1");
   });
 
-  it("extracts username from details", () => {
-    auditLog(mockLogger as never, "LOGIN_SUCCESS", {
+  it("extracts username from details", async () => {
+    await auditLog(mockLogger as never, "LOGIN_SUCCESS", {
       userId: "u1",
       username: "alice",
     });
@@ -93,20 +98,20 @@ describe("auditLog", () => {
     expect(logData.username).toBe("alice");
   });
 
-  it("handles empty details object", () => {
-    auditLog(mockLogger as never, "LOGOUT");
+  it("handles empty details object", async () => {
+    await auditLog(mockLogger as never, "LOGOUT");
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
     expect(mockInsertRun).toHaveBeenCalledTimes(1);
   });
 
-  it("survives DB insert failure", () => {
+  it("survives DB insert failure", async () => {
     mockInsertRun.mockImplementationOnce(() => {
       throw new Error("DB write failed");
     });
 
     // Should not throw
-    auditLog(mockLogger as never, "SETTINGS_UPDATED", { userId: "u1" });
+    await auditLog(mockLogger as never, "SETTINGS_UPDATED", { userId: "u1" });
 
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
     expect(mockLogger.warn).toHaveBeenCalledTimes(1);
@@ -114,7 +119,7 @@ describe("auditLog", () => {
     expect(warnData.event).toBe("SETTINGS_UPDATED");
   });
 
-  it("logs different event types correctly", () => {
+  it("logs different event types correctly", async () => {
     const events = [
       "LOGIN_SUCCESS",
       "LOGIN_FAILED",
@@ -129,7 +134,7 @@ describe("auditLog", () => {
 
     for (const event of events) {
       vi.clearAllMocks();
-      auditLog(mockLogger as never, event, { userId: "u1" });
+      await auditLog(mockLogger as never, event, { userId: "u1" });
 
       expect(mockLogger.info).toHaveBeenCalledTimes(1);
       const logMessage = mockLogger.info.mock.calls[0][1];
@@ -137,8 +142,8 @@ describe("auditLog", () => {
     }
   });
 
-  it("serializes details as JSON for DB storage", () => {
-    auditLog(mockLogger as never, "USER_UPDATED", {
+  it("serializes details as JSON for DB storage", async () => {
+    await auditLog(mockLogger as never, "USER_UPDATED", {
       adminId: "admin-1",
       targetUserId: "u2",
       changes: { role: "editor" },
@@ -147,14 +152,14 @@ describe("auditLog", () => {
     expect(mockInsertRun).toHaveBeenCalledTimes(1);
   });
 
-  it("includes all detail fields in the log output", () => {
+  it("includes all detail fields in the log output", async () => {
     const details = {
       userId: "u1",
       keyId: "key-123",
       keyName: "Production Key",
     };
 
-    auditLog(mockLogger as never, "API_KEY_CREATED", details);
+    await auditLog(mockLogger as never, "API_KEY_CREATED", details);
 
     const logData = mockLogger.info.mock.calls[0][0];
     expect(logData.keyId).toBe("key-123");

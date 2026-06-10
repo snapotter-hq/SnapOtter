@@ -35,38 +35,36 @@ afterAll(async () => {
  * Insert an OIDC-only user directly into the DB (no passwordHash).
  * Returns a session token for the user.
  */
-function createOidcUser(opts: { username?: string; email?: string; role?: string } = {}): {
+async function createOidcUser(
+  opts: { username?: string; email?: string; role?: string } = {},
+): Promise<{
   userId: string;
   username: string;
   sessionToken: string;
-} {
+}> {
   const userId = randomUUID();
   const username = opts.username || `oidc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-  db.insert(schema.users)
-    .values({
-      id: userId,
-      username,
-      passwordHash: null,
-      role: opts.role || "user",
-      team: "default-team-00000000",
-      mustChangePassword: false,
-      authProvider: "oidc",
-      externalId: `sub-${userId}`,
-      email: opts.email || `${username}@example.com`,
-    })
-    .run();
+  await db.insert(schema.users).values({
+    id: userId,
+    username,
+    passwordHash: null,
+    role: opts.role || "user",
+    team: "default-team-00000000",
+    mustChangePassword: false,
+    authProvider: "oidc",
+    externalId: `sub-${userId}`,
+    email: opts.email || `${username}@example.com`,
+  });
 
   // Create a session (simulates what the OIDC callback would do)
   const sessionToken = randomUUID();
-  db.insert(schema.sessions)
-    .values({
-      id: sessionToken,
-      userId,
-      expiresAt: new Date(Date.now() + 3_600_000),
-      idToken: "mock-id-token-jwt",
-    })
-    .run();
+  await db.insert(schema.sessions).values({
+    id: sessionToken,
+    userId,
+    expiresAt: new Date(Date.now() + 3_600_000),
+    idToken: "mock-id-token-jwt",
+  });
 
   return { userId, username, sessionToken };
 }
@@ -74,26 +72,24 @@ function createOidcUser(opts: { username?: string; email?: string; role?: string
 /**
  * Insert a session for an existing user with custom options.
  */
-function createOidcSession(
+async function createOidcSession(
   userId: string,
   opts: { expiresAt?: Date; idToken?: string | null } = {},
-): string {
+): Promise<string> {
   const sessionToken = randomUUID();
-  db.insert(schema.sessions)
-    .values({
-      id: sessionToken,
-      userId,
-      expiresAt: opts.expiresAt ?? new Date(Date.now() + 3_600_000),
-      idToken: opts.idToken ?? null,
-    })
-    .run();
+  await db.insert(schema.sessions).values({
+    id: sessionToken,
+    userId,
+    expiresAt: opts.expiresAt ?? new Date(Date.now() + 3_600_000),
+    idToken: opts.idToken ?? null,
+  });
   return sessionToken;
 }
 
 /**
  * Insert a "hybrid" user -- has both a local password AND an OIDC link.
  */
-function _createHybridUser(
+async function _createHybridUser(
   passwordHash: string,
   opts: { username?: string; email?: string } = {},
 ): { userId: string; username: string; sessionToken: string } {
@@ -101,28 +97,24 @@ function _createHybridUser(
   const username =
     opts.username || `hybrid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-  db.insert(schema.users)
-    .values({
-      id: userId,
-      username,
-      passwordHash,
-      role: "user",
-      team: "default-team-00000000",
-      mustChangePassword: false,
-      authProvider: "oidc",
-      externalId: `sub-${userId}`,
-      email: opts.email || `${username}@example.com`,
-    })
-    .run();
+  await db.insert(schema.users).values({
+    id: userId,
+    username,
+    passwordHash,
+    role: "user",
+    team: "default-team-00000000",
+    mustChangePassword: false,
+    authProvider: "oidc",
+    externalId: `sub-${userId}`,
+    email: opts.email || `${username}@example.com`,
+  });
 
   const sessionToken = randomUUID();
-  db.insert(schema.sessions)
-    .values({
-      id: sessionToken,
-      userId,
-      expiresAt: new Date(Date.now() + 3_600_000),
-    })
-    .run();
+  await db.insert(schema.sessions).values({
+    id: sessionToken,
+    userId,
+    expiresAt: new Date(Date.now() + 3_600_000),
+  });
 
   return { userId, username, sessionToken };
 }
@@ -132,7 +124,7 @@ function _createHybridUser(
 // =====================================================================
 describe("Session response fields", () => {
   it("returns OIDC fields for an OIDC user session", async () => {
-    const { sessionToken, username } = createOidcUser();
+    const { sessionToken, username } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "GET",
@@ -185,7 +177,7 @@ describe("Session response fields", () => {
 // =====================================================================
 describe("Password guards for OIDC users", () => {
   it("OIDC user (no passwordHash) cannot change password", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -203,7 +195,7 @@ describe("Password guards for OIDC users", () => {
   });
 
   it("admin cannot reset password for OIDC user", async () => {
-    const { userId } = createOidcUser();
+    const { userId } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -223,7 +215,7 @@ describe("Password guards for OIDC users", () => {
 // =====================================================================
 describe("Users list includes OIDC fields", () => {
   it("GET /api/auth/users includes authProvider, hasLocalPassword, hasOidcLink", async () => {
-    const { username: oidcUsername } = createOidcUser();
+    const { username: oidcUsername } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "GET",
@@ -251,7 +243,7 @@ describe("Users list includes OIDC fields", () => {
   });
 
   it("users list does not expose passwordHash or externalId directly", async () => {
-    createOidcUser();
+    await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "GET",
@@ -275,7 +267,7 @@ describe("Users list includes OIDC fields", () => {
 describe("Backward compatibility", () => {
   it("local login still works when OIDC users exist in the DB", async () => {
     // Create an OIDC user (just to prove it doesn't break local login)
-    createOidcUser();
+    await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -290,7 +282,7 @@ describe("Backward compatibility", () => {
   });
 
   it("OIDC user cannot log in via local login (no passwordHash)", async () => {
-    const { username } = createOidcUser();
+    const { username } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -641,7 +633,7 @@ describe("OIDC callback edge cases", () => {
 // =====================================================================
 describe("Admin operations on OIDC users", () => {
   it("admin can delete an OIDC user", async () => {
-    const { userId } = createOidcUser();
+    const { userId } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "DELETE",
@@ -652,12 +644,12 @@ describe("Admin operations on OIDC users", () => {
     expect(res.statusCode).toBe(200);
 
     // Verify user is gone
-    const user = db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
     expect(user).toBeUndefined();
   });
 
   it("admin can update role of an OIDC user", async () => {
-    const { userId } = createOidcUser();
+    const { userId } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "PUT",
@@ -668,7 +660,7 @@ describe("Admin operations on OIDC users", () => {
 
     expect(res.statusCode).toBe(200);
 
-    const user = db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
     expect(user?.role).toBe("editor");
   });
 });
@@ -678,7 +670,7 @@ describe("Admin operations on OIDC users", () => {
 // =====================================================================
 describe("Cookie-based session auth", () => {
   it("OIDC session cookie works for authenticated requests", async () => {
-    const { sessionToken, username } = createOidcUser();
+    const { sessionToken, username } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "GET",
@@ -693,7 +685,7 @@ describe("Cookie-based session auth", () => {
   });
 
   it("Both cookie and Bearer work simultaneously", async () => {
-    const { sessionToken: oidcToken, username: oidcUsername } = createOidcUser();
+    const { sessionToken: oidcToken, username: oidcUsername } = await createOidcUser();
 
     // Bearer token for local user (admin)
     const bearerRes = await testApp.app.inject({
@@ -735,10 +727,10 @@ describe("Cookie-based session auth", () => {
 // =====================================================================
 describe("Session expiry", () => {
   it("expired OIDC session returns 401", async () => {
-    const { userId } = createOidcUser();
+    const { userId } = await createOidcUser();
 
     // Create a session that expired 10 minutes ago
-    const expiredToken = createOidcSession(userId, {
+    const expiredToken = await createOidcSession(userId, {
       expiresAt: new Date(Date.now() - 600_000),
     });
 
@@ -751,11 +743,10 @@ describe("Session expiry", () => {
     expect(res.statusCode).toBe(401);
 
     // Verify the expired session was cleaned up from DB
-    const session = db
+    const [session] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, expiredToken))
-      .get();
+      .where(eq(schema.sessions.id, expiredToken));
     expect(session).toBeUndefined();
   });
 });
@@ -765,7 +756,7 @@ describe("Session expiry", () => {
 // =====================================================================
 describe("API keys for OIDC users", () => {
   it("OIDC user can create an API key", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -781,7 +772,7 @@ describe("API keys for OIDC users", () => {
   });
 
   it("API key works for auth after creation", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     // Create the API key via cookie auth
     const createRes = await testApp.app.inject({
@@ -824,7 +815,7 @@ describe("API keys for OIDC users", () => {
 // =====================================================================
 describe("Logout", () => {
   it("logout clears the snapotter-session cookie", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -850,14 +841,13 @@ describe("Logout", () => {
   });
 
   it("session is deleted from DB after logout", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     // Verify session exists before logout
-    const before = db
+    const [before] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken))
-      .get();
+      .where(eq(schema.sessions.id, sessionToken));
     expect(before).toBeDefined();
 
     await testApp.app.inject({
@@ -867,16 +857,15 @@ describe("Logout", () => {
     });
 
     // Verify session is gone
-    const after = db
+    const [after] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken))
-      .get();
+      .where(eq(schema.sessions.id, sessionToken));
     expect(after).toBeUndefined();
   });
 
   it("logout returns logoutUrl when session has idToken and OIDC discovery is cached", async () => {
-    const { sessionToken } = createOidcUser();
+    const { sessionToken } = await createOidcUser();
 
     // The default createOidcUser sets idToken to "mock-id-token-jwt".
     // Without a running OIDC provider and cached discovery, the logout

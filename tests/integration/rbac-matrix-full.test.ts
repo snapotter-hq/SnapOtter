@@ -29,10 +29,10 @@ beforeAll(async () => {
     headers: { authorization: `Bearer ${adminToken}` },
     payload: { username: editorUsername, password: "EditorPass1", role: "editor" },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, editorUsername))
-    .run();
+    .where(eq(schema.users.username, editorUsername));
   const editorLogin = await testApp.app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -48,10 +48,10 @@ beforeAll(async () => {
     headers: { authorization: `Bearer ${adminToken}` },
     payload: { username: userUsername, password: "UserPass12", role: "user" },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, userUsername))
-    .run();
+    .where(eq(schema.users.username, userUsername));
   const userLogin = await testApp.app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -360,10 +360,10 @@ describe("Cross-role isolation", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: expiredUsername, password: "ExpiredPass1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, expiredUsername))
-      .run();
+      .where(eq(schema.users.username, expiredUsername));
 
     const loginRes = await testApp.app.inject({
       method: "POST",
@@ -373,10 +373,10 @@ describe("Cross-role isolation", () => {
     const expiredToken = JSON.parse(loginRes.body).token;
 
     // Manually expire the session
-    db.update(schema.sessions)
+    await db
+      .update(schema.sessions)
       .set({ expiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(schema.sessions.id, expiredToken))
-      .run();
+      .where(eq(schema.sessions.id, expiredToken));
 
     const res = await testApp.app.inject({
       method: "GET",

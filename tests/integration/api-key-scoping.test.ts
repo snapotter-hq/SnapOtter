@@ -36,10 +36,10 @@ describe("API key permission scoping", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "scopetest", password: "ScopeTest1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "scopetest"))
-      .run();
+      .where(eq(schema.users.username, "scopetest"));
 
     const loginRes = await testApp.app.inject({
       method: "POST",
@@ -152,10 +152,10 @@ describe("API key expiration", () => {
     const keyId = JSON.parse(createRes.body).id;
 
     // Manually expire the key in DB
-    db.update(schema.apiKeys)
+    await db
+      .update(schema.apiKeys)
       .set({ expiresAt: new Date(Date.now() - 1000) })
-      .where(eq(schema.apiKeys.id, keyId))
-      .run();
+      .where(eq(schema.apiKeys.id, keyId));
 
     const res = await testApp.app.inject({
       method: "GET",

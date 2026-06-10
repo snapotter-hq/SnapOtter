@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {},
+  pool: {},
+  closeDb: async () => {},
   schema: {},
 }));
 

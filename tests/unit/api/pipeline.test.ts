@@ -19,6 +19,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     delete: () => ({ where: () => ({ run: vi.fn() }) }),
     update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     settings: { key: {} },
     pipelines: { id: {} },

@@ -33,10 +33,10 @@ async function registerUser(token: string, username: string, role: string, passw
  * Helper: log in as a given user and return the session token.
  */
 async function loginAs(username: string, password = "Testpass1"): Promise<string> {
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
 
   const res = await testApp.app.inject({
     method: "POST",
@@ -196,10 +196,10 @@ describe("update user role escalation", () => {
     const originalAdminId = JSON.parse(sessionRes.body).user.id;
 
     // Demote ALL admins except the original via DB
-    const allUsers = db.select().from(schema.users).all();
+    const allUsers = await db.select().from(schema.users);
     for (const u of allUsers) {
       if (u.role === "admin" && u.id !== originalAdminId) {
-        db.update(schema.users).set({ role: "user" }).where(eq(schema.users.id, u.id)).run();
+        await db.update(schema.users).set({ role: "user" }).where(eq(schema.users.id, u.id));
       }
     }
 

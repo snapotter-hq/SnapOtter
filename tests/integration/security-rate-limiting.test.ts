@@ -103,34 +103,32 @@ describe("Per-user storage quota enforcement (L3)", () => {
 
   it("tracks file sizes in the database for quota calculation", async () => {
     // Verify we can query total storage per user (the quota check mechanism)
-    const adminUser = db
+    const [adminUser] = await db
       .select()
       .from(schema.users)
-      .where(eq(schema.users.username, "admin"))
-      .get();
+      .where(eq(schema.users.username, "admin"));
 
     expect(adminUser).toBeDefined();
 
-    const result = db
+    const [result] = await db
       .select({ total: sql<number>`coalesce(sum(${schema.userFiles.size}), 0)` })
       .from(schema.userFiles)
-      .where(eq(schema.userFiles.userId, adminUser?.id ?? ""))
-      .get();
+      .where(eq(schema.userFiles.userId, adminUser?.id ?? ""));
 
     // Should have some bytes from the uploads in previous tests
     expect(result).toBeDefined();
-    expect(typeof result?.total).toBe("number");
-    expect(result?.total).toBeGreaterThanOrEqual(0);
+    // Postgres returns SUM as string (bigint); coerce for comparison
+    expect(Number(result?.total)).toBeGreaterThanOrEqual(0);
   });
 
   it("quota check query returns 0 for users with no files", async () => {
-    const result = db
+    const [result] = await db
       .select({ total: sql<number>`coalesce(sum(${schema.userFiles.size}), 0)` })
       .from(schema.userFiles)
-      .where(eq(schema.userFiles.userId, "nonexistent-user-id"))
-      .get();
+      .where(eq(schema.userFiles.userId, "nonexistent-user-id"));
 
     expect(result).toBeDefined();
-    expect(result?.total).toBe(0);
+    // Postgres returns SUM as string (bigint); coerce for comparison
+    expect(Number(result?.total)).toBe(0);
   });
 });

@@ -25,9 +25,9 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
 
       expect(source).toContain(
-        "export function captureException(error: unknown, request?: FastifyRequest)",
+        "export async function captureException(error: unknown, request?: FastifyRequest)",
       );
-      expect(source).toContain("if (request && !isRequestOptedIn(request)) return;");
+      expect(source).toContain("if (request && !(await isRequestOptedIn(request))) return;");
     });
 
     it("error handler passes request to captureException", async () => {
@@ -60,7 +60,8 @@ describe("Server-side Analytics No-Leak Invariant", () => {
     });
 
     it("rate 1.0 always accepts (checked before Math.random call)", () => {
-      expect(1.0 >= 1.0).toBe(true);
+      const rate = 1.0;
+      expect(rate >= 1.0).toBe(true);
     });
 
     it("rate between 0 and 1 produces a mix", () => {
@@ -78,14 +79,14 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
       expect(source).toContain(
-        "if (!posthogClient || !isRequestOptedIn(request) || !shouldSample()) return;",
+        "if (!posthogClient || !(await isRequestOptedIn(request)) || !shouldSample()) return;",
       );
     });
 
     it("trackEvent wraps capture in try-catch (never throws)", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      const trackEventBlock = source.slice(source.indexOf("export function trackEvent"));
+      const trackEventBlock = source.slice(source.indexOf("export async function trackEvent"));
       expect(trackEventBlock).toContain("try {");
       expect(trackEventBlock).toContain("catch {");
     });

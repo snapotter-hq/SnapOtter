@@ -39,10 +39,10 @@ describe("permissions in auth responses", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "permtest", password: "TestPass1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "permtest"))
-      .run();
+      .where(eq(schema.users.username, "permtest"));
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -96,10 +96,10 @@ describe("permission enforcement on routes", () => {
     }
 
     // Clear mustChangePassword so the user can access routes
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "regularuser"))
-      .run();
+      .where(eq(schema.users.username, "regularuser"));
 
     // Login as the regular user
     const loginRes = await testApp.app.inject({
@@ -314,10 +314,10 @@ describe("API key ownership scoping", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "keyuserA", password: "TestPass1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "keyuserA"))
-      .run();
+      .where(eq(schema.users.username, "keyuserA"));
     const loginA = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/login",
@@ -332,10 +332,10 @@ describe("API key ownership scoping", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "keyuserB", password: "TestPass1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "keyuserB"))
-      .run();
+      .where(eq(schema.users.username, "keyuserB"));
     const loginB = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/login",
@@ -417,10 +417,10 @@ describe("file ownership scoping", () => {
         headers: { authorization: `Bearer ${adminToken}` },
         payload: { username: name, password: "TestPass1", role: "user" },
       });
-      db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({ mustChangePassword: false })
-        .where(eq(schema.users.username, name))
-        .run();
+        .where(eq(schema.users.username, name));
     }
     const loginA = await testApp.app.inject({
       method: "POST",
@@ -524,10 +524,10 @@ describe("escalation prevention", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "esceditor", password: "EscEditor1", role: "editor" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "esceditor"))
-      .run();
+      .where(eq(schema.users.username, "esceditor"));
 
     const editorLogin = await testApp.app.inject({
       method: "POST",
@@ -574,10 +574,10 @@ describe("escalation prevention", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "admin2esc", password: "Admin2Esc1", role: "admin" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "admin2esc"))
-      .run();
+      .where(eq(schema.users.username, "admin2esc"));
 
     const listRes = await testApp.app.inject({
       method: "GET",
@@ -607,10 +607,10 @@ describe("pipeline ownership scoping", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { username: "pipeuser", password: "TestPass1", role: "user" },
     });
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.username, "pipeuser"))
-      .run();
+      .where(eq(schema.users.username, "pipeuser"));
     const loginRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/login",

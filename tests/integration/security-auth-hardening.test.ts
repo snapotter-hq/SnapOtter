@@ -38,10 +38,10 @@ async function createUser(
   if (res.statusCode !== 201) {
     throw new Error(`createUser failed: ${res.statusCode} ${res.body}`);
   }
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
   return { username, password, id: body.id };
 }
 

@@ -870,7 +870,7 @@ describe("loadEnv", () => {
       "MAX_MEGAPIXELS",
       "RATE_LIMIT_PER_MIN",
       "SKIP_MUST_CHANGE_PASSWORD",
-      "DB_PATH",
+      "DATABASE_URL",
       "WORKSPACE_PATH",
       "DEFAULT_THEME",
       "DEFAULT_LOCALE",
@@ -912,7 +912,7 @@ describe("loadEnv", () => {
     expect(typeof env.MAX_MEGAPIXELS).toBe("number");
     expect(typeof env.RATE_LIMIT_PER_MIN).toBe("number");
     expect(typeof env.SKIP_MUST_CHANGE_PASSWORD).toBe("boolean");
-    expect(typeof env.DB_PATH).toBe("string");
+    expect(typeof env.DATABASE_URL).toBe("string");
     expect(typeof env.WORKSPACE_PATH).toBe("string");
     expect(["light", "dark"]).toContain(env.DEFAULT_THEME);
     expect(typeof env.DEFAULT_LOCALE).toBe("string");
@@ -1008,11 +1008,11 @@ describe("loadEnv", () => {
   });
 
   it("accepts string values for string fields", async () => {
-    process.env.DB_PATH = "/var/data/mydb.sqlite";
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/testdb";
     process.env.DEFAULT_LOCALE = "fr";
     const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
     const env = loadEnv();
-    expect(env.DB_PATH).toBe("/var/data/mydb.sqlite");
+    expect(env.DATABASE_URL).toBe("postgres://user:pass@localhost:5432/testdb");
     expect(env.DEFAULT_LOCALE).toBe("fr");
   });
 
@@ -1059,6 +1059,8 @@ describe("loadEnv", () => {
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {},
+  pool: {},
+  closeDb: async () => {},
   schema: { users: {}, sessions: {} },
 }));
 

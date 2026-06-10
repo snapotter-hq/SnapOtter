@@ -45,10 +45,10 @@ async function createAndLogin(
     headers: { authorization: `Bearer ${token}` },
     payload: { username, password: "TestPass1", role },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
   const loginRes = await app.inject({
     method: "POST",
     url: "/api/auth/login",

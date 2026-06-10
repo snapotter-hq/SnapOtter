@@ -32,12 +32,15 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => ({
-          get: () => dbGetResult.value,
-        }),
+        where: () => {
+          const val = dbGetResult.value;
+          return Promise.resolve(val ? [val] : []);
+        },
       }),
     }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     settings: { key: "key" },
     users: { id: "id", analyticsEnabled: "analyticsEnabled" },
@@ -128,8 +131,8 @@ describe("initAnalytics", () => {
 });
 
 describe("captureException", () => {
-  it("does nothing when sentryModule is null", () => {
-    expect(() => mod.captureException(new Error("test"))).not.toThrow();
+  it("does nothing when sentryModule is null", async () => {
+    await expect(mod.captureException(new Error("test"))).resolves.toBeUndefined();
   });
 
   it("does nothing when request user is not opted in", async () => {
@@ -140,7 +143,7 @@ describe("captureException", () => {
 
     mockAuthUser.value = null;
     const fakeRequest = { headers: {} } as Parameters<typeof mod.captureException>[1];
-    mod.captureException(new Error("test"), fakeRequest);
+    await mod.captureException(new Error("test"), fakeRequest);
     expect(mockSentryCapture).not.toHaveBeenCalled();
   });
 
@@ -151,7 +154,7 @@ describe("captureException", () => {
     await mod.initAnalytics();
 
     const err = new Error("test error");
-    mod.captureException(err);
+    await mod.captureException(err);
     expect(mockSentryCapture).toHaveBeenCalledWith(err);
   });
 
@@ -165,7 +168,7 @@ describe("captureException", () => {
     dbGetResult.value = { analyticsEnabled: true };
     const fakeRequest = { headers: {} } as Parameters<typeof mod.captureException>[1];
     const err = new Error("opted in error");
-    mod.captureException(err, fakeRequest);
+    await mod.captureException(err, fakeRequest);
     expect(mockSentryCapture).toHaveBeenCalledWith(err);
   });
 });
@@ -194,15 +197,19 @@ describe("shutdownAnalytics", () => {
 });
 
 describe("trackEvent", () => {
-  it("does nothing when posthogClient is null", () => {
+  it("does nothing when posthogClient is null", async () => {
     const fakeRequest = {} as Parameters<typeof mod.trackEvent>[0];
-    expect(() => mod.trackEvent(fakeRequest, "test_event", { key: "value" })).not.toThrow();
+    await expect(
+      mod.trackEvent(fakeRequest, "test_event", { key: "value" }),
+    ).resolves.toBeUndefined();
   });
 
-  it("does nothing when ANALYTICS_ENABLED is false", () => {
+  it("does nothing when ANALYTICS_ENABLED is false", async () => {
     config.ANALYTICS_ENABLED = false;
     const fakeRequest = {} as Parameters<typeof mod.trackEvent>[0];
-    expect(() => mod.trackEvent(fakeRequest, "test_event", { key: "value" })).not.toThrow();
+    await expect(
+      mod.trackEvent(fakeRequest, "test_event", { key: "value" }),
+    ).resolves.toBeUndefined();
   });
 
   it("does nothing when request user is not opted in", async () => {
@@ -212,7 +219,7 @@ describe("trackEvent", () => {
 
     mockAuthUser.value = null;
     const fakeRequest = { headers: {} } as Parameters<typeof mod.trackEvent>[0];
-    mod.trackEvent(fakeRequest, "test_event", { key: "value" });
+    await mod.trackEvent(fakeRequest, "test_event", { key: "value" });
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
@@ -225,7 +232,7 @@ describe("trackEvent", () => {
     mockAuthUser.value = { id: "user-1", analyticsEnabled: true };
     dbGetResult.value = { analyticsEnabled: true };
     const fakeRequest = { headers: {} } as Parameters<typeof mod.trackEvent>[0];
-    mod.trackEvent(fakeRequest, "test_event", { key: "value" });
+    await mod.trackEvent(fakeRequest, "test_event", { key: "value" });
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
@@ -238,7 +245,7 @@ describe("trackEvent", () => {
     mockAuthUser.value = { id: "user-1", analyticsEnabled: true };
     dbGetResult.value = { analyticsEnabled: true };
     const fakeRequest = { headers: {} } as Parameters<typeof mod.trackEvent>[0];
-    mod.trackEvent(fakeRequest, "tool_used", { tool: "resize" });
+    await mod.trackEvent(fakeRequest, "tool_used", { tool: "resize" });
     expect(mockCapture).toHaveBeenCalledWith({
       distinctId: "unknown",
       event: "tool_used",
@@ -255,7 +262,7 @@ describe("trackEvent", () => {
     dbGetResult.value = { value: "inst-abc-123", analyticsEnabled: true };
     mockAuthUser.value = { id: "user-1", analyticsEnabled: true };
     const fakeRequest = { headers: {} } as Parameters<typeof mod.trackEvent>[0];
-    mod.trackEvent(fakeRequest, "tool_used", { tool: "crop" });
+    await mod.trackEvent(fakeRequest, "tool_used", { tool: "crop" });
     expect(mockCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         distinctId: "inst-abc-123",
@@ -273,7 +280,7 @@ describe("trackEvent", () => {
     const fakeRequest = {
       headers: { "x-analytics-consent": "true" },
     } as unknown as Parameters<typeof mod.trackEvent>[0];
-    mod.trackEvent(fakeRequest, "test_event", { key: "value" });
+    await mod.trackEvent(fakeRequest, "test_event", { key: "value" });
     expect(mockCapture).toHaveBeenCalled();
   });
 

@@ -36,7 +36,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
       .select({
         id: schema.teams.id,
         name: schema.teams.name,
-        memberCount: sql<number>`(SELECT COUNT(*) FROM users WHERE users.team = ${schema.teams.id})`,
+        memberCount: sql<number>`(SELECT COUNT(*)::int FROM users WHERE users.team = ${schema.teams.id})`,
         createdAt: schema.teams.createdAt,
       })
       .from(schema.teams);
@@ -145,7 +145,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
 
       // Cannot delete a team that has members
       const [memberCount] = await db
-        .select({ count: sql<number>`COUNT(*)` })
+        .select({ count: sql<number>`COUNT(*)::int` })
         .from(schema.users)
         .where(eq(schema.users.team, id));
 

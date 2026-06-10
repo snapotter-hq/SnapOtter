@@ -18,6 +18,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     insert: () => ({ values: () => ({ run: vi.fn() }) }),
     update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     settings: { key: {} },
     jobs: { id: {}, status: {} },

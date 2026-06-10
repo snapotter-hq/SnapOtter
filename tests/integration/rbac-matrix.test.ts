@@ -19,10 +19,10 @@ beforeAll(async () => {
     headers: { authorization: `Bearer ${adminToken}` },
     payload: { username: "matrix_editor", password: "EditorPass1", role: "editor" },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, "matrix_editor"))
-    .run();
+    .where(eq(schema.users.username, "matrix_editor"));
   const editorLogin = await testApp.app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -37,10 +37,10 @@ beforeAll(async () => {
     headers: { authorization: `Bearer ${adminToken}` },
     payload: { username: "matrix_user", password: "UserPass12", role: "user" },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, "matrix_user"))
-    .run();
+    .where(eq(schema.users.username, "matrix_user"));
   const userLogin = await testApp.app.inject({
     method: "POST",
     url: "/api/auth/login",

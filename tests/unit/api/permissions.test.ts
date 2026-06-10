@@ -12,6 +12,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({ from: () => ({ where: () => ({ get: () => null }) }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: { roles: {}, settings: {} },
 }));
 
@@ -23,8 +25,8 @@ import { getPermissions, hasPermission } from "../../../apps/api/src/permissions
 
 describe("permissions", () => {
   describe("getPermissions", () => {
-    it("returns all 14 permissions for admin", () => {
-      const perms = getPermissions("admin");
+    it("returns all 14 permissions for admin", async () => {
+      const perms = await getPermissions("admin");
       expect(perms).toHaveLength(14);
       expect(perms).toContain("tools:use");
       expect(perms).toContain("files:own");
@@ -42,8 +44,8 @@ describe("permissions", () => {
       expect(perms).toContain("audit:read");
     });
 
-    it("returns only basic permissions for user role", () => {
-      const perms = getPermissions("user");
+    it("returns only basic permissions for user role", async () => {
+      const perms = await getPermissions("user");
       expect(perms).toEqual([
         "tools:use",
         "files:own",
@@ -53,8 +55,8 @@ describe("permissions", () => {
       ]);
     });
 
-    it("does NOT contain admin-only permissions for user role", () => {
-      const perms = getPermissions("user");
+    it("does NOT contain admin-only permissions for user role", async () => {
+      const perms = await getPermissions("user");
       expect(perms).not.toContain("files:all");
       expect(perms).not.toContain("apikeys:all");
       expect(perms).not.toContain("pipelines:all");
@@ -63,27 +65,27 @@ describe("permissions", () => {
       expect(perms).not.toContain("teams:manage");
     });
 
-    it("returns empty array for unknown role", () => {
-      const perms = getPermissions("unknown" as Role);
+    it("returns empty array for unknown role", async () => {
+      const perms = await getPermissions("unknown" as Role);
       expect(perms).toEqual([]);
     });
   });
 
   describe("hasPermission", () => {
-    it("returns true for admin with users:manage", () => {
-      expect(hasPermission("admin", "users:manage")).toBe(true);
+    it("returns true for admin with users:manage", async () => {
+      expect(await hasPermission("admin", "users:manage")).toBe(true);
     });
 
-    it("returns true for user with tools:use", () => {
-      expect(hasPermission("user", "tools:use")).toBe(true);
+    it("returns true for user with tools:use", async () => {
+      expect(await hasPermission("user", "tools:use")).toBe(true);
     });
 
-    it("returns false for user with users:manage", () => {
-      expect(hasPermission("user", "users:manage")).toBe(false);
+    it("returns false for user with users:manage", async () => {
+      expect(await hasPermission("user", "users:manage")).toBe(false);
     });
 
-    it("returns false for user with settings:write", () => {
-      expect(hasPermission("user", "settings:write")).toBe(false);
+    it("returns false for user with settings:write", async () => {
+      expect(await hasPermission("user", "settings:write")).toBe(false);
     });
   });
 });

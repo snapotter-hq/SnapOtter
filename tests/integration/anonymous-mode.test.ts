@@ -13,7 +13,7 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
-  ensureAnonymousUser();
+  await ensureAnonymousUser();
 }, 30_000);
 
 afterAll(async () => {
@@ -21,18 +21,18 @@ afterAll(async () => {
 }, 10_000);
 
 describe("ensureAnonymousUser", () => {
-  it("creates anonymous row in the users table", () => {
-    const row = db.select().from(schema.users).where(eq(schema.users.id, "anonymous")).get();
+  it("creates anonymous row in the users table", async () => {
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
     expect(row).toBeDefined();
     expect(row?.username).toBe("anonymous");
     expect(row?.role).toBe("admin");
     expect(row?.mustChangePassword).toBe(false);
   });
 
-  it("is idempotent", () => {
-    ensureAnonymousUser();
-    ensureAnonymousUser();
-    const rows = db.select().from(schema.users).where(eq(schema.users.id, "anonymous")).all();
+  it("is idempotent", async () => {
+    await ensureAnonymousUser();
+    await ensureAnonymousUser();
+    const rows = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
     expect(rows).toHaveLength(1);
   });
 });
@@ -40,64 +40,52 @@ describe("ensureAnonymousUser", () => {
 describe("FK constraint with anonymous userId", () => {
   it("can insert an API key with userId 'anonymous'", async () => {
     const keyHash = await hashPassword("si_test");
-    expect(() =>
-      db
-        .insert(schema.apiKeys)
-        .values({
-          id: randomUUID(),
-          userId: "anonymous",
-          keyHash,
-          keyPrefix: "si_te",
-          name: "FK test key",
-        })
-        .run(),
-    ).not.toThrow();
+    await expect(
+      db.insert(schema.apiKeys).values({
+        id: randomUUID(),
+        userId: "anonymous",
+        keyHash,
+        keyPrefix: "si_te",
+        name: "FK test key",
+      }),
+    ).resolves.toBeDefined();
   });
 
-  it("can insert a pipeline with userId 'anonymous'", () => {
-    expect(() =>
-      db
-        .insert(schema.pipelines)
-        .values({
-          id: randomUUID(),
-          userId: "anonymous",
-          name: "FK test pipeline",
-          steps: JSON.stringify([{ toolId: "resize", settings: { width: 100 } }]),
-        })
-        .run(),
-    ).not.toThrow();
+  it("can insert a pipeline with userId 'anonymous'", async () => {
+    await expect(
+      db.insert(schema.pipelines).values({
+        id: randomUUID(),
+        userId: "anonymous",
+        name: "FK test pipeline",
+        steps: JSON.stringify([{ toolId: "resize", settings: { width: 100 } }]),
+      }),
+    ).resolves.toBeDefined();
   });
 
-  it("can insert a user file with userId 'anonymous'", () => {
-    expect(() =>
-      db
-        .insert(schema.userFiles)
-        .values({
-          id: randomUUID(),
-          userId: "anonymous",
-          originalName: "test.png",
-          storedName: "fk-test-stored.png",
-          mimeType: "image/png",
-          size: 1024,
-        })
-        .run(),
-    ).not.toThrow();
+  it("can insert a user file with userId 'anonymous'", async () => {
+    await expect(
+      db.insert(schema.userFiles).values({
+        id: randomUUID(),
+        userId: "anonymous",
+        originalName: "test.png",
+        storedName: "fk-test-stored.png",
+        mimeType: "image/png",
+        size: 1024,
+      }),
+    ).resolves.toBeDefined();
   });
 
   it("rejects FK violation for nonexistent userId", async () => {
     const keyHash = await hashPassword("si_bad");
-    expect(() =>
-      db
-        .insert(schema.apiKeys)
-        .values({
-          id: randomUUID(),
-          userId: "nonexistent-user-id",
-          keyHash,
-          keyPrefix: "si_ba",
-          name: "bad FK key",
-        })
-        .run(),
-    ).toThrow();
+    await expect(
+      db.insert(schema.apiKeys).values({
+        id: randomUUID(),
+        userId: "nonexistent-user-id",
+        keyHash,
+        keyPrefix: "si_ba",
+        name: "bad FK key",
+      }),
+    ).rejects.toThrow();
   });
 });
 

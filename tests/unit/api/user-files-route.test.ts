@@ -19,11 +19,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     insert: () => ({ values: () => ({ run: vi.fn() }) }),
     delete: () => ({ where: () => ({ run: vi.fn() }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     userFiles: { id: {}, userId: {}, parentId: {}, createdAt: {}, originalName: {} },
-  },
-  sqlite: {
-    prepare: () => ({ all: () => [] }),
   },
 }));
 

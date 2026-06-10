@@ -1,22 +1,21 @@
 /**
- * Test server helper — builds a real Fastify app with an isolated temp
- * SQLite database for integration tests.
+ * Test server helper -- builds a real Fastify app with an isolated Postgres
+ * database for integration tests.
  *
- * Environment variables are injected via vitest.config.ts `test.env` BEFORE
- * this module is loaded, ensuring apps/api/src/config.ts picks them up.
+ * Environment variables (DATABASE_URL, WORKSPACE_PATH) are set per-fork in
+ * tests/setup/per-fork-env.ts BEFORE this module is loaded, ensuring
+ * apps/api/src/config.ts picks them up.
  *
  * Each call to `buildTestApp()` returns a fresh, fully-wired server instance
  * that can be exercised with `app.inject()` (no port binding required).
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 
 // ---------------------------------------------------------------------------
-// 1. Ensure directories exist for the DB and workspace paths that vitest.config
-//    injected into process.env.
+// 1. Ensure the workspace directory exists. The Postgres database is already
+//    created by per-fork-env.ts (cloned from the migrated template).
 // ---------------------------------------------------------------------------
-mkdirSync(dirname(process.env.DB_PATH!), { recursive: true });
 mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
 import cookie from "@fastify/cookie";
@@ -50,8 +49,9 @@ import { teamsRoutes } from "../../apps/api/src/routes/teams.js";
 import { registerToolRoutes } from "../../apps/api/src/routes/tools/index.js";
 import { userFileRoutes } from "../../apps/api/src/routes/user-files.js";
 
-// Run migrations to create all tables in the temp DB
-runMigrations();
+// Run migrations (idempotent -- template already has the schema, but this
+// ensures the __drizzle_migrations journal is consistent in each fork).
+await runMigrations();
 
 // ---------------------------------------------------------------------------
 // 3. Public API
@@ -66,10 +66,10 @@ export async function buildTestApp(): Promise<TestApp> {
   await ensureDefaultAdmin();
 
   // Clear the mustChangePassword flag so tests can use the admin freely
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, "admin"))
-    .run();
+    .where(eq(schema.users.username, "admin"));
 
   const app = Fastify({
     logger: false, // quiet during tests
@@ -152,7 +152,7 @@ export async function buildTestApp(): Promise<TestApp> {
 
     let dbOk = false;
     try {
-      db.select().from(schema.settings).limit(1).all();
+      await db.select().from(schema.settings).limit(1);
       dbOk = true;
     } catch {
       /* db unreachable */
@@ -184,14 +184,10 @@ export async function buildTestApp(): Promise<TestApp> {
 
   const cleanup = async () => {
     await app.close();
-    // Checkpoint WAL to prevent unbounded growth across sequential test files.
-    // Without this, the WAL/SHM files grow until SQLite hits SQLITE_IOERR_SHMSIZE.
-    try {
-      const { sqlite } = await import("../../apps/api/src/db/index.js");
-      sqlite.pragma("wal_checkpoint(TRUNCATE)");
-    } catch {
-      // best-effort
-    }
+    // The pg pool is a module-level singleton shared across the fork.
+    // Do NOT call closeDb() here; let the fork process exit naturally.
+    // Closing prematurely would break tests that run DB queries after
+    // the app is closed (e.g. verifying DB state in assertions).
   };
 
   return { app, cleanup };

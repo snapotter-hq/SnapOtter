@@ -38,10 +38,10 @@ async function createUser(
   if (res.statusCode !== 201) {
     throw new Error(`createUser failed: ${res.statusCode} ${res.body}`);
   }
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
   return { username, password, id: body.id };
 }
 
@@ -146,10 +146,10 @@ describe("Session edge cases", () => {
     const token = await loginAs("admin", "Adminpass1");
 
     // Manually expire the session in the DB
-    db.update(schema.sessions)
+    await db
+      .update(schema.sessions)
       .set({ expiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(schema.sessions.id, token))
-      .run();
+      .where(eq(schema.sessions.id, token));
 
     const res = await testApp.app.inject({
       method: "GET",

@@ -4,6 +4,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({ from: () => ({ where: () => ({ get: () => null }) }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: { roles: {}, settings: {} },
 }));
 
@@ -14,8 +16,8 @@ vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
 import { getPermissions, hasPermission } from "../../../apps/api/src/permissions.js";
 
 describe("role permissions", () => {
-  it("admin has all 14 permissions", () => {
-    const perms = getPermissions("admin");
+  it("admin has all 14 permissions", async () => {
+    const perms = await getPermissions("admin");
     expect(perms).toContain("tools:use");
     expect(perms).toContain("files:all");
     expect(perms).toContain("users:manage");
@@ -25,8 +27,8 @@ describe("role permissions", () => {
     expect(perms.length).toBe(14);
   });
 
-  it("editor has collaborative but not admin permissions", () => {
-    const perms = getPermissions("editor");
+  it("editor has collaborative but not admin permissions", async () => {
+    const perms = await getPermissions("editor");
     expect(perms).toContain("tools:use");
     expect(perms).toContain("files:own");
     expect(perms).toContain("files:all");
@@ -40,8 +42,8 @@ describe("role permissions", () => {
     expect(perms).not.toContain("audit:read");
   });
 
-  it("user has basic permissions only", () => {
-    const perms = getPermissions("user");
+  it("user has basic permissions only", async () => {
+    const perms = await getPermissions("user");
     expect(perms).toContain("tools:use");
     expect(perms).toContain("files:own");
     expect(perms).toContain("apikeys:own");
@@ -51,15 +53,15 @@ describe("role permissions", () => {
     expect(perms).not.toContain("users:manage");
   });
 
-  it("unknown role returns empty permissions", () => {
-    const perms = getPermissions("bogus" as any);
+  it("unknown role returns empty permissions", async () => {
+    const perms = await getPermissions("bogus" as any);
     expect(perms).toEqual([]);
   });
 
-  it("hasPermission checks correctly", () => {
-    expect(hasPermission("admin", "users:manage")).toBe(true);
-    expect(hasPermission("editor", "users:manage")).toBe(false);
-    expect(hasPermission("user", "tools:use")).toBe(true);
-    expect(hasPermission("user", "files:all")).toBe(false);
+  it("hasPermission checks correctly", async () => {
+    expect(await hasPermission("admin", "users:manage")).toBe(true);
+    expect(await hasPermission("editor", "users:manage")).toBe(false);
+    expect(await hasPermission("user", "tools:use")).toBe(true);
+    expect(await hasPermission("user", "files:all")).toBe(false);
   });
 });

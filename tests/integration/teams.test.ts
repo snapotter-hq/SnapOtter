@@ -26,19 +26,19 @@ afterAll(async () => {
 }, 10_000);
 
 // Helper: seed a Default team if not present
-function ensureDefaultTeam(): string {
-  const existing = db.select().from(schema.teams).where(eq(schema.teams.name, "Default")).get();
+async function ensureDefaultTeam(): Promise<string> {
+  const [existing] = await db.select().from(schema.teams).where(eq(schema.teams.name, "Default"));
   if (existing) return existing.id;
   const id = randomUUID();
-  db.insert(schema.teams).values({ id, name: "Default" }).run();
+  await db.insert(schema.teams).values({ id, name: "Default" });
   return id;
 }
 
 // Helper: clean all teams except Default, and recreate Default if missing
-function resetTeams(): string {
+async function resetTeams(): Promise<string> {
   // Delete non-Default teams
-  db.delete(schema.teams).where(sql`${schema.teams.name} != 'Default'`).run();
-  return ensureDefaultTeam();
+  await db.delete(schema.teams).where(sql`${schema.teams.name} != 'Default'`);
+  return await ensureDefaultTeam();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -106,10 +106,10 @@ describe("POST /api/v1/teams", () => {
     // Login as non-admin
     // First clear mustChangePassword
     const userId = JSON.parse(regRes.body).id;
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ mustChangePassword: false })
-      .where(eq(schema.users.id, userId))
-      .run();
+      .where(eq(schema.users.id, userId));
 
     const loginRes = await app.inject({
       method: "POST",
@@ -127,7 +127,7 @@ describe("POST /api/v1/teams", () => {
     expect(res.statusCode).toBe(403);
 
     // Cleanup
-    db.delete(schema.users).where(eq(schema.users.id, userId)).run();
+    await db.delete(schema.users).where(eq(schema.users.id, userId));
   });
 
   it("rejects duplicate names (case-insensitive)", async () => {
@@ -211,11 +211,11 @@ describe("POST /api/v1/teams", () => {
 describe("PUT /api/v1/teams/:id", () => {
   let teamId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetTeams();
     // Create a team to rename
     teamId = randomUUID();
-    db.insert(schema.teams).values({ id: teamId, name: "OldName" }).run();
+    await db.insert(schema.teams).values({ id: teamId, name: "OldName" });
   });
 
   it("renames a team", async () => {
@@ -229,7 +229,7 @@ describe("PUT /api/v1/teams/:id", () => {
     expect(JSON.parse(res.body).ok).toBe(true);
 
     // Verify
-    const team = db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get();
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
     expect(team?.name).toBe("NewName");
   });
 
@@ -293,13 +293,13 @@ describe("PUT /api/v1/teams/:id", () => {
 describe("DELETE /api/v1/teams/:id", () => {
   let defaultTeamId: string;
 
-  beforeEach(() => {
-    defaultTeamId = resetTeams();
+  beforeEach(async () => {
+    defaultTeamId = await resetTeams();
   });
 
   it("deletes an empty team", async () => {
     const teamId = randomUUID();
-    db.insert(schema.teams).values({ id: teamId, name: "ToDelete" }).run();
+    await db.insert(schema.teams).values({ id: teamId, name: "ToDelete" });
 
     const res = await app.inject({
       method: "DELETE",
@@ -310,25 +310,23 @@ describe("DELETE /api/v1/teams/:id", () => {
     expect(JSON.parse(res.body).ok).toBe(true);
 
     // Verify it's gone
-    const team = db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get();
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
     expect(team).toBeUndefined();
   });
 
   it("rejects deleting a team with members", async () => {
     const teamId = randomUUID();
-    db.insert(schema.teams).values({ id: teamId, name: "HasMembers" }).run();
+    await db.insert(schema.teams).values({ id: teamId, name: "HasMembers" });
 
     // Assign a user to this team
     const userId = randomUUID();
-    db.insert(schema.users)
-      .values({
-        id: userId,
-        username: "memberuser",
-        passwordHash: "dummy:hash",
-        role: "user",
-        team: teamId,
-      })
-      .run();
+    await db.insert(schema.users).values({
+      id: userId,
+      username: "memberuser",
+      passwordHash: "dummy:hash",
+      role: "user",
+      team: teamId,
+    });
 
     const res = await app.inject({
       method: "DELETE",
@@ -339,8 +337,8 @@ describe("DELETE /api/v1/teams/:id", () => {
     expect(JSON.parse(res.body).error).toMatch(/members/i);
 
     // Cleanup
-    db.delete(schema.users).where(eq(schema.users.id, userId)).run();
-    db.delete(schema.teams).where(eq(schema.teams.id, teamId)).run();
+    await db.delete(schema.users).where(eq(schema.users.id, userId));
+    await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
   });
 
   it("rejects deleting the Default team", async () => {
@@ -355,7 +353,7 @@ describe("DELETE /api/v1/teams/:id", () => {
 
   it("requires admin", async () => {
     const teamId = randomUUID();
-    db.insert(schema.teams).values({ id: teamId, name: "NoAuth" }).run();
+    await db.insert(schema.teams).values({ id: teamId, name: "NoAuth" });
 
     const res = await app.inject({
       method: "DELETE",
@@ -364,7 +362,7 @@ describe("DELETE /api/v1/teams/:id", () => {
     expect(res.statusCode).toBe(401);
 
     // Cleanup
-    db.delete(schema.teams).where(eq(schema.teams.id, teamId)).run();
+    await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
   });
 
   it("returns 404 for non-existent team", async () => {

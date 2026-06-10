@@ -32,6 +32,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       set: () => ({ where: () => ({ run: mockUpdateRun }) }),
     }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: {
     settings: { key: {} },
   },

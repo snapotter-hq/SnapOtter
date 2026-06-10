@@ -7,6 +7,8 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     }),
     insert: () => ({ values: () => ({ run: vi.fn() }) }),
   },
+  pool: {},
+  closeDb: async () => {},
   schema: { settings: {}, userFiles: {} },
 }));
 

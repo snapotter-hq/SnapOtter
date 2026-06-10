@@ -38,10 +38,10 @@ async function createUserAndLogin(
   }
   const regBody = JSON.parse(regRes.body);
 
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
 
   const loginRes = await testApp.app.inject({
     method: "POST",

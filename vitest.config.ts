@@ -27,6 +27,7 @@ export default defineConfig({
         maxForks: process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2)),
       },
     },
+    globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup/per-fork-env.ts"],
     exclude: [
       "tests/e2e/**",
@@ -45,7 +46,7 @@ export default defineConfig({
       AUTH_ENABLED: "true",
       DEFAULT_USERNAME: "admin",
       DEFAULT_PASSWORD: "Adminpass1",
-      // DB_PATH and WORKSPACE_PATH are set per-fork in tests/setup/per-fork-env.ts
+      // DATABASE_URL and WORKSPACE_PATH are set per-fork in tests/setup/per-fork-env.ts
       MAX_UPLOAD_SIZE_MB: "10",
       MAX_BATCH_SIZE: "10",
       RATE_LIMIT_PER_MIN: "10000",
@@ -105,6 +106,7 @@ export default defineConfig({
       "@fastify/swagger": path.join(apiNodeModules, "@fastify/swagger"),
       "@fastify/swagger-ui": path.join(apiNodeModules, "@fastify/swagger-ui"),
       "better-sqlite3": path.join(apiNodeModules, "better-sqlite3"),
+      pg: path.join(apiNodeModules, "pg"),
       "drizzle-orm": path.join(apiNodeModules, "drizzle-orm"),
       archiver: path.join(apiNodeModules, "archiver"),
       "p-queue": path.join(apiNodeModules, "p-queue"),

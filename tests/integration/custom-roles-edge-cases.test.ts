@@ -50,10 +50,10 @@ async function createUserAndLogin(
     headers: { authorization: `Bearer ${adminToken}` },
     payload: { username, password, role },
   });
-  db.update(schema.users)
+  await db
+    .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, username))
-    .run();
+    .where(eq(schema.users.username, username));
 
   const loginRes = await testApp.app.inject({
     method: "POST",
@@ -223,10 +223,10 @@ describe("CRUD edge cases", () => {
           role: roleName,
         },
       });
-      db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({ mustChangePassword: false })
-        .where(eq(schema.users.username, `multi-u${i}-${suffix}`))
-        .run();
+        .where(eq(schema.users.username, `multi-u${i}-${suffix}`));
     }
 
     // Delete the role
