@@ -212,7 +212,7 @@ describe("PUT /api/v1/teams/:id", () => {
   let teamId: string;
 
   beforeEach(async () => {
-    resetTeams();
+    await resetTeams();
     // Create a team to rename
     teamId = randomUUID();
     await db.insert(schema.teams).values({ id: teamId, name: "OldName" });

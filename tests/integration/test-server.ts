@@ -30,7 +30,12 @@ import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { runMigrations } from "../../apps/api/src/db/migrate.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
-import { authMiddleware, authRoutes, ensureDefaultAdmin } from "../../apps/api/src/plugins/auth.js";
+import {
+  authMiddleware,
+  authRoutes,
+  ensureBuiltinRoles,
+  ensureDefaultAdmin,
+} from "../../apps/api/src/plugins/auth.js";
 import { oidcRoutes } from "../../apps/api/src/plugins/oidc.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
 import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
@@ -62,7 +67,8 @@ export interface TestApp {
 }
 
 export async function buildTestApp(): Promise<TestApp> {
-  // Seed the default admin user (idempotent — skips if users already exist)
+  // Seed built-in roles and default admin user (both idempotent)
+  await ensureBuiltinRoles();
   await ensureDefaultAdmin();
 
   // Clear the mustChangePassword flag so tests can use the admin freely

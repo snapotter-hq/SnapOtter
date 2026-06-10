@@ -47,8 +47,26 @@ afterAll(async () => {
 
 // ── Batch progress tracking via X-Job-Id ────────────────────────
 
-// Fire-and-forget persist calls need a tick to flush to the DB.
-const flushPersist = () => new Promise((r) => setTimeout(r, 100));
+// Fire-and-forget persist calls need time to flush to the DB.
+// With Postgres, async writes involve network round-trips that may exceed a
+// fixed delay.  Poll for the expected terminal status with a generous ceiling.
+const flushPersist = async (
+  jobId?: string,
+  terminalStatuses: string[] = ["completed", "failed"],
+  maxMs = 2000,
+) => {
+  if (!jobId) {
+    // Fallback: fixed delay when no jobId is available
+    await new Promise((r) => setTimeout(r, 200));
+    return;
+  }
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    if (row && terminalStatuses.includes(row.status)) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
 
 describe("Batch progress tracking", () => {
   it("assigns a job ID to batch operations", async () => {
@@ -118,7 +136,7 @@ describe("Batch progress tracking", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    await flushPersist();
+    await flushPersist(clientJobId);
 
     // Check the jobs table for the persisted progress
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
@@ -157,7 +175,7 @@ describe("Batch progress tracking", () => {
     // Should fail (422 = all files failed)
     expect(res.statusCode).toBe(422);
 
-    await flushPersist();
+    await flushPersist(clientJobId);
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
     expect(job).toBeDefined();
@@ -167,7 +185,7 @@ describe("Batch progress tracking", () => {
   it("tracks progress for multi-file batch with partial success", async () => {
     const clientJobId = randomUUID();
 
-    // Mix valid image + invalid data — partial success
+    // Mix valid image + invalid data -- partial success
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
       {
@@ -193,7 +211,7 @@ describe("Batch progress tracking", () => {
     // Should succeed (at least one file processed)
     expect(res.statusCode).toBe(200);
 
-    await flushPersist();
+    await flushPersist(clientJobId);
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
     expect(job).toBeDefined();
@@ -237,7 +255,7 @@ describe("Pipeline batch progress tracking", () => {
     expect(res.headers["x-job-id"]).toBe(clientJobId);
 
     // Verify DB persistence
-    await flushPersist();
+    await flushPersist(clientJobId);
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
     expect(job).toBeDefined();
@@ -293,7 +311,7 @@ describe("Job DB record structure", () => {
       body,
     });
 
-    await flushPersist();
+    await flushPersist(clientJobId);
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
 
     expect(job).toBeDefined();
@@ -319,7 +337,7 @@ describe("SSE progress endpoint", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const res = await app.inject({
       method: "GET",
@@ -420,7 +438,7 @@ describe("updateJobProgress direct calls", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -443,7 +461,7 @@ describe("updateJobProgress direct calls", () => {
         { filename: "b.png", error: "Corrupt file" },
       ],
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -464,7 +482,7 @@ describe("updateJobProgress direct calls", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -500,7 +518,7 @@ describe("updateSingleFileProgress direct calls", () => {
       phase: "complete",
       percent: 100,
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -519,7 +537,7 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 30,
       error: "Processing timeout",
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -545,7 +563,7 @@ describe("updateSingleFileProgress direct calls", () => {
       phase: "complete",
       percent: 100,
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
@@ -571,7 +589,7 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 25,
       error: "Timeout error",
     });
-    await flushPersist();
+    await flushPersist(jobId);
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
