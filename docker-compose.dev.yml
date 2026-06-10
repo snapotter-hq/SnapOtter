@@ -6,6 +6,7 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: snapotter-dev-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: snapotter
       POSTGRES_PASSWORD: snapotter
@@ -19,10 +20,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
 
   redis:
     image: redis:8-alpine
     container_name: snapotter-dev-redis
+    restart: unless-stopped
     command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
     ports:
       - "6379:6379"
@@ -33,6 +36,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
 
 volumes:
   snapotter-dev-pgdata:
