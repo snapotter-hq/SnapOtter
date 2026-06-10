@@ -66,7 +66,9 @@ export async function hasEffectivePermission(
   return true;
 }
 
-export function requirePermission(permission: Permission) {
+export function requirePermission(
+  permission: Permission,
+): (request: FastifyRequest, reply: FastifyReply) => Promise<AuthUser | null> {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request);
     if (!user) {

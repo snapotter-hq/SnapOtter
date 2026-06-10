@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -418,14 +418,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // Invalidate all other sessions for this user
     const currentToken = extractToken(request);
-    const allSessions = await db
-      .select()
-      .from(schema.sessions)
-      .where(eq(schema.sessions.userId, authUser.id));
-    for (const s of allSessions) {
-      if (s.id !== currentToken) {
-        await db.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
-      }
+    if (currentToken) {
+      await db
+        .delete(schema.sessions)
+        .where(and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)));
     }
 
     // Revoke all API keys - if credentials were compromised, keys must be rotated too

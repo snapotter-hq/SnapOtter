@@ -83,9 +83,13 @@ export async function initAnalytics(): Promise<void> {
 }
 
 export async function captureException(error: unknown, request?: FastifyRequest): Promise<void> {
-  if (!sentryModule) return;
-  if (request && !(await isRequestOptedIn(request))) return;
-  sentryModule.captureException(error);
+  try {
+    if (!sentryModule) return;
+    if (request && !(await isRequestOptedIn(request))) return;
+    sentryModule.captureException(error);
+  } catch {
+    // analytics must never throw
+  }
 }
 
 export async function shutdownAnalytics(): Promise<void> {
@@ -137,14 +141,14 @@ export async function trackEvent(
   event: string,
   properties: Record<string, unknown>,
 ): Promise<void> {
-  if (!posthogClient || !(await isRequestOptedIn(request)) || !shouldSample()) return;
   try {
+    if (!posthogClient || !(await isRequestOptedIn(request)) || !shouldSample()) return;
     posthogClient.capture({
       distinctId: await getInstanceId(),
       event,
       properties,
     });
   } catch {
-    // never throw from analytics
+    // analytics must never throw
   }
 }
