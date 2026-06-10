@@ -29,7 +29,14 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.test
     container_name: SnapOtter-test-e2e
-    command: ["sh", "-c", "npx playwright install --with-deps chromium && pnpm test:e2e"]
+    # Visual project is excluded: linux baselines are managed by the
+    # update-visual-baselines workflow, not generated inside the container.
+    command:
+      [
+        "sh",
+        "-c",
+        "npx playwright install --with-deps chromium && pnpm playwright test --project=chromium && pnpm playwright test --project=chromium-serial --workers=1",
+      ]
     environment:
       - NODE_ENV=test
       - AUTH_ENABLED=true
