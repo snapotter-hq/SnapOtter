@@ -27,7 +27,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const isAdmin = user.role === "admin";
-    const rows = db.select().from(schema.settings).all();
+    const rows = await db.select().from(schema.settings);
 
     const settings: Record<string, string> = {};
     for (const row of rows) {
@@ -40,7 +40,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   // PUT /api/v1/settings — Save settings (admin only)
   app.put("/api/v1/settings", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requirePermission("settings:write")(request, reply);
+    const admin = await requirePermission("settings:write")(request, reply);
     if (!admin) return;
 
     const parsed = settingsBodySchema.safeParse(request.body);
@@ -75,20 +75,23 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
     for (const { key, strValue } of entries) {
       // Upsert: insert or update on conflict
-      const existing = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get();
+      const [existing] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, key));
 
       if (existing) {
-        db.update(schema.settings)
+        await db
+          .update(schema.settings)
           .set({ value: strValue, updatedAt: now })
-          .where(eq(schema.settings.key, key))
-          .run();
+          .where(eq(schema.settings.key, key));
       } else {
-        db.insert(schema.settings).values({ key, value: strValue }).run();
+        await db.insert(schema.settings).values({ key, value: strValue });
       }
     }
 
     if (entries.length > 0) {
-      auditLog(request.log, "SETTINGS_UPDATED", {
+      await auditLog(request.log, "SETTINGS_UPDATED", {
         adminId: admin.id,
         username: admin.username,
         keys: entries.map((e) => e.key),
@@ -111,7 +114,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "Forbidden", code: "FORBIDDEN" });
       }
 
-      const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get();
+      const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
 
       if (!row) {
         return reply.status(404).send({

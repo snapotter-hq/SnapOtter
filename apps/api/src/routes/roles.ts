@@ -53,18 +53,17 @@ const updateRoleSchema = z.object({
 export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/roles — List all roles (requires audit:read to view)
   app.get("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requirePermission("audit:read")(request, reply);
+    const user = await requirePermission("audit:read")(request, reply);
     if (!user) return;
 
-    const roles = db.select().from(schema.roles).all();
-    const userCounts = db
+    const roles = await db.select().from(schema.roles);
+    const userCounts = await db
       .select({
         role: schema.users.role,
         count: sql<number>`COUNT(*)`,
       })
       .from(schema.users)
-      .groupBy(schema.users.role)
-      .all();
+      .groupBy(schema.users.role);
     const countMap = new Map(userCounts.map((r) => [r.role, r.count]));
 
     return reply.send({
@@ -83,7 +82,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /api/v1/roles — Create custom role
   app.post("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requirePermission("users:manage")(request, reply);
+    const user = await requirePermission("users:manage")(request, reply);
     if (!user) return;
 
     const parsed = createRoleSchema.safeParse(request.body);
@@ -102,24 +101,22 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: `Invalid permissions: ${invalid.join(", ")}`, code: "VALIDATION_ERROR" });
     }
 
-    const existing = db.select().from(schema.roles).where(eq(schema.roles.name, name)).get();
+    const [existing] = await db.select().from(schema.roles).where(eq(schema.roles.name, name));
     if (existing) {
       return reply.status(409).send({ error: "Role name already exists", code: "CONFLICT" });
     }
 
     const id = randomUUID();
-    db.insert(schema.roles)
-      .values({
-        id,
-        name,
-        description: description?.trim() ?? "",
-        permissions,
-        isBuiltin: false,
-        createdBy: user.id,
-      })
-      .run();
+    await db.insert(schema.roles).values({
+      id,
+      name,
+      description: description?.trim() ?? "",
+      permissions,
+      isBuiltin: false,
+      createdBy: user.id,
+    });
 
-    auditLog(request.log, "ROLE_CREATED", { adminId: user.id, roleId: id, roleName: name });
+    await auditLog(request.log, "ROLE_CREATED", { adminId: user.id, roleId: id, roleName: name });
 
     return reply.status(201).send({
       id,
@@ -134,11 +131,11 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   app.put(
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requirePermission("users:manage")(request, reply);
+      const user = await requirePermission("users:manage")(request, reply);
       if (!user) return;
 
       const { id } = request.params;
-      const role = db.select().from(schema.roles).where(eq(schema.roles.id, id)).get();
+      const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
       if (!role) {
         return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
       }
@@ -159,15 +156,15 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
       if (body.name) {
-        const dup = db.select().from(schema.roles).where(eq(schema.roles.name, body.name)).get();
+        const [dup] = await db.select().from(schema.roles).where(eq(schema.roles.name, body.name));
         if (dup && dup.id !== id) {
           return reply.status(409).send({ error: "Role name already exists", code: "CONFLICT" });
         }
         // Update users on old role name to new name
-        db.update(schema.users)
+        await db
+          .update(schema.users)
           .set({ role: body.name })
-          .where(eq(schema.users.role, role.name))
-          .run();
+          .where(eq(schema.users.role, role.name));
         updates.name = body.name;
       }
       if (body.description !== undefined) {
@@ -184,8 +181,8 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         updates.permissions = body.permissions;
       }
 
-      db.update(schema.roles).set(updates).where(eq(schema.roles.id, id)).run();
-      auditLog(request.log, "ROLE_UPDATED", { adminId: user.id, roleId: id });
+      await db.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
+      await auditLog(request.log, "ROLE_UPDATED", { adminId: user.id, roleId: id });
 
       return reply.send({ ok: true });
     },
@@ -195,11 +192,11 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requirePermission("users:manage")(request, reply);
+      const user = await requirePermission("users:manage")(request, reply);
       if (!user) return;
 
       const { id } = request.params;
-      const role = db.select().from(schema.roles).where(eq(schema.roles.id, id)).get();
+      const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
       if (!role) {
         return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
       }
@@ -209,13 +206,13 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: "Cannot delete built-in roles", code: "VALIDATION_ERROR" });
       }
 
-      db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({ role: "user", updatedAt: new Date() })
-        .where(eq(schema.users.role, role.name))
-        .run();
+        .where(eq(schema.users.role, role.name));
 
-      db.delete(schema.roles).where(eq(schema.roles.id, id)).run();
-      auditLog(request.log, "ROLE_DELETED", {
+      await db.delete(schema.roles).where(eq(schema.roles.id, id));
+      await auditLog(request.log, "ROLE_DELETED", {
         adminId: user.id,
         roleId: id,
         roleName: role.name,

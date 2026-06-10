@@ -457,11 +457,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         if (fileId) {
           try {
             const { saveFile } = await import("../lib/file-storage.js");
-            const parent = db
+            const [parent] = await db
               .select()
               .from(schema.userFiles)
-              .where(eq(schema.userFiles.id, fileId))
-              .get();
+              .where(eq(schema.userFiles.id, fileId));
             if (parent) {
               const newVersion = parent.version + 1;
               const parentChain: string[] = parent.toolChain ?? [];
@@ -478,21 +477,19 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                 // dimensions are non-critical
               }
               const newId = randomUUID();
-              db.insert(schema.userFiles)
-                .values({
-                  id: newId,
-                  userId: parent.userId,
-                  originalName: result.filename,
-                  storedName,
-                  mimeType: result.contentType,
-                  size: result.buffer.length,
-                  width,
-                  height,
-                  version: newVersion,
-                  parentId: fileId,
-                  toolChain: newToolChain,
-                })
-                .run();
+              await db.insert(schema.userFiles).values({
+                id: newId,
+                userId: parent.userId,
+                originalName: result.filename,
+                storedName,
+                mimeType: result.contentType,
+                size: result.buffer.length,
+                width,
+                height,
+                version: newVersion,
+                parentId: fileId,
+                toolChain: newToolChain,
+              });
               savedFileId = newId;
             }
           } catch (saveErr) {

@@ -58,49 +58,47 @@ console.log("Database initialized");
 if (env.AUTH_ENABLED) {
   await ensureDefaultAdmin();
 } else {
-  ensureAnonymousUser();
+  await ensureAnonymousUser();
 }
 
-function ensureInstanceId() {
-  const existing = db
+async function ensureInstanceId() {
+  const [existing] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "instance_id"))
-    .get();
+    .where(eq(schema.settings.key, "instance_id"));
   if (!existing) {
-    db.insert(schema.settings).values({ key: "instance_id", value: randomUUID() }).run();
+    await db.insert(schema.settings).values({ key: "instance_id", value: randomUUID() });
   }
 }
 
-ensureInstanceId();
+await ensureInstanceId();
 
-function ensureDefaultSettings() {
+async function ensureDefaultSettings() {
   const defaults: Record<string, string> = {
     defaultTheme: env.DEFAULT_THEME,
     defaultLocale: env.DEFAULT_LOCALE,
     defaultToolView: env.DEFAULT_TOOL_VIEW,
   };
   for (const [key, value] of Object.entries(defaults)) {
-    const existing = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get();
+    const [existing] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
     if (!existing) {
-      db.insert(schema.settings).values({ key, value }).run();
+      await db.insert(schema.settings).values({ key, value });
     }
   }
 }
 
-ensureDefaultSettings();
+await ensureDefaultSettings();
 
 if (!env.COOKIE_SECRET) {
-  const existing = db
+  const [existing] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "cookie_secret"))
-    .get();
+    .where(eq(schema.settings.key, "cookie_secret"));
   if (existing) {
     (env as Record<string, unknown>).COOKIE_SECRET = existing.value;
   } else {
     const generated = randomUUID() + randomUUID();
-    db.insert(schema.settings).values({ key: "cookie_secret", value: generated }).run();
+    await db.insert(schema.settings).values({ key: "cookie_secret", value: generated });
     (env as Record<string, unknown>).COOKIE_SECRET = generated;
   }
 }
@@ -122,7 +120,7 @@ try {
 }
 
 // Mark any jobs left in processing/queued from a previous unclean shutdown
-recoverStaleJobs();
+await recoverStaleJobs();
 
 // Set up AI feature directories and recover from interrupted installs
 ensureAiDirs();
@@ -280,7 +278,7 @@ await docsRoutes(app);
 app.get("/api/v1/health", async (_request, reply) => {
   let dbOk = false;
   try {
-    db.select().from(schema.settings).limit(1).get();
+    await db.select().from(schema.settings).limit(1);
     dbOk = true;
   } catch {
     /* db unreachable */
@@ -296,12 +294,12 @@ app.get("/api/v1/health", async (_request, reply) => {
 
 // Admin health check (full diagnostics)
 app.get("/api/v1/admin/health", async (request, reply) => {
-  const admin = requirePermission("system:health")(request, reply);
+  const admin = await requirePermission("system:health")(request, reply);
   if (!admin) return;
 
   let dbOk = false;
   try {
-    db.select().from(schema.settings).limit(1).all();
+    await db.select().from(schema.settings).limit(1);
     dbOk = true;
   } catch {
     /* db unreachable */
@@ -339,7 +337,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // Start workspace cleanup cron
-const cleanupCron = startCleanupCron();
+const cleanupCron = await startCleanupCron();
 
 // Start
 try {

@@ -38,7 +38,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
     let scopedPermissions: string[] | null = null;
     if (body.permissions && body.permissions.length > 0) {
-      const userPerms = getPermissions(user.role);
+      const userPerms = await getPermissions(user.role);
       const permSet = new Set<string>(userPerms);
       const invalid = body.permissions.filter((p) => !permSet.has(p));
       if (invalid.length > 0) {
@@ -73,22 +73,20 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     const id = randomUUID();
 
     try {
-      db.insert(schema.apiKeys)
-        .values({
-          id,
-          userId: user.id,
-          keyHash,
-          keyPrefix,
-          name,
-          permissions: scopedPermissions,
-          expiresAt,
-        })
-        .run();
+      await db.insert(schema.apiKeys).values({
+        id,
+        userId: user.id,
+        keyHash,
+        keyPrefix,
+        name,
+        permissions: scopedPermissions,
+        expiresAt,
+      });
     } catch {
       return reply.status(409).send({ error: "Failed to create API key" });
     }
 
-    auditLog(request.log, "API_KEY_CREATED", { userId: user.id, keyId: id, keyName: name });
+    await auditLog(request.log, "API_KEY_CREATED", { userId: user.id, keyId: id, keyName: name });
 
     // Return the raw key ONCE — it cannot be retrieved again
     return reply.status(201).send({
@@ -114,13 +112,12 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       lastUsedAt: schema.apiKeys.lastUsedAt,
       expiresAt: schema.apiKeys.expiresAt,
     };
-    const keys = hasEffectivePermission(user, "apikeys:all")
-      ? db.select(selectFields).from(schema.apiKeys).all()
-      : db
+    const keys = (await hasEffectivePermission(user, "apikeys:all"))
+      ? await db.select(selectFields).from(schema.apiKeys)
+      : await db
           .select(selectFields)
           .from(schema.apiKeys)
-          .where(eq(schema.apiKeys.userId, user.id))
-          .all();
+          .where(eq(schema.apiKeys.userId, user.id));
 
     return reply.send({
       apiKeys: keys.map((k) => ({
@@ -144,11 +141,10 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       const { id } = request.params;
 
       // Ensure the key belongs to the requesting user
-      const existing = db
+      const [existing] = await db
         .select()
         .from(schema.apiKeys)
-        .where(and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.userId, user.id)))
-        .get();
+        .where(and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.userId, user.id)));
 
       if (!existing) {
         return reply.status(404).send({
@@ -157,9 +153,9 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id)).run();
+      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
 
-      auditLog(request.log, "API_KEY_DELETED", { userId: user.id, keyId: id });
+      await auditLog(request.log, "API_KEY_DELETED", { userId: user.id, keyId: id });
 
       return reply.send({ ok: true });
     },

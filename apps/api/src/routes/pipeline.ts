@@ -352,15 +352,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     const id = randomUUID();
 
     try {
-      db.insert(schema.pipelines)
-        .values({
-          id,
-          userId: user.id,
-          name,
-          description: description ?? null,
-          steps,
-        })
-        .run();
+      await db.insert(schema.pipelines).values({
+        id,
+        userId: user.id,
+        name,
+        description: description ?? null,
+        steps,
+      });
     } catch {
       return reply.status(409).send({ error: "Failed to save pipeline" });
     }
@@ -384,8 +382,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     if (!user) return;
 
     // Admins see all pipelines; regular users see their own + legacy (no owner)
-    const allRows = db.select().from(schema.pipelines).all();
-    const rows = hasEffectivePermission(user, "pipelines:all")
+    const allRows = await db.select().from(schema.pipelines);
+    const rows = (await hasEffectivePermission(user, "pipelines:all"))
       ? allRows
       : allRows.filter((row) => !row.userId || row.userId === user.id);
 
@@ -413,7 +411,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       const { id } = request.params;
 
-      const existing = db.select().from(schema.pipelines).where(eq(schema.pipelines.id, id)).get();
+      const [existing] = await db
+        .select()
+        .from(schema.pipelines)
+        .where(eq(schema.pipelines.id, id));
 
       if (!existing) {
         return reply.status(404).send({ error: "Pipeline not found" });
@@ -423,12 +424,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       if (
         existing.userId &&
         existing.userId !== user.id &&
-        !hasEffectivePermission(user, "pipelines:all")
+        !(await hasEffectivePermission(user, "pipelines:all"))
       ) {
         return reply.status(403).send({ error: "Not authorized to delete this pipeline" });
       }
 
-      db.delete(schema.pipelines).where(eq(schema.pipelines.id, id)).run();
+      await db.delete(schema.pipelines).where(eq(schema.pipelines.id, id));
 
       return reply.send({ ok: true });
     },

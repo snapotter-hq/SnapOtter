@@ -23,11 +23,10 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       };
     }
 
-    const row = db
+    const [row] = await db
       .select()
       .from(schema.settings)
-      .where(eq(schema.settings.key, "instance_id"))
-      .get();
+      .where(eq(schema.settings.key, "instance_id"));
 
     return {
       enabled: true,
@@ -56,28 +55,28 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
 
     if (body.remindLater) {
       const remindAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({
           analyticsEnabled: null,
           analyticsConsentShownAt: now,
           analyticsConsentRemindAt: remindAt,
           updatedAt: now,
         })
-        .where(eq(schema.users.id, user.id))
-        .run();
+        .where(eq(schema.users.id, user.id));
       return reply.send({ ok: true, analyticsEnabled: null });
     }
 
     const enabled = body.enabled === true;
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({
         analyticsEnabled: enabled,
         analyticsConsentShownAt: now,
         analyticsConsentRemindAt: null,
         updatedAt: now,
       })
-      .where(eq(schema.users.id, user.id))
-      .run();
+      .where(eq(schema.users.id, user.id));
     return reply.send({ ok: true, analyticsEnabled: enabled });
   });
 }

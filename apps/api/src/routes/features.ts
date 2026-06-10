@@ -129,7 +129,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.post(
     "/api/v1/admin/features/:bundleId/install",
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
-      const admin = requirePermission("features:manage")(request, reply);
+      const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const { bundleId } = request.params;
@@ -280,7 +280,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.post(
     "/api/v1/admin/features/:bundleId/uninstall",
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
-      const admin = requirePermission("features:manage")(request, reply);
+      const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const { bundleId } = request.params;
@@ -355,7 +355,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   app.get(
     "/api/v1/admin/features/disk-usage",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const admin = requirePermission("features:manage")(request, reply);
+      const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;
 
       const totalBytes = getDirSize(getAiDir());

@@ -16,7 +16,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../config.js";
-import { db, schema, sqlite } from "../db/index.js";
+import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
 import {
   deleteStoredFile,
@@ -85,14 +85,13 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
  * Check whether a user has exceeded their storage quota.
  * Returns the total bytes used, or throws if the quota is exceeded.
  */
-function checkStorageQuota(userId: string | null): void {
+async function checkStorageQuota(userId: string | null): Promise<void> {
   if (!userId || env.MAX_STORAGE_PER_USER_MB <= 0) return;
 
-  const result = db
+  const [result] = await db
     .select({ total: sql<number>`coalesce(sum(${schema.userFiles.size}), 0)` })
     .from(schema.userFiles)
-    .where(eq(schema.userFiles.userId, userId))
-    .get();
+    .where(eq(schema.userFiles.userId, userId));
 
   const usedBytes = result?.total ?? 0;
   const limitBytes = env.MAX_STORAGE_PER_USER_MB * 1024 * 1024;
@@ -145,7 +144,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       const conditions = [latestCondition];
 
       // Users without files:all only see their own files
-      if (!hasEffectivePermission(user, "files:all")) {
+      if (!(await hasEffectivePermission(user, "files:all"))) {
         conditions.push(eq(schema.userFiles.userId, user.id));
       }
 
@@ -154,21 +153,19 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         conditions.push(like(schema.userFiles.originalName, `%${escaped}%`));
       }
 
-      const rows = db
+      const rows = await db
         .select()
         .from(schema.userFiles)
         .where(and(...conditions))
         .orderBy(desc(schema.userFiles.createdAt))
         .limit(limit)
-        .offset(offset)
-        .all();
+        .offset(offset);
 
       // Total count (for pagination)
-      const countResult = db
+      const [countResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(schema.userFiles)
-        .where(and(...conditions))
-        .get();
+        .where(and(...conditions));
 
       return reply.send({
         files: rows.map(serializeFile),
@@ -236,26 +233,24 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         // Create DB record
         const id = randomUUID();
         try {
-          db.insert(schema.userFiles)
-            .values({
-              id,
-              userId,
-              originalName: safeName,
-              storedName,
-              mimeType,
-              size: safeBuffer.length,
-              width: validation.width,
-              height: validation.height,
-              version: 1,
-              parentId: null,
-              toolChain: null,
-            })
-            .run();
+          await db.insert(schema.userFiles).values({
+            id,
+            userId,
+            originalName: safeName,
+            storedName,
+            mimeType,
+            size: safeBuffer.length,
+            width: validation.width,
+            height: validation.height,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+          });
         } catch {
           return reply.status(409).send({ error: "Failed to save file record" });
         }
 
-        const row = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
+        const [row] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
 
         if (row) created.push(serializeFile(row));
       }
@@ -264,7 +259,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ error: "No valid files uploaded" });
       }
 
-      auditLog(request.log, "FILE_UPLOADED", {
+      await auditLog(request.log, "FILE_UPLOADED", {
         userId,
         count: created.length,
         files: created.map((f) => f.originalName),
@@ -288,20 +283,22 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const { id } = request.params;
 
-      const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
+      const [file] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
 
-      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
+      if (
+        !file ||
+        (file.userId !== user.id && !(await hasEffectivePermission(user, "files:all")))
+      ) {
         return reply.status(404).send({ error: "File not found" });
       }
 
       // Walk the full version chain using a recursive CTE.
       // First find the root ancestor, then collect all descendants.
       //
-      // Postgres conversion notes (raw sqlite.prepare CTE below):
-      //   1. tool_chain arrives as parsed jsonb (string[] | null), do NOT re-add JSON.parse
-      //   2. created_at arrives as timestamptz (Date/ISO string), remove the `* 1000` epoch-seconds conversion
-      //   3. Update ChainRow: tool_chain becomes string[] | null, created_at becomes string
-      interface ChainRow {
+      // node-postgres returns:
+      //   tool_chain as parsed jsonb (string[] | null) - do NOT JSON.parse
+      //   created_at as Date (timestamptz) - use directly, no * 1000
+      type ChainRow = {
         id: string;
         original_name: string;
         mime_type: string;
@@ -310,35 +307,34 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         height: number | null;
         version: number;
         parent_id: string | null;
-        tool_chain: string | null;
-        created_at: number;
-      }
+        tool_chain: string[] | null;
+        created_at: Date;
+      };
 
-      const chainRows = sqlite
-        .prepare(`
-          WITH RECURSIVE
-          ancestors(id, parent_id) AS (
-            SELECT id, parent_id FROM user_files WHERE id = ?
-            UNION ALL
-            SELECT uf.id, uf.parent_id FROM user_files uf
-            INNER JOIN ancestors a ON uf.id = a.parent_id
-          ),
-          chain(id, original_name, mime_type, size, width, height,
-                version, parent_id, tool_chain, created_at) AS (
-            SELECT f.id, f.original_name, f.mime_type, f.size, f.width, f.height,
-                   f.version, f.parent_id, f.tool_chain, f.created_at
-            FROM user_files f
-            WHERE f.id = (SELECT id FROM ancestors WHERE parent_id IS NULL LIMIT 1)
-            UNION ALL
-            SELECT child.id, child.original_name, child.mime_type, child.size,
-                   child.width, child.height, child.version, child.parent_id,
-                   child.tool_chain, child.created_at
-            FROM user_files child
-            INNER JOIN chain c ON child.parent_id = c.id
-          )
-          SELECT * FROM chain ORDER BY version ASC
-        `)
-        .all(id) as ChainRow[];
+      const cteResult = await db.execute<ChainRow>(sql`
+        WITH RECURSIVE
+        ancestors(id, parent_id) AS (
+          SELECT id, parent_id FROM user_files WHERE id = ${id}
+          UNION ALL
+          SELECT uf.id, uf.parent_id FROM user_files uf
+          INNER JOIN ancestors a ON uf.id = a.parent_id
+        ),
+        chain(id, original_name, mime_type, size, width, height,
+              version, parent_id, tool_chain, created_at) AS (
+          SELECT f.id, f.original_name, f.mime_type, f.size, f.width, f.height,
+                 f.version, f.parent_id, f.tool_chain, f.created_at
+          FROM user_files f
+          WHERE f.id = (SELECT id FROM ancestors WHERE parent_id IS NULL LIMIT 1)
+          UNION ALL
+          SELECT child.id, child.original_name, child.mime_type, child.size,
+                 child.width, child.height, child.version, child.parent_id,
+                 child.tool_chain, child.created_at
+          FROM user_files child
+          INNER JOIN chain c ON child.parent_id = c.id
+        )
+        SELECT * FROM chain ORDER BY version ASC
+      `);
+      const chainRows = cteResult.rows;
 
       const versions = chainRows.map((r) => ({
         id: r.id,
@@ -350,7 +346,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         version: r.version,
         parentId: r.parent_id,
         toolChain: r.tool_chain ?? [],
-        createdAt: new Date(r.created_at * 1000).toISOString(),
+        createdAt: new Date(r.created_at).toISOString(),
       }));
 
       return reply.send({
@@ -373,9 +369,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const { id } = request.params;
 
-      const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
+      const [file] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
 
-      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
+      if (
+        !file ||
+        (file.userId !== user.id && !(await hasEffectivePermission(user, "files:all")))
+      ) {
         return reply.status(404).send({ error: "File not found" });
       }
 
@@ -409,9 +408,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const { id } = request.params;
 
-      const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
+      const [file] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
 
-      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all"))) {
+      if (
+        !file ||
+        (file.userId !== user.id && !(await hasEffectivePermission(user, "files:all")))
+      ) {
         return reply.status(404).send({ error: "File not found" });
       }
 
@@ -481,49 +483,48 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     let deletedCount = 0;
 
-    interface DeleteChainRow {
+    type DeleteChainRow = {
       id: string;
       stored_name: string;
-    }
+    };
 
     for (const id of ids) {
       // Ownership check: non-admin users can only delete their own files
-      const file = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
-      if (!file || (file.userId !== user.id && !hasEffectivePermission(user, "files:all")))
+      const [file] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
+      if (!file || (file.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))))
         continue;
       // Collect all files in the chain using a recursive CTE
-      const chainRows = sqlite
-        .prepare(`
-            WITH RECURSIVE chain(id, stored_name) AS (
-              SELECT f.id, f.stored_name
-              FROM user_files f
-              WHERE f.id = (
-                WITH RECURSIVE ancestors(id, parent_id) AS (
-                  SELECT id, parent_id FROM user_files WHERE id = ?
-                  UNION ALL
-                  SELECT uf.id, uf.parent_id FROM user_files uf
-                  INNER JOIN ancestors a ON uf.id = a.parent_id
-                )
-                SELECT id FROM ancestors WHERE parent_id IS NULL LIMIT 1
-              )
+      const cteResult = await db.execute<DeleteChainRow>(sql`
+        WITH RECURSIVE chain(id, stored_name) AS (
+          SELECT f.id, f.stored_name
+          FROM user_files f
+          WHERE f.id = (
+            WITH RECURSIVE ancestors(id, parent_id) AS (
+              SELECT id, parent_id FROM user_files WHERE id = ${id}
               UNION ALL
-              SELECT child.id, child.stored_name
-              FROM user_files child
-              INNER JOIN chain c ON child.parent_id = c.id
+              SELECT uf.id, uf.parent_id FROM user_files uf
+              INNER JOIN ancestors a ON uf.id = a.parent_id
             )
-            SELECT id, stored_name FROM chain
-          `)
-        .all(id) as DeleteChainRow[];
+            SELECT id FROM ancestors WHERE parent_id IS NULL LIMIT 1
+          )
+          UNION ALL
+          SELECT child.id, child.stored_name
+          FROM user_files child
+          INNER JOIN chain c ON child.parent_id = c.id
+        )
+        SELECT id, stored_name FROM chain
+      `);
+      const chainRows = cteResult.rows;
 
       for (const row of chainRows) {
         await deleteStoredFile(row.stored_name);
         await deleteThumbnail(row.stored_name);
-        db.delete(schema.userFiles).where(eq(schema.userFiles.id, row.id)).run();
+        await db.delete(schema.userFiles).where(eq(schema.userFiles.id, row.id));
         deletedCount++;
       }
     }
 
-    auditLog(request.log, "FILE_DELETED", { userId: user.id, count: deletedCount, ids });
+    await auditLog(request.log, "FILE_DELETED", { userId: user.id, count: deletedCount, ids });
 
     return reply.send({ deleted: deletedCount });
   });
@@ -587,11 +588,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Look up the parent to compute the next version and carry forward the tool chain
-    const parent = db
+    const [parent] = await db
       .select()
       .from(schema.userFiles)
-      .where(eq(schema.userFiles.id, parentId))
-      .get();
+      .where(eq(schema.userFiles.id, parentId));
 
     if (!parent) {
       return reply.status(404).send({ error: "Parent file not found" });
@@ -619,26 +619,24 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     // Create DB record
     const id = randomUUID();
     try {
-      db.insert(schema.userFiles)
-        .values({
-          id,
-          userId,
-          originalName: resultName,
-          storedName,
-          mimeType,
-          size: safeResultBuffer.length,
-          width: validation.width,
-          height: validation.height,
-          version: nextVersion,
-          parentId,
-          toolChain: newChain,
-        })
-        .run();
+      await db.insert(schema.userFiles).values({
+        id,
+        userId,
+        originalName: resultName,
+        storedName,
+        mimeType,
+        size: safeResultBuffer.length,
+        width: validation.width,
+        height: validation.height,
+        version: nextVersion,
+        parentId,
+        toolChain: newChain,
+      });
     } catch {
       return reply.status(409).send({ error: "Failed to save result record" });
     }
 
-    const row = db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id)).get();
+    const [row] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
 
     return reply.status(201).send({ file: row ? serializeFile(row) : null });
   });

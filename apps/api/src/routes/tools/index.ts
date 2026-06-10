@@ -65,19 +65,17 @@ import { registerWatermarkText } from "./watermark-text.js";
  */
 export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   // Read disabled tools from settings
-  const disabledRow = db
+  const [disabledRow] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "disabledTools"))
-    .get();
+    .where(eq(schema.settings.key, "disabledTools"));
   const disabledTools: string[] = disabledRow ? JSON.parse(disabledRow.value) : [];
 
   // Read experimental flag
-  const expRow = db
+  const [expRow] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "enableExperimentalTools"))
-    .get();
+    .where(eq(schema.settings.key, "enableExperimentalTools"));
   const enableExperimental = expRow?.value === "true";
 
   // Get experimental tool IDs from shared constants
