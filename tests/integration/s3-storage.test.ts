@@ -19,7 +19,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { s3Storage } from "@snapotter/enterprise";
+import { loadS3Storage, type S3StorageModule } from "@snapotter/enterprise";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../apps/api/src/config.js";
 
@@ -39,6 +39,7 @@ const minioAvailable = (() => {
 })();
 
 let s3Client: S3Client;
+let s3Storage: S3StorageModule;
 let originalStorageMode: string;
 
 async function listKeys(): Promise<string[]> {
@@ -67,6 +68,8 @@ describe.skipIf(!minioAvailable)("S3 storage backend", () => {
     });
 
     await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+
+    s3Storage = await loadS3Storage();
 
     originalStorageMode = env.STORAGE_MODE;
     const e = env as Record<string, unknown>;
