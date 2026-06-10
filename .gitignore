@@ -69,3 +69,6 @@ apps/videos
 remotion/
 demo
 pentest-results/
+# Stryker mutation testing
+.stryker-tmp/
+packages/image-engine/reports/
