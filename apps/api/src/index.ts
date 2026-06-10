@@ -19,6 +19,7 @@ import {
   authMiddleware,
   authRoutes,
   ensureAnonymousUser,
+  ensureBuiltinRoles,
   ensureDefaultAdmin,
 } from "./plugins/auth.js";
 import { oidcRoutes } from "./plugins/oidc.js";
@@ -73,6 +74,11 @@ if (env.SQLITE_MIGRATE_PATH) {
     console.log("SQLITE_MIGRATE_PATH set but target is not empty; skipping import");
   }
 }
+
+// Seed built-in roles (admin, editor, user) that legacy SQLite migrations
+// inserted via data statements.  The pg baseline is DDL-only, so roles are
+// seeded here at boot time.  onConflictDoNothing makes this idempotent.
+await ensureBuiltinRoles();
 
 if (env.AUTH_ENABLED) {
   await ensureDefaultAdmin();

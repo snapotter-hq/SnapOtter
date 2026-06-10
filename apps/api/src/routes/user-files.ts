@@ -163,7 +163,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       // Total count (for pagination)
       const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(schema.userFiles)
         .where(and(...conditions));
 

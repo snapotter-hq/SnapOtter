@@ -47,6 +47,24 @@ const listeners = new Map<string, Set<(data: JobProgress | SingleFileProgress) =
 
 // ── DB persistence helpers ──────────────────────────────────────────
 
+/**
+ * Per-job serialization queues.  Fire-and-forget persist calls for the same
+ * jobId must run sequentially so that the final "completed" write is never
+ * overwritten by a late-arriving "processing" write.  Without this, the
+ * async Postgres round-trips can re-order concurrent writes.
+ */
+const persistQueues = new Map<string, Promise<void>>();
+
+function enqueuePersist(jobId: string, fn: () => Promise<void>): void {
+  const prev = persistQueues.get(jobId) ?? Promise.resolve();
+  const next = prev.then(fn, fn); // run even if prior rejected
+  persistQueues.set(jobId, next);
+  // Clean up the map entry once the queue drains
+  next.then(() => {
+    if (persistQueues.get(jobId) === next) persistQueues.delete(jobId);
+  });
+}
+
 async function persistJobProgress(progress: JobProgress): Promise<void> {
   try {
     const completionRatio =
@@ -160,7 +178,7 @@ export async function recoverStaleJobs(): Promise<void> {
  */
 export function updateJobProgress(progress: JobProgress): void {
   jobProgressStore.set(progress.jobId, progress);
-  persistJobProgress(progress);
+  enqueuePersist(progress.jobId, () => persistJobProgress(progress));
   // Notify all SSE listeners (add type: "batch" so the frontend can distinguish
   // batch events from single-file events in the shared SSE stream)
   const subs = listeners.get(progress.jobId);
@@ -181,7 +199,7 @@ export function updateJobProgress(progress: JobProgress): void {
 
 export function updateSingleFileProgress(progress: Omit<SingleFileProgress, "type">): void {
   const event: SingleFileProgress = { ...progress, type: "single" };
-  persistSingleFileProgress(progress);
+  enqueuePersist(progress.jobId, () => persistSingleFileProgress(progress));
 
   if (progress.phase === "complete" || progress.phase === "failed") {
     if (singleFileCompletions.size >= 10_000) {

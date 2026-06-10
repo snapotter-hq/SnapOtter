@@ -54,7 +54,7 @@ export async function auditLogRoutes(app: FastifyInstance): Promise<void> {
         .offset(offset);
 
       const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(schema.auditLog)
         .where(where);
 

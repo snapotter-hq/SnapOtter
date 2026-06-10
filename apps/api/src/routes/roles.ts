@@ -60,7 +60,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     const userCounts = await db
       .select({
         role: schema.users.role,
-        count: sql<number>`COUNT(*)`,
+        count: sql<number>`COUNT(*)::int`,
       })
       .from(schema.users)
       .groupBy(schema.users.role);

@@ -180,6 +180,69 @@ export async function ensureDefaultAdmin(): Promise<void> {
   }
 }
 
+/**
+ * Seed the three built-in roles (admin, editor, user) that the legacy SQLite
+ * migration 0007_custom_roles.sql used to insert.  The Postgres baseline is
+ * DDL-only, so these must be created at boot time instead.
+ *
+ * Uses onConflictDoNothing so the function is safe to call when:
+ *  - Roles already exist from a previous boot
+ *  - Roles were imported by the 1.x SQLite-to-Postgres data migrator
+ */
+export async function ensureBuiltinRoles(): Promise<void> {
+  const builtinRoles = [
+    {
+      id: "builtin-admin",
+      name: "admin",
+      description: "Full administrative access",
+      permissions: [
+        "tools:use",
+        "files:own",
+        "files:all",
+        "apikeys:own",
+        "apikeys:all",
+        "pipelines:own",
+        "pipelines:all",
+        "settings:read",
+        "settings:write",
+        "users:manage",
+        "teams:manage",
+        "branding:manage",
+        "features:manage",
+        "system:health",
+        "audit:read",
+      ],
+      isBuiltin: true,
+    },
+    {
+      id: "builtin-editor",
+      name: "editor",
+      description: "Can see all files and pipelines",
+      permissions: [
+        "tools:use",
+        "files:own",
+        "files:all",
+        "apikeys:own",
+        "pipelines:own",
+        "pipelines:all",
+        "settings:read",
+      ],
+      isBuiltin: true,
+    },
+    {
+      id: "builtin-user",
+      name: "user",
+      description: "Basic tool access",
+      permissions: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
+      isBuiltin: true,
+    },
+  ];
+
+  for (const role of builtinRoles) {
+    await db.insert(schema.roles).values(role).onConflictDoNothing();
+  }
+}
+
 // ── Login attempt limit ──────────────────────────────────────────
 
 async function getLoginAttemptLimit(): Promise<number> {
@@ -211,6 +274,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ error: "Username and password are required" });
       }
       const body = parsed.data;
+
+      // Postgres rejects NUL bytes (\x00) in text columns.  Valid usernames
+      // never contain NUL, so such credentials can never match -- return 401
+      // immediately (same result SQLite produced by running the query).
+      if (body.username.includes("\x00") || body.password.includes("\x00")) {
+        return reply.status(401).send({ error: "Invalid credentials" });
+      }
 
       const [user] = await db
         .select()
