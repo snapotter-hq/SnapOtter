@@ -10,19 +10,16 @@ import type { Crop } from "react-image-crop";
 import type { BgPreviewState } from "@/components/common/image-viewer";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
+import { TOOL_DISPLAY_MODES } from "./tool-display-modes";
 
 // ── Display modes ──────────────────────────────────────────────────
+// The DisplayMode type and per-tool map live in tool-display-modes.ts (a pure
+// module with no React imports) so tests can introspect them. Re-exported here
+// for existing importers.
 
-export type DisplayMode =
-  | "side-by-side"
-  | "before-after"
-  | "live-preview"
-  | "no-comparison"
-  | "interactive-crop"
-  | "interactive-eraser"
-  | "interactive-split"
-  | "no-dropzone"
-  | "custom-results";
+export type { DisplayMode } from "./tool-display-modes";
+
+import type { DisplayMode } from "./tool-display-modes";
 
 // ── Crop and eraser prop types ─────────────────────────────────────
 
@@ -371,161 +368,100 @@ function EraseObjectSettingsWrapper(props: { eraserProps?: EraserProps }) {
 }
 
 // ── The registry ───────────────────────────────────────────────────
+// Display modes come from TOOL_DISPLAY_MODES (tool-display-modes.ts); entries
+// here hold only the React-side pieces (Settings, ResultsPanel, livePreview,
+// accept). The merge below throws at module load if either side is missing a
+// tool, so drift between the two files cannot ship.
 
-export const toolRegistry = new Map<string, ToolRegistryEntry>([
+type RegistryEntryConfig = Omit<ToolRegistryEntry, "displayMode">;
+
+const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   // Essentials
-  ["resize", { displayMode: "side-by-side", Settings: ResizeSettings }],
-  ["crop", { displayMode: "interactive-crop", Settings: CropSettingsWrapper as never }],
-  [
-    "rotate",
-    {
-      displayMode: "side-by-side",
-      livePreview: true,
-      Settings: RotateSettings as never,
-    },
-  ],
-  ["convert", { displayMode: "no-comparison", Settings: ConvertSettings }],
-  ["compress", { displayMode: "before-after", Settings: CompressSettings }],
-  ["strip-metadata", { displayMode: "no-comparison", Settings: StripMetadataSettings }],
-  ["edit-metadata", { displayMode: "no-comparison", Settings: EditMetadataSettings }],
+  ["resize", { Settings: ResizeSettings }],
+  ["crop", { Settings: CropSettingsWrapper as never }],
+  ["rotate", { livePreview: true, Settings: RotateSettings as never }],
+  ["convert", { Settings: ConvertSettings }],
+  ["compress", { Settings: CompressSettings }],
+  ["strip-metadata", { Settings: StripMetadataSettings }],
+  ["edit-metadata", { Settings: EditMetadataSettings }],
 
   // Color adjustments (consolidated)
   [
     "adjust-colors",
-    {
-      displayMode: "live-preview" as DisplayMode,
-      livePreview: true,
-      Settings: makeColorSettingsComponent("adjust-colors") as never,
-    },
+    { livePreview: true, Settings: makeColorSettingsComponent("adjust-colors") as never },
   ],
 
   // Sharpening
-  ["sharpening", { displayMode: "before-after", Settings: SharpeningSettings }],
+  ["sharpening", { Settings: SharpeningSettings }],
 
   // Watermark & Overlay
-  ["watermark-text", { displayMode: "before-after", Settings: WatermarkTextSettings }],
-  ["watermark-image", { displayMode: "before-after", Settings: WatermarkImageSettings }],
-  ["text-overlay", { displayMode: "before-after", Settings: TextOverlaySettings }],
-  ["compose", { displayMode: "before-after", Settings: ComposeSettings }],
-  [
-    "meme-generator",
-    {
-      displayMode: "no-dropzone",
-      Settings: MemeGeneratorSettings,
-      ResultsPanel: MemeGeneratorPreview,
-    },
-  ],
+  ["watermark-text", { Settings: WatermarkTextSettings }],
+  ["watermark-image", { Settings: WatermarkImageSettings }],
+  ["text-overlay", { Settings: TextOverlaySettings }],
+  ["compose", { Settings: ComposeSettings }],
+  ["meme-generator", { Settings: MemeGeneratorSettings, ResultsPanel: MemeGeneratorPreview }],
 
   // Utilities
-  ["info", { displayMode: "no-comparison", Settings: InfoSettings }],
-  ["compare", { displayMode: "before-after", Settings: CompareSettings }],
-  [
-    "find-duplicates",
-    {
-      displayMode: "custom-results",
-      Settings: FindDuplicatesSettings,
-      ResultsPanel: FindDuplicatesResults,
-    },
-  ],
-  ["color-palette", { displayMode: "no-comparison", Settings: ColorPaletteSettings }],
-  [
-    "qr-generate",
-    { displayMode: "no-dropzone", Settings: QrGenerateSettings, ResultsPanel: QrGeneratePreview },
-  ],
-  [
-    "html-to-image",
-    {
-      displayMode: "no-dropzone",
-      Settings: HtmlToImageSettings,
-      ResultsPanel: HtmlToImageResults,
-    },
-  ],
-  ["barcode-read", { displayMode: "before-after", Settings: BarcodeReadSettings }],
-  [
-    "image-to-base64",
-    {
-      displayMode: "custom-results",
-      Settings: ImageToBase64Settings,
-      ResultsPanel: ImageToBase64Results,
-    },
-  ],
+  ["info", { Settings: InfoSettings }],
+  ["compare", { Settings: CompareSettings }],
+  ["find-duplicates", { Settings: FindDuplicatesSettings, ResultsPanel: FindDuplicatesResults }],
+  ["color-palette", { Settings: ColorPaletteSettings }],
+  ["qr-generate", { Settings: QrGenerateSettings, ResultsPanel: QrGeneratePreview }],
+  ["html-to-image", { Settings: HtmlToImageSettings, ResultsPanel: HtmlToImageResults }],
+  ["barcode-read", { Settings: BarcodeReadSettings }],
+  ["image-to-base64", { Settings: ImageToBase64Settings, ResultsPanel: ImageToBase64Results }],
 
   // Layout & Composition
-  [
-    "collage",
-    { displayMode: "no-dropzone", Settings: CollageSettings, ResultsPanel: CollagePreview },
-  ],
-  ["stitch", { displayMode: "no-comparison", Settings: StitchSettings }],
-  [
-    "split",
-    { displayMode: "interactive-split", Settings: SplitSettings, ResultsPanel: SplitCanvas },
-  ],
-  ["border", { displayMode: "live-preview", livePreview: true, Settings: BorderSettings as never }],
-  [
-    "beautify",
-    { displayMode: "live-preview", livePreview: true, Settings: BeautifySettings as never },
-  ],
+  ["collage", { Settings: CollageSettings, ResultsPanel: CollagePreview }],
+  ["stitch", { Settings: StitchSettings }],
+  ["split", { Settings: SplitSettings, ResultsPanel: SplitCanvas }],
+  ["border", { livePreview: true, Settings: BorderSettings as never }],
+  ["beautify", { livePreview: true, Settings: BeautifySettings as never }],
 
   // Format & Conversion
-  [
-    "svg-to-raster",
-    { displayMode: "before-after", accept: ".svg,.svgz", Settings: SvgToRasterSettings },
-  ],
-  ["vectorize", { displayMode: "before-after", Settings: VectorizeSettings }],
-  ["gif-tools", { displayMode: "before-after", Settings: GifToolsSettings }],
+  ["svg-to-raster", { accept: ".svg,.svgz", Settings: SvgToRasterSettings }],
+  ["vectorize", { Settings: VectorizeSettings }],
+  ["gif-tools", { Settings: GifToolsSettings }],
 
   // Optimization extras
-  ["bulk-rename", { displayMode: "before-after", Settings: BulkRenameSettings }],
-  ["favicon", { displayMode: "before-after", Settings: FaviconSettings }],
-  ["image-to-pdf", { displayMode: "before-after", Settings: ImageToPdfSettings }],
-  ["optimize-for-web", { displayMode: "before-after", Settings: OptimizeForWebSettings }],
-  [
-    "pdf-to-image",
-    { displayMode: "no-dropzone", Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview },
-  ],
+  ["bulk-rename", { Settings: BulkRenameSettings }],
+  ["favicon", { Settings: FaviconSettings }],
+  ["image-to-pdf", { Settings: ImageToPdfSettings }],
+  ["optimize-for-web", { Settings: OptimizeForWebSettings }],
+  ["pdf-to-image", { Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview }],
 
   // Adjustments extra
-  ["replace-color", { displayMode: "before-after", Settings: ReplaceColorSettings }],
-  ["color-blindness", { displayMode: "before-after", Settings: ColorBlindnessSettings }],
+  ["replace-color", { Settings: ReplaceColorSettings }],
+  ["color-blindness", { Settings: ColorBlindnessSettings }],
 
   // AI Tools
-  ["remove-background", { displayMode: "before-after", Settings: RemoveBgSettings }],
-  ["upscale", { displayMode: "before-after", Settings: UpscaleSettings }],
-  ["ocr", { displayMode: "before-after", Settings: OcrSettings }],
-  ["blur-faces", { displayMode: "before-after", Settings: BlurFacesSettings }],
-  ["enhance-faces", { displayMode: "before-after", Settings: EnhanceFacesSettings }],
-  [
-    "erase-object",
-    {
-      displayMode: "interactive-eraser",
-      Settings: EraseObjectSettingsWrapper as never,
-    },
-  ],
-  ["smart-crop", { displayMode: "before-after", Settings: SmartCropSettings }],
-  [
-    "image-enhancement",
-    {
-      displayMode: "before-after" as DisplayMode,
-      livePreview: true,
-      Settings: ImageEnhancementSettings as never,
-    },
-  ],
-  ["colorize", { displayMode: "before-after", Settings: ColorizeSettings }],
-  ["noise-removal", { displayMode: "before-after", Settings: NoiseRemovalSettings }],
-  [
-    "passport-photo",
-    {
-      displayMode: "custom-results",
-      Settings: PassportPhotoSettings,
-      ResultsPanel: PassportPhotoPreview,
-    },
-  ],
-  ["red-eye-removal", { displayMode: "before-after", Settings: RedEyeRemovalSettings }],
-  ["restore-photo", { displayMode: "before-after", Settings: RestorePhotoSettings }],
-  ["transparency-fixer", { displayMode: "before-after", Settings: TransparencyFixerSettings }],
-  ["content-aware-resize", { displayMode: "side-by-side", Settings: ContentAwareResizeSettings }],
-  ["ai-canvas-expand", { displayMode: "before-after", Settings: AiCanvasExpandSettings }],
-]);
+  ["remove-background", { Settings: RemoveBgSettings }],
+  ["upscale", { Settings: UpscaleSettings }],
+  ["ocr", { Settings: OcrSettings }],
+  ["blur-faces", { Settings: BlurFacesSettings }],
+  ["enhance-faces", { Settings: EnhanceFacesSettings }],
+  ["erase-object", { Settings: EraseObjectSettingsWrapper as never }],
+  ["smart-crop", { Settings: SmartCropSettings }],
+  ["image-enhancement", { livePreview: true, Settings: ImageEnhancementSettings as never }],
+  ["colorize", { Settings: ColorizeSettings }],
+  ["noise-removal", { Settings: NoiseRemovalSettings }],
+  ["passport-photo", { Settings: PassportPhotoSettings, ResultsPanel: PassportPhotoPreview }],
+  ["red-eye-removal", { Settings: RedEyeRemovalSettings }],
+  ["restore-photo", { Settings: RestorePhotoSettings }],
+  ["transparency-fixer", { Settings: TransparencyFixerSettings }],
+  ["content-aware-resize", { Settings: ContentAwareResizeSettings }],
+  ["ai-canvas-expand", { Settings: AiCanvasExpandSettings }],
+];
+
+export const toolRegistry = new Map<string, ToolRegistryEntry>(
+  ENTRY_CONFIG.map(([toolId, entry]) => {
+    const displayMode = TOOL_DISPLAY_MODES[toolId];
+    if (!displayMode) {
+      throw new Error(`Tool "${toolId}" has no display mode in tool-display-modes.ts`);
+    }
+    return [toolId, { ...entry, displayMode }];
+  }),
+);
 
 export function getToolRegistryEntry(toolId: string): ToolRegistryEntry | undefined {
   return toolRegistry.get(toolId);
