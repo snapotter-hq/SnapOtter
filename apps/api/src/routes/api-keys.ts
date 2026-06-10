@@ -80,7 +80,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
           keyHash,
           keyPrefix,
           name,
-          permissions: scopedPermissions ? JSON.stringify(scopedPermissions) : null,
+          permissions: scopedPermissions,
           expiresAt,
         })
         .run();
@@ -126,7 +126,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       apiKeys: keys.map((k) => ({
         id: k.id,
         name: k.name,
-        permissions: k.permissions ? JSON.parse(k.permissions) : null,
+        permissions: k.permissions ?? null,
         createdAt: k.createdAt.toISOString(),
         lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
         expiresAt: k.expiresAt?.toISOString() ?? null,

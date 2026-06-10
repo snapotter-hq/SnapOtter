@@ -68,7 +68,7 @@ export async function auditLogRoutes(app: FastifyInstance): Promise<void> {
           action: e.action,
           targetType: e.targetType,
           targetId: e.targetId,
-          details: e.details ? JSON.parse(e.details) : null,
+          details: e.details ?? null,
           ipAddress: e.ipAddress,
           createdAt: e.createdAt.toISOString(),
         })),

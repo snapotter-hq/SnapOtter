@@ -44,7 +44,7 @@ export function getPermissions(role: Role | string): Permission[] {
       .where(eq(schema.roles.name, role as string))
       .get();
     if (customRole) {
-      return JSON.parse(customRole.permissions) as Permission[];
+      return customRole.permissions as Permission[];
     }
   } catch {
     // DB not yet available during early startup

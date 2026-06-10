@@ -1,72 +1,81 @@
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  real,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
+export const jobStatus = pgEnum("job_status", ["queued", "processing", "completed", "failed"]);
+
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash"),
   role: text("role").notNull().default("user"),
   team: text("team").notNull().default("Default"),
-  mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(true),
+  mustChangePassword: boolean("must_change_password").notNull().default(true),
   authProvider: text("auth_provider").notNull().default("local"),
   externalId: text("external_id"),
   email: text("email"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
-  analyticsEnabled: integer("analytics_enabled", { mode: "boolean" }),
-  analyticsConsentShownAt: integer("analytics_consent_shown_at", { mode: "timestamp" }),
-  analyticsConsentRemindAt: integer("analytics_consent_remind_at", { mode: "timestamp" }),
+  analyticsEnabled: boolean("analytics_enabled"),
+  analyticsConsentShownAt: timestamp("analytics_consent_shown_at", { withTimezone: true }),
+  analyticsConsentRemindAt: timestamp("analytics_consent_remind_at", { withTimezone: true }),
 });
 
-export const teams = sqliteTable("teams", {
+export const teams = pgTable("teams", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   idToken: text("id_token"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const settings = sqliteTable("settings", {
+export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const jobs = sqliteTable("jobs", {
+export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),
-  status: text("status", { enum: ["queued", "processing", "completed", "failed"] })
-    .notNull()
-    .default("queued"),
+  status: jobStatus("status").notNull().default("queued"),
   progress: real("progress").notNull().default(0),
-  inputFiles: text("input_files").notNull(),
+  inputFiles: jsonb("input_files").notNull(),
   outputPath: text("output_path"),
-  settings: text("settings"),
+  settings: jsonb("settings"),
   error: text("error"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
 });
 
-export const apiKeys = sqliteTable("api_keys", {
+export const apiKeys = pgTable("api_keys", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -74,55 +83,55 @@ export const apiKeys = sqliteTable("api_keys", {
   keyHash: text("key_hash").notNull(),
   keyPrefix: text("key_prefix"),
   name: text("name").notNull().default("Default API Key"),
-  permissions: text("permissions"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  permissions: jsonb("permissions"),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
-  lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
-  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
-export const pipelines = sqliteTable("pipelines", {
+export const pipelines = pgTable("pipelines", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  steps: text("steps").notNull(), // JSON array of { toolId, settings }
-  createdAt: integer("created_at", { mode: "timestamp" })
+  steps: jsonb("steps").notNull(), // JSON array of { toolId, settings }
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const auditLog = sqliteTable("audit_log", {
+export const auditLog = pgTable("audit_log", {
   id: text("id").primaryKey(),
   actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
   actorUsername: text("actor_username").notNull(),
   action: text("action").notNull(),
   targetType: text("target_type"),
   targetId: text("target_id"),
-  details: text("details"),
+  details: jsonb("details"),
   ipAddress: text("ip_address"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const roles = sqliteTable("roles", {
+export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
   description: text("description").notNull().default(""),
-  permissions: text("permissions").notNull(),
-  isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),
+  permissions: jsonb("permissions").notNull(),
+  isBuiltin: boolean("is_builtin").notNull().default(false),
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
-export const userFiles = sqliteTable("user_files", {
+export const userFiles = pgTable("user_files", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   originalName: text("original_name").notNull(),
@@ -133,8 +142,8 @@ export const userFiles = sqliteTable("user_files", {
   height: integer("height"),
   version: integer("version").notNull().default(1),
   parentId: text("parent_id"),
-  toolChain: text("tool_chain"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  toolChain: jsonb("tool_chain"),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
 });

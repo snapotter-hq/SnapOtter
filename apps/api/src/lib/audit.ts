@@ -56,7 +56,7 @@ export function auditLog(
         action: event,
         targetType,
         targetId,
-        details: JSON.stringify(details),
+        details,
         ipAddress: null,
       })
       .run();

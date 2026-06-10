@@ -358,7 +358,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           userId: user.id,
           name,
           description: description ?? null,
-          steps: JSON.stringify(steps),
+          steps,
         })
         .run();
     } catch {
@@ -393,7 +393,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       id: row.id,
       name: row.name,
       description: row.description,
-      steps: JSON.parse(row.steps),
+      steps: row.steps,
       createdAt: row.createdAt.toISOString(),
     }));
 

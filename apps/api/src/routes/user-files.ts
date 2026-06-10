@@ -76,7 +76,7 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
     height: row.height,
     version: row.version,
     parentId: row.parentId,
-    toolChain: row.toolChain ? JSON.parse(row.toolChain) : [],
+    toolChain: row.toolChain ?? [],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -344,7 +344,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         height: r.height,
         version: r.version,
         parentId: r.parent_id,
-        toolChain: r.tool_chain ? JSON.parse(r.tool_chain) : [],
+        toolChain: r.tool_chain ?? [],
         createdAt: new Date(r.created_at * 1000).toISOString(),
       }));
 
@@ -595,7 +595,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const nextVersion = parent.version + 1;
 
     // Build the tool chain: append the new toolId to the parent's chain
-    const existingChain: string[] = parent.toolChain ? JSON.parse(parent.toolChain) : [];
+    const existingChain: string[] = parent.toolChain ? (parent.toolChain as string[]) : [];
     const newChain = toolId ? [...existingChain, toolId] : existingChain;
 
     // Determine the original filename (preserve parent's name, update extension)
@@ -626,7 +626,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           height: validation.height,
           version: nextVersion,
           parentId,
-          toolChain: JSON.stringify(newChain),
+          toolChain: newChain,
         })
         .run();
     } catch {

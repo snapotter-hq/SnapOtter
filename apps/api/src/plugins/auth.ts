@@ -944,9 +944,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
               .where(eq(schema.users.id, key.userId))
               .get();
             if (apiUser) {
-              const keyPermissions = key.permissions
-                ? JSON.parse(key.permissions as string)
-                : undefined;
+              const keyPermissions = key.permissions ?? undefined;
               (request as FastifyRequest & { user?: AuthUser }).user = {
                 id: apiUser.id,
                 username: apiUser.username,

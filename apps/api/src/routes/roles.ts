@@ -72,7 +72,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         id: r.id,
         name: r.name,
         description: r.description,
-        permissions: JSON.parse(r.permissions),
+        permissions: r.permissions,
         isBuiltin: r.isBuiltin,
         userCount: countMap.get(r.name) ?? 0,
         createdAt: r.createdAt.toISOString(),
@@ -113,7 +113,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         id,
         name,
         description: description?.trim() ?? "",
-        permissions: JSON.stringify(permissions),
+        permissions,
         isBuiltin: false,
         createdBy: user.id,
       })
@@ -181,7 +181,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
             code: "VALIDATION_ERROR",
           });
         }
-        updates.permissions = JSON.stringify(body.permissions);
+        updates.permissions = body.permissions;
       }
 
       db.update(schema.roles).set(updates).where(eq(schema.roles.id, id)).run();

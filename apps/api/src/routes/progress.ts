@@ -75,7 +75,7 @@ function persistJobProgress(progress: JobProgress): void {
           type: "batch",
           status: progress.status,
           progress: completionRatio,
-          inputFiles: JSON.stringify({ totalFiles: progress.totalFiles }),
+          inputFiles: { totalFiles: progress.totalFiles },
           error: progress.errors.length > 0 ? JSON.stringify(progress.errors) : null,
         })
         .run();
@@ -116,7 +116,7 @@ function persistSingleFileProgress(progress: Omit<SingleFileProgress, "type">): 
           type: "single",
           status,
           progress: progress.percent / 100,
-          inputFiles: "[]",
+          inputFiles: [],
           error: progress.error ?? null,
         })
         .run();
