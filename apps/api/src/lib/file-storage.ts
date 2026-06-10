@@ -54,6 +54,8 @@ const SAFE_STORAGE_EXTENSIONS = new Set([
 
 let s3Mod: S3StorageModule | null = null;
 
+// Concurrent calls may double-initialize; configureS3 is idempotent
+// (same config values, client rebuilt), so no guard is needed.
 async function getS3(): Promise<S3StorageModule> {
   if (!s3Mod) {
     const { loadS3Storage } = await import("@snapotter/enterprise");
