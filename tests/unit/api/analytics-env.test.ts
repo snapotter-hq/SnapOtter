@@ -28,10 +28,10 @@ describe("analytics env var validation", () => {
 
   // ── ANALYTICS_ENABLED ───────────────────────────────────────────────────
 
-  it("ANALYTICS_ENABLED defaults to true", async () => {
+  it("ANALYTICS_ENABLED defaults to false (no-phone-home)", async () => {
     const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
     const env = loadEnv();
-    expect(env.ANALYTICS_ENABLED).toBe(true);
+    expect(env.ANALYTICS_ENABLED).toBe(false);
   });
 
   it("ANALYTICS_ENABLED='false' transforms to boolean false", async () => {
@@ -98,10 +98,10 @@ describe("analytics env var validation", () => {
 
   // ── POSTHOG_API_KEY ────────────────────────────────────────────────────
 
-  it("POSTHOG_API_KEY defaults to the baked-in key", async () => {
+  it("POSTHOG_API_KEY defaults to empty string (no baked key)", async () => {
     const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
     const env = loadEnv();
-    expect(env.POSTHOG_API_KEY).toBe("phc_CVHjGivwWVzh76M5EjijTwP5LpiqWie3EbCzXU7w2Smy");
+    expect(env.POSTHOG_API_KEY).toBe("");
   });
 
   it("POSTHOG_API_KEY can be overridden with a custom value", async () => {
@@ -132,12 +132,10 @@ describe("analytics env var validation", () => {
 
   // ── SENTRY_DSN ─────────────────────────────────────────────────────────
 
-  it("SENTRY_DSN defaults to the baked-in DSN", async () => {
+  it("SENTRY_DSN defaults to empty string (no baked DSN)", async () => {
     const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
     const env = loadEnv();
-    expect(env.SENTRY_DSN).toBe(
-      "https://2fd53fc3b3fdc59d02cac044a4f90b71@o4511263372738560.ingest.us.sentry.io/4511264620085248",
-    );
+    expect(env.SENTRY_DSN).toBe("");
   });
 
   it("SENTRY_DSN can be overridden with a custom value", async () => {

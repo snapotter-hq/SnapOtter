@@ -80,18 +80,22 @@ const envSchema = z
     OIDC_USERNAME_CLAIM: z.string().default("preferred_username"),
     EXTERNAL_URL: z.string().default(""),
     COOKIE_SECRET: z.string().default(""),
+    REDIS_URL: z.string().default("redis://localhost:6379"),
+    SYNC_WAIT_MS: z.coerce.number().default(8000),
+    JOB_TIMEOUT_FAST_S: z.coerce.number().default(120),
+    JOB_TIMEOUT_LONG_S: z.coerce.number().default(7200),
+    JOBS_RETENTION_DAYS: z.coerce.number().default(30),
+    AUDIT_RETENTION_DAYS: z.coerce.number().default(0),
+    LOG_DIR: z.string().default("./data/logs"),
+    SCRATCH_PATH: z.string().default(""),
     ANALYTICS_ENABLED: z
       .enum(["true", "false"])
-      .default("true")
+      .default("false")
       .transform((v) => v === "true"),
     ANALYTICS_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1.0),
-    POSTHOG_API_KEY: z.string().default("phc_CVHjGivwWVzh76M5EjijTwP5LpiqWie3EbCzXU7w2Smy"),
+    POSTHOG_API_KEY: z.string().default(""),
     POSTHOG_HOST: z.string().default("https://us.i.posthog.com"),
-    SENTRY_DSN: z
-      .string()
-      .default(
-        "https://2fd53fc3b3fdc59d02cac044a4f90b71@o4511263372738560.ingest.us.sentry.io/4511264620085248",
-      ),
+    SENTRY_DSN: z.string().default(""),
   })
   .superRefine((data, ctx) => {
     if (data.STORAGE_MODE === "s3") {
