@@ -116,14 +116,17 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: "pnpm --filter @snapotter/web dev",
+      // Production build + static preview: the dev server's on-demand
+      // transform saturates under parallel workers and flakes 30s-timeout
+      // tests. The build adds ~40s once per run and removes that whole class.
+      command: "pnpm --filter @snapotter/web build && pnpm --filter @snapotter/web preview",
       port: TEST_WEB_PORT,
       reuseExistingServer: !process.env.CI,
       env: {
         PORT: String(TEST_WEB_PORT),
         VITE_API_URL: "http://localhost:13490",
       },
-      timeout: 30_000,
+      timeout: 240_000,
     },
   ],
 });
