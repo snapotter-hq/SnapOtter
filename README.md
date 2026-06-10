@@ -111,3 +111,5 @@ This project is dual-licensed under the [AGPLv3](LICENSE) and a commercial licen
 
 - **AGPLv3 (free):** You may use, modify, and distribute this software under the AGPLv3. If you run a modified version as a network service, you must make your source code available under the AGPLv3.
 - **Commercial license (paid):** For use in proprietary software or SaaS products where AGPLv3 source-disclosure is not suitable, a commercial license is available. [Contact us](mailto:contact@snapotter.com) for pricing and terms.
+
+See [LICENSING.md](LICENSING.md) for full details on the open-core boundary between AGPLv3 and commercial code.

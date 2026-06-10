@@ -42,6 +42,7 @@
     "test:e2e:docs": "playwright test --config playwright.docs.config.ts",
     "test:e2e:analytics": "playwright test --config playwright.analytics-local.config.ts",
     "test:docker": "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
+    "check:license-boundary": "node scripts/check-license-boundary.mjs",
     "version:sync": "./scripts/sync-version.sh",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",

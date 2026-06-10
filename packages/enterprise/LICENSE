@@ -1,14 +1,13 @@
-SnapOtter Enterprise License
+SnapOtter Commercial License
 
-Copyright (c) 2026 SnapOtter. All rights reserved.
+Copyright (c) 2026 SnapOtter
 
-The code in this directory and its subdirectories ("Enterprise
-Features") is licensed separately from the rest of the SnapOtter
-project, which is available under the AGPLv3 license.
+All code in this directory (packages/enterprise) and its subdirectories is
+NOT covered by the AGPL-3.0 license that governs the rest of this repository.
 
-You may view and contribute to the Enterprise Features under the terms
-of the SnapOtter Contributor License Agreement. However, you may NOT
-use, deploy, or distribute the Enterprise Features in production
-without a valid, paid SnapOtter Enterprise license.
+Use of this code in production requires a valid SnapOtter commercial license
+key (team or enterprise plan). You may view, build, and modify this code for
+evaluation and development purposes. You may not use it in production, offer
+it as a service, or redistribute it without a commercial agreement.
 
-To purchase a license: enterprise@snapotter.com
+Contact: snapotter.hq@gmail.com

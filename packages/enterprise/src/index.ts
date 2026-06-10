@@ -27,4 +27,5 @@ export function getActiveLicense(): LicensePayload | null {
   return activeLicense;
 }
 
+export * as s3Storage from "./storage-s3.js";
 export { ENTERPRISE_FEATURES, type EnterpriseFeature, type LicensePayload };

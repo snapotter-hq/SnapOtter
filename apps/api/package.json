@@ -13,7 +13,6 @@
     "migrate:sqlite": "tsx src/db/migrate-from-sqlite.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1063.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.0.0",

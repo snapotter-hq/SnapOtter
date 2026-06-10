@@ -11,6 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1063.0",
     "@snapotter/shared": "workspace:*"
   },
   "devDependencies": {

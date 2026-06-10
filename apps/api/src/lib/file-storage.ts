@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { mkdir, readFile, statfs, unlink, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { Readable } from "node:stream";
+import { s3Storage } from "@snapotter/enterprise";
 import { env } from "../config.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
@@ -49,13 +50,18 @@ const SAFE_STORAGE_EXTENSIONS = new Set([
   ".hdr",
 ]);
 
-// ── S3 backend (lazy-loaded only when STORAGE_MODE=s3) ──────────────
+// ── S3 backend (configured once when STORAGE_MODE=s3) ──────────────
 
-let s3Mod: typeof import("./storage-s3.js") | null = null;
-
-async function s3(): Promise<typeof import("./storage-s3.js")> {
-  if (!s3Mod) s3Mod = await import("./storage-s3.js");
-  return s3Mod;
+if (env.STORAGE_MODE === "s3") {
+  s3Storage.configureS3({
+    bucket: env.S3_BUCKET,
+    region: env.S3_REGION,
+    endpoint: env.S3_ENDPOINT,
+    accessKeyId: env.S3_ACCESS_KEY_ID,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+    prefix: env.S3_PREFIX,
+  });
 }
 
 function useS3(): boolean {
@@ -77,8 +83,7 @@ let storageReady = false;
 export async function ensureStorageDir(): Promise<void> {
   if (storageReady) return;
   if (useS3()) {
-    const mod = await s3();
-    await mod.checkConnection();
+    await s3Storage.checkConnection();
     storageReady = true;
     return;
   }
@@ -100,8 +105,7 @@ export async function ensureStorageDir(): Promise<void> {
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   const storedName = generateStoredName(originalName);
   if (useS3()) {
-    const mod = await s3();
-    await mod.putObject(storedName, buffer);
+    await s3Storage.putObject(storedName, buffer);
     return storedName;
   }
   await ensureStorageDir();
@@ -123,24 +127,21 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
 
 export async function readStoredFile(storedName: string): Promise<Buffer> {
   if (useS3()) {
-    const mod = await s3();
-    return mod.getObject(storedName);
+    return s3Storage.getObject(storedName);
   }
   return readFile(join(env.FILES_STORAGE_PATH, storedName));
 }
 
 export async function streamStoredFile(storedName: string): Promise<Readable> {
   if (useS3()) {
-    const mod = await s3();
-    return mod.getObjectStream(storedName);
+    return s3Storage.getObjectStream(storedName);
   }
   return createReadStream(join(env.FILES_STORAGE_PATH, storedName));
 }
 
 export async function deleteStoredFile(storedName: string): Promise<void> {
   if (useS3()) {
-    const mod = await s3();
-    await mod.deleteObject(storedName);
+    await s3Storage.deleteObject(storedName);
     return;
   }
   try {
@@ -182,8 +183,7 @@ function thumbPath(storedName: string): string {
 
 export async function getCachedThumbnail(storedName: string): Promise<Buffer | null> {
   if (useS3()) {
-    const mod = await s3();
-    return mod.getThumbnail(storedName);
+    return s3Storage.getThumbnail(storedName);
   }
   try {
     return await readFile(thumbPath(storedName));
@@ -194,8 +194,7 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
 
 export async function saveThumbnail(storedName: string, buffer: Buffer): Promise<void> {
   if (useS3()) {
-    const mod = await s3();
-    await mod.putThumbnail(storedName, buffer);
+    await s3Storage.putThumbnail(storedName, buffer);
     return;
   }
   await ensureThumbDir();
@@ -204,8 +203,7 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
 
 export async function deleteThumbnail(storedName: string): Promise<void> {
   if (useS3()) {
-    const mod = await s3();
-    await mod.deleteThumbnail(storedName);
+    await s3Storage.deleteThumbnail(storedName);
     return;
   }
   try {
