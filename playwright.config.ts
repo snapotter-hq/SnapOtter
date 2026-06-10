@@ -19,8 +19,9 @@ export default defineConfig({
   },
   snapshotPathTemplate: "{testDir}/__screenshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
-  retries: 0,
-  workers: 1,
+  retries: process.env.CI ? 1 : 0,
+  // Overridable so CI smoke and the serial bucket can pin their own count.
+  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 1,
   reporter: "html",
   use: {
     baseURL: `http://localhost:${TEST_WEB_PORT}`,
