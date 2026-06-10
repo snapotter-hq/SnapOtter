@@ -33,16 +33,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   user: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
 };
 
-export function getPermissions(role: Role | string): Permission[] {
+export async function getPermissions(role: Role | string): Promise<Permission[]> {
   if (role in ROLE_PERMISSIONS) {
     return ROLE_PERMISSIONS[role as Role];
   }
   try {
-    const customRole = db
+    const [customRole] = await db
       .select()
       .from(schema.roles)
-      .where(eq(schema.roles.name, role as string))
-      .get();
+      .where(eq(schema.roles.name, role as string));
     if (customRole) {
       return customRole.permissions as Permission[];
     }
@@ -52,12 +51,15 @@ export function getPermissions(role: Role | string): Permission[] {
   return [];
 }
 
-export function hasPermission(role: Role | string, permission: Permission): boolean {
-  return getPermissions(role).includes(permission);
+export async function hasPermission(role: Role | string, permission: Permission): Promise<boolean> {
+  return (await getPermissions(role)).includes(permission);
 }
 
-export function hasEffectivePermission(user: AuthUser, permission: Permission): boolean {
-  if (!hasPermission(user.role, permission)) return false;
+export async function hasEffectivePermission(
+  user: AuthUser,
+  permission: Permission,
+): Promise<boolean> {
+  if (!(await hasPermission(user.role, permission))) return false;
   if (user.apiKeyPermissions) {
     return user.apiKeyPermissions.includes(permission);
   }
@@ -65,13 +67,13 @@ export function hasEffectivePermission(user: AuthUser, permission: Permission): 
 }
 
 export function requirePermission(permission: Permission) {
-  return (request: FastifyRequest, reply: FastifyReply) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request);
     if (!user) {
       reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
       return null;
     }
-    if (!hasEffectivePermission(user, permission)) {
+    if (!(await hasEffectivePermission(user, permission))) {
       reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
       return null;
     }
@@ -79,7 +81,7 @@ export function requirePermission(permission: Permission) {
   };
 }
 
-export function requireOwnershipOrPermission(
+export async function requireOwnershipOrPermission(
   request: FastifyRequest,
   reply: FastifyReply,
   resourceUserId: string | null,
@@ -90,7 +92,7 @@ export function requireOwnershipOrPermission(
     reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
     return null;
   }
-  if (resourceUserId !== user.id && !hasEffectivePermission(user, allPermission)) {
+  if (resourceUserId !== user.id && !(await hasEffectivePermission(user, allPermission))) {
     return null;
   }
   return user;

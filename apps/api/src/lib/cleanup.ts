@@ -9,13 +9,12 @@ import { db, schema } from "../db/index.js";
  * Read the temp file max age from DB settings, falling back to env var.
  * Called each cleanup cycle so changes take effect without restart.
  */
-export function getMaxAgeMs(): number {
+export async function getMaxAgeMs(): Promise<number> {
   try {
-    const row = db
+    const [row] = await db
       .select()
       .from(schema.settings)
-      .where(eq(schema.settings.key, "tempFileMaxAgeHours"))
-      .get();
+      .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
     if (row) {
       const hours = parseFloat(row.value);
       if (!Number.isNaN(hours) && hours > 0) return hours * 60 * 60 * 1000;
@@ -30,20 +29,19 @@ export function getMaxAgeMs(): number {
  * Check whether startup cleanup should run.
  * Returns true by default; only returns false when explicitly set to "false".
  */
-export function shouldRunStartupCleanup(): boolean {
+export async function shouldRunStartupCleanup(): Promise<boolean> {
   try {
-    const row = db
+    const [row] = await db
       .select()
       .from(schema.settings)
-      .where(eq(schema.settings.key, "startupCleanup"))
-      .get();
+      .where(eq(schema.settings.key, "startupCleanup"));
     return row ? row.value !== "false" : true;
   } catch {
     return true;
   }
 }
 
-export function startCleanupCron(): { stop: () => void } {
+export async function startCleanupCron(): Promise<{ stop: () => void }> {
   try {
     mkdirSync(env.WORKSPACE_PATH, { recursive: true });
   } catch (err: unknown) {
@@ -59,7 +57,7 @@ export function startCleanupCron(): { stop: () => void } {
   const intervalMs = env.CLEANUP_INTERVAL_MINUTES * 60 * 1000;
 
   const cleanup = async () => {
-    const maxAgeMs = getMaxAgeMs();
+    const maxAgeMs = await getMaxAgeMs();
     try {
       const entries = await readdir(env.WORKSPACE_PATH, { withFileTypes: true }).catch(() => []);
       const now = Date.now();
@@ -87,12 +85,12 @@ export function startCleanupCron(): { stop: () => void } {
   };
 
   // Purge expired sessions from the database
-  const purgeExpiredSessions = () => {
+  const purgeExpiredSessions = async () => {
     try {
       const now = new Date();
-      const result = db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, now)).run();
-      if (result.changes > 0) {
-        console.log(`Cleanup: purged ${result.changes} expired sessions`);
+      const result = await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, now));
+      if (result.rowCount && result.rowCount > 0) {
+        console.log(`Cleanup: purged ${result.rowCount} expired sessions`);
       }
     } catch (err) {
       console.error("Session cleanup error:", err);
@@ -100,7 +98,7 @@ export function startCleanupCron(): { stop: () => void } {
   };
 
   // Run on startup only if setting allows it
-  if (shouldRunStartupCleanup()) {
+  if (await shouldRunStartupCleanup()) {
     cleanup();
     purgeExpiredSessions();
   }

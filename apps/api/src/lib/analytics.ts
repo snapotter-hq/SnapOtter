@@ -82,9 +82,9 @@ export async function initAnalytics(): Promise<void> {
   }
 }
 
-export function captureException(error: unknown, request?: FastifyRequest): void {
+export async function captureException(error: unknown, request?: FastifyRequest): Promise<void> {
   if (!sentryModule) return;
-  if (request && !isRequestOptedIn(request)) return;
+  if (request && !(await isRequestOptedIn(request))) return;
   sentryModule.captureException(error);
 }
 
@@ -100,19 +100,22 @@ export async function shutdownAnalytics(): Promise<void> {
   }
 }
 
-function getInstanceId(): string {
-  const row = db.select().from(schema.settings).where(eq(schema.settings.key, "instance_id")).get();
+async function getInstanceId(): Promise<string> {
+  const [row] = await db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.key, "instance_id"));
   return row?.value ?? "unknown";
 }
 
-function isUserOptedIn(userId: string): boolean {
+async function isUserOptedIn(userId: string): Promise<boolean> {
   if (!env.ANALYTICS_ENABLED) return false;
   if (userId === "anonymous") return false;
-  const user = db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
   return user?.analyticsEnabled === true;
 }
 
-function isRequestOptedIn(request: FastifyRequest): boolean {
+async function isRequestOptedIn(request: FastifyRequest): Promise<boolean> {
   if (!env.ANALYTICS_ENABLED) return false;
   const user = getAuthUser(request);
   if (!user) return false;
@@ -120,7 +123,7 @@ function isRequestOptedIn(request: FastifyRequest): boolean {
     const header = request.headers["x-analytics-consent"];
     return header === "true";
   }
-  return isUserOptedIn(user.id);
+  return await isUserOptedIn(user.id);
 }
 
 function shouldSample(): boolean {
@@ -129,15 +132,15 @@ function shouldSample(): boolean {
   return Math.random() < env.ANALYTICS_SAMPLE_RATE;
 }
 
-export function trackEvent(
+export async function trackEvent(
   request: FastifyRequest,
   event: string,
   properties: Record<string, unknown>,
-): void {
-  if (!posthogClient || !isRequestOptedIn(request) || !shouldSample()) return;
+): Promise<void> {
+  if (!posthogClient || !(await isRequestOptedIn(request)) || !shouldSample()) return;
   try {
     posthogClient.capture({
-      distinctId: getInstanceId(),
+      distinctId: await getInstanceId(),
       event,
       properties,
     });

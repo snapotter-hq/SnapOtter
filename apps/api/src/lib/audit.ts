@@ -35,11 +35,11 @@ type AuditEvent =
  *
  * Dual-writes: structured stdout log (for aggregators) + SQLite row.
  */
-export function auditLog(
+export async function auditLog(
   logger: FastifyBaseLogger,
   event: AuditEvent,
   details: Record<string, unknown> = {},
-): void {
+): Promise<void> {
   logger.info({ audit: true, event, ...details }, `[AUDIT] ${event}`);
 
   const actorId = (details.userId as string) ?? (details.adminId as string) ?? null;
@@ -48,18 +48,16 @@ export function auditLog(
   const targetType = deriveTargetType(event);
 
   try {
-    db.insert(schema.auditLog)
-      .values({
-        id: randomUUID(),
-        actorId,
-        actorUsername,
-        action: event,
-        targetType,
-        targetId,
-        details,
-        ipAddress: null,
-      })
-      .run();
+    await db.insert(schema.auditLog).values({
+      id: randomUUID(),
+      actorId,
+      actorUsername,
+      action: event,
+      targetType,
+      targetId,
+      details,
+      ipAddress: null,
+    });
   } catch {
     logger.warn({ event }, "Failed to write audit log to DB");
   }

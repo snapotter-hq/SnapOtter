@@ -136,11 +136,12 @@ export function createSessionToken(): string {
 
 // ── Default admin creation ─────────────────────────────────────────
 
-export function ensureAnonymousUser(): void {
-  const existing = db.select().from(schema.users).where(eq(schema.users.id, "anonymous")).get();
+export async function ensureAnonymousUser(): Promise<void> {
+  const [existing] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
   if (existing) return;
 
-  db.insert(schema.users)
+  await db
+    .insert(schema.users)
     .values({
       id: "anonymous",
       username: "anonymous",
@@ -148,19 +149,18 @@ export function ensureAnonymousUser(): void {
       mustChangePassword: false,
       authProvider: "local",
     })
-    .onConflictDoNothing()
-    .run();
+    .onConflictDoNothing();
 }
 
 export async function ensureDefaultAdmin(): Promise<void> {
-  const existingUsers = db.select().from(schema.users).all();
+  const existingUsers = await db.select().from(schema.users);
   if (existingUsers.length > 0) return;
 
   const id = randomUUID();
   const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
 
   const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
-  const result = db
+  const result = await db
     .insert(schema.users)
     .values({
       id,
@@ -169,13 +169,12 @@ export async function ensureDefaultAdmin(): Promise<void> {
       role: "admin",
       mustChangePassword: mustChange,
     })
-    .onConflictDoNothing()
-    .run();
+    .onConflictDoNothing();
 
-  if (result.changes > 0) {
+  if (result.rowCount && result.rowCount > 0) {
     console.log(
       mustChange
-        ? `Default admin user '${env.DEFAULT_USERNAME}' created — password change required on first login`
+        ? `Default admin user '${env.DEFAULT_USERNAME}' created - password change required on first login`
         : `Default admin user '${env.DEFAULT_USERNAME}' created (password change skipped via env)`,
     );
   }
@@ -183,12 +182,11 @@ export async function ensureDefaultAdmin(): Promise<void> {
 
 // ── Login attempt limit ──────────────────────────────────────────
 
-function getLoginAttemptLimit(): number {
-  const row = db
+async function getLoginAttemptLimit(): Promise<number> {
+  const [row] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "loginAttemptLimit"))
-    .get();
+    .where(eq(schema.settings.key, "loginAttemptLimit"));
   if (row) {
     const parsed = parseInt(row.value, 10);
     if (!Number.isNaN(parsed) && parsed > 0) return parsed;
@@ -214,14 +212,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const body = parsed.data;
 
-      const user = db
+      const [user] = await db
         .select()
         .from(schema.users)
-        .where(eq(schema.users.username, body.username))
-        .get();
+        .where(eq(schema.users.username, body.username));
 
       if (!user || !user.passwordHash) {
-        auditLog(request.log, "LOGIN_FAILED", {
+        await auditLog(request.log, "LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "unknown_user",
         });
@@ -230,7 +227,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const valid = await verifyPassword(body.password, user.passwordHash);
       if (!valid) {
-        auditLog(request.log, "LOGIN_FAILED", {
+        await auditLog(request.log, "LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "bad_password",
         });
@@ -241,17 +238,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      db.insert(schema.sessions)
-        .values({
-          id: token,
-          userId: user.id,
-          expiresAt,
-        })
-        .run();
+      await db.insert(schema.sessions).values({
+        id: token,
+        userId: user.id,
+        expiresAt,
+      });
 
-      auditLog(request.log, "LOGIN_SUCCESS", { userId: user.id, username: user.username });
+      await auditLog(request.log, "LOGIN_SUCCESS", { userId: user.id, username: user.username });
 
-      const teamRow = db.select().from(schema.teams).where(eq(schema.teams.id, user.team)).get();
+      const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
 
       return reply.send({
         token,
@@ -260,7 +255,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: user.username,
           role: user.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-          permissions: getPermissions(user.role),
+          permissions: await getPermissions(user.role),
           teamName: teamRow?.name ?? user.team,
           analyticsEnabled: user.analyticsEnabled ?? null,
           analyticsConsentShownAt: user.analyticsConsentShownAt?.getTime() ?? null,
@@ -278,7 +273,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     let logoutUrl: string | undefined;
 
     if (token) {
-      const session = db.select().from(schema.sessions).where(eq(schema.sessions.id, token)).get();
+      const [session] = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, token));
 
       if (session?.idToken && env.OIDC_ENABLED) {
         try {
@@ -296,7 +294,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      db.delete(schema.sessions).where(eq(schema.sessions.id, token)).run();
+      await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
     }
 
     // Clear the session cookie
@@ -307,7 +305,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       cookieReply.clearCookie("snapotter-session", { path: "/" });
     }
 
-    auditLog(request.log, "LOGOUT", { userId: user?.id });
+    await auditLog(request.log, "LOGOUT", { userId: user?.id });
     return reply.send({ ok: true, ...(logoutUrl && { logoutUrl }) });
   });
 
@@ -320,7 +318,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: "anonymous",
           role: "admin",
           mustChangePassword: false,
-          permissions: getPermissions("admin"),
+          permissions: await getPermissions("admin"),
           analyticsEnabled: null,
           analyticsConsentShownAt: null,
           analyticsConsentRemindAt: null,
@@ -334,16 +332,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "No session token provided" });
     }
 
-    const session = db.select().from(schema.sessions).where(eq(schema.sessions.id, token)).get();
+    const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
 
     if (!session || session.expiresAt < new Date()) {
       if (session) {
-        db.delete(schema.sessions).where(eq(schema.sessions.id, token)).run();
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
       }
       return reply.status(401).send({ error: "Session expired or invalid" });
     }
 
-    const user = db.select().from(schema.users).where(eq(schema.users.id, session.userId)).get();
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, session.userId));
 
     if (!user) {
       return reply.status(401).send({ error: "User not found" });
@@ -355,7 +353,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         username: user.username,
         role: user.role,
         mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-        permissions: getPermissions(user.role),
+        permissions: await getPermissions(user.role),
         authProvider: user.authProvider ?? "local",
         loginMethod: session.idToken ? "oidc" : "local",
         email: user.email ?? null,
@@ -391,7 +389,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const user = db.select().from(schema.users).where(eq(schema.users.id, authUser.id)).get();
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, authUser.id));
 
     if (!user) {
       return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
@@ -413,38 +411,40 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const newHash = await hashPassword(body.newPassword);
 
-    db.update(schema.users)
+    await db
+      .update(schema.users)
       .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
-      .where(eq(schema.users.id, authUser.id))
-      .run();
+      .where(eq(schema.users.id, authUser.id));
 
     // Invalidate all other sessions for this user
     const currentToken = extractToken(request);
-    const allSessions = db
+    const allSessions = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.userId, authUser.id))
-      .all();
+      .where(eq(schema.sessions.userId, authUser.id));
     for (const s of allSessions) {
       if (s.id !== currentToken) {
-        db.delete(schema.sessions).where(eq(schema.sessions.id, s.id)).run();
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
       }
     }
 
-    // Revoke all API keys — if credentials were compromised, keys must be rotated too
-    db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id)).run();
+    // Revoke all API keys - if credentials were compromised, keys must be rotated too
+    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
 
-    auditLog(request.log, "PASSWORD_CHANGED", { userId: authUser.id, username: authUser.username });
+    await auditLog(request.log, "PASSWORD_CHANGED", {
+      userId: authUser.id,
+      username: authUser.username,
+    });
 
     return reply.send({ ok: true });
   });
 
   // GET /api/auth/users (admin only)
   app.get("/api/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requirePermission("users:manage")(request, reply);
+    const admin = await requirePermission("users:manage")(request, reply);
     if (!admin) return;
 
-    const users = db
+    const users = await db
       .select({
         id: schema.users.id,
         username: schema.users.username,
@@ -456,11 +456,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         passwordHash: schema.users.passwordHash,
         createdAt: schema.users.createdAt,
       })
-      .from(schema.users)
-      .all();
+      .from(schema.users);
 
     // Build a team ID -> name lookup
-    const allTeams = db.select().from(schema.teams).all();
+    const allTeams = await db.select().from(schema.teams);
     const teamNameById = new Map(allTeams.map((t) => [t.id, t.name]));
 
     return reply.send({
@@ -481,7 +480,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /api/auth/register (admin only)
   app.post("/api/auth/register", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = requirePermission("users:manage")(request, reply);
+    const admin = await requirePermission("users:manage")(request, reply);
     if (!admin) return;
 
     const parsed = registerSchema.safeParse(request.body);
@@ -515,11 +514,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (validBuiltinRoles.includes(body.role)) {
         role = body.role;
       } else {
-        const customRole = db
+        const [customRole] = await db
           .select()
           .from(schema.roles)
-          .where(eq(schema.roles.name, body.role))
-          .get();
+          .where(eq(schema.roles.name, body.role));
         if (customRole) {
           role = body.role;
         }
@@ -544,35 +542,32 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     if (requestedTeam) {
       // Look up by name first, then fall back to ID
-      const teamByName = db
+      const [teamByName] = await db
         .select()
         .from(schema.teams)
-        .where(eq(schema.teams.name, requestedTeam))
-        .get();
-      const teamById = teamByName
-        ? null
-        : db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam)).get();
+        .where(eq(schema.teams.name, requestedTeam));
+      const [teamById] = teamByName
+        ? [null]
+        : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
       const found = teamByName || teamById;
       if (!found)
         return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
       teamId = found.id;
       teamName = found.name;
     } else {
-      const defaultTeam = db
+      const [defaultTeam] = await db
         .select()
         .from(schema.teams)
-        .where(eq(schema.teams.name, "Default"))
-        .get();
+        .where(eq(schema.teams.name, "Default"));
       teamId = defaultTeam?.id || "default-team-00000000";
       teamName = defaultTeam?.name || "Default";
     }
 
     // Check for duplicate username first (so 409 takes priority over limit)
-    const existing = db
+    const [existing] = await db
       .select()
       .from(schema.users)
-      .where(eq(schema.users.username, body.username))
-      .get();
+      .where(eq(schema.users.username, body.username));
 
     if (existing) {
       return reply.status(409).send({
@@ -583,7 +578,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // Check user limit (0 = unlimited)
     if (MAX_USERS > 0) {
-      const userCount = db.select().from(schema.users).all().length;
+      const allUsers = await db.select().from(schema.users);
+      const userCount = allUsers.length;
       if (userCount >= MAX_USERS) {
         return reply.status(403).send({
           error: `User limit reached (${MAX_USERS} max)`,
@@ -595,18 +591,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const id = randomUUID();
     const passwordHash = await hashPassword(body.password);
 
-    db.insert(schema.users)
-      .values({
-        id,
-        username: body.username,
-        passwordHash,
-        role,
-        team: teamId,
-        mustChangePassword: true,
-      })
-      .run();
+    await db.insert(schema.users).values({
+      id,
+      username: body.username,
+      passwordHash,
+      role,
+      team: teamId,
+      mustChangePassword: true,
+    });
 
-    auditLog(request.log, "USER_CREATED", {
+    await auditLog(request.log, "USER_CREATED", {
       adminId: admin.id,
       newUserId: id,
       newUsername: body.username,
@@ -625,7 +619,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.put(
     "/api/auth/users/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requirePermission("users:manage")(request, reply);
+      const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -638,7 +632,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const body = parsed.data;
 
-      const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
@@ -663,9 +657,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (body.role) {
         const validBuiltinRoles = ["admin", "editor", "user"];
-        const isValid =
-          validBuiltinRoles.includes(body.role) ||
-          db.select().from(schema.roles).where(eq(schema.roles.name, body.role)).get();
+        const [customRoleRow] = validBuiltinRoles.includes(body.role)
+          ? [null]
+          : await db.select().from(schema.roles).where(eq(schema.roles.name, body.role));
+        const isValid = validBuiltinRoles.includes(body.role) || customRoleRow;
         if (isValid) {
           // Prevent removing your own admin role
           if (id === admin.id && body.role !== "admin") {
@@ -677,11 +672,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
           // Last admin protection
           if (user.role === "admin" && body.role !== "admin") {
-            const adminCount = db
+            const [adminCount] = await db
               .select({ count: sql<number>`COUNT(*)` })
               .from(schema.users)
-              .where(eq(schema.users.role, "admin"))
-              .get();
+              .where(eq(schema.users.role, "admin"));
             if (adminCount && adminCount.count <= 1) {
               return reply.status(400).send({
                 error: "Cannot demote the last admin",
@@ -696,14 +690,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (body.team?.trim()) {
         // Look up by name first, then fall back to ID
-        const teamByName = db
+        const [teamByName] = await db
           .select()
           .from(schema.teams)
-          .where(eq(schema.teams.name, body.team.trim()))
-          .get();
-        const teamById = teamByName
-          ? null
-          : db.select().from(schema.teams).where(eq(schema.teams.id, body.team.trim())).get();
+          .where(eq(schema.teams.name, body.team.trim()));
+        const [teamById] = teamByName
+          ? [null]
+          : await db.select().from(schema.teams).where(eq(schema.teams.id, body.team.trim()));
         const found = teamByName || teamById;
         if (!found) {
           return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
@@ -711,18 +704,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         updates.team = found.id;
       }
 
-      db.update(schema.users).set(updates).where(eq(schema.users.id, id)).run();
+      await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
 
       // Invalidate all sessions when role changes to force re-login with new permissions
       if (updates.role && updates.role !== user.role) {
-        db.delete(schema.sessions).where(eq(schema.sessions.userId, id)).run();
+        await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
         request.log.info(
           { targetUserId: id, oldRole: user.role, newRole: updates.role },
           "Sessions invalidated due to role change",
         );
       }
 
-      auditLog(request.log, "USER_UPDATED", {
+      await auditLog(request.log, "USER_UPDATED", {
         adminId: admin.id,
         targetUserId: id,
         changes: { role: updates.role, team: updates.team },
@@ -736,7 +729,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/users/:id/reset-password",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requirePermission("users:manage")(request, reply);
+      const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -757,7 +750,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
@@ -772,18 +765,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const newHash = await hashPassword(body.newPassword);
 
-      db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, id))
-        .run();
+        .where(eq(schema.users.id, id));
 
       // Invalidate all sessions for this user
-      db.delete(schema.sessions).where(eq(schema.sessions.userId, id)).run();
+      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
       // Revoke all API keys
-      db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id)).run();
+      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
 
-      auditLog(request.log, "PASSWORD_RESET", {
+      await auditLog(request.log, "PASSWORD_RESET", {
         adminId: admin.id,
         targetUserId: id,
         targetUsername: user.username,
@@ -797,7 +790,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     "/api/auth/users/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = requirePermission("users:manage")(request, reply);
+      const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
 
       const { id } = request.params;
@@ -809,19 +802,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
       }
 
       // Delete associated sessions
-      db.delete(schema.sessions).where(eq(schema.sessions.userId, id)).run();
+      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
       // Delete the user (cascades to api_keys via FK)
-      db.delete(schema.users).where(eq(schema.users.id, id)).run();
+      await db.delete(schema.users).where(eq(schema.users.id, id));
 
-      auditLog(request.log, "USER_DELETED", {
+      await auditLog(request.log, "USER_DELETED", {
         adminId: admin.id,
         deletedUserId: id,
         deletedUsername: user.username,
@@ -886,22 +879,21 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "Authentication required" });
     }
 
-    const session = db.select().from(schema.sessions).where(eq(schema.sessions.id, token)).get();
+    const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
 
     if (!session || session.expiresAt < new Date()) {
       if (session) {
-        db.delete(schema.sessions).where(eq(schema.sessions.id, token)).run();
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
       }
 
       // Try API key authentication if token has si_ prefix
       if (token.startsWith("si_")) {
         const prefix = computeKeyPrefix(token);
         // Lookup by prefix (O(1) instead of scanning all keys)
-        const candidates = db
+        const candidates = await db
           .select()
           .from(schema.apiKeys)
-          .where(eq(schema.apiKeys.keyPrefix, prefix))
-          .all();
+          .where(eq(schema.apiKeys.keyPrefix, prefix));
         // Fall back to full scan for legacy keys without a prefix (bounded to 100)
         let keysToCheck: typeof candidates;
         if (candidates.length > 0) {
@@ -910,39 +902,34 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
           request.log.warn(
             "Legacy API key lookup triggered (no keyPrefix match). Migrate keys to use prefix-based lookup.",
           );
-          keysToCheck = db
-            .select()
-            .from(schema.apiKeys)
-            .all()
-            .filter((k) => !k.keyPrefix)
-            .slice(0, 100);
+          const allKeys = await db.select().from(schema.apiKeys);
+          keysToCheck = allKeys.filter((k) => !k.keyPrefix).slice(0, 100);
         }
         for (const key of keysToCheck) {
           const matches = await verifyPassword(token, key.keyHash);
           if (matches) {
             // Check expiration
             if (key.expiresAt && key.expiresAt < new Date()) {
-              // Key expired — skip it
+              // Key expired - skip it
               continue;
             }
             // Backfill prefix for legacy keys
             if (!key.keyPrefix) {
-              db.update(schema.apiKeys)
+              await db
+                .update(schema.apiKeys)
                 .set({ keyPrefix: prefix, lastUsedAt: new Date() })
-                .where(eq(schema.apiKeys.id, key.id))
-                .run();
+                .where(eq(schema.apiKeys.id, key.id));
             } else {
-              db.update(schema.apiKeys)
+              await db
+                .update(schema.apiKeys)
                 .set({ lastUsedAt: new Date() })
-                .where(eq(schema.apiKeys.id, key.id))
-                .run();
+                .where(eq(schema.apiKeys.id, key.id));
             }
             // Load the user
-            const apiUser = db
+            const [apiUser] = await db
               .select()
               .from(schema.users)
-              .where(eq(schema.users.id, key.userId))
-              .get();
+              .where(eq(schema.users.id, key.userId));
             if (apiUser) {
               const keyPermissions = key.permissions ?? undefined;
               (request as FastifyRequest & { user?: AuthUser }).user = {
@@ -962,7 +949,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "Session expired or invalid" });
     }
 
-    const user = db.select().from(schema.users).where(eq(schema.users.id, session.userId)).get();
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, session.userId));
 
     if (!user) {
       if (isPublic) return;
