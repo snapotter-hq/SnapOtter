@@ -7,7 +7,7 @@ import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
-import { db, schema } from "./db/index.js";
+import { closeDb, db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { startCleanupCron } from "./lib/cleanup.js";
@@ -43,7 +43,7 @@ import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 
 // Run before anything else
-runMigrations();
+await runMigrations();
 console.log("Database initialized");
 
 if (env.AUTH_ENABLED) {
@@ -414,8 +414,7 @@ async function shutdown(signal: string) {
   }
 
   try {
-    const { sqlite: sqliteConn } = await import("./db/index.js");
-    sqliteConn.close();
+    await closeDb();
     console.log("Database connection closed");
   } catch (err) {
     console.error("Error closing database:", err);

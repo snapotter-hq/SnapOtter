@@ -1,48 +1,28 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { db, sqlite } from "./index.js";
+import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { pool } from "./index.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const MIGRATION_LOCK_KEY = 7_421_001; // arbitrary app-wide advisory lock id
 
-// Resolve migrations folder relative to this file, not the working directory
-const migrationsFolder = join(__dirname, "../../drizzle");
+export async function runMigrations(): Promise<void> {
+  const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 
-function isAlreadyExistsError(err: unknown): boolean {
-  if (err instanceof Error) {
-    if (err.message.includes("already exists")) return true;
-    // DrizzleError wraps the real SqliteError in .cause
-    if ("cause" in err && err.cause instanceof Error) {
-      return err.cause.message.includes("already exists");
-    }
-  }
-  return false;
-}
-
-let migrated = false;
-
-export function runMigrations() {
-  if (migrated) return;
-  // Temporarily disable FK checks so table-recreation migrations
-  // (DROP + RENAME pattern) can proceed without constraint errors.
-  // Must be set outside any transaction to take effect in SQLite.
-  sqlite.pragma("foreign_keys = OFF");
+  // Advisory locks are session-scoped. With a Pool the lock and unlock could
+  // land on different connections, so we acquire a dedicated client and run
+  // lock, migration, and unlock on that single session.
+  const client = await pool.connect();
   try {
-    migrate(db, { migrationsFolder });
-  } catch (err: unknown) {
-    // In test / multi-process environments, concurrent workers may race to
-    // apply migrations on the same database file. If a table already exists,
-    // the schema is in place and we can safely continue.
-    // Drizzle wraps the SqliteError in a DrizzleError, so check both the
-    // outer message and the cause chain.
-    if (isAlreadyExistsError(err)) {
-      // Tables created by another process — DB is ready
-    } else {
-      throw err;
+    const clientDb = drizzle(client);
+    await clientDb.execute(sql`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
+    try {
+      await migrate(clientDb, { migrationsFolder });
+    } finally {
+      await clientDb.execute(sql`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
     }
   } finally {
-    sqlite.pragma("foreign_keys = ON");
+    client.release();
   }
-  migrated = true;
 }
