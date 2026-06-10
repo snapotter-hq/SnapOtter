@@ -1,0 +1,52 @@
+name: Update Visual Baselines
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-baselines:
+    name: Regenerate linux visual baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright Chromium
+        run: pnpm playwright install --with-deps chromium
+      - name: Regenerate baselines
+        run: pnpm playwright test --project=chromium-visual --update-snapshots
+        env:
+          PW_WORKERS: "2"
+      - name: Open PR with refreshed baselines
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- 'tests/e2e/__screenshots__'; then
+            untracked=$(git ls-files --others --exclude-standard -- 'tests/e2e/__screenshots__')
+            if [ -z "$untracked" ]; then
+              echo "No baseline changes."
+              exit 0
+            fi
+          fi
+          BRANCH="chore/visual-baselines-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add tests/e2e/__screenshots__
+          git commit -m "test(e2e): refresh linux visual baselines"
+          git push origin "$BRANCH"
+          gh pr create --title "test(e2e): refresh linux visual baselines" \
+            --body "Automated baseline refresh from the update-visual-baselines workflow. Review the image diffs before merging." \
+            --base main --head "$BRANCH"
