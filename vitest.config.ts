@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
@@ -12,9 +11,6 @@ const webNodeModules = path.resolve(__dirname, "apps/web/node_modules");
 // Resolve landing-workspace packages.
 const landingNodeModules = path.resolve(__dirname, "apps/landing/node_modules");
 
-// Temp dir for integration test DB + workspace (set BEFORE any app code loads)
-const testDir = path.join(os.tmpdir(), `SnapOtter-test-${crypto.randomUUID().slice(0, 8)}`);
-
 export default defineConfig({
   esbuild: {
     jsx: "automatic",
@@ -26,9 +22,12 @@ export default defineConfig({
     pool: "forks",
     poolOptions: {
       forks: {
-        singleFork: true,
+        // Parallel forks; each fork gets an isolated DB + workspace via
+        // tests/setup/per-fork-env.ts. CI runners have 4 vCPUs.
+        maxForks: process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2)),
       },
     },
+    setupFiles: ["tests/setup/per-fork-env.ts"],
     exclude: [
       "tests/e2e/**",
       "tests/e2e-docs/**",
@@ -46,8 +45,7 @@ export default defineConfig({
       AUTH_ENABLED: "true",
       DEFAULT_USERNAME: "admin",
       DEFAULT_PASSWORD: "Adminpass1",
-      DB_PATH: path.join(testDir, "test.db"),
-      WORKSPACE_PATH: path.join(testDir, "workspace"),
+      // DB_PATH and WORKSPACE_PATH are set per-fork in tests/setup/per-fork-env.ts
       MAX_UPLOAD_SIZE_MB: "10",
       MAX_BATCH_SIZE: "10",
       RATE_LIMIT_PER_MIN: "10000",
