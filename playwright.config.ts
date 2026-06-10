@@ -35,8 +35,10 @@ export default defineConfig({
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   // Files run across workers; tests within a file stay ordered. The serial
-  // bucket is pinned to --workers=1 by its run command. Overridable for CI.
-  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 4,
+  // bucket is pinned to --workers=1 by its run command. Default is 2: the
+  // dev-mode webServers saturate beyond that and 30s-timeout tests start
+  // flaking. Raise via PW_WORKERS on stronger setups.
+  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 2,
   reporter: "html",
   use: {
     baseURL: `http://localhost:${TEST_WEB_PORT}`,
