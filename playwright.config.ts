@@ -1,10 +1,22 @@
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const authFile = path.join(__dirname, ".playwright", ".auth", "user.json");
-const testDbPath = path.join(__dirname, "test-results", ".e2e-db", "snapotter.db");
 
 const TEST_WEB_PORT = 2349;
+
+// Fresh Postgres database per e2e run.  The create-db script (chained before
+// the API in the webServer command) CREATEs it and cleans up stale databases
+// from previous runs.  The API auto-migrates the empty database at boot.
+const E2E_PG_BASE_URL =
+  process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
+const e2eDbName = `snapotter_e2e_${process.pid}_${randomBytes(4).toString("hex")}`;
+const e2eDatabaseUrl = (() => {
+  const url = new URL(E2E_PG_BASE_URL);
+  url.pathname = `/${e2eDbName}`;
+  return url.toString();
+})();
 
 // Specs that mutate global server state (settings, users, roles, API keys)
 // or assert on global lists/timing. These run in the chromium-serial project
@@ -98,7 +110,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f "${testDbPath}" "${testDbPath}-shm" "${testDbPath}-wal" && mkdir -p "${path.dirname(testDbPath)}" && pnpm --filter @snapotter/api dev`,
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api dev`,
       port: 13490,
       reuseExistingServer: !process.env.CI,
       env: {
@@ -108,7 +120,7 @@ export default defineConfig({
         RATE_LIMIT_PER_MIN: "50000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
-        DB_PATH: testDbPath,
+        DATABASE_URL: e2eDatabaseUrl,
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
         DATA_DIR: path.join(__dirname, "test-results", ".e2e-data"),

@@ -1,11 +1,22 @@
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const authFile = path.join(__dirname, "test-results", ".auth", "analytics-local-user.json");
-const testDbPath = path.join(__dirname, "test-results", ".e2e-analytics-db", "snapotter.db");
 
 const TEST_API_PORT = 13491;
 const TEST_WEB_PORT = 2350;
+
+// Fresh Postgres database per analytics-local e2e run (same mechanism as the
+// main playwright.config.ts).
+const E2E_PG_BASE_URL =
+  process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
+const e2eDbName = `snapotter_e2e_${process.pid}_${randomBytes(4).toString("hex")}`;
+const e2eDatabaseUrl = (() => {
+  const url = new URL(E2E_PG_BASE_URL);
+  url.pathname = `/${e2eDbName}`;
+  return url.toString();
+})();
 
 export default defineConfig({
   testDir: "./tests/e2e-analytics",
@@ -36,7 +47,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f "${testDbPath}" "${testDbPath}-shm" "${testDbPath}-wal" && mkdir -p "${path.dirname(testDbPath)}" && pnpm --filter @snapotter/api dev`,
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api dev`,
       port: TEST_API_PORT,
       reuseExistingServer: !process.env.CI,
       env: {
@@ -46,7 +57,7 @@ export default defineConfig({
         RATE_LIMIT_PER_MIN: "50000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "true",
-        DB_PATH: testDbPath,
+        DATABASE_URL: e2eDatabaseUrl,
         PORT: String(TEST_API_PORT),
       },
       timeout: 30_000,

@@ -89,6 +89,20 @@ jobs:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
@@ -126,9 +140,11 @@ jobs:
 
       - run: pip install "pip-audit==2.10.0"
       - name: Run pip-audit (ignoring CVEs blocked by dependency constraints)
+        # CVE-2025-3000: torch 2.12.0, no fixed release available as of 2026-06-11
         run: >-
           pip-audit -r packages/ai/python/requirements.txt
           --ignore-vuln CVE-2024-27763
+          --ignore-vuln CVE-2025-3000
           --ignore-vuln CVE-2026-40086
           --ignore-vuln CVE-2026-25990
           --ignore-vuln CVE-2026-40192

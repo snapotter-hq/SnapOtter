@@ -16,6 +16,20 @@ jobs:
     name: E2E Full (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +65,20 @@ jobs:
     name: E2E Serial Bucket
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install system dependencies
@@ -80,6 +108,20 @@ jobs:
     name: E2E Cross-Browser (Firefox + WebKit)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
@@ -141,6 +183,20 @@ jobs:
     name: Schemathesis API Fuzz
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install system dependencies
@@ -154,7 +210,8 @@ jobs:
       - name: Start API server
         run: |
           mkdir -p /tmp/st-data
-          AUTH_ENABLED=false ANALYTICS_ENABLED=false DB_PATH=/tmp/st-data/st.db \
+          AUTH_ENABLED=false ANALYTICS_ENABLED=false \
+            DATABASE_URL=postgres://snapotter:snapotter@localhost:5432/snapotter \
             WORKSPACE_PATH=/tmp/st-data/workspace DATA_DIR=/tmp/st-data \
             pnpm --filter @snapotter/api dev &
           for i in $(seq 1 60); do
