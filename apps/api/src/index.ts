@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
 import { closeDb, db, schema } from "./db/index.js";
@@ -54,6 +54,18 @@ try {
   process.exit(1);
 }
 console.log("Database initialized");
+
+// Auto-import 1.x SQLite database on first boot (before default user creation)
+if (env.SQLITE_MIGRATE_PATH) {
+  const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM users`);
+  if ((rows[0].n as number) === 0) {
+    const { migrateFromSqlite } = await import("./db/migrate-from-sqlite.js");
+    const result = await migrateFromSqlite(env.SQLITE_MIGRATE_PATH, { force: false });
+    console.log("Imported 1.x SQLite database:", JSON.stringify(result.tables));
+  } else {
+    console.log("SQLITE_MIGRATE_PATH set but target is not empty; skipping import");
+  }
+}
 
 if (env.AUTH_ENABLED) {
   await ensureDefaultAdmin();
