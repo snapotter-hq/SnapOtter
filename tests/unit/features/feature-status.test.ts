@@ -601,3 +601,39 @@ describe("verifyBundleModels", () => {
     expect(mod.verifyBundleModels("background-removal")).toBeNull();
   });
 });
+
+describe("ensureAiDirs", () => {
+  it("creates AI directories when the manifest exists and DATA_DIR is writable", () => {
+    writeTestManifest({});
+    mod.ensureAiDirs();
+    expect(existsSync(join(aiDir, "venv"))).toBe(true);
+    expect(existsSync(modelsDir)).toBe(true);
+    expect(existsSync(join(aiDir, "pip-cache"))).toBe(true);
+  });
+
+  it("warns instead of throwing when DATA_DIR is uncreatable", async () => {
+    // Point DATA_DIR below a regular file so mkdir fails (ENOTDIR), the same
+    // failure class as the default /data on a sealed macOS root (ENOENT).
+    const blocker = join(tempDir, "blocker");
+    writeFileSync(blocker, "not a directory");
+    process.env.DATA_DIR = join(blocker, "data");
+    writeTestManifest({});
+    vi.resetModules();
+    mod = await import("../../../apps/api/src/lib/feature-status.js");
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => mod.ensureAiDirs()).not.toThrow();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Cannot create AI directories"));
+    errorSpy.mockRestore();
+  });
+
+  it("is a no-op outside managed environments (no manifest, no /.dockerenv)", async () => {
+    process.env.FEATURE_MANIFEST_PATH = join(tempDir, "missing-manifest.json");
+    process.env.DATA_DIR = join(tempDir, "fresh-data");
+    vi.resetModules();
+    mod = await import("../../../apps/api/src/lib/feature-status.js");
+
+    mod.ensureAiDirs();
+    expect(existsSync(join(tempDir, "fresh-data"))).toBe(false);
+  });
+});

@@ -55,14 +55,14 @@ export function ensureAiDirs(): void {
     mkdirSync(MODELS_DIR, { recursive: true });
     mkdirSync(join(AI_DIR, "pip-cache"), { recursive: true });
   } catch (err: unknown) {
+    // Never refuse to boot over the AI data dir. On native checkouts the
+    // default DATA_DIR (/data) is often uncreatable (ENOENT/EROFS on a
+    // sealed macOS root, EACCES on restrictive volumes); AI tools simply
+    // report as not installed until DATA_DIR points somewhere writable.
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "EACCES") {
-      console.error(
-        `WARNING: Cannot create AI directories under "${AI_DIR}". AI features will be unavailable. Check volume permissions (PUID/PGID).`,
-      );
-      return;
-    }
-    throw err;
+    console.error(
+      `WARNING: Cannot create AI directories under "${AI_DIR}" (${code}). AI features will be unavailable. Set DATA_DIR to a writable path (or check volume permissions / PUID / PGID in Docker).`,
+    );
   }
 }
 
