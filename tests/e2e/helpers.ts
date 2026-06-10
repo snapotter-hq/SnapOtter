@@ -113,8 +113,14 @@ export async function uploadTestImage(page: Page): Promise<void> {
   const testImagePath = getTestImagePath();
 
   const fileChooserPromise = page.waitForEvent("filechooser");
-  const dropzone = page.locator("[class*='border-dashed']").first();
-  await dropzone.click();
+  // Prefer the explicit upload button; on some tool pages the first
+  // border-dashed element is a settings section, not the dropzone.
+  const uploadButton = page.getByRole("button", { name: /upload from computer/i }).first();
+  if (await uploadButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await uploadButton.click();
+  } else {
+    await page.locator("[class*='border-dashed']").first().click();
+  }
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(testImagePath);
 

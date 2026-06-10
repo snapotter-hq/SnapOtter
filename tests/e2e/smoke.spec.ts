@@ -66,7 +66,7 @@ test.describe("Smoke tests", () => {
 
     // The dropzone should be visible
     await expect(page.getByText("Upload from computer")).toBeVisible();
-    await expect(page.getByText("Drop files here")).toBeVisible();
+    await expect(page.getByText("Drop your images here")).toBeVisible();
   });
 
   test("sidebar is visible on desktop", async ({ loggedInPage: page }) => {

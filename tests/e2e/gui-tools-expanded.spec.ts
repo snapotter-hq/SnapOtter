@@ -717,7 +717,9 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("none background tab hides background controls", async ({ loggedInPage: page }) => {
       await page.goto("/beautify");
 
-      await page.getByRole("button", { name: "None" }).click();
+      // Multiple sections (background, shadow, frame) each have a "None"
+      // option; the background tabs are the first group.
+      await page.getByRole("button", { name: "None" }).first().click();
     });
 
     test("iPhone frame option is selectable", async ({ loggedInPage: page }) => {
@@ -863,7 +865,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
 
       await page.getByRole("button", { name: "Percentage" }).click();
       // Percentage input should be visible
-      await expect(page.locator("#gif-percentage")).toBeVisible();
+      await expect(page.locator("#gif-pct")).toBeVisible();
     });
 
     test("resize pixel mode width input accepts values", async ({ loggedInPage: page }) => {
@@ -1191,10 +1193,12 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // FAVICON (expanded -- settings and processing)
   // ========================================================================
   test.describe("Favicon Expanded", () => {
-    test("shows mstile sizes in generated list", async ({ loggedInPage: page }) => {
+    test("shows generated icon sizes in list", async ({ loggedInPage: page }) => {
       await page.goto("/favicon");
 
-      await expect(page.getByText("mstile-150x150.png")).toBeVisible();
+      // Current generated set (mstile was dropped from FAVICON_SIZES)
+      await expect(page.getByText("android-chrome-512x512.png")).toBeVisible();
+      await expect(page.getByText("apple-touch-icon.png")).toBeVisible();
     });
 
     test("undo after favicon generation returns to settings", async ({ loggedInPage: page }) => {
@@ -1375,6 +1379,15 @@ test.describe("GUI Expanded Tool Coverage", () => {
   test.describe("Navigate Away Resets (expanded tools)", () => {
     test("ai-canvas-expand: navigate away resets state", async ({ loggedInPage: page }) => {
       await page.goto("/ai-canvas-expand");
+
+      // On servers without the AI bundle the page shows an install prompt
+      // instead of a dropzone; there is no state to reset.
+      const uploadVisible = await page
+        .getByText("Upload from computer")
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
+      test.skip(!uploadVisible, "AI canvas-expand bundle not installed");
+
       await uploadTestImage(page);
 
       await page.locator("#cac-top").fill("20");

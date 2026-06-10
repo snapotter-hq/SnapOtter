@@ -1,8 +1,11 @@
 import { expect, test, uploadTestImage } from "./helpers";
 
 test.describe("Home Page", () => {
-  test("shows SnapOtter branding in dropzone", async ({ loggedInPage: page }) => {
-    await expect(page.getByText("SnapOtter").first()).toBeVisible();
+  test("shows branding and dropzone prompt", async ({ loggedInPage: page }) => {
+    // The wordmark renders as a logo image, not text; the document title is
+    // the stable brand assertion.
+    await expect(page).toHaveTitle(/SnapOtter/i);
+    await expect(page.getByText("Drop your images here")).toBeVisible();
   });
 
   test("dropzone shows upload button", async ({ loggedInPage: page }) => {
