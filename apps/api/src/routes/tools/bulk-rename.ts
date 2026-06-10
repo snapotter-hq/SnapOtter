@@ -103,6 +103,9 @@ export function registerBulkRename(app: FastifyInstance) {
           details: err instanceof Error ? err.message : "Unknown error",
         });
       }
+      // The ZIP stream already started; end the connection so clients see a
+      // truncated transfer instead of hanging forever.
+      reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
     }
   });
 }

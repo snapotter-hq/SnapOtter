@@ -139,6 +139,13 @@ export function registerSplit(app: FastifyInstance) {
       const fullW = metadata.width ?? 0;
       const fullH = metadata.height ?? 0;
 
+      // Force a full pixel decode before streaming starts. Metadata alone
+      // lets truncated files through, and a decode failure after
+      // reply.hijack() cannot become an error response anymore.
+      if (validation.format !== "svg") {
+        await sharp(fileBuffer).stats();
+      }
+
       let cols = settings.columns;
       let rows = settings.rows;
       if (settings.tileWidth && settings.tileHeight) {
@@ -221,6 +228,9 @@ export function registerSplit(app: FastifyInstance) {
           details: err instanceof Error ? err.message : "Unknown error",
         });
       }
+      // The ZIP stream already started; end the connection so clients see a
+      // truncated transfer instead of hanging forever.
+      reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
     }
   });
 

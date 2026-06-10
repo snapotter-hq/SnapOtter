@@ -106,6 +106,13 @@ export function registerFavicon(app: FastifyInstance) {
           buf = await autoOrient(buf);
         }
 
+        // Force a full pixel decode now. Header validation alone lets
+        // truncated files through, and a decode failure after reply.hijack()
+        // cannot be turned into an error response anymore.
+        if (validation.format !== "svg") {
+          await sharp(buf).stats();
+        }
+
         decodedFiles.push({ buffer: buf, filename: file.filename });
       } catch (err) {
         const reason = err instanceof Error ? err.message : "Unknown decode error";
@@ -206,6 +213,9 @@ export function registerFavicon(app: FastifyInstance) {
           details: err instanceof Error ? err.message : "Unknown error",
         });
       }
+      // The ZIP stream already started; end the connection so clients see a
+      // truncated transfer instead of hanging forever.
+      reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
     }
   });
 }
