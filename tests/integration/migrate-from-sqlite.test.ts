@@ -40,8 +40,8 @@ function buildFixtureSqlite(path: string): void {
   `);
   const now = 1750000000; // seconds epoch, as 1.x stored
   s.prepare(
-    "INSERT INTO users (id, username, password_hash, must_change_password, created_at, updated_at, analytics_enabled) VALUES (?,?,?,?,?,?,?)",
-  ).run("u1", "alice", "hash", 0, now, now, 1);
+    "INSERT INTO users (id, username, password_hash, must_change_password, created_at, updated_at, analytics_enabled, analytics_consent_shown_at) VALUES (?,?,?,?,?,?,?,?)",
+  ).run("u1", "alice", "hash", 0, now, now, 1, null);
   s.prepare("INSERT INTO teams (id, name, created_at) VALUES (?,?,?)").run("t1", "Legal", now);
   s.prepare('INSERT INTO settings ("key", value, updated_at) VALUES (?,?,?)').run(
     "cookieSecret",
@@ -59,8 +59,14 @@ function buildFixtureSqlite(path: string): void {
     now,
   );
   s.prepare(
-    "INSERT INTO jobs (id, type, status, progress, input_files, created_at) VALUES (?,?,?,?,?,?)",
-  ).run("j1", "batch", "completed", 1, '["a.png"]', now);
+    "INSERT INTO jobs (id, type, status, progress, input_files, created_at, completed_at) VALUES (?,?,?,?,?,?,?)",
+  ).run("j1", "batch", "completed", 1, '["a.png"]', now, null);
+  s.prepare(
+    "INSERT INTO audit_log (id, actor_username, action, details, created_at) VALUES (?,?,?,?,?)",
+  ).run("al1", "alice", "login", null, now);
+  s.prepare(
+    "INSERT INTO user_files (id, user_id, original_name, stored_name, mime_type, size, version, tool_chain, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+  ).run("uf1", "u1", "photo.png", "abc123.png", "image/png", 1024, 1, null, now);
   s.close();
 }
 
@@ -90,15 +96,36 @@ describe("migrate-from-sqlite", () => {
     expect(user.username).toBe("alice");
     expect(user.must_change_password).toBe(false); // 0 became boolean false
     expect(user.analytics_enabled).toBe(true); // 1 became boolean true
+    expect(user.analytics_consent_shown_at).toBeNull(); // explicit NULL preserved
     expect(new Date(user.created_at as string).getTime()).toBe(1750000000 * 1000); // seconds became timestamptz
     const [pipeline] = (await db.execute(sql`SELECT * FROM pipelines WHERE id = 'p1'`)).rows;
     expect((pipeline.steps as Array<{ toolId: string }>)[0].toolId).toBe("compress"); // text JSON became jsonb
     const [setting] = (await db.execute(sql`SELECT * FROM settings WHERE key = 'cookieSecret'`))
       .rows;
     expect(setting.value).toBe("not-json-value"); // settings.value stayed text, untouched
+    const [job] = (await db.execute(sql`SELECT * FROM jobs WHERE id = 'j1'`)).rows;
+    expect(job.completed_at).toBeNull(); // explicit NULL preserved
+    // audit_log with NULL details
+    const alRows = (await db.execute(sql`SELECT * FROM audit_log WHERE id = 'al1'`)).rows;
+    expect(alRows).toHaveLength(1);
+    expect(alRows[0].details).toBeNull();
+    expect(result.tables.audit_log).toBe(1);
+    // user_files with NULL tool_chain
+    const ufRows = (await db.execute(sql`SELECT * FROM user_files WHERE id = 'uf1'`)).rows;
+    expect(ufRows).toHaveLength(1);
+    expect(ufRows[0].tool_chain).toBeNull();
+    expect(result.tables.user_files).toBe(1);
   });
 
   it("refuses a non-empty target without force", async () => {
     await expect(migrateFromSqlite(sqlitePath, { force: false })).rejects.toThrow(/non-empty/i);
+  });
+
+  it("force on populated target fails on PK collision and rolls back", async () => {
+    // The first test already inserted rows; forcing again should hit a PK/unique violation
+    await expect(migrateFromSqlite(sqlitePath, { force: true })).rejects.toThrow();
+    // Rollback must leave previous data intact
+    const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM users`);
+    expect(rows[0].n).toBe(1);
   });
 });

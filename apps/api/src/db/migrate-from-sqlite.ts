@@ -52,7 +52,13 @@ function convertRow(table: string, row: SqliteRow): SqliteRow {
     } else if (BOOL.has(col)) {
       out[col] = raw === 1;
     } else if (JSONB[table]?.has(col)) {
-      out[col] = JSON.parse(raw as string); // strict: a 1.x row with invalid JSON must abort loudly
+      try {
+        out[col] = JSON.parse(raw as string);
+      } catch (e) {
+        throw new Error(
+          `Invalid JSON in ${table}.${col} (row id=${String(row.id)}): ${(e as Error).message}`,
+        );
+      }
     } else {
       out[col] = raw;
     }
@@ -65,12 +71,14 @@ export async function migrateFromSqlite(
   opts: { force: boolean },
 ): Promise<MigrationResult> {
   const { default: Database } = await import("better-sqlite3"); // lazy: only the migrator needs it
+  // Intentionally also called by the boot path (idempotent via advisory lock + drizzle journal)
+  // so the CLI works standalone; do not remove.
   await runMigrations();
 
   const existing = await db.execute(sql`SELECT count(*)::int AS n FROM users`);
   if ((existing.rows[0].n as number) > 0 && !opts.force) {
     throw new Error(
-      "Target Postgres database is non-empty; refusing to migrate. Re-run with --force only if you understand rows will be inserted alongside existing data.",
+      "Target Postgres database is non-empty; refusing to migrate. Re-run with --force to attempt inserting 1.x rows into the existing database. This will FAIL and roll back if any primary key or unique value (username, team name, role name) collides with existing data.",
     );
   }
 
@@ -116,7 +124,7 @@ export async function migrateFromSqlite(
 }
 
 // CLI entry: pnpm --filter @snapotter/api migrate:sqlite -- <path> [--force]
-const invokedDirectly = process.argv[1]?.endsWith("migrate-from-sqlite.ts");
+const invokedDirectly = /migrate-from-sqlite\.[tj]s$/.test(process.argv[1] ?? "");
 if (invokedDirectly) {
   // pnpm forwards "--" as a literal arg; skip it and any flags to find the positional path
   const args = process.argv.slice(2);

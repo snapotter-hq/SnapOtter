@@ -59,9 +59,16 @@ console.log("Database initialized");
 if (env.SQLITE_MIGRATE_PATH) {
   const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM users`);
   if ((rows[0].n as number) === 0) {
-    const { migrateFromSqlite } = await import("./db/migrate-from-sqlite.js");
-    const result = await migrateFromSqlite(env.SQLITE_MIGRATE_PATH, { force: false });
-    console.log("Imported 1.x SQLite database:", JSON.stringify(result.tables));
+    try {
+      const { migrateFromSqlite } = await import("./db/migrate-from-sqlite.js");
+      const result = await migrateFromSqlite(env.SQLITE_MIGRATE_PATH, { force: false });
+      console.log("Imported 1.x SQLite database:", JSON.stringify(result.tables));
+    } catch (err) {
+      console.error(
+        `FATAL: 1.x SQLite import failed from ${env.SQLITE_MIGRATE_PATH}: ${(err as Error).message}. No partial data was written.`,
+      );
+      process.exit(1);
+    }
   } else {
     console.log("SQLITE_MIGRATE_PATH set but target is not empty; skipping import");
   }
