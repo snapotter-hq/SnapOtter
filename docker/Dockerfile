@@ -289,7 +289,6 @@ RUN mkdir -p /data /data/files /data/ai/models /data/ai/pip-cache /tmp/workspace
 ENV PORT=1349 \
     NODE_ENV=production \
     STORAGE_MODE=local \
-    DB_PATH=/data/snapotter.db \
     WORKSPACE_PATH=/tmp/workspace \
     FILES_STORAGE_PATH=/data/files \
     PYTHON_VENV_PATH=/data/ai/venv \
@@ -337,6 +336,7 @@ RUN chown -R snapotter:snapotter /app /data /tmp/workspace /opt/venv
 
 # Entrypoint fixes volume permissions then drops to snapotter via gosu
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/wait-for-postgres.mjs /app/docker/wait-for-postgres.mjs
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 1349

@@ -15,13 +15,19 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DB_PATH=/tmp/test-snapotter.db
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
+      - REDIS_URL=redis://redis:6379
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000
     tmpfs:
       - /tmp/test-workspace
       - /tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # ── E2E tests (Playwright against full app) ─────────────────────────────
   test-e2e:
@@ -42,7 +48,8 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DB_PATH=/tmp/test-snapotter.db
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
+      - REDIS_URL=redis://redis:6379
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000
@@ -53,3 +60,36 @@ services:
     depends_on:
       test-unit:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: SnapOtter-test-postgres
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    container_name: SnapOtter-test-redis
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    tmpfs:
+      - /data

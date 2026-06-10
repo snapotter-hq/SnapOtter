@@ -63,6 +63,18 @@ if [ ! -d "$AI_VENV" ] && [ -d "/opt/venv" ]; then
   echo "AI venv ready at $AI_VENV"
 fi
 
+# Wait for Postgres to be reachable before starting the app
+if [ -n "${DATABASE_URL:-}" ]; then
+  echo "Waiting for Postgres..."
+  i=0
+  until node /app/docker/wait-for-postgres.mjs; do
+    i=$((i+1))
+    if [ "$i" -ge 60 ]; then echo "FATAL: Postgres unreachable after 60s"; exit 1; fi
+    sleep 1
+  done
+  echo "Postgres is reachable."
+fi
+
 print_banner() {
   RST='\033[0m'
   printf '\n'
