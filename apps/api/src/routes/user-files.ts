@@ -544,7 +544,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     // Enforce per-user storage quota before saving results
     try {
-      checkStorageQuota(userId);
+      await checkStorageQuota(userId);
     } catch (err) {
       const statusCode = (err as Error & { statusCode?: number }).statusCode ?? 413;
       return reply.status(statusCode).send({ error: (err as Error).message });
