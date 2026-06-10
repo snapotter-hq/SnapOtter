@@ -147,10 +147,60 @@ export async function waitForProcessing(page: Page, timeoutMs = 30_000) {
 // (all "chromium" project tests already have auth via storageState,
 //  but this provides backward compatibility for tests that use it)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// putSettings() — write system settings through the API using the page's
+// bearer token (the app stores it in localStorage, so page.request alone
+// sends no auth).
+// ---------------------------------------------------------------------------
+async function getAuthToken(page: Page): Promise<string | null> {
+  return page.evaluate(() => localStorage.getItem("snapotter-token")).catch(() => null);
+}
+
+export async function putSettings(
+  page: Page,
+  data: Record<string, string>,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAuthToken(page);
+  const res = await page.request.put("/api/v1/settings", {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    data,
+  });
+  return { ok: res.ok(), status: res.status() };
+}
+
+/**
+ * changePasswordViaApi() — revert a password change without driving the UI.
+ * The current session token survives a password change (the API only revokes
+ * other sessions), so tests that successfully change the admin password MUST
+ * call this to restore it before finishing.
+ */
+export async function changePasswordViaApi(
+  page: Page,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAuthToken(page);
+  const res = await page.request.post("/api/auth/change-password", {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    data: { currentPassword, newPassword },
+  });
+  return { ok: res.ok(), status: res.status() };
+}
+
 export const test = base.extend<{ loggedInPage: Page }>({
   loggedInPage: async ({ page }, use) => {
     // storageState is already loaded by the project config, just navigate
     await page.goto("/");
+    // Self-heal global server settings a crashed predecessor may have left
+    // mutated (e.g. defaultToolView=fullscreen redirects "/" and hides the
+    // sidebar, cascading failures through every later test on the shared DB).
+    const healed = await putSettings(page, { defaultToolView: "sidebar", defaultLocale: "en" });
+    if (!healed.ok) {
+      console.warn(`loggedInPage settings heal failed with status ${healed.status}`);
+    }
+    if (page.url().includes("/fullscreen")) {
+      await page.goto("/");
+    }
     await use(page);
   },
 });
@@ -176,6 +226,13 @@ export async function isAiSidecarRunning(page: Page): Promise<boolean> {
 // ---------------------------------------------------------------------------
 export async function openSettings(page: Page): Promise<void> {
   const sidebar = page.locator("aside");
+  if (!(await sidebar.isVisible({ timeout: 2000 }).catch(() => false))) {
+    // Fullscreen grid layout hides the aside behind a banner "Sidebar" toggle.
+    const sidebarToggle = page.getByRole("button", { name: /^sidebar$/i });
+    if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await sidebarToggle.click();
+    }
+  }
   if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
     await sidebar.getByText("Settings").click();
   } else {

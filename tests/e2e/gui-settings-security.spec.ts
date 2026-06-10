@@ -1,4 +1,4 @@
-import { expect, openSettings, test } from "./helpers";
+import { changePasswordViaApi, expect, openSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Settings Dialog -- Security (change password) and API Keys tabs
@@ -82,12 +82,15 @@ test.describe("GUI Settings - Security Tab", () => {
 
     // Change password from admin -> admin (same value, to avoid breaking other tests)
     await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("admin");
-    await page.getByPlaceholder("Confirm New Password").fill("admin");
+    await page.getByPlaceholder("New Password").first().fill("Testpass123");
+    await page.getByPlaceholder("Confirm New Password").fill("Testpass123");
 
     await page.getByRole("button", { name: /change password/i }).click();
 
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+
+    const revert = await changePasswordViaApi(page, "Testpass123", "admin");
+    expect(revert.ok).toBeTruthy();
   });
 
   test("form fields are cleared after successful password change", async ({
@@ -97,11 +100,14 @@ test.describe("GUI Settings - Security Tab", () => {
     await page.getByRole("button", { name: /security/i }).click();
 
     await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("admin");
-    await page.getByPlaceholder("Confirm New Password").fill("admin");
+    await page.getByPlaceholder("New Password").first().fill("Testpass123");
+    await page.getByPlaceholder("Confirm New Password").fill("Testpass123");
 
     await page.getByRole("button", { name: /change password/i }).click();
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+
+    const revert = await changePasswordViaApi(page, "Testpass123", "admin");
+    expect(revert.ok).toBeTruthy();
 
     // All fields should be cleared after success
     await expect(page.getByPlaceholder("Current Password")).toHaveValue("");

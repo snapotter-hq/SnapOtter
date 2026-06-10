@@ -1,4 +1,4 @@
-import { expect, openSettings, test } from "./helpers";
+import { changePasswordViaApi, expect, login, openSettings, putSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Settings Dialog -- General, System Settings, About tabs
@@ -204,11 +204,10 @@ test.describe("GUI Settings - General Tab", () => {
     await page.waitForURL(/\/fullscreen/, { timeout: 10_000 });
     expect(page.url()).toContain("/fullscreen");
 
-    // Restore original value
-    await openSettings(page);
-    await page.locator("select").first().selectOption(originalValue);
-    await page.getByRole("button", { name: /save settings/i }).click();
-    await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
+    // Restore via API: the fullscreen layout has no reachable settings entry,
+    // and an unrestored value poisons every later test on the shared server.
+    const restore = await putSettings(page, { defaultToolView: originalValue });
+    expect(restore.ok).toBeTruthy();
   });
 
   test("shows App Version string", async ({ loggedInPage: page }) => {
@@ -225,7 +224,12 @@ test.describe("GUI Settings - General Tab", () => {
     await expect(page.getByRole("button", { name: /save settings/i })).toBeVisible();
   });
 
-  test("logout button redirects to /login", async ({ loggedInPage: page }) => {
+  test("logout button redirects to /login", async ({ browser }) => {
+    // Isolated session: logging out revokes the token server-side, and the
+    // shared storageState token must survive for every later test in the run.
+    const context = await browser.newContext({ storageState: undefined });
+    const page = await context.newPage();
+    await login(page);
     await openSettings(page);
 
     const logoutBtn = page.getByRole("button", { name: /log out/i });
@@ -236,6 +240,7 @@ test.describe("GUI Settings - General Tab", () => {
 
     // Should be on the login page
     expect(page.url()).toContain("/login");
+    await context.close();
   });
 });
 
@@ -277,7 +282,7 @@ test.describe("GUI Settings - System Settings Tab", () => {
     await openSettings(page);
     await page.getByRole("button", { name: /system settings/i }).click();
 
-    await expect(page.getByText("Language")).toBeVisible();
+    await expect(page.getByText("Language", { exact: true })).toBeVisible();
     await expect(page.getByText("Language for the interface")).toBeVisible();
     const langSelect = page.locator("select").filter({ has: page.locator("option[value='en']") });
     await expect(langSelect).toBeVisible();
@@ -737,11 +742,16 @@ test.describe("GUI Settings - Audit Log Tab", () => {
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
 
+    // Client policy requires 8+ chars, so a temporary password is used and
+    // reverted via API right after (the current session token survives).
     await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("admin");
-    await page.getByPlaceholder("Confirm New Password").fill("admin");
+    await page.getByPlaceholder("New Password").first().fill("Testpass123");
+    await page.getByPlaceholder("Confirm New Password").fill("Testpass123");
     await page.getByRole("button", { name: /change password/i }).click();
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+
+    const revert = await changePasswordViaApi(page, "Testpass123", "admin");
+    expect(revert.ok).toBeTruthy();
 
     // Navigate to audit log and filter by PASSWORD_CHANGED
     await page.getByRole("button", { name: /audit log/i }).click();
@@ -790,7 +800,7 @@ test.describe("GUI Settings - System Settings (extended)", () => {
   test("changed Language persists after dialog re-open", async ({ loggedInPage: page }) => {
     await openSettings(page);
     await page.getByRole("button", { name: /system settings/i }).click();
-    await expect(page.getByText("Language")).toBeVisible();
+    await expect(page.getByText("Language", { exact: true })).toBeVisible();
 
     const langSelect = page.locator("select").filter({ has: page.locator("option[value='en']") });
     const originalValue = await langSelect.inputValue();
@@ -815,12 +825,12 @@ test.describe("GUI Settings - System Settings (extended)", () => {
     // Verify the language select persisted the new value
     const langSelect2 = page.locator("select").filter({ has: page.locator("option[value='en']") });
     const persisted = await langSelect2.inputValue();
-    expect(persisted).toBe(newValue);
 
-    // Restore original locale
-    await langSelect2.selectOption(originalValue);
-    await page.locator("button").filter({ hasText: /save/i }).first().click();
-    await page.waitForTimeout(2_000);
+    // Restore via API before asserting: a failed assertion must not leave the
+    // server in a non-English locale for every later test.
+    const restore = await putSettings(page, { defaultLocale: originalValue });
+    expect(restore.ok).toBeTruthy();
+    expect(persisted).toBe(newValue);
   });
 
   test("changed Login Attempt Limit persists after dialog re-open", async ({

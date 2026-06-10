@@ -1,4 +1,5 @@
 import { test as base, expect } from "@playwright/test";
+import { authFile } from "../../playwright.config";
 import { login, openSettings } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
@@ -136,7 +137,7 @@ async function deleteRoleByName(adminToken: string, name: string): Promise<void>
 
 base.describe("RBAC Full — People Management UI", () => {
   base.use({
-    storageState: "test-results/.auth/user.json",
+    storageState: authFile,
   });
 
   base.test(
@@ -169,7 +170,7 @@ base.describe("RBAC Full — People Management UI", () => {
 
 base.describe("RBAC Full — Roles Management UI", () => {
   base.use({
-    storageState: "test-results/.auth/user.json",
+    storageState: authFile,
   });
 
   base.test("admin sees Roles tab in settings", async ({ page }) => {
@@ -202,7 +203,7 @@ base.describe("RBAC Full — Roles Management UI", () => {
 
 base.describe("RBAC Full — Audit Log UI", () => {
   base.use({
-    storageState: "test-results/.auth/user.json",
+    storageState: authFile,
   });
 
   base.test("admin sees Audit Log tab in settings", async ({ page }) => {
@@ -239,7 +240,7 @@ base.describe("RBAC Full — Audit Log UI", () => {
 
 base.describe("RBAC Full — API Key Scoping UI", () => {
   base.use({
-    storageState: "test-results/.auth/user.json",
+    storageState: authFile,
   });
 
   base.test("API Keys section has permission scoping toggle", async ({ page }) => {
