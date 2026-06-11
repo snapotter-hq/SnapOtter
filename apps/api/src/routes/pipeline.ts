@@ -1,37 +1,39 @@
 /**
  * Pipeline execution, save, list, and delete routes.
  *
- * POST   /api/v1/pipeline/execute  — Execute a pipeline (array of tool steps)
- * POST   /api/v1/pipeline/save     — Save a pipeline definition
- * GET    /api/v1/pipeline/list      — List saved pipelines
- * DELETE /api/v1/pipeline/:id       — Delete a saved pipeline
+ * POST   /api/v1/pipeline/execute  -- Execute a pipeline (array of tool steps)
+ * POST   /api/v1/pipeline/save     -- Save a pipeline definition
+ * GET    /api/v1/pipeline/list     -- List saved pipelines
+ * DELETE /api/v1/pipeline/:id      -- Delete a saved pipeline
+ * POST   /api/v1/pipeline/batch    -- Batch pipeline execution (ZIP output)
  */
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import archiver from "archiver";
+import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import PQueue from "p-queue";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { hasAiJobHandler } from "../jobs/ai-handlers.js";
+import { recordChildOutcome } from "../jobs/batch-progress.js";
+import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
+import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { trackEvent } from "../lib/analytics.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
-import { resolveConcurrency } from "../lib/env.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { getObjectStream, putObject } from "../lib/object-storage.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
-import { createWorkspace } from "../lib/workspace.js";
 import { hasEffectivePermission } from "../permissions.js";
-import { requireAuth } from "../plugins/auth.js";
-import { type JobProgress, updateJobProgress, updateSingleFileProgress } from "./progress.js";
+import { getAuthUser, requireAuth } from "../plugins/auth.js";
+import { updateJobProgress, updateSingleFileProgress } from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
 
 /** Schema for a single pipeline step. */
@@ -60,6 +62,116 @@ const savePipelineSchema = z.object({
   steps: stepsSchema,
 });
 
+// ── Helpers ────────────────────────────────────────────────────
+
+function resolvePool(toolId: string): Pool {
+  if (hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId]) return "ai";
+  return "image";
+}
+
+interface ParsedStep {
+  toolId: string;
+  resolvedToolId: string;
+  parsedSettings: unknown;
+  pool: Pool;
+}
+
+/**
+ * Build a FlowJob tree for a single-file pipeline.
+ *
+ * BullMQ children run BEFORE parents, so the sequential chain nests
+ * with step 0 deepest:
+ *
+ *   finalize (parent)
+ *     step N-1
+ *       step N-2
+ *         ...
+ *           step 0 (deepest leaf, runs first)
+ */
+function buildPipelineFlowTree(opts: {
+  jobId: string;
+  userId: string | null;
+  parsedSteps: ParsedStep[];
+  uploadKey: string;
+  filename: string;
+  clientJobId?: string;
+  parentId?: string;
+  totalFiles?: number;
+}): { tree: FlowJob; stepJobIds: string[] } {
+  const { jobId, userId, parsedSteps, uploadKey, filename, clientJobId, parentId, totalFiles } =
+    opts;
+  const totalSteps = parsedSteps.length;
+  const stepJobIds = parsedSteps.map((_: unknown, i: number) => `${jobId}-s${i}`);
+
+  // Build bottom-up: step 0 is the deepest leaf
+  let currentNode: FlowJob = {
+    name: parsedSteps[0].resolvedToolId,
+    queueName: queueName(parsedSteps[0].pool),
+    data: {
+      kind: "pipeline-step",
+      jobId: stepJobIds[0],
+      toolId: parsedSteps[0].resolvedToolId,
+      userId,
+      pool: parsedSteps[0].pool,
+      stepIndex: 0,
+      totalSteps,
+      prevJobId: undefined,
+      clientJobId,
+      inputRefs: [uploadKey],
+      filename,
+      settings: parsedSteps[0].parsedSettings,
+    } satisfies ToolJobData,
+    opts: { jobId: stepJobIds[0] },
+  };
+
+  for (let i = 1; i < totalSteps; i++) {
+    currentNode = {
+      name: parsedSteps[i].resolvedToolId,
+      queueName: queueName(parsedSteps[i].pool),
+      data: {
+        kind: "pipeline-step",
+        jobId: stepJobIds[i],
+        toolId: parsedSteps[i].resolvedToolId,
+        userId,
+        pool: parsedSteps[i].pool,
+        stepIndex: i,
+        totalSteps,
+        prevJobId: stepJobIds[i - 1],
+        clientJobId,
+        inputRefs: [],
+        filename,
+        settings: parsedSteps[i].parsedSettings,
+      } satisfies ToolJobData,
+      opts: { jobId: stepJobIds[i] },
+      children: [currentNode],
+    };
+  }
+
+  // Finalize parent
+  const tree: FlowJob = {
+    name: "pipeline-finalize",
+    queueName: queueName("image"),
+    data: {
+      kind: "pipeline-finalize",
+      jobId,
+      toolId: "pipeline",
+      userId,
+      pool: "image" as Pool,
+      totalSteps,
+      clientJobId,
+      parentId,
+      totalFiles,
+      inputRefs: [],
+      filename,
+      settings: {},
+    } satisfies ToolJobData,
+    opts: { jobId },
+    children: [currentNode],
+  };
+
+  return { tree, stepJobIds };
+}
+
 export async function registerPipelineRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /api/v1/pipeline/execute
@@ -68,9 +180,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
    *   - A file part (the image to process)
    *   - A "pipeline" field containing JSON: { steps: [{ toolId, settings }, ...] }
    *
-   * Processes the image through each step sequentially.
-   * The output of step N becomes the input of step N+1.
-   * Returns the final processed image for download.
+   * Enqueues a BullMQ FlowProducer tree (nested children for sequential
+   * execution) and blocks until the finalize job completes.
    */
   app.post("/api/v1/pipeline/execute", async (request: FastifyRequest, reply: FastifyReply) => {
     let fileBuffer: Buffer | null = null;
@@ -121,7 +232,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     if (validation.format === "heif") {
       try {
         fileBuffer = await decodeHeic(fileBuffer);
-        // Update filename extension to match the decoded format
         const ext = filename.match(/\.[^.]+$/)?.[0];
         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
       } catch (err) {
@@ -174,7 +284,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return reply.status(400).send({ error: "Pipeline must be valid JSON" });
     }
 
-    // Validate all tool IDs exist before starting
+    // Validate all tool IDs and settings; collect parsed steps
+    const parsedSteps: ParsedStep[] = [];
+
     for (let i = 0; i < pipeline.steps.length; i++) {
       const step = pipeline.steps[i];
 
@@ -202,7 +314,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         });
       }
 
-      // Validate the settings for this tool
       const settingsResult = toolConfig.settingsSchema.safeParse(step.settings);
       if (!settingsResult.success) {
         return reply.status(400).send({
@@ -215,65 +326,125 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           ),
         });
       }
+
+      parsedSteps.push({
+        toolId: step.toolId,
+        resolvedToolId,
+        parsedSettings: settingsResult.data,
+        pool: resolvePool(resolvedToolId),
+      });
     }
 
-    // Execute the pipeline: pass the buffer through each step sequentially
-    const startTime = Date.now();
-    let currentBuffer = fileBuffer;
-    let currentFilename = filename;
-    const stepResults: Array<{ step: number; toolId: string; size: number }> = [];
-    const totalSteps = pipeline.steps.length;
+    // ── Enqueue as a BullMQ flow ────────────────────────────────
 
-    const reportProgress = (percent: number, stage?: string) => {
-      if (!clientJobId) return;
+    const startTime = Date.now();
+    const jobId = randomUUID();
+    const userId = getAuthUser(request)?.id ?? null;
+    const originalSize = fileBuffer.length;
+
+    // Upload decoded file to object storage
+    const uploadKey = `uploads/${jobId}/${filename}`;
+    await putObject(uploadKey, fileBuffer);
+
+    // Report initial progress
+    if (clientJobId) {
       updateSingleFileProgress({
         jobId: clientJobId,
         phase: "processing",
-        percent,
-        stage,
+        percent: 0,
+        stage: "Preparing pipeline...",
       });
-    };
+    }
 
+    // Build the nested FlowJob tree
+    const { tree, stepJobIds } = buildPipelineFlowTree({
+      jobId,
+      userId,
+      parsedSteps,
+      uploadKey,
+      filename,
+      clientJobId: clientJobId ?? jobId,
+    });
+
+    // Insert all durable rows before adding the flow. enqueueToolJob
+    // inserts row-then-add; for flows we insert ALL rows first, then
+    // one flow.add.
+    for (let i = 0; i < parsedSteps.length; i++) {
+      await db.insert(schema.jobs).values({
+        id: stepJobIds[i],
+        userId,
+        toolId: parsedSteps[i].resolvedToolId,
+        pool: parsedSteps[i].pool,
+        type: "pipeline-step",
+        status: "queued",
+        inputRefs: i === 0 ? [uploadKey] : [],
+        settings: parsedSteps[i].parsedSettings as Record<string, unknown>,
+      });
+    }
+
+    await db.insert(schema.jobs).values({
+      id: jobId,
+      userId,
+      toolId: "pipeline",
+      pool: "image",
+      type: "pipeline-finalize",
+      status: "queued",
+      inputRefs: [],
+      settings: {},
+    });
+
+    // Add the flow to BullMQ
+    await getFlowProducer().add(tree);
+
+    // Wait for the finalize job (pipelines block to completion)
     try {
-      for (let i = 0; i < totalSteps; i++) {
-        const step = pipeline.steps[i];
-        const stepPercent = Math.round((i / totalSteps) * 90);
-        reportProgress(stepPercent, `Step ${i + 1}/${totalSteps}: ${step.toolId}`);
+      const result = await waitForJob("image", jobId, 10 * 60_000);
 
-        // Route content-aware resize to its dedicated tool
-        const resolvedToolId =
-          step.toolId === "resize" && step.settings?.contentAware
-            ? "content-aware-resize"
-            : step.toolId;
-
-        const toolConfig = getToolConfig(resolvedToolId);
-        if (!toolConfig) {
-          return reply.status(400).send({
-            error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
-          });
-        }
-
-        try {
-          const settings = toolConfig.settingsSchema.parse(step.settings);
-          const result = await toolConfig.process(currentBuffer, settings, currentFilename);
-
-          stepResults.push({
-            step: i + 1,
-            toolId: step.toolId,
-            size: result.buffer.length,
-          });
-
-          currentBuffer = result.buffer;
-          currentFilename = result.filename;
-        } catch (stepErr) {
-          const msg = stepErr instanceof Error ? stepErr.message : "Processing failed";
-          throw new Error(`Step ${i + 1} (${step.toolId}): ${msg}`);
-        }
+      if (!result) {
+        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+          step_count: pipeline.steps.length,
+          tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
+          is_batch: false,
+          duration_ms: Date.now() - startTime,
+          status: "failed",
+        });
+        return reply.status(422).send({
+          error: "Pipeline processing timed out",
+        });
       }
 
-      reportProgress(95, "Saving...");
+      // Check for step failure reported by the finalize handler
+      if (result.resultPayload?.error) {
+        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+          step_count: pipeline.steps.length,
+          tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
+          is_batch: false,
+          duration_ms: Date.now() - startTime,
+          status: "failed",
+        });
+        return reply.status(422).send({
+          error: result.resultPayload.error as string,
+          completedSteps: result.resultPayload.steps,
+        });
+      }
+
+      trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        step_count: pipeline.steps.length,
+        tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
+        is_batch: false,
+        duration_ms: Date.now() - startTime,
+        status: "completed",
+      });
+
+      return reply.send({
+        jobId,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+        originalSize,
+        processedSize: result.processedSize,
+        stepsCompleted: result.resultPayload?.stepsCompleted ?? parsedSteps.length,
+        steps: result.resultPayload?.steps ?? [],
+      });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Pipeline processing failed";
       trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
         step_count: pipeline.steps.length,
         tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
@@ -282,37 +453,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         status: "failed",
       });
       return reply.status(422).send({
-        error: message,
-        completedSteps: stepResults,
+        error: err instanceof Error ? err.message : "Pipeline processing failed",
       });
     }
-
-    // Save the final output to workspace
-    const jobId = randomUUID();
-    const workspacePath = await createWorkspace(jobId);
-    const outputPath = join(workspacePath, "output", currentFilename);
-    await writeFile(outputPath, currentBuffer);
-
-    // Also save the original input for reference
-    const inputPath = join(workspacePath, "input", filename);
-    await writeFile(inputPath, fileBuffer);
-
-    trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
-      step_count: pipeline.steps.length,
-      tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
-      is_batch: false,
-      duration_ms: Date.now() - startTime,
-      status: "completed",
-    });
-
-    return reply.send({
-      jobId,
-      downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(currentFilename)}`,
-      originalSize: fileBuffer.length,
-      processedSize: currentBuffer.length,
-      stepsCompleted: stepResults.length,
-      steps: stepResults,
-    });
   });
 
   /**
@@ -449,8 +592,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
    * POST /api/v1/pipeline/batch
    *
    * Accepts multipart with multiple files + a "pipeline" JSON field.
-   * Runs the full pipeline on each file with concurrency control via p-queue.
-   * Returns a ZIP containing all processed results.
+   * Each file is processed through the full pipeline via a per-file
+   * FlowProducer chain. All chains are children of a single
+   * batch-finalize parent. Returns a ZIP containing all results.
    */
   app.post("/api/v1/pipeline/batch", async (request: FastifyRequest, reply: FastifyReply) => {
     // ── Parse multipart ──────────────────────────────────────────────
@@ -525,24 +669,31 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return reply.status(400).send({ error: "Pipeline must be valid JSON" });
     }
 
-    // Validate all tool IDs exist and settings are valid before processing
+    // Validate all tool IDs and settings
+    const parsedSteps: ParsedStep[] = [];
+
     for (let i = 0; i < pipeline.steps.length; i++) {
       const step = pipeline.steps[i];
-      const toolConfig = getToolConfig(step.toolId);
+
+      const resolvedToolId =
+        step.toolId === "resize" && step.settings?.contentAware
+          ? "content-aware-resize"
+          : step.toolId;
+
+      const toolConfig = getToolConfig(resolvedToolId);
       if (!toolConfig) {
         return reply.status(400).send({
           error: `Step ${i + 1}: Tool "${step.toolId}" not found`,
         });
       }
 
-      // Guard: check if the tool's AI feature bundle is installed
-      if (!isToolInstalled(step.toolId)) {
-        const bundle = getBundleForTool(step.toolId);
+      if (!isToolInstalled(resolvedToolId)) {
+        const bundle = getBundleForTool(resolvedToolId);
         return reply.status(501).send({
           error: `Step ${i + 1} (${step.toolId}): Feature "${bundle?.name}" is not installed`,
           code: "FEATURE_NOT_INSTALLED",
-          feature: TOOL_BUNDLE_MAP[step.toolId],
-          featureName: bundle?.name ?? step.toolId,
+          feature: TOOL_BUNDLE_MAP[resolvedToolId],
+          featureName: bundle?.name ?? resolvedToolId,
         });
       }
 
@@ -558,126 +709,243 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           ),
         });
       }
+
+      parsedSteps.push({
+        toolId: step.toolId,
+        resolvedToolId,
+        parsedSettings: settingsResult.data,
+        pool: resolvePool(resolvedToolId),
+      });
     }
 
-    // ── Progress tracking ────────────────────────────────────────────
+    // ── Prepare files and build flow ─────────────────────────────────
     const batchStartTime = Date.now();
-    const jobId = clientJobId || randomUUID();
+    const parentId = clientJobId || randomUUID();
+    const userId = getAuthUser(request)?.id ?? null;
 
-    const progress: JobProgress = {
-      jobId,
+    // Insert batch-finalize row BEFORE updateJobProgress to avoid
+    // a duplicate-key race with the progress persist layer.
+    await db.insert(schema.jobs).values({
+      id: parentId,
+      userId,
+      toolId: "pipeline-batch",
+      pool: "system",
+      type: "batch-finalize",
+      status: "queued",
+      inputRefs: [],
+      settings: { flowChildCount: 0 },
+    });
+
+    // Emit initial batch progress
+    updateJobProgress({
+      jobId: parentId,
       status: "processing",
       totalFiles: files.length,
       completedFiles: 0,
       failedFiles: 0,
       errors: [],
-    };
-    updateJobProgress({ ...progress });
+    });
 
-    // ── Process files through the pipeline with concurrency control ──
-    const queue = new PQueue({ concurrency: resolveConcurrency(env) });
+    // Validate, decode, and upload each file; build per-file pipeline chains
+    const perFileChildren: FlowJob[] = [];
+    const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
+    let flowChildIndex = 0;
 
-    const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
-      null,
-    );
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      let processBuffer = file.buffer;
+      let processFilename = file.filename;
 
-    try {
-      const tasks = files.map((file, index) =>
-        queue.add(async () => {
-          progress.currentFile = file.filename;
-          updateJobProgress({ ...progress });
+      const fileValidation = await validateImageBuffer(processBuffer, processFilename);
+      if (!fileValidation.valid) {
+        preFailures.push({
+          originalIndex: fi,
+          filename: file.filename,
+          error: `Invalid image: ${fileValidation.reason}`,
+        });
+        continue;
+      }
 
-          // Validate the image
-          const validation = await validateImageBuffer(file.buffer, file.filename);
-          if (!validation.valid) {
-            progress.failedFiles++;
-            progress.errors.push({
-              filename: file.filename,
-              error: `Invalid image: ${validation.reason}`,
-            });
-            progress.completedFiles++;
-            updateJobProgress({ ...progress });
-            return;
-          }
+      // Decode chain
+      if (fileValidation.format === "heif") {
+        try {
+          processBuffer = await decodeHeic(processBuffer);
+          const ext = processFilename.match(/\.[^.]+$/)?.[0];
+          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+        } catch {
+          preFailures.push({
+            originalIndex: fi,
+            filename: file.filename,
+            error: "Failed to decode HEIC file",
+          });
+          continue;
+        }
+      }
 
-          try {
-            let currentBuffer = file.buffer;
-            let currentFilename = file.filename;
+      if (needsCliDecode(fileValidation.format)) {
+        try {
+          processBuffer = await decodeToSharpCompat(processBuffer, fileValidation.format);
+          const ext = processFilename.match(/\.[^.]+$/)?.[0];
+          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+        } catch {
+          // Fall through -- tool might handle it
+        }
+      }
 
-            // Decode HEIC/HEIF if needed
-            if (validation.format === "heif") {
-              currentBuffer = await decodeHeic(currentBuffer);
-              const ext = currentFilename.match(/\.[^.]+$/)?.[0];
-              if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
-            }
+      if (isSvgBuffer(processBuffer)) {
+        processBuffer = sanitizeSvg(processBuffer);
+      } else {
+        processBuffer = await autoOrient(processBuffer);
+      }
 
-            // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-            if (needsCliDecode(validation.format)) {
-              currentBuffer = await decodeToSharpCompat(currentBuffer, validation.format);
-              const ext = currentFilename.match(/\.[^.]+$/)?.[0];
-              if (ext) currentFilename = `${currentFilename.slice(0, -ext.length)}.png`;
-            }
+      // Upload decoded file
+      const perFileJobId = `${parentId}-f${flowChildIndex}`;
+      const uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
+      await putObject(uploadKey, processBuffer);
 
-            // Sanitize SVG or normalize EXIF orientation
-            if (isSvgBuffer(currentBuffer)) {
-              currentBuffer = sanitizeSvg(currentBuffer);
-            } else {
-              currentBuffer = await autoOrient(currentBuffer);
-            }
+      // Build per-file pipeline chain
+      const { tree: perFileTree, stepJobIds } = buildPipelineFlowTree({
+        jobId: perFileJobId,
+        userId,
+        parsedSteps,
+        uploadKey,
+        filename: processFilename,
+        parentId,
+        totalFiles: files.length,
+      });
 
-            // Run through all pipeline steps sequentially
-            for (let i = 0; i < pipeline.steps.length; i++) {
-              const step = pipeline.steps[i];
+      // Insert step + finalize rows for this file
+      for (let si = 0; si < parsedSteps.length; si++) {
+        await db.insert(schema.jobs).values({
+          id: stepJobIds[si],
+          userId,
+          toolId: parsedSteps[si].resolvedToolId,
+          pool: parsedSteps[si].pool,
+          type: "pipeline-step",
+          status: "queued",
+          inputRefs: si === 0 ? [uploadKey] : [],
+          settings: parsedSteps[si].parsedSettings as Record<string, unknown>,
+        });
+      }
 
-              // Route content-aware resize to its dedicated tool
-              const resolvedToolId =
-                step.toolId === "resize" && step.settings?.contentAware
-                  ? "content-aware-resize"
-                  : step.toolId;
+      await db.insert(schema.jobs).values({
+        id: perFileJobId,
+        userId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline-finalize",
+        status: "queued",
+        inputRefs: [],
+        settings: {},
+      });
 
-              const toolConfig = getToolConfig(resolvedToolId);
-              if (!toolConfig) {
-                throw new Error(`Step ${i + 1} (${step.toolId}): Tool not found or not available`);
-              }
-
-              try {
-                const settings = toolConfig.settingsSchema.parse(step.settings);
-                const result = await toolConfig.process(currentBuffer, settings, currentFilename);
-                currentBuffer = result.buffer;
-                currentFilename = result.filename;
-              } catch (stepErr) {
-                const msg = stepErr instanceof Error ? stepErr.message : "Processing failed";
-                throw new Error(`Step ${i + 1} (${step.toolId}): ${msg}`);
-              }
-            }
-
-            results[index] = { buffer: currentBuffer, filename: currentFilename };
-
-            progress.completedFiles++;
-            updateJobProgress({ ...progress });
-          } catch (err) {
-            progress.failedFiles++;
-            progress.errors.push({
-              filename: file.filename,
-              error: err instanceof Error ? err.message : "Pipeline processing failed",
-            });
-            progress.completedFiles++;
-            updateJobProgress({ ...progress });
-          }
-        }),
-      );
-
-      await Promise.all(tasks);
-    } catch (err) {
-      request.log.error({ err }, "Unexpected error in pipeline batch queue");
+      perFileChildren.push(perFileTree);
+      flowChildIndex++;
     }
 
-    // ── Finalize progress ────────────────────────────────────────────
-    progress.status = progress.failedFiles === progress.totalFiles ? "failed" : "completed";
-    progress.currentFile = undefined;
-    updateJobProgress({ ...progress });
+    // Record pre-failures in batch progress
+    for (const pf of preFailures) {
+      await recordChildOutcome(parentId, files.length, pf.filename, pf.error);
+    }
 
-    // ── Deduplicate output filenames ─────────────────────────────────
+    if (perFileChildren.length === 0) {
+      // All files failed validation
+      trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        step_count: pipeline.steps.length,
+        tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
+        is_batch: true,
+        file_count: files.length,
+        duration_ms: Date.now() - batchStartTime,
+        status: "failed",
+      });
+      return reply.status(422).send({
+        error: "All files failed processing",
+        errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+      });
+    }
+
+    // Build batch-finalize parent
+    const batchTree: FlowJob = {
+      name: "batch-finalize",
+      queueName: queueName("system"),
+      data: {
+        kind: "batch-finalize",
+        jobId: parentId,
+        toolId: "pipeline-batch",
+        userId,
+        pool: "system" as Pool,
+        totalFiles: files.length,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: perFileChildren.length },
+      } satisfies ToolJobData,
+      opts: { jobId: parentId },
+      children: perFileChildren,
+    };
+
+    // Update the parent row with the final flow child count
+    await db
+      .update(schema.jobs)
+      .set({ settings: { flowChildCount: perFileChildren.length } })
+      .where(eq(schema.jobs.id, parentId));
+
+    await getFlowProducer().add(batchTree);
+
+    // Wait for batch completion
+    const batchResult = await waitForJob("system", parentId, 30 * 60_000);
+
+    if (!batchResult) {
+      trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        step_count: pipeline.steps.length,
+        tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
+        is_batch: true,
+        file_count: files.length,
+        duration_ms: Date.now() - batchStartTime,
+        status: "failed",
+      });
+      return reply.status(422).send({ error: "Pipeline batch processing timed out" });
+    }
+
+    const manifest = (batchResult.resultPayload?.manifest ?? []) as Array<{
+      index: number;
+      filename: string;
+      outputRef?: string;
+      error?: string;
+    }>;
+
+    // Combine manifest with pre-failures
+    const allResults: Array<{
+      originalIndex: number;
+      filename: string;
+      outputRef?: string;
+      error?: string;
+    }> = [];
+
+    // Map flow indices back to original file indices
+    let fci = 0;
+    for (let fi = 0; fi < files.length; fi++) {
+      const pf = preFailures.find((p) => p.originalIndex === fi);
+      if (pf) {
+        allResults.push({
+          originalIndex: fi,
+          filename: pf.filename,
+          error: pf.error,
+        });
+      } else {
+        const entry = manifest.find((m) => m.index === fci);
+        if (entry) {
+          allResults.push({
+            originalIndex: fi,
+            filename: entry.filename,
+            outputRef: entry.outputRef,
+            error: entry.error,
+          });
+        }
+        fci++;
+      }
+    }
+
+    // Deduplicate output filenames
     const usedNames = new Set<string>();
     function getUniqueName(name: string): string {
       if (!usedNames.has(name)) {
@@ -697,18 +965,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return candidate;
     }
 
-    const fileResultsMap: Record<string, string> = {};
-    for (let i = 0; i < results.length; i++) {
-      const entry = results[i];
-      if (entry) {
-        const uniqueName = getUniqueName(entry.filename);
-        entry.filename = uniqueName;
-        fileResultsMap[String(i)] = uniqueName;
-      }
-    }
+    const successEntries = allResults.filter((r) => r.outputRef);
+    const failedEntries = allResults.filter((r) => !r.outputRef);
 
-    // If every file failed, return an error instead of an empty ZIP
-    if (progress.status === "failed") {
+    if (successEntries.length === 0) {
       trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
         step_count: pipeline.steps.length,
         tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
@@ -719,7 +979,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       });
       return reply.status(422).send({
         error: "All files failed processing",
-        errors: progress.errors,
+        errors: failedEntries.map((f) => ({ filename: f.filename, error: f.error ?? "Failed" })),
       });
     }
 
@@ -732,13 +992,20 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       status: "completed",
     });
 
+    const fileResultsMap: Record<string, string> = {};
+    for (const entry of successEntries) {
+      const uniqueName = getUniqueName(entry.filename);
+      entry.filename = uniqueName;
+      fileResultsMap[String(entry.originalIndex)] = uniqueName;
+    }
+
     // ── Stream ZIP response ──────────────────────────────────────────
     reply.hijack();
     reply.raw.writeHead(200, {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="pipeline-batch-${jobId.slice(0, 8)}.zip"`,
+      "Content-Disposition": `attachment; filename="pipeline-batch-${parentId.slice(0, 8)}.zip"`,
       "Transfer-Encoding": "chunked",
-      "X-Job-Id": jobId,
+      "X-Job-Id": parentId,
       "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
       ...getSecurityHeaders(),
     });
@@ -754,11 +1021,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
     archive.pipe(reply.raw);
 
-    // Append results in original upload order
-    for (const result of results) {
-      if (result) {
-        archive.append(result.buffer, { name: result.filename });
-      }
+    // Append results from object storage in original upload order
+    for (const entry of successEntries) {
+      const stream = await getObjectStream(entry.outputRef!);
+      archive.append(stream, { name: entry.filename });
     }
 
     await archive.finalize();

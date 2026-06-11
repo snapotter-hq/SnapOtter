@@ -4,27 +4,33 @@
  * POST /api/v1/tools/:toolId/batch
  *
  * Accepts multipart with multiple files + settings JSON.
- * Processes all files through the tool using p-queue for concurrency control.
+ * Each file is enqueued as a batch-child BullMQ job; a batch-finalize
+ * parent assembles the manifest once all children complete.
  * Returns a ZIP file containing all processed images.
  */
 import { randomUUID } from "node:crypto";
-import { extname } from "node:path";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import archiver from "archiver";
+import type { FlowJob } from "bullmq";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import PQueue from "p-queue";
 import sharp from "sharp";
 import { env } from "../config.js";
+import { db, schema } from "../db/index.js";
+import { hasAiJobHandler } from "../jobs/ai-handlers.js";
+import { recordChildOutcome } from "../jobs/batch-progress.js";
+import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
+import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
-import { resolveConcurrency } from "../lib/env.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { type JobProgress, updateJobProgress } from "./progress.js";
+import { getObjectStream, putObject } from "../lib/object-storage.js";
+import { updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
 interface ParsedFile {
@@ -125,109 +131,227 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
-      // Create a job ID for progress tracking
-      const jobId = clientJobId || randomUUID();
+      // ── Create job ID and initial progress ────────────────────────
+      const parentId = clientJobId || randomUUID();
+      const userId = (request as unknown as { user?: { id: string } }).user?.id ?? null;
+      const pool: Pool = hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId] ? "ai" : "image";
 
-      const progress: JobProgress = {
-        jobId,
+      // Insert the parent row BEFORE updateJobProgress, because the
+      // progress persist layer does a check-then-insert that races
+      // with our explicit insert below.
+      await db.insert(schema.jobs).values({
+        id: parentId,
+        userId,
+        toolId,
+        pool: "system",
+        type: "batch-finalize",
+        status: "queued",
+        inputRefs: [],
+        settings: { flowChildCount: 0 },
+      });
+
+      updateJobProgress({
+        jobId: parentId,
         status: "processing",
         totalFiles: files.length,
         completedFiles: 0,
         failedFiles: 0,
         errors: [],
-      };
-      updateJobProgress({ ...progress });
+      });
 
-      // Use p-queue for concurrency control
-      const queue = new PQueue({ concurrency: resolveConcurrency(env) });
+      // ── Validate, decode, and upload each file ────────────────────
+      const flowChildren: FlowJob[] = [];
+      const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
+      let flowChildIndex = 0;
 
-      // All processed buffers are held in memory until ZIP streaming begins.
-      // Peak memory scales with files.length * avg output size. MAX_BATCH_SIZE bounds this.
-      // Collect results in indexed array to preserve upload order
-      const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
-        null,
-      );
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        let processBuffer = file.buffer;
+        let processFilename = file.filename;
 
-      // Process all files through the queue
-      try {
-        const tasks = files.map((file, index) =>
-          queue.add(async () => {
-            progress.currentFile = file.filename;
-            updateJobProgress({ ...progress });
+        const validation = await validateImageBuffer(processBuffer, processFilename);
+        if (!validation.valid) {
+          preFailures.push({
+            originalIndex: i,
+            filename: file.filename,
+            error: `Invalid image: ${validation.reason}`,
+          });
+          continue;
+        }
 
-            // Validate the image
-            const validation = await validateImageBuffer(file.buffer, file.filename);
-            if (!validation.valid) {
-              progress.failedFiles++;
-              progress.errors.push({
-                filename: file.filename,
-                error: `Invalid image: ${validation.reason}`,
-              });
-              progress.completedFiles++;
-              updateJobProgress({ ...progress });
-              return;
-            }
+        // Decode chain (skip for metadata tools that handle all formats natively)
+        const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
 
+        if (!skipPreprocess && validation.format === "heif") {
+          try {
+            processBuffer = await decodeHeic(processBuffer);
+            const ext = processFilename.match(/\.[^.]+$/)?.[0];
+            if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+          } catch {
+            preFailures.push({
+              originalIndex: i,
+              filename: file.filename,
+              error: "Failed to decode HEIC file",
+            });
+            continue;
+          }
+        }
+
+        if (!skipPreprocess && needsCliDecode(validation.format)) {
+          try {
+            processBuffer = await decodeToSharpCompat(processBuffer, validation.format);
+          } catch {
             try {
-              let processBuffer = file.buffer;
-              let processFilename = file.filename;
-              // Skip HEIC decode and auto-orient for edit-metadata (ExifTool handles all formats natively)
-              const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
-              if (!skipPreprocess && validation.format === "heif") {
-                processBuffer = await decodeHeic(processBuffer);
-                // Update extension to match decoded format (HEIC/HEIF → PNG)
-                const ext = processFilename.match(/\.[^.]+$/)?.[0];
-                if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-              }
-              if (!skipPreprocess && needsCliDecode(validation.format)) {
-                try {
-                  processBuffer = await decodeToSharpCompat(processBuffer, validation.format);
-                } catch {
-                  await sharp(processBuffer).metadata();
-                }
-                const ext = processFilename.match(/\.[^.]+$/)?.[0];
-                if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-              }
-              if (!skipPreprocess) {
-                processBuffer = await autoOrient(processBuffer);
-              }
-              const result = await toolConfig.process(processBuffer, settings, processFilename);
-
-              // Add tool suffix so downloads don't overwrite originals
-              let outFilename = result.filename;
-              if (outFilename === processFilename) {
-                const ext = extname(processFilename);
-                const base = ext ? processFilename.slice(0, -ext.length) : processFilename;
-                outFilename = `${base}_${toolId}${ext}`;
-              }
-
-              results[index] = { buffer: result.buffer, filename: outFilename };
-
-              progress.completedFiles++;
-              updateJobProgress({ ...progress });
-            } catch (err) {
-              progress.failedFiles++;
-              progress.errors.push({
-                filename: file.filename,
-                error: err instanceof Error ? err.message : "Processing failed",
-              });
-              progress.completedFiles++;
-              updateJobProgress({ ...progress });
+              await sharp(processBuffer).metadata();
+            } catch {
+              // Neither CLI decode nor Sharp can handle it; upload raw
             }
-          }),
-        );
+          }
+          const ext = processFilename.match(/\.[^.]+$/)?.[0];
+          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+        }
 
-        await Promise.all(tasks);
-      } catch (err) {
-        request.log.error({ err }, "Unexpected error in batch queue");
+        if (!skipPreprocess) {
+          processBuffer = await autoOrient(processBuffer);
+        }
+
+        // Upload decoded file to object storage
+        const childId = `${parentId}-f${flowChildIndex}`;
+        const key = `uploads/${childId}/${processFilename}`;
+        await putObject(key, processBuffer);
+
+        // Insert child row
+        await db.insert(schema.jobs).values({
+          id: childId,
+          userId,
+          toolId,
+          pool,
+          type: "batch-child",
+          status: "queued",
+          inputRefs: [key],
+          settings: settings as Record<string, unknown>,
+        });
+
+        // Build flow child node
+        flowChildren.push({
+          name: toolId,
+          queueName: queueName(pool),
+          data: {
+            kind: "batch-child",
+            jobId: childId,
+            toolId,
+            userId,
+            pool,
+            parentId,
+            totalFiles: files.length,
+            fileIndex: i,
+            inputRefs: [key],
+            filename: processFilename,
+            settings,
+          } satisfies ToolJobData,
+          opts: { jobId: childId },
+        });
+
+        flowChildIndex++;
       }
 
-      // Finalize progress
-      progress.status = progress.failedFiles === progress.totalFiles ? "failed" : "completed";
-      progress.currentFile = undefined;
-      updateJobProgress({ ...progress });
+      // Record pre-failures in batch progress
+      for (const pf of preFailures) {
+        await recordChildOutcome(parentId, files.length, pf.filename, pf.error);
+      }
 
-      // Deduplicate filenames in original order and build X-File-Results header
+      if (flowChildren.length === 0) {
+        // All files failed validation
+        return reply.status(422).send({
+          error: "All files failed processing",
+          errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+        });
+      }
+
+      // ── Build flow tree and enqueue ────────────────────────────────
+      const batchTree: FlowJob = {
+        name: "batch-finalize",
+        queueName: queueName("system"),
+        data: {
+          kind: "batch-finalize",
+          jobId: parentId,
+          toolId,
+          userId,
+          pool: "system" as Pool,
+          totalFiles: files.length,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: flowChildren.length },
+        } satisfies ToolJobData,
+        opts: { jobId: parentId },
+        children: flowChildren,
+      };
+
+      // Update the parent row with the final flow child count
+      await db
+        .update(schema.jobs)
+        .set({ settings: { flowChildCount: flowChildren.length } })
+        .where(eq(schema.jobs.id, parentId));
+
+      await getFlowProducer().add(batchTree);
+
+      // ── Wait for completion and stream ZIP ─────────────────────────
+      const batchResult = await waitForJob("system", parentId, 30 * 60_000);
+
+      if (!batchResult) {
+        return reply.status(422).send({ error: "Batch processing timed out" });
+      }
+
+      const manifest = (batchResult.resultPayload?.manifest ?? []) as Array<{
+        index: number;
+        filename: string;
+        outputRef?: string;
+        error?: string;
+      }>;
+
+      // Combine manifest with pre-failures for the full ordered result
+      const allResults: Array<{
+        originalIndex: number;
+        filename: string;
+        outputRef?: string;
+        error?: string;
+      }> = [];
+
+      let fci = 0;
+      for (let i = 0; i < files.length; i++) {
+        const pf = preFailures.find((p) => p.originalIndex === i);
+        if (pf) {
+          allResults.push({
+            originalIndex: i,
+            filename: pf.filename,
+            error: pf.error,
+          });
+        } else {
+          const entry = manifest.find((m) => m.index === fci);
+          if (entry) {
+            allResults.push({
+              originalIndex: i,
+              filename: entry.filename,
+              outputRef: entry.outputRef,
+              error: entry.error,
+            });
+          }
+          fci++;
+        }
+      }
+
+      const successEntries = allResults.filter((r) => r.outputRef);
+      const failedEntries = allResults.filter((r) => !r.outputRef);
+
+      // If every file failed, return an error instead of an empty ZIP
+      if (successEntries.length === 0) {
+        return reply.status(422).send({
+          error: "All files failed processing",
+          errors: failedEntries.map((f) => ({ filename: f.filename, error: f.error ?? "Failed" })),
+        });
+      }
+
+      // Deduplicate output filenames and build X-File-Results header
       const usedNames = new Set<string>();
       function getUniqueName(name: string): string {
         if (!usedNames.has(name)) {
@@ -248,30 +372,19 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const fileResultsMap: Record<string, string> = {};
-      for (let i = 0; i < results.length; i++) {
-        const entry = results[i];
-        if (entry) {
-          const uniqueName = getUniqueName(entry.filename);
-          entry.filename = uniqueName;
-          fileResultsMap[String(i)] = uniqueName;
-        }
-      }
-
-      // If every file failed, return an error instead of an empty ZIP
-      if (progress.status === "failed") {
-        return reply.status(422).send({
-          error: "All files failed processing",
-          errors: progress.errors,
-        });
+      for (const entry of successEntries) {
+        const uniqueName = getUniqueName(entry.filename);
+        entry.filename = uniqueName;
+        fileResultsMap[String(entry.originalIndex)] = uniqueName;
       }
 
       // Hijack and stream the ZIP response after all processing
       reply.hijack();
       reply.raw.writeHead(200, {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="batch-${toolId}-${jobId.slice(0, 8)}.zip"`,
+        "Content-Disposition": `attachment; filename="batch-${toolId}-${parentId.slice(0, 8)}.zip"`,
         "Transfer-Encoding": "chunked",
-        "X-Job-Id": jobId,
+        "X-Job-Id": parentId,
         "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
         ...getSecurityHeaders(),
       });
@@ -287,11 +400,10 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
       archive.pipe(reply.raw);
 
-      // Append results in original upload order
-      for (const result of results) {
-        if (result) {
-          archive.append(result.buffer, { name: result.filename });
-        }
+      // Append results from object storage in original upload order
+      for (const entry of successEntries) {
+        const stream = await getObjectStream(entry.outputRef!);
+        archive.append(stream, { name: entry.filename });
       }
 
       await archive.finalize();

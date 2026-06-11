@@ -33,6 +33,7 @@ import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
 import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
 import { hasAiJobHandler, runAiToolJob } from "./ai-handlers.js";
+import { recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createRedisConnection } from "./connection.js";
 import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
@@ -149,7 +150,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     let resultPayload: Record<string, unknown> | undefined;
     let extraOutputs: Array<{ name: string; buffer: Buffer; contentType: string }> | undefined;
 
-    if (data.kind === "ai-tool" && hasAiJobHandler(data.toolId)) {
+    if (hasAiJobHandler(data.toolId)) {
       const aiResult = await runAiToolJob(data, inputBuffer, ctx);
       resultBuffer = aiResult.buffer;
       resultFilename = aiResult.filename;
@@ -297,6 +298,316 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   }
 }
 
+// ── Pipeline step handler ─────────────────────────────────────
+
+/**
+ * Process a single pipeline step. Resolves inputRefs at run time
+ * (step 0 uses the upload key; later steps read the previous step's
+ * output_refs from the DB), reports pipeline-level progress, then
+ * falls through to processToolJob for the actual tool work.
+ *
+ * Errors are caught and returned as a failure marker instead of
+ * throwing so that subsequent steps and the finalize parent still
+ * run (BullMQ parents do not run when children fail hard).
+ */
+async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult> {
+  const data = job.data;
+
+  // Resolve inputRefs at run time: step 0 already has them from the
+  // route; later steps read the previous step's output from the DB.
+  if (data.stepIndex !== undefined && data.stepIndex > 0 && data.prevJobId) {
+    const [prevRow] = await db
+      .select({ outputRefs: schema.jobs.outputRefs, status: schema.jobs.status })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, data.prevJobId));
+
+    if (!prevRow || prevRow.status === "failed" || !prevRow.outputRefs?.[0]) {
+      // Previous step failed -- propagate the error without processing.
+      const prevError =
+        prevRow?.status === "failed"
+          ? ((
+              (
+                await db
+                  .select({ error: schema.jobs.error })
+                  .from(schema.jobs)
+                  .where(eq(schema.jobs.id, data.prevJobId))
+              )[0]?.error as { message?: string } | null
+            )?.message ?? "Processing failed")
+          : "Previous step has no output";
+      await db
+        .update(schema.jobs)
+        .set({ status: "failed", completedAt: new Date(), error: { message: prevError } })
+        .where(eq(schema.jobs.id, data.jobId));
+      return {
+        outputRefs: [],
+        filename: data.filename,
+        contentType: "",
+        originalSize: 0,
+        processedSize: 0,
+        resultPayload: { failed: true, error: prevError },
+      };
+    }
+    data.inputRefs = [prevRow.outputRefs[0]];
+  }
+
+  // Report pipeline-level progress to the pipeline's SSE channel.
+  const pipelineProgressId = data.clientJobId;
+  if (pipelineProgressId) {
+    const percent = Math.round(((data.stepIndex ?? 0) / (data.totalSteps ?? 1)) * 90);
+    const stage = `Step ${(data.stepIndex ?? 0) + 1}/${data.totalSteps}: ${data.toolId}`;
+    updateSingleFileProgress({ jobId: pipelineProgressId, phase: "processing", percent, stage });
+  }
+
+  // Clear clientJobId so processToolJob's terminal SSE event goes to the
+  // step's own jobId (nobody listens) instead of prematurely ending the
+  // pipeline's SSE stream.
+  data.clientJobId = undefined;
+
+  try {
+    return await processToolJob(job);
+  } catch (err) {
+    // Step failed -- return failure marker. processToolJob already
+    // updated the DB row to "failed" and emitted a terminal event
+    // on the step's own progress channel.
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return {
+      outputRefs: [],
+      filename: data.filename,
+      contentType: "",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: { failed: true, error: errorMsg },
+    };
+  }
+}
+
+// ── Pipeline finalize handler ─────────────────────────────────
+
+/**
+ * Assemble the pipeline result after all steps have completed.
+ *
+ * Reads all step DB rows, copies the last step's output to
+ * `outputs/<pipelineJobId>/<filename>` so the legacy download URL
+ * works, and returns the pipeline envelope payload.
+ *
+ * When part of a pipeline-batch (parentId is set), also records the
+ * child outcome for batch progress tracking.
+ */
+async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
+  const data = job.data;
+  const totalSteps = data.totalSteps ?? 0;
+
+  const steps: Array<{ step: number; toolId: string; size: number }> = [];
+  let firstBytesIn = 0;
+  let lastOutputRef = "";
+  let lastBytesOut = 0;
+  let failedAtStep: number | null = null;
+  let failError = "";
+
+  for (let i = 0; i < totalSteps; i++) {
+    const stepId = `${data.jobId}-s${i}`;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stepId));
+
+    if (!row) {
+      failedAtStep = i;
+      failError = `Step ${i + 1} row not found`;
+      break;
+    }
+
+    if (row.status !== "completed") {
+      failedAtStep = i;
+      failError = (row.error as { message?: string } | null)?.message ?? `Step ${i + 1} failed`;
+      break;
+    }
+
+    steps.push({
+      step: i + 1,
+      toolId: row.toolId ?? "unknown",
+      size: Number(row.bytesOut ?? 0),
+    });
+
+    if (i === 0) firstBytesIn = Number(row.bytesIn ?? 0);
+    if (i === totalSteps - 1) {
+      lastOutputRef = row.outputRefs?.[0] ?? "";
+      lastBytesOut = Number(row.bytesOut ?? 0);
+    }
+  }
+
+  const progressJobId = data.clientJobId ?? data.jobId;
+
+  // ── Failure path ────────────────────────────────────────────
+  if (failedAtStep !== null) {
+    const errorMsg = `Step ${failedAtStep + 1}: ${failError}`;
+
+    await db
+      .update(schema.jobs)
+      .set({ status: "failed", completedAt: new Date(), error: { message: errorMsg } })
+      .where(eq(schema.jobs.id, data.jobId));
+
+    updateSingleFileProgress({
+      jobId: progressJobId,
+      phase: "failed",
+      percent: 0,
+      error: errorMsg,
+    });
+
+    // Batch progress (pipeline-batch only)
+    if (data.parentId && data.totalFiles !== undefined) {
+      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+    }
+
+    return {
+      outputRefs: [],
+      filename: data.filename,
+      contentType: "",
+      originalSize: firstBytesIn,
+      processedSize: 0,
+      resultPayload: {
+        error: errorMsg,
+        stepsCompleted: steps.length,
+        steps,
+      },
+    };
+  }
+
+  // ── Success path ────────────────────────────────────────────
+  if (!lastOutputRef) throw new Error("Last step has no output");
+
+  // Copy last step's output to outputs/<pipelineJobId>/<filename> so
+  // the legacy download URL /api/v1/download/<pipelineJobId>/... works.
+  const lastOutputBuffer = await getObjectBuffer(lastOutputRef);
+  const outFilename = lastOutputRef.split("/").pop()!;
+  const parentKey = `outputs/${data.jobId}/${outFilename}`;
+  await putObject(parentKey, lastOutputBuffer);
+
+  await db
+    .update(schema.jobs)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+      outputRefs: [parentKey],
+      bytesIn: firstBytesIn,
+      bytesOut: lastBytesOut,
+    })
+    .where(eq(schema.jobs.id, data.jobId));
+
+  updateSingleFileProgress({
+    jobId: progressJobId,
+    phase: "complete",
+    percent: 100,
+    stage: "complete",
+  });
+
+  // Batch progress (pipeline-batch only)
+  if (data.parentId && data.totalFiles !== undefined) {
+    await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+  }
+
+  return {
+    outputRefs: [parentKey],
+    filename: outFilename,
+    contentType: "application/octet-stream",
+    originalSize: firstBytesIn,
+    processedSize: lastBytesOut,
+    resultPayload: {
+      stepsCompleted: totalSteps,
+      steps,
+    },
+  };
+}
+
+// ── Batch child handler ───────────────────────────────────────
+
+/**
+ * Wraps processToolJob for batch-child jobs. On success, records the
+ * outcome in the batch progress counters. On failure, catches the
+ * error and returns a failure marker *instead of throwing* so the
+ * parent batch-finalize job still runs. A hard throw would prevent
+ * BullMQ from advancing the parent.
+ *
+ * Each child records exactly once: the success path calls
+ * recordChildOutcome after processToolJob returns; the failure path
+ * calls it in the catch block. processToolJob's internal error
+ * handling writes the DB row to "failed" before re-throwing, so the
+ * DB state is accurate regardless.
+ */
+async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> {
+  try {
+    const result = await processToolJob(job);
+    await recordChildOutcome(job.data.parentId!, job.data.totalFiles!, job.data.filename);
+    return result;
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    await recordChildOutcome(job.data.parentId!, job.data.totalFiles!, job.data.filename, error);
+    // Return a completed job with a failure marker so the parent runs.
+    return {
+      outputRefs: [],
+      filename: job.data.filename,
+      contentType: "",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: { failed: true, error },
+    };
+  }
+}
+
+// ── Batch finalize handler ────────────────────────────────────
+
+/**
+ * Assembles the ordered manifest from child DB rows after all batch
+ * children have completed. Runs on the system pool (concurrency 1)
+ * and does only lightweight DB reads -- no heavy processing.
+ *
+ * The manifest `[{index, filename, outputRef?, error?}]` is returned
+ * as the job result so the HTTP route can stream the ZIP.
+ */
+async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
+  const data = job.data;
+  const flowChildCount =
+    (data.settings as { flowChildCount?: number } | null)?.flowChildCount ?? data.totalFiles ?? 0;
+
+  const manifest: Array<{
+    index: number;
+    filename: string;
+    outputRef?: string;
+    error?: string;
+  }> = [];
+
+  for (let i = 0; i < flowChildCount; i++) {
+    const childId = `${data.jobId}-f${i}`;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
+
+    if (!row) {
+      manifest.push({ index: i, filename: `file-${i}`, error: "Child job row not found" });
+      continue;
+    }
+
+    if (row.status === "completed" && row.outputRefs?.[0]) {
+      const outFilename = row.outputRefs[0].split("/").pop()!;
+      manifest.push({ index: i, filename: outFilename, outputRef: row.outputRefs[0] });
+    } else {
+      const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
+      const inputFilename = row.inputRefs?.[0]?.split("/").pop() ?? `file-${i}`;
+      manifest.push({ index: i, filename: inputFilename, error: errorMsg });
+    }
+  }
+
+  // Update parent row
+  await db
+    .update(schema.jobs)
+    .set({ status: "completed", completedAt: new Date() })
+    .where(eq(schema.jobs.id, data.jobId));
+
+  return {
+    outputRefs: [],
+    filename: "",
+    contentType: "application/json",
+    originalSize: 0,
+    processedSize: 0,
+    resultPayload: { manifest },
+  };
+}
+
 // ── Worker pool management ─────────────────────────────────────
 
 const workers: Worker[] = [];
@@ -309,8 +620,13 @@ export function startWorkers(): void {
 
     const processor = async (job: Job<ToolJobData>): Promise<ToolJobResult> => {
       if (pool === "system") {
+        if (job.data.kind === "batch-finalize") return processBatchFinalize(job);
         return runSystemJob(job);
       }
+      const kind = job.data.kind;
+      if (kind === "pipeline-step") return processPipelineStep(job);
+      if (kind === "pipeline-finalize") return processPipelineFinalize(job);
+      if (kind === "batch-child") return processBatchChild(job);
       return processToolJob(job);
     };
 
