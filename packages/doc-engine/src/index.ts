@@ -1,7 +1,9 @@
 export {
   gsAvailable,
+  pdfcpuAvailable,
   qpdfAvailable,
   resolveGs,
+  resolvePdfcpu,
   resolveQpdf,
   resolveSoffice,
   sofficeAvailable,

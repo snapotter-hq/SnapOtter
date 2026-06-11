@@ -11,6 +11,17 @@
 FROM mwader/static-ffmpeg:8.0 AS ffmpeg
 
 # ============================================
+# Stage 0b: Static pdfcpu binary (pure Go, no CGO)
+# ============================================
+# CGO_ENABLED=0 produces a fully static binary; no cross-compiler needed.
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:a1ae6b6c564f3e0072d70081036827a2705dbcf6b38aaa6d97f5de97fe9abdb4 AS pdfcpu-builder
+ARG TARGETOS=linux
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go install github.com/pdfcpu/pdfcpu/cmd/pdfcpu@v0.13.0 \
+    && cp "$(find /go/bin -type f -name pdfcpu | head -1)" /tmp/pdfcpu
+
+# ============================================
 # Stage 1: Build the frontend (Vite + React)
 # ============================================
 # Run on the native build platform to avoid QEMU crashes with esbuild on
@@ -201,9 +212,11 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
-    # Document engine: qpdf + LibreOffice headless
-    # WeasyPrint/calibre/pdfcpu arrive with the tools that need them (Phase 4+)
+    # Document engine: qpdf + LibreOffice headless + WeasyPrint runtime deps
+    # calibre deferred (ebook wave)
     qpdf \
+    libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
+    fonts-dejavu-core \
     libreoffice-writer libreoffice-calc \
     gcc g++ \
     libgl1 libglib2.0-0 libgles2 \
@@ -241,6 +254,9 @@ COPY --from=caire-builder /tmp/caire /usr/local/bin/caire
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 
+# pdfcpu static binary (PDF layout: crop, n-up, booklet, stamps)
+COPY --from=pdfcpu-builder /tmp/pdfcpu /usr/local/bin/pdfcpu
+
 # libheif tools (heif-convert, heif-dec, heif-enc) built from source.
 # LD_LIBRARY_PATH ensures our custom 1.21.2 libs take precedence over distro libheif1.
 COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
@@ -259,7 +275,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84 \
         pikepdf==10.8.0 \
-        PyMuPDF==1.27.2.3
+        PyMuPDF==1.27.2.3 \
+        weasyprint==69.0 \
+        pdf2docx==0.5.13 \
+        markdown==3.10.2
 
 # On-demand AI feature installer and manifest
 COPY docker/feature-manifest.json /app/docker/feature-manifest.json

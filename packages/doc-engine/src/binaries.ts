@@ -25,6 +25,9 @@ export function resolveSoffice(): string | null {
 export function resolveGs(): string | null {
   return resolveBin("GS_PATH", "gs");
 }
+export function resolvePdfcpu(): string | null {
+  return resolveBin("PDFCPU_PATH", "pdfcpu");
+}
 export function qpdfAvailable(): boolean {
   return resolveQpdf() !== null;
 }
@@ -33,4 +36,7 @@ export function sofficeAvailable(): boolean {
 }
 export function gsAvailable(): boolean {
   return resolveGs() !== null;
+}
+export function pdfcpuAvailable(): boolean {
+  return resolvePdfcpu() !== null;
 }
