@@ -23,6 +23,8 @@ import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
+import { registerCsvExcel } from "./csv-excel.js";
+import { registerCsvJson } from "./csv-json.js";
 import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
 import { registerEraseObject } from "./erase-object.js";
@@ -35,6 +37,7 @@ import { registerImageEnhancement } from "./image-enhancement.js";
 import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
+import { registerJsonXml } from "./json-xml.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -54,6 +57,7 @@ import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerSharpening } from "./sharpening.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
+import { registerSplitCsv } from "./split-csv.js";
 import { registerSplitPdf } from "./split-pdf.js";
 import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
@@ -170,6 +174,12 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "compress-pdf", register: registerCompressPdf },
     { id: "rotate-pdf", register: registerRotatePdf },
     { id: "word-to-pdf", register: registerWordToPdf },
+
+    // Data Files
+    { id: "csv-excel", register: registerCsvExcel },
+    { id: "csv-json", register: registerCsvJson },
+    { id: "json-xml", register: registerJsonXml },
+    { id: "split-csv", register: registerSplitCsv },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

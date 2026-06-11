@@ -334,6 +334,22 @@ export const tr: TranslationKeys = {
       name: "Word to PDF",
       description: "Convert Word documents to PDF",
     },
+    "csv-excel": {
+      name: "CSV to Excel",
+      description: "Convert between CSV and Excel (XLSX), both directions",
+    },
+    "csv-json": {
+      name: "CSV to JSON",
+      description: "Convert between CSV and JSON, both directions",
+    },
+    "json-xml": {
+      name: "JSON to XML",
+      description: "Convert between JSON and XML, both directions",
+    },
+    "split-csv": {
+      name: "Split CSV",
+      description: "Split a CSV into smaller files by row count",
+    },
     pipeline: {
       name: "Pipeline Oluşturucu",
       description: "Birden fazla aracı bir iş akışında zincirleyin",
@@ -1398,6 +1414,31 @@ export const tr: TranslationKeys = {
       submit: "Convert to PDF",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
+    },
+    "csv-excel": {
+      sheet: "Worksheet number",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "csv-json": {
+      pretty: "Pretty print",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "json-xml": {
+      pretty: "Pretty print",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "split-csv": {
+      rowsPerFile: "Rows per file",
+      keepHeader: "Keep header in each file",
+      submit: "Split",
+      submitBatch: "Split ({count} files)",
+      progressLabel: "Splitting",
     },
   },
   urlImport: {

@@ -26,7 +26,7 @@ export function registerWordToPdf(app: FastifyInstance) {
 
       ctx.report(10, "Converting");
       const outPath = await convertDocument(inPath, ctx.scratchDir, "pdf", {
-        timeoutMs: env.LIBREOFFICE_TIMEOUT_S * 1000,
+        timeoutMs: (env.LIBREOFFICE_TIMEOUT_S || 120) * 1000,
       });
       ctx.report(90, "Done");
 
