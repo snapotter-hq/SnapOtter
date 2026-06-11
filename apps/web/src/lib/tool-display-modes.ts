@@ -116,3 +116,9 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "json-xml": "no-comparison",
   "split-csv": "no-comparison",
 };
+
+/**
+ * Tools whose selected files all post in ONE request as repeated "file" parts.
+ * Consumed by use-tool-processor; backend routes declare maxInputs.
+ */
+export const MULTI_FILE_TOOLS: ReadonlySet<string> = new Set(["merge-pdf"]);

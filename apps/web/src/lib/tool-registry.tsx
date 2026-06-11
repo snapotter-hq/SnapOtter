@@ -55,8 +55,6 @@ export interface ToolRegistryEntry {
   livePreview?: boolean;
   /** Override the default file-picker accept string (e.g. ".svg,.svgz"). */
   accept?: string;
-  /** Send all selected files in a single request instead of one-per-request. */
-  multiFile?: boolean;
   /** The settings component for this tool. */
   Settings: React.ComponentType<{
     onPreviewTransform?: (t: PreviewTransform) => void;
@@ -557,7 +555,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["extract-audio", { accept: VIDEO_INPUTS.join(","), Settings: ExtractAudioSettings }],
 
   // PDF & Document tools
-  ["merge-pdf", { accept: ".pdf", multiFile: true, Settings: MergePdfSettings }],
+  ["merge-pdf", { accept: ".pdf", Settings: MergePdfSettings }],
   ["split-pdf", { accept: ".pdf", Settings: SplitPdfSettings }],
   ["compress-pdf", { accept: ".pdf", Settings: CompressPdfSettings }],
   ["rotate-pdf", { accept: ".pdf", Settings: RotatePdfSettings }],
