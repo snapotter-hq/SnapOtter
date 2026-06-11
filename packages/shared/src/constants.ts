@@ -1,4 +1,4 @@
-import { IMAGE_INPUTS } from "./modality.js";
+import { IMAGE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -609,6 +609,62 @@ export const TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
+  },
+  // Video
+  {
+    id: "convert-video",
+    name: "Convert Video",
+    description: "Convert videos between MP4, MOV, and WebM",
+    category: "video",
+    icon: "Video",
+    route: "/convert-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "long",
+  },
+  {
+    id: "compress-video",
+    name: "Compress Video",
+    description: "Shrink video file size with quality control",
+    category: "video",
+    icon: "FileVideo",
+    route: "/compress-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "long",
+  },
+  {
+    id: "trim-video",
+    name: "Trim Video",
+    description: "Cut a clip out of a video",
+    category: "video",
+    icon: "Scissors",
+    route: "/trim-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "mute-video",
+    name: "Mute Video",
+    description: "Remove the audio track from a video",
+    category: "video",
+    icon: "VolumeX",
+    route: "/mute-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "video-to-gif",
+    name: "Video to GIF",
+    description: "Turn a video clip into an animated GIF",
+    category: "video",
+    icon: "Film",
+    route: "/video-to-gif",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "long",
   },
 ];
 

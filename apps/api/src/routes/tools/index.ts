@@ -16,8 +16,10 @@ import { registerColorize } from "./colorize.js";
 import { registerCompare } from "./compare.js";
 import { registerCompose } from "./compose.js";
 import { registerCompress } from "./compress.js";
+import { registerCompressVideo } from "./compress-video.js";
 import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConvert } from "./convert.js";
+import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
 import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
@@ -31,6 +33,7 @@ import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerMemeGenerator } from "./meme-generator.js";
+import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
@@ -51,8 +54,10 @@ import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
 import { registerTextOverlay } from "./text-overlay.js";
 import { registerTransparencyFixer } from "./transparency-fixer.js";
+import { registerTrimVideo } from "./trim-video.js";
 import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
+import { registerVideoToGif } from "./video-to-gif.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkText } from "./watermark-text.js";
 
@@ -138,6 +143,13 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     // Adjustments extra
     { id: "replace-color", register: registerReplaceColor },
     { id: "color-blindness", register: registerColorBlindness },
+
+    // Video
+    { id: "convert-video", register: registerConvertVideo },
+    { id: "compress-video", register: registerCompressVideo },
+    { id: "trim-video", register: registerTrimVideo },
+    { id: "mute-video", register: registerMuteVideo },
+    { id: "video-to-gif", register: registerVideoToGif },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

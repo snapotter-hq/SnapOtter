@@ -281,6 +281,26 @@ export const de: TranslationKeys = {
       description:
         "Bilder in Base64-Zeichenketten zum Einbetten in HTML, CSS und mehr konvertieren",
     },
+    "convert-video": {
+      name: "Convert Video",
+      description: "Convert videos between MP4, MOV, and WebM",
+    },
+    "compress-video": {
+      name: "Compress Video",
+      description: "Shrink video file size with quality control",
+    },
+    "trim-video": {
+      name: "Trim Video",
+      description: "Cut a clip out of a video",
+    },
+    "mute-video": {
+      name: "Mute Video",
+      description: "Remove the audio track from a video",
+    },
+    "video-to-gif": {
+      name: "Video to GIF",
+      description: "Turn a video clip into an animated GIF",
+    },
     pipeline: {
       name: "Pipeline-Builder",
       description: "Mehrere Werkzeuge zu einem Workflow verketten",
@@ -1247,6 +1267,49 @@ export const de: TranslationKeys = {
       fast: "Schnell",
       balanced: "Ausgewogen",
       best: "Beste",
+    },
+    "convert-video": {
+      format: "Output format",
+      quality: "Quality",
+      high: "High",
+      balanced: "Balanced",
+      small: "Smallest",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "compress-video": {
+      quality: "Compression",
+      light: "Light",
+      balanced: "Balanced",
+      strong: "Strong",
+      resolution: "Resolution",
+      original: "Original",
+      submit: "Compress",
+      submitBatch: "Compress ({count} files)",
+      progressLabel: "Compressing",
+    },
+    "trim-video": {
+      start: "Start (seconds)",
+      end: "End (seconds)",
+      precise: "Frame-accurate (re-encodes)",
+      submit: "Trim",
+      submitBatch: "Trim ({count} files)",
+      progressLabel: "Trimming",
+    },
+    "mute-video": {
+      submit: "Remove audio",
+      submitBatch: "Remove audio ({count} files)",
+      progressLabel: "Muting",
+    },
+    "video-to-gif": {
+      fps: "Frames per second",
+      width: "Width (px)",
+      start: "Start (seconds)",
+      duration: "Duration (seconds)",
+      submit: "Create GIF",
+      submitBatch: "Create GIFs ({count} files)",
+      progressLabel: "Creating GIF",
     },
   },
   urlImport: {
