@@ -167,20 +167,20 @@ async function persistDurable(
 
 function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
   const json = JSON.stringify(payload);
-  void sharedRedis()
-    .publish(progressChannel(), json)
-    .catch(() => {});
-
   const isTerminal =
     payload.type === "single"
       ? payload.phase === "complete" || payload.phase === "failed"
       : payload.status === "completed" || payload.status === "failed";
 
-  if (isTerminal) {
-    void sharedRedis()
-      .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
-      .catch(() => {});
-  }
+  // Terminal events write the replay cache BEFORE publishing, so a client
+  // connecting right after the live event always finds the terminal key.
+  const announce = isTerminal
+    ? sharedRedis()
+        .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
+        .catch(() => {})
+        .then(() => sharedRedis().publish(progressChannel(), json))
+    : sharedRedis().publish(progressChannel(), json);
+  void Promise.resolve(announce).catch(() => {});
 
   enqueuePersist(payload.jobId, () => persistDurable(payload));
 }
@@ -209,6 +209,11 @@ let sseSubscriber: ReturnType<typeof createRedisConnection> | null = null;
 function ensureSubscriber(): void {
   if (sseSubscriber) return;
   sseSubscriber = createRedisConnection();
+  // ioredis auto-resubscribes after reconnects; the handler keeps connection
+  // errors observable without crashing (ioredis silentEmits, but be explicit).
+  sseSubscriber.on("error", (err) => {
+    console.error("SSE progress subscriber error", err);
+  });
   void sseSubscriber.subscribe(progressChannel());
   sseSubscriber.on("message", (_channel: string, message: string) => {
     try {

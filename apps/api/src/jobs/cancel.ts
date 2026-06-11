@@ -40,6 +40,9 @@ let subscriber: Redis | null = null;
 
 export async function startCancelListener(): Promise<void> {
   subscriber = createRedisConnection();
+  subscriber.on("error", (err) => {
+    console.error("Cancel listener subscriber error", err);
+  });
   await subscriber.subscribe(CANCEL_CHANNEL());
   subscriber.on("message", (_channel: string, message: string) => {
     const ac = cancelables.get(message);
