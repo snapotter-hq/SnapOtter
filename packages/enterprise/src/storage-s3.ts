@@ -244,12 +244,16 @@ export async function deleteGenericPrefix(prefix: string): Promise<void> {
       // DeleteObjects supports up to 1000 keys per call
       for (let i = 0; i < keys.length; i += 1000) {
         const batch = keys.slice(i, i + 1000);
-        await getClient().send(
+        const deleteResult = await getClient().send(
           new DeleteObjectsCommand({
             Bucket: cfg().bucket,
             Delete: { Objects: batch.map((Key) => ({ Key })) },
           }),
         );
+        if (deleteResult.Errors && deleteResult.Errors.length > 0) {
+          const summary = deleteResult.Errors.map((e) => `${e.Key}: ${e.Code}`).join(", ");
+          throw new Error(`S3 DeleteObjects partial failure: ${summary}`);
+        }
       }
     }
     continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;

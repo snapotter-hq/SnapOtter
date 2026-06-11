@@ -13,9 +13,10 @@ import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents } from "./jobs/enqueue.js";
 import { closeQueues, queueCounts } from "./jobs/queues.js";
+import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
-import { startCleanupCron } from "./lib/cleanup.js";
+import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { shutdownWorkerPool } from "./lib/worker-pool.js";
@@ -423,8 +424,11 @@ if (process.env.NODE_ENV === "production") {
   await registerStatic(app);
 }
 
-// Start workspace cleanup cron
-const cleanupCron = await startCleanupCron();
+// Schedule repeatable system jobs (storage TTL, session purge, retention)
+await scheduleSystemJobs();
+if (await shouldRunStartupCleanup()) {
+  await enqueueSystemJob(SYSTEM_JOBS.storageTtl);
+}
 
 // Start BullMQ worker pools (after route registration so the tool registry is full)
 startWorkers();
@@ -470,8 +474,6 @@ async function shutdown(signal: string) {
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
   forceExit.unref();
-
-  cleanupCron.stop();
 
   try {
     await app.close();

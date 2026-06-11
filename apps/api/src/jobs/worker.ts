@@ -617,11 +617,30 @@ export function startWorkers(): void {
   for (const pool of POOLS) {
     const workerConcurrency = pool === "system" || pool === "ai" ? 1 : concurrency;
 
-    const processor = async (job: Job<ToolJobData>): Promise<ToolJobResult> => {
-      if (pool === "system") {
-        if (job.data.kind === "batch-finalize") return processBatchFinalize(job);
+    if (pool === "system") {
+      // System pool returns heterogeneous results: batch-finalize yields
+      // ToolJobResult; cron system jobs yield domain-specific values.
+      // Result generic is unknown to avoid casting lies.
+      const systemProcessor = async (job: Job<ToolJobData>): Promise<unknown> => {
+        if (job.data?.kind === "batch-finalize") return processBatchFinalize(job);
         return runSystemJob(job);
-      }
+      };
+
+      const worker = new Worker<ToolJobData, unknown>(queueName(pool), systemProcessor, {
+        connection: createRedisConnection(),
+        concurrency: workerConcurrency,
+        stalledInterval: 30_000,
+      });
+
+      worker.on("error", (err) => {
+        console.error(`Worker error [${pool}]:`, err);
+      });
+
+      workers.push(worker);
+      continue;
+    }
+
+    const processor = async (job: Job<ToolJobData>): Promise<ToolJobResult> => {
       const kind = job.data.kind;
       if (kind === "pipeline-step") return processPipelineStep(job);
       if (kind === "pipeline-finalize") return processPipelineFinalize(job);
