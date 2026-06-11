@@ -96,6 +96,7 @@ export default defineConfig({
       "framer-motion": path.join(landingNodeModules, "framer-motion"),
       "@snapotter/enterprise": path.resolve(__dirname, "packages/enterprise/src/index.ts"),
       "@snapotter/image-engine": path.resolve(__dirname, "packages/image-engine/src/index.ts"),
+      "@snapotter/media-engine": path.resolve(__dirname, "packages/media-engine/src/index.ts"),
       "@snapotter/shared/i18n": path.resolve(__dirname, "packages/shared/src/i18n"),
       "@snapotter/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
       fastify: path.join(apiNodeModules, "fastify"),

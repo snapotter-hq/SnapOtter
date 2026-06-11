@@ -152,6 +152,9 @@ importers:
       '@snapotter/image-engine':
         specifier: workspace:*
         version: link:../../packages/image-engine
+      '@snapotter/media-engine':
+        specifier: workspace:*
+        version: link:../../packages/media-engine
       '@snapotter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -516,6 +519,19 @@ importers:
       '@stryker-mutator/vitest-runner':
         specifier: ^9.6.1
         version: 9.6.1(@stryker-mutator/core@9.6.1(@types/node@25.8.0))(vitest@3.2.6(@types/debug@4.1.13)(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(terser@5.47.1)(tsx@4.22.4)(yaml@2.8.3))
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(terser@5.47.1)(tsx@4.22.4)(yaml@2.8.3)
+
+  packages/media-engine:
+    dependencies:
+      '@snapotter/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

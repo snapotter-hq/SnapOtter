@@ -24,6 +24,7 @@
     "@snapotter/ai": "workspace:*",
     "@snapotter/enterprise": "workspace:*",
     "@snapotter/image-engine": "workspace:*",
+    "@snapotter/media-engine": "workspace:*",
     "@snapotter/shared": "workspace:*",
     "archiver": "^7.0.1",
     "better-sqlite3": "^11.7.0",
