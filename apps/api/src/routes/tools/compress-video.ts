@@ -48,7 +48,7 @@ export function registerCompressVideo(app: FastifyInstance) {
         if (settings.resolution !== "original") {
           args.push("-vf", SCALE[settings.resolution]);
         }
-        args.push("-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", out);
+        args.push("-c:a", resolveEncoder("aac"), "-b:a", "96k", "-movflags", "+faststart", out);
         return args;
       });
       return { scratchPath: outPath, filename: outName, contentType: "video/mp4" };

@@ -2,7 +2,7 @@ import { extname } from "node:path";
 import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool } from "../../lib/media-tool.js";
+import { runMediaTool, videoContentType } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z
@@ -12,13 +12,6 @@ const settingsSchema = z
     precise: z.boolean().default(false),
   })
   .refine((s) => s.endS > s.startS, { message: "End must be after start" });
-
-const EXT_CONTENT_TYPES: Record<string, string> = {
-  ".mp4": "video/mp4",
-  ".mov": "video/quicktime",
-  ".webm": "video/webm",
-  ".mkv": "video/x-matroska",
-};
 
 export function registerTrimVideo(app: FastifyInstance) {
   createToolRoute(app, {
@@ -32,7 +25,7 @@ export function registerTrimVideo(app: FastifyInstance) {
       const origExt = extname(ctx.inputs[0].filename) || ".mp4";
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}_trimmed${origExt}`;
-      const contentType = EXT_CONTENT_TYPES[origExt.toLowerCase()] || "video/mp4";
+      const contentType = videoContentType(origExt);
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
         if (settings.precise) {
@@ -52,7 +45,7 @@ export function registerTrimVideo(app: FastifyInstance) {
             "-pix_fmt",
             "yuv420p",
             "-c:a",
-            "aac",
+            resolveEncoder("aac"),
             out,
           ];
         }

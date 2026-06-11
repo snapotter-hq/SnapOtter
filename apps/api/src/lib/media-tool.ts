@@ -3,6 +3,18 @@ import { join } from "node:path";
 import { probeMedia, runFfmpeg } from "@snapotter/media-engine";
 import type { ToolProcessCtxV2 } from "../routes/tool-factory.js";
 
+const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+  ".mkv": "video/x-matroska",
+};
+
+/** Content type for a preserved-container video output; mp4 fallback. */
+export function videoContentType(ext: string): string {
+  return EXT_VIDEO_CONTENT_TYPES[ext.toLowerCase()] || "video/mp4";
+}
+
 export interface MediaRunResult {
   outPath: string;
   durationS: number | null;
