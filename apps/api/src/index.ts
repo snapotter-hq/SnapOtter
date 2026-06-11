@@ -20,7 +20,7 @@ import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analyt
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
-import { shutdownWorkerPool } from "./lib/worker-pool.js";
+
 import { requirePermission } from "./permissions.js";
 import {
   authMiddleware,
@@ -504,13 +504,6 @@ async function shutdown(signal: string) {
     console.log("HTTP server closed");
   } catch (err) {
     console.error("Error closing HTTP server:", err);
-  }
-
-  try {
-    await shutdownWorkerPool();
-    console.log("Worker pool shut down");
-  } catch (err) {
-    console.error("Error shutting down worker pool:", err);
   }
 
   try {

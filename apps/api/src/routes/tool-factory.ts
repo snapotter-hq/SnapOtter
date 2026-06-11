@@ -136,8 +136,8 @@ export function getRegisteredToolIds(): string[] {
  * otherwise wraps the legacy process function via adaptLegacyProcess.
  */
 export function registerToolProcessFn(config: AnyToolRouteConfig): void {
-  config.processV2 = config.processV2 ?? adaptLegacyProcess(config);
-  toolRegistry.set(config.toolId, config);
+  const resolved = { ...config, processV2: config.processV2 ?? adaptLegacyProcess(config) };
+  toolRegistry.set(config.toolId, resolved);
 }
 
 /**
@@ -156,11 +156,14 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
  *   - Response formatting (legacy envelope)
  */
 export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig<T>): void {
-  // Register in the tool registry for batch processing (cast to type-erased form).
-  // Resolve processV2 so the worker always has one available.
+  // Register a resolved copy in the tool registry for batch processing.
+  // Spread avoids mutating the caller's config object.
   const erased = config as AnyToolRouteConfig;
-  erased.processV2 = erased.processV2 ?? adaptLegacyProcess(erased);
-  toolRegistry.set(config.toolId, erased);
+  const resolved: AnyToolRouteConfig = {
+    ...erased,
+    processV2: erased.processV2 ?? adaptLegacyProcess(erased),
+  };
+  toolRegistry.set(config.toolId, resolved);
 
   app.post(
     `/api/v1/tools/${config.toolId}`,
