@@ -276,6 +276,7 @@ export const vi: TranslationKeys = {
       name: "Trình xây dựng Pipeline",
       description: "Kết nối nhiều công cụ thành một quy trình làm việc",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

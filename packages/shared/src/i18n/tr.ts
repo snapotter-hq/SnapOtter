@@ -276,6 +276,7 @@ export const tr: TranslationKeys = {
       name: "Pipeline Oluşturucu",
       description: "Birden fazla aracı bir iş akışında zincirleyin",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

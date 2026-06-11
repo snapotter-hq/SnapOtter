@@ -235,6 +235,7 @@ export const ja: TranslationKeys = {
       description: "画像をBase64文字列に変換してHTML、CSS等に埋め込み",
     },
     pipeline: { name: "Pipelineビルダー", description: "複数のツールをワークフローに連結" },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

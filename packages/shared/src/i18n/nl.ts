@@ -275,6 +275,7 @@ export const nl: TranslationKeys = {
       name: "Pipeline-builder",
       description: "Meerdere tools koppelen tot een workflow",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

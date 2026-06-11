@@ -1,4 +1,6 @@
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { useFileStore } from "@/stores/file-store";
 
 interface ProgressCardProps {
   active: boolean;
@@ -10,6 +12,10 @@ interface ProgressCardProps {
 }
 
 export function ProgressCard({ active, phase, label, stage, percent, elapsed }: ProgressCardProps) {
+  const { t } = useTranslation();
+  const activeJobId = useFileStore((s) => s.activeJobId);
+  const cancelCurrentJob = useFileStore((s) => s.cancelCurrentJob);
+
   if (!active) return null;
 
   const icon =
@@ -45,6 +51,16 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
           style={{ width: `${Math.min(100, percent)}%` }}
         />
       </div>
+      {activeJobId && cancelCurrentJob && (
+        <button
+          type="button"
+          onClick={() => cancelCurrentJob()}
+          className="w-full py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center gap-1.5 transition-colors"
+        >
+          <X className="h-3 w-3" />
+          {t.common.cancel}
+        </button>
+      )}
     </div>
   );
 }

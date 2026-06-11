@@ -275,6 +275,7 @@ export const de: TranslationKeys = {
       name: "Pipeline-Builder",
       description: "Mehrere Werkzeuge zu einem Workflow verketten",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

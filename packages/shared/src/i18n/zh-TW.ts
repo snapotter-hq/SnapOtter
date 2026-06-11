@@ -221,6 +221,7 @@ export const zhTW: TranslationKeys = {
       description: "將影像轉換為Base64字串，嵌入HTML、CSS等",
     },
     pipeline: { name: "Pipeline建構器", description: "將多個工具串聯為工作流程" },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

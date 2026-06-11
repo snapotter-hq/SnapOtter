@@ -1,5 +1,6 @@
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -37,8 +38,17 @@ const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 
 export function useToolProcessor(toolId: string) {
-  const { processing, error, processedUrl, originalSize, processedSize, setProcessing, setError } =
-    useFileStore();
+  const { t } = useTranslation();
+  const {
+    processing,
+    error,
+    processedUrl,
+    originalSize,
+    processedSize,
+    setProcessing,
+    setError,
+    setActiveJob,
+  } = useFileStore();
 
   const [progress, setProgress] = useState<ToolProgress>(IDLE_PROGRESS);
   const [warning, setWarning] = useState<string | null>(null);
@@ -52,6 +62,24 @@ export function useToolProcessor(toolId: string) {
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
   const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
+
+  const clearActiveJob = useCallback(() => {
+    activeJobIdRef.current = null;
+    setActiveJob(null, null);
+  }, [setActiveJob]);
+
+  const cancelCurrentJob = useCallback(async () => {
+    const jobId = activeJobIdRef.current;
+    if (!jobId) return;
+    try {
+      await fetch(`/api/v1/jobs/${jobId}/cancel`, {
+        method: "POST",
+        headers: formatHeaders(),
+      });
+    } catch {
+      // Cancel request failed; SSE handler or stall timeout will clean up
+    }
+  }, []);
 
   const reconnectSSE = useCallback(() => {
     const jobId = activeJobIdRef.current;
@@ -82,7 +110,7 @@ export function useToolProcessor(toolId: string) {
                 eventSourceRef.current = null;
               }
               if (elapsedRef.current) clearInterval(elapsedRef.current);
-              activeJobIdRef.current = null;
+              clearActiveJob();
               setError(
                 "Processing timed out with no progress for 5 minutes. Try again or use a smaller image.",
               );
@@ -96,7 +124,7 @@ export function useToolProcessor(toolId: string) {
             if (elapsedRef.current) clearInterval(elapsedRef.current);
             es.close();
             eventSourceRef.current = null;
-            activeJobIdRef.current = null;
+            clearActiveJob();
 
             const result = data.result as ProcessResult;
             setWarning(result.warning ?? null);
@@ -120,7 +148,7 @@ export function useToolProcessor(toolId: string) {
             if (elapsedRef.current) clearInterval(elapsedRef.current);
             es.close();
             eventSourceRef.current = null;
-            activeJobIdRef.current = null;
+            clearActiveJob();
             setError(data.error || "Processing failed");
             setProcessing(false);
             setProgress(IDLE_PROGRESS);
@@ -150,7 +178,7 @@ export function useToolProcessor(toolId: string) {
     } catch {
       // EventSource creation failed
     }
-  }, [setError, setProcessing]);
+  }, [clearActiveJob, setError, setProcessing]);
 
   // Reconnect SSE when tab becomes visible again (mobile tab recovery)
   useEffect(() => {
@@ -254,7 +282,7 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
-              activeJobIdRef.current = null;
+              clearActiveJob();
 
               const result = data.result as ProcessResult;
               setWarning(result.warning ?? null);
@@ -277,7 +305,7 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
-              activeJobIdRef.current = null;
+              clearActiveJob();
               setError(data.error || "Processing failed");
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -354,6 +382,7 @@ export function useToolProcessor(toolId: string) {
         if (xhr.status === 202) {
           asyncMode = true;
           asyncModeRef.current = true;
+          setActiveJob(clientJobId, cancelCurrentJob);
           resetStallTimer();
           return;
         }
@@ -398,7 +427,7 @@ export function useToolProcessor(toolId: string) {
 
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
+        clearActiveJob();
       };
 
       xhr.onerror = () => {
@@ -411,7 +440,7 @@ export function useToolProcessor(toolId: string) {
         setError("Processing was interrupted. Retry when reconnected.");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
+        clearActiveJob();
       };
 
       xhr.ontimeout = () => {
@@ -424,7 +453,7 @@ export function useToolProcessor(toolId: string) {
         setError("Request timed out - the server may be overloaded. Try again.");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
+        clearActiveJob();
       };
 
       xhr.open("POST", `/api/v1/tools/${toolId}`);
@@ -433,7 +462,16 @@ export function useToolProcessor(toolId: string) {
       });
       xhr.send(formData);
     },
-    [toolId, isAiTool, setProcessing, setError, toolName],
+    [
+      toolId,
+      isAiTool,
+      setProcessing,
+      setError,
+      setActiveJob,
+      clearActiveJob,
+      cancelCurrentJob,
+      toolName,
+    ],
   );
 
   const processAllFiles = useCallback(
@@ -572,7 +610,7 @@ export function useToolProcessor(toolId: string) {
 
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
+        clearActiveJob();
       } catch (err) {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
         if (eventSourceRef.current) {
@@ -582,17 +620,18 @@ export function useToolProcessor(toolId: string) {
         setError(err instanceof Error ? err.message : "Batch processing failed");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
+        clearActiveJob();
       }
     },
-    [toolId, processFiles, setProcessing, setError, toolName],
+    [toolId, processFiles, setProcessing, setError, clearActiveJob, toolName],
   );
 
   return {
     processFiles,
     processAllFiles,
+    cancelCurrentJob,
     processing,
-    error,
+    error: error === "Canceled" ? t.tools.processing.canceled : error,
     warning,
     downloadUrl: processedUrl,
     originalSize,

@@ -222,6 +222,7 @@ export const zhCN: TranslationKeys = {
       description: "将图片转换为 Base64 字符串，可嵌入 HTML、CSS 等",
     },
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

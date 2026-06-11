@@ -260,6 +260,7 @@ export const es: TranslationKeys = {
       name: "Constructor de Pipeline",
       description: "Encadena multiples herramientas en un flujo de trabajo",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

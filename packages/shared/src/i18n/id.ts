@@ -275,6 +275,7 @@ export const id: TranslationKeys = {
       name: "Pipeline Builder",
       description: "Rangkai beberapa alat menjadi alur kerja",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

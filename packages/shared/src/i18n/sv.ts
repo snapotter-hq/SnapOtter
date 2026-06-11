@@ -273,6 +273,7 @@ export const sv: TranslationKeys = {
       name: "Pipeline-byggare",
       description: "Kedja samman flera verktyg till ett arbetsflode",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

@@ -275,6 +275,7 @@ export const ru: TranslationKeys = {
       name: "Конструктор Pipeline",
       description: "Объединение нескольких инструментов в рабочий процесс",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

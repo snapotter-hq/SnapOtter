@@ -273,6 +273,7 @@ export const ptBR: TranslationKeys = {
       name: "Construtor de Pipeline",
       description: "Encadeie varias ferramentas em um fluxo de trabalho",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

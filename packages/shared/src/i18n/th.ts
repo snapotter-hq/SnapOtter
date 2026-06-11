@@ -268,6 +268,7 @@ export const th: TranslationKeys = {
       name: "ตัวสร้าง Pipeline",
       description: "เชื่อมต่อหลายเครื่องมือเป็นขั้นตอนทำงาน",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

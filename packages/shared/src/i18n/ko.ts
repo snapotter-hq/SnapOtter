@@ -222,6 +222,7 @@ export const ko: TranslationKeys = {
       description: "이미지를 Base64 문자열로 변환하여 HTML, CSS 등에 임베드",
     },
     pipeline: { name: "Pipeline 빌더", description: "여러 도구를 워크플로로 연결" },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

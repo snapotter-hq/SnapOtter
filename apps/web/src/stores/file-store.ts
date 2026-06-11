@@ -93,6 +93,8 @@ interface FileState {
   batchZipFilename: string | null;
   processing: boolean;
   error: string | null;
+  activeJobId: string | null;
+  cancelCurrentJob: (() => Promise<void>) | null;
 
   // Derived from entries (selected entry fields)
   readonly files: File[];
@@ -116,6 +118,7 @@ interface FileState {
   setBatchZip: (blob: Blob, filename: string) => void;
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
+  setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
   setJobId: (id: string) => void;
   setProcessedUrl: (url: string | null, previewUrl?: string | null) => void;
   setSizes: (original: number, processed: number) => void;
@@ -130,6 +133,8 @@ export const useFileStore = create<FileState>((set, get) => ({
   batchZipFilename: null,
   processing: false,
   error: null,
+  activeJobId: null,
+  cancelCurrentJob: null,
 
   // Initial derived values (empty state)
   files: [],
@@ -271,6 +276,8 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   setError: (e) => set(e ? { error: e, processing: false } : { error: null }),
 
+  setActiveJob: (id, cancelFn) => set({ activeJobId: id, cancelCurrentJob: cancelFn }),
+
   setJobId: (_id) => {
     // no-op for backward compat
   },
@@ -332,6 +339,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       batchZipFilename: null,
       processing: false,
       error: null,
+      activeJobId: null,
+      cancelCurrentJob: null,
       files: deriveFiles(resetEntries),
       ...deriveSelected(resetEntries, selectedIndex),
     });
@@ -347,6 +356,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       batchZipFilename: null,
       processing: false,
       error: null,
+      activeJobId: null,
+      cancelCurrentJob: null,
       files: [],
       ...deriveSelected([], 0),
     });

@@ -270,6 +270,7 @@ export const ar: TranslationKeys = {
       name: "منشئ Pipeline",
       description: "ربط عدة أدوات في سير عمل واحد",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {

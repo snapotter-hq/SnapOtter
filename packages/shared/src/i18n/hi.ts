@@ -267,6 +267,7 @@ export const hi: TranslationKeys = {
       name: "Pipeline बिल्डर",
       description: "कई टूल्स को एक वर्कफ्लो में चेन करें",
     },
+    processing: { canceled: "Processing canceled" },
   },
   toolSettings: {
     compress: {
