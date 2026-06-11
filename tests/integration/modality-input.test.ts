@@ -77,6 +77,12 @@ describe("DocumentInputHandler", () => {
     }
   });
 
+  it.skipIf(!qpdfAvailable())("accepts a password-protected pdf (unlock-pdf's input)", async () => {
+    const buf = await readFile(join(process.cwd(), "tests/fixtures/documents/encrypted.pdf"));
+    const out = await new DocumentInputHandler().prepare(buf, "encrypted.pdf", { scratchDir });
+    expect(out.filename).toBe("encrypted.pdf");
+  });
+
   it("accepts the docx fixture container", async () => {
     const buf = await readFile(join(process.cwd(), "tests/fixtures/documents/tiny.docx"));
     const out = await new DocumentInputHandler().prepare(buf, "tiny.docx", { scratchDir });

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
  * Generates the tiny media/document fixtures committed under tests/fixtures/.
- * Requires ffmpeg on PATH (or FFMPEG_PATH). Run once; outputs are committed.
+ * Requires ffmpeg on PATH (or FFMPEG_PATH) and qpdf (or QPDF_PATH).
+ * Run once; outputs are committed.
  *   node scripts/generate-test-fixtures.mjs
  */
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +19,13 @@ mkdirSync(mediaDir, { recursive: true });
 mkdirSync(docsDir, { recursive: true });
 
 const ffmpeg = process.env.FFMPEG_PATH || "ffmpeg";
+
+function whichBin(envVar, name) {
+  if (process.env[envVar]) return process.env[envVar];
+  const res = spawnSync("which", [name], { encoding: "utf8" });
+  if (res.status === 0 && res.stdout.trim()) return res.stdout.trim().split("\n")[0];
+  return null;
+}
 
 function run(args) {
   const res = spawnSync(ffmpeg, ["-y", "-hide_banner", "-loglevel", "error", ...args], {
@@ -102,6 +110,47 @@ await writeZip(
   join(docsDir, "tiny.epub"),
   { "META-INF/container.xml": epubContainer, "OEBPS/content.opf": epubOpf, "OEBPS/chapter.xhtml": epubChapter },
   { name: "mimetype", content: "application/epub+zip" },
+);
+
+// Encrypted PDF fixture derived from test-3page.pdf via qpdf (AES-256).
+const qpdf = whichBin("QPDF_PATH", "qpdf");
+if (qpdf) {
+  const srcPdf = join(root, "tests/fixtures/test-3page.pdf");
+  const encPdf = join(docsDir, "encrypted.pdf");
+  const qres = spawnSync(qpdf, [srcPdf, "--encrypt", "test123", "owner123", "256", "--", encPdf], {
+    stdio: "inherit",
+  });
+  if (qres.status !== 0) {
+    console.error("qpdf encryption failed");
+    process.exit(1);
+  }
+  console.log("encrypted.pdf written");
+} else {
+  console.warn("qpdf not found; skipping encrypted.pdf");
+}
+
+// tiny.html fixture for html-to-pdf tests.
+writeFileSync(
+  join(docsDir, "tiny.html"),
+  `<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>SnapOtter test</title>
+  <style>h1 { color: #336; } p { font-size: 12pt; }</style></head>
+  <body><h1>SnapOtter HTML fixture</h1><p>Paged media test paragraph.</p></body>
+</html>
+`,
+);
+
+// tiny.md fixture for markdown-to-pdf tests.
+writeFileSync(
+  join(docsDir, "tiny.md"),
+  `# SnapOtter Markdown fixture
+
+A paragraph with **bold** and a list:
+
+- alpha
+- beta
+`,
 );
 
 console.log("Fixtures written to tests/fixtures/media and tests/fixtures/documents");

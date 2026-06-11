@@ -10,4 +10,4 @@ export { gsCompressPdf, type PdfCompressionPreset } from "./ghostscript.js";
 export { type ConvertOptions, convertDocument } from "./libreoffice.js";
 export { assertValidRange, qpdfMerge, qpdfRotate, qpdfSplitRanges } from "./pdf-ops.js";
 export { pdfPageCountPy } from "./python-docs.js";
-export { qpdfCheck, qpdfPageCount } from "./qpdf.js";
+export { qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";

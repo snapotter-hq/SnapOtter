@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qpdfAvailable, qpdfCheck, qpdfPageCount } from "@snapotter/doc-engine";
+import {
+  qpdfAvailable,
+  qpdfCheck,
+  qpdfPageCount,
+  qpdfRequiresPassword,
+} from "@snapotter/doc-engine";
 import { env } from "../config.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
@@ -31,19 +36,25 @@ export class DocumentInputHandler implements InputHandler {
         const p = join(dir, "input.pdf");
         try {
           await writeFile(p, raw);
-          try {
-            await qpdfCheck(p);
-          } catch (err) {
-            throw new InputValidationError(
-              `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-            );
-          }
-          if (env.MAX_PDF_PAGES > 0) {
-            const pages = await qpdfPageCount(p);
-            if (pages > env.MAX_PDF_PAGES) {
+          if (await qpdfRequiresPassword(p)) {
+            // Password-protected PDFs are structurally unverifiable without the
+            // password and are legitimate inputs (unlock-pdf). Page caps cannot be
+            // read either; the consuming tool enforces its own limits.
+          } else {
+            try {
+              await qpdfCheck(p);
+            } catch (err) {
               throw new InputValidationError(
-                `PDF has ${pages} pages, exceeding the maximum of ${env.MAX_PDF_PAGES}`,
+                `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
               );
+            }
+            if (env.MAX_PDF_PAGES > 0) {
+              const pages = await qpdfPageCount(p);
+              if (pages > env.MAX_PDF_PAGES) {
+                throw new InputValidationError(
+                  `PDF has ${pages} pages, exceeding the maximum of ${env.MAX_PDF_PAGES}`,
+                );
+              }
             }
           }
         } finally {
