@@ -479,6 +479,9 @@ export function getFeatureStates(): FeatureBundleState[] {
 // v1 validates bundleId against the manifest but does NOT verify per-file
 // checksums. Transport integrity is the operator's responsibility; a
 // checksum manifest is a phase-3 candidate.
+//
+// Security: symlink/hardlink and other non-file entry types are rejected
+// during extraction. Only "File" and "Directory" entries are permitted.
 
 interface BundleDescriptor {
   bundleId: string;
@@ -511,6 +514,11 @@ export async function importBundleArchive(
         cwd: stagingDir,
         strip: 0,
         filter: (entryPath, entry) => {
+          // Reject non-file entry types (symlinks, hardlinks, devices, FIFOs, etc.)
+          if ("type" in entry && entry.type !== "File" && entry.type !== "Directory") {
+            rej(new ImportValidationError(`Unsupported entry type ${entry.type}: ${entryPath}`));
+            return false;
+          }
           // Reject absolute paths and path traversal
           if (entryPath.startsWith("/") || entryPath.split("/").includes("..")) {
             rej(new ImportValidationError(`Blocked unsafe archive entry: ${entryPath}`));
@@ -563,6 +571,13 @@ export async function importBundleArchive(
       !descriptor.models.every((m) => typeof m === "string")
     ) {
       throw new ImportValidationError("bundle.json: models must be an array of strings");
+    }
+
+    // Validate individual model paths against traversal
+    for (const model of descriptor.models) {
+      if (!model || model.includes("..") || model.startsWith("/") || model.includes("\\")) {
+        throw new ImportValidationError(`bundle.json: invalid model path "${model}"`);
+      }
     }
 
     // Validate bundleId against the manifest

@@ -6,7 +6,14 @@
  * helper and the POST /api/v1/admin/features/import endpoint.
  */
 import { randomUUID } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,6 +46,7 @@ const {
   releaseInstallLock,
   invalidateCache,
   ImportLockError,
+  ImportValidationError,
 } = await import("../../apps/api/src/lib/feature-status.js");
 
 // Test helpers from test-server
@@ -99,6 +107,38 @@ async function buildTraversalArchive(): Promise<string> {
     },
     ["evil/pwned.txt"],
   );
+
+  return archivePath;
+}
+
+/**
+ * Build an archive containing a SymbolicLink entry under models/.
+ * tar.create preserves symlinks as SymbolicLink entries by default
+ * (follow defaults to false).
+ */
+async function buildSymlinkArchive(): Promise<string> {
+  const stagingDir = join(tmpdir(), `snapotter-symlink-build-${randomUUID()}`);
+  mkdirSync(join(stagingDir, "models"), { recursive: true });
+
+  // Valid bundle.json so extraction reaches the filter
+  writeFileSync(
+    join(stagingDir, "bundle.json"),
+    JSON.stringify({
+      bundleId: testBundleId,
+      version: testVersion,
+      models: ["evil"],
+    }),
+    "utf-8",
+  );
+
+  // Create a symlink: models/evil -> ../bundle.json
+  symlinkSync("../bundle.json", join(stagingDir, "models", "evil"));
+
+  const archivePath = join(tmpdir(), `test-symlink-${randomUUID()}.tar.gz`);
+  await tar.create({ gzip: true, file: archivePath, cwd: stagingDir }, [
+    "bundle.json",
+    "models/evil",
+  ]);
 
   return archivePath;
 }
@@ -195,6 +235,33 @@ describe("importBundleArchive", () => {
     } finally {
       releaseInstallLock();
     }
+  });
+
+  it("rejects archive containing a SymbolicLink entry", async () => {
+    const archivePath = await buildSymlinkArchive();
+    const stream = createReadStream(archivePath);
+
+    await expect(importBundleArchive(stream)).rejects.toThrow(/Unsupported entry type/);
+
+    // Verify no symlink landed in MODELS_DIR
+    expect(existsSync(join(modelsDir, "evil"))).toBe(false);
+  });
+
+  it("rejects bundle.json with traversal in models array", async () => {
+    const archivePath = await buildArchive(
+      {
+        bundleId: testBundleId,
+        version: testVersion,
+        models: ["../escape.bin"],
+      },
+      [{ path: "legit.bin", content: Buffer.alloc(16, 0xaa) }],
+    );
+
+    const stream = createReadStream(archivePath);
+    await expect(importBundleArchive(stream)).rejects.toThrow(ImportValidationError);
+    await expect(importBundleArchive(createReadStream(archivePath))).rejects.toThrow(
+      /invalid model path/,
+    );
   });
 });
 
