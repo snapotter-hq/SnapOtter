@@ -7,6 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../apps/api/src/jobs/types.js";
@@ -114,5 +115,65 @@ describe("Tool async window (sync-wait path)", () => {
     expect(result.processedSize).toBeGreaterThan(0);
     // Resized image should be different size than original
     expect(result.processedSize).not.toBe(result.originalSize);
+  });
+});
+
+describe("EXIF auto-orientation in factory path", () => {
+  it("strips EXIF orientation and rotates pixels for a JPEG with orientation 6", async () => {
+    // Build a 40x20 JPEG with EXIF orientation 6 (rotated 90 CW).
+    // When physically oriented, the output must be 20x40.
+    const rotated = await sharp({
+      create: {
+        width: 40,
+        height: 20,
+        channels: 3,
+        background: { r: 255, g: 0, b: 0 },
+      },
+    })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+
+    // Verify the source has the orientation tag embedded
+    const srcMeta = await sharp(rotated).metadata();
+    expect(srcMeta.orientation).toBe(6);
+
+    // POST to compress (quality mode preserves pixels, only re-encodes)
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "rotated.jpg", contentType: "image/jpeg", content: rotated },
+      { name: "settings", content: JSON.stringify({ mode: "quality", quality: 90 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/compress",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+
+    // Download the output and inspect metadata
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+
+    const outMeta = await sharp(dlRes.rawPayload).metadata();
+
+    // (a) Orientation tag must be absent or 1 (upright)
+    expect(outMeta.orientation ?? 1).toBe(1);
+
+    // (b) Pixels are physically rotated: 40x20 with orientation 6
+    //     becomes 20x40 after auto-orient
+    expect(outMeta.width).toBe(20);
+    expect(outMeta.height).toBe(40);
   });
 });

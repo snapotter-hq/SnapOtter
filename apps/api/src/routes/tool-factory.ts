@@ -6,6 +6,7 @@ import type { z } from "zod";
 import { env } from "../config.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
 import { trackEvent } from "../lib/analytics.js";
+import { autoOrient } from "../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
@@ -166,6 +167,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Read back the uploaded file for validation/decode chain
       let fileBuffer = await getObjectBuffer(inputKey);
+      const originalBuffer = fileBuffer;
 
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
@@ -267,6 +269,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         }
       }
 
+      // Auto-orient non-SVG images: physically rotate pixels to match
+      // the EXIF orientation tag so the worker sees upright pixels.
+      if (!isSvg) {
+        fileBuffer = await autoOrient(fileBuffer);
+      }
+
       reportProgress(15, "Preparing...");
 
       // Parse and validate settings
@@ -305,16 +313,16 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         });
       }
 
-      // If decode transformed the buffer, write the decoded version to
-      // a sibling key so the worker processes the decoded data.
+      // If decode/orient transformed the buffer or changed the filename,
+      // write the final version so the worker processes the correct data.
+      // Skip re-upload when the buffer is reference-identical to the
+      // originally streamed bytes and the filename hasn't changed.
       const decodedName = filename;
       const decodedKey = `uploads/${jobId}/${decodedName}`;
       if (decodedKey !== inputKey) {
         await putObject(decodedKey, fileBuffer);
         inputKey = decodedKey;
-      } else {
-        // Buffer may have been mutated in-place (e.g. SVG sanitize).
-        // Re-upload so the worker sees the sanitized version.
+      } else if (fileBuffer !== originalBuffer) {
         await putObject(inputKey, fileBuffer);
       }
 
@@ -368,7 +376,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         });
         return reply.status(422).send({
           error: "Processing failed",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
     },
