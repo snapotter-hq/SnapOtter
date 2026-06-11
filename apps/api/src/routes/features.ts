@@ -30,6 +30,9 @@ import {
   getInstallScriptPath,
   getManifestPath,
   getModelsDir,
+  ImportLockError,
+  ImportValidationError,
+  importBundleArchive,
   invalidateCache,
   isDockerEnvironment,
   isFeatureInstalled,
@@ -360,6 +363,43 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
 
       const totalBytes = getDirSize(getAiDir());
       return reply.send({ totalBytes });
+    },
+  );
+
+  // POST /api/v1/admin/features/import — Import an offline bundle archive
+  app.post(
+    "/api/v1/admin/features/import",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const admin = await requirePermission("features:manage")(request, reply);
+      if (!admin) return;
+
+      let part: Awaited<ReturnType<FastifyRequest["file"]>>;
+      try {
+        part = await request.file();
+      } catch {
+        return reply.status(400).send({ error: "Expected a multipart file upload" });
+      }
+
+      if (!part?.file) {
+        return reply.status(400).send({ error: "No file provided" });
+      }
+
+      try {
+        const result = await importBundleArchive(part.file);
+        invalidateCache();
+        return reply.send({
+          bundleId: result.bundleId,
+          version: result.version,
+        });
+      } catch (err) {
+        if (err instanceof ImportLockError) {
+          return reply.status(409).send({ error: err.message });
+        }
+        if (err instanceof ImportValidationError) {
+          return reply.status(400).send({ error: err.message });
+        }
+        throw err;
+      }
     },
   );
 }

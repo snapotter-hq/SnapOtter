@@ -1761,6 +1761,12 @@ export const id: TranslationKeys = {
       repair: "Repair",
       uninstall: "Uninstall",
       installing: "Installing...",
+      importBundle: "Import Bundle",
+      importDescription: "Upload a .tar.gz bundle archive exported from another installation.",
+      importButton: "Import from file",
+      importing: "Importing...",
+      importSuccess: "Bundle imported successfully.",
+      importError: "Bundle import failed: {error}",
     },
     about: {
       heading: "Tentang",

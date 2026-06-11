@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
   constants,
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
@@ -12,9 +14,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
 import { FEATURE_BUNDLES, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import * as tar from "tar";
 
 // ── Paths ───────────────────────────────────────────────────────────────
 
@@ -463,4 +467,180 @@ export function getFeatureStates(): FeatureBundleState[] {
       error,
     };
   });
+}
+
+// ── Offline bundle import ──────────────────────────────────────────────
+//
+// Archive format (v1):
+//   Gzipped tar containing:
+//     bundle.json  - { bundleId, version, models: string[] }
+//     models/...   - files mirroring MODELS_DIR layout
+//
+// v1 validates bundleId against the manifest but does NOT verify per-file
+// checksums. Transport integrity is the operator's responsibility; a
+// checksum manifest is a phase-3 candidate.
+
+interface BundleDescriptor {
+  bundleId: string;
+  version: string;
+  models: string[];
+}
+
+const IMPORT_MAX_BYTES = 20 * 1024 * 1024 * 1024; // 20 GB cumulative
+const IMPORT_MAX_ENTRIES = 10_000;
+
+export async function importBundleArchive(
+  stream: Readable,
+): Promise<{ bundleId: string; version: string; models: string[] }> {
+  const stagingId = `import-${randomUUID()}`;
+  const stagingDir = join(AI_DIR, stagingId);
+
+  if (!acquireInstallLock("__import__")) {
+    throw new ImportLockError("Another install or import is already in progress");
+  }
+
+  try {
+    mkdirSync(stagingDir, { recursive: true });
+
+    // Extract with safety guards
+    let cumulativeBytes = 0;
+    let entryCount = 0;
+
+    await new Promise<void>((res, rej) => {
+      const extractor = tar.extract({
+        cwd: stagingDir,
+        strip: 0,
+        filter: (entryPath, entry) => {
+          // Reject absolute paths and path traversal
+          if (entryPath.startsWith("/") || entryPath.split("/").includes("..")) {
+            rej(new ImportValidationError(`Blocked unsafe archive entry: ${entryPath}`));
+            return false;
+          }
+          entryCount++;
+          if (entryCount > IMPORT_MAX_ENTRIES) {
+            rej(new ImportValidationError(`Archive exceeds ${IMPORT_MAX_ENTRIES} entry limit`));
+            return false;
+          }
+          // Track cumulative size from tar headers (avoids consuming
+          // entry data which would prevent extraction to disk)
+          const entrySize = "size" in entry ? (entry.size as number) : 0;
+          cumulativeBytes += entrySize;
+          if (cumulativeBytes > IMPORT_MAX_BYTES) {
+            rej(new ImportValidationError("Archive exceeds 20 GB cumulative size limit"));
+            return false;
+          }
+          return true;
+        },
+      });
+
+      stream.pipe(extractor);
+      extractor.on("finish", () => res());
+      extractor.on("error", rej);
+      stream.on("error", rej);
+    });
+
+    // Read and validate bundle.json
+    const bundlePath = join(stagingDir, "bundle.json");
+    if (!existsSync(bundlePath)) {
+      throw new ImportValidationError("Archive is missing bundle.json at root");
+    }
+
+    let descriptor: BundleDescriptor;
+    try {
+      descriptor = JSON.parse(readFileSync(bundlePath, "utf-8")) as BundleDescriptor;
+    } catch {
+      throw new ImportValidationError("bundle.json is not valid JSON");
+    }
+
+    if (!descriptor.bundleId || typeof descriptor.bundleId !== "string") {
+      throw new ImportValidationError("bundle.json: bundleId must be a non-empty string");
+    }
+    if (!descriptor.version || typeof descriptor.version !== "string") {
+      throw new ImportValidationError("bundle.json: version must be a non-empty string");
+    }
+    if (
+      !Array.isArray(descriptor.models) ||
+      !descriptor.models.every((m) => typeof m === "string")
+    ) {
+      throw new ImportValidationError("bundle.json: models must be an array of strings");
+    }
+
+    // Validate bundleId against the manifest
+    const manifest = readManifest();
+    if (!manifest) {
+      throw new ImportValidationError("Feature manifest not found; cannot validate bundle");
+    }
+    if (!manifest.bundles[descriptor.bundleId]) {
+      throw new ImportValidationError(
+        `Unknown bundleId "${descriptor.bundleId}"; not in feature manifest`,
+      );
+    }
+
+    // Move models/* into MODELS_DIR
+    const stagingModels = join(stagingDir, "models");
+    if (existsSync(stagingModels)) {
+      mkdirSync(MODELS_DIR, { recursive: true });
+      moveTreeRecursive(stagingModels, MODELS_DIR);
+    }
+
+    markInstalled(descriptor.bundleId, descriptor.version, descriptor.models);
+
+    return {
+      bundleId: descriptor.bundleId,
+      version: descriptor.version,
+      models: descriptor.models,
+    };
+  } finally {
+    // Clean up staging dir (best-effort)
+    try {
+      rmSync(stagingDir, { recursive: true, force: true });
+    } catch {
+      // staging cleanup is best-effort
+    }
+    releaseInstallLock();
+  }
+}
+
+/** Recursively move entries from src into dest, merging directories. */
+function moveTreeRecursive(src: string, dest: string): void {
+  const entries = readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = join(src, entry.name);
+    const destPath = join(dest, entry.name);
+    if (entry.isDirectory()) {
+      mkdirSync(destPath, { recursive: true });
+      moveTreeRecursive(srcPath, destPath);
+    } else {
+      mkdirSync(dirname(destPath), { recursive: true });
+      try {
+        renameSync(srcPath, destPath);
+      } catch (err: unknown) {
+        // EXDEV: cross-device link (staging on different fs than MODELS_DIR).
+        // Staging is under AI_DIR so same-fs is expected, but fall back to
+        // copy+unlink for robustness (e.g. /tmp overlay mounts).
+        if ((err as NodeJS.ErrnoException).code === "EXDEV") {
+          copyFileSync(srcPath, destPath);
+          unlinkSync(srcPath);
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
+}
+
+// ── Import-specific error types ────────────────────────────────────────
+
+export class ImportValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportValidationError";
+  }
+}
+
+export class ImportLockError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportLockError";
+  }
 }

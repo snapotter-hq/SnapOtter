@@ -1,8 +1,8 @@
 import type { FeatureBundleState } from "@snapotter/shared";
-import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { apiGet } from "@/lib/api";
+import { apiGet, formatHeaders } from "@/lib/api";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -125,6 +125,100 @@ export function AiFeaturesSection() {
       {diskUsage !== null && (
         <p className="text-xs text-muted-foreground pt-2 border-t border-border">
           {format(t.settings.aiFeatures.diskUsage, { size: formatFileSize(diskUsage) })}
+        </p>
+      )}
+
+      <ImportBundleSection
+        onImported={() => {
+          fetch();
+          loadDiskUsage();
+        }}
+      />
+    </div>
+  );
+}
+
+function ImportBundleSection({ onImported }: { onImported: () => void }) {
+  const { t } = useTranslation();
+  const [importing, setImporting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
+    null,
+  );
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = async (file: File) => {
+    setImporting(true);
+    setFeedback(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/v1/admin/features/import", {
+        method: "POST",
+        headers: formatHeaders(),
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(body.error || `Import failed: ${res.status}`);
+      }
+
+      setFeedback({ type: "success", message: t.settings.aiFeatures.importSuccess });
+      onImported();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setFeedback({
+        type: "error",
+        message: format(t.settings.aiFeatures.importError, { error: msg }),
+      });
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="pt-4 border-t border-border space-y-2">
+      <div>
+        <h4 className="text-sm font-medium text-foreground">
+          {t.settings.aiFeatures.importBundle}
+        </h4>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {t.settings.aiFeatures.importDescription}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".tar.gz,.tgz"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+          }}
+        />
+        <button
+          type="button"
+          disabled={importing}
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {importing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Upload className="h-3.5 w-3.5" />
+          )}
+          {importing ? t.settings.aiFeatures.importing : t.settings.aiFeatures.importButton}
+        </button>
+      </div>
+      {feedback && (
+        <p
+          className={`text-xs ${feedback.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
+        >
+          {feedback.message}
         </p>
       )}
     </div>
