@@ -9,6 +9,10 @@ export function assertValidRange(range: string): void {
   }
 }
 
+function assertPassword(pw: string): void {
+  if (pw.length === 0 || pw.length > 256) throw new Error("Password must be 1-256 characters");
+}
+
 /** Merge inputs (>= 2) into outPath, full pages, input order. */
 export async function qpdfMerge(inputPaths: string[], outPath: string): Promise<void> {
   if (inputPaths.length < 2) throw new Error("qpdfMerge needs at least two inputs");
@@ -34,4 +38,56 @@ export async function qpdfRotate(
 ): Promise<void> {
   assertValidRange(range);
   await runQpdf([`--rotate=+${angle}:${range}`, inputPath, outPath], 60_000);
+}
+
+/** AES-256 encrypt with user + owner passwords (qpdf --encrypt user owner 256 --). */
+export async function qpdfEncrypt(
+  inputPath: string,
+  userPassword: string,
+  ownerPassword: string,
+  outPath: string,
+): Promise<void> {
+  assertPassword(userPassword);
+  assertPassword(ownerPassword);
+  await runQpdf(
+    [inputPath, "--encrypt", userPassword, ownerPassword, "256", "--", outPath],
+    60_000,
+  );
+}
+
+/** Decrypt with a known password; qpdf rejects wrong passwords with exit 2. */
+export async function qpdfDecrypt(
+  inputPath: string,
+  password: string,
+  outPath: string,
+): Promise<void> {
+  assertPassword(password);
+  await runQpdf([`--password=${password}`, "--decrypt", inputPath, outPath], 60_000);
+}
+
+/**
+ * Arbitrary qpdf pages spec against a single input (extract "1-3", explicit
+ * reorder "3,1,2", inverse keep-sets computed by callers). Same validated
+ * grammar as the wave-1 range ops.
+ */
+export async function qpdfPagesSpec(
+  inputPath: string,
+  spec: string,
+  outPath: string,
+): Promise<void> {
+  assertValidRange(spec);
+  await runQpdf([inputPath, "--pages", ".", spec, "--", outPath], 60_000);
+}
+
+export async function qpdfLinearize(inputPath: string, outPath: string): Promise<void> {
+  await runQpdf(["--linearize", inputPath, outPath], 60_000);
+}
+
+/**
+ * Repair: qpdf's reader recovers damaged xref/structure where possible and
+ * the rewrite produces a clean file. Damaged-beyond-recovery inputs reject
+ * with qpdf's diagnostics.
+ */
+export async function qpdfRepair(inputPath: string, outPath: string): Promise<void> {
+  await runQpdf([inputPath, outPath], 60_000);
 }

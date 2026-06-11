@@ -5,9 +5,16 @@ import { join } from "node:path";
 import {
   gsAvailable,
   gsCompressPdf,
+  gsGrayscalePdf,
+  gsPdfaConvert,
   qpdfAvailable,
+  qpdfDecrypt,
+  qpdfEncrypt,
+  qpdfLinearize,
   qpdfMerge,
   qpdfPageCount,
+  qpdfPagesSpec,
+  qpdfRepair,
   qpdfRotate,
   qpdfSplitRanges,
 } from "@snapotter/doc-engine";
@@ -59,6 +66,68 @@ describe.skipIf(!qpdfAvailable())("doc-engine pdf ops (requires qpdf)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("encrypts and decrypts roundtrip", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const enc = join(dir, "enc.pdf");
+      const dec = join(dir, "dec.pdf");
+      await qpdfEncrypt(PDF, "user1", "owner1", enc);
+      await expect(qpdfPageCount(enc)).rejects.toThrow(); // password gate works
+      await qpdfDecrypt(enc, "user1", dec);
+      expect(await qpdfPageCount(dec)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a wrong password on decrypt", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      await expect(
+        qpdfDecrypt(
+          join(process.cwd(), "tests/fixtures/documents/encrypted.pdf"),
+          "wrong",
+          join(dir, "x.pdf"),
+        ),
+      ).rejects.toThrow(/password|invalid/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reorders pages with an explicit order", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const out = join(dir, "reordered.pdf");
+      await qpdfPagesSpec(PDF, "3,1,2", out);
+      expect(await qpdfPageCount(out)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("linearizes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const out = join(dir, "lin.pdf");
+      await qpdfLinearize(PDF, out);
+      expect(await qpdfPageCount(out)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("repairs (rewrites) a valid pdf without loss", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const out = join(dir, "repaired.pdf");
+      await qpdfRepair(PDF, out);
+      expect(await qpdfPageCount(out)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe.skipIf(!gsAvailable())("doc-engine ghostscript compress (requires gs)", () => {
@@ -71,6 +140,30 @@ describe.skipIf(!gsAvailable())("doc-engine ghostscript compress (requires gs)",
       const outBytes = await readFile(out);
       expect(outBytes.subarray(0, 5).toString()).toBe("%PDF-");
       expect(outBytes.length).toBeLessThanOrEqual(inBytes.length * 2); // tiny fixtures can grow; validity is the real assertion
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("converts to grayscale (valid pdf out)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const out = join(dir, "gray.pdf");
+      await gsGrayscalePdf(PDF, out);
+      const bytes = await readFile(out);
+      expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("produces a pdf/a candidate", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const out = join(dir, "pdfa.pdf");
+      await gsPdfaConvert(PDF, out);
+      const bytes = await readFile(out);
+      expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

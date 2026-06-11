@@ -8,8 +8,23 @@ export {
   resolveSoffice,
   sofficeAvailable,
 } from "./binaries.js";
-export { gsCompressPdf, type PdfCompressionPreset } from "./ghostscript.js";
+export {
+  gsCompressPdf,
+  gsGrayscalePdf,
+  gsPdfaConvert,
+  type PdfCompressionPreset,
+} from "./ghostscript.js";
 export { type ConvertOptions, convertDocument } from "./libreoffice.js";
-export { assertValidRange, qpdfMerge, qpdfRotate, qpdfSplitRanges } from "./pdf-ops.js";
+export {
+  assertValidRange,
+  qpdfDecrypt,
+  qpdfEncrypt,
+  qpdfLinearize,
+  qpdfMerge,
+  qpdfPagesSpec,
+  qpdfRepair,
+  qpdfRotate,
+  qpdfSplitRanges,
+} from "./pdf-ops.js";
 export { pdfPageCountPy } from "./python-docs.js";
 export { qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";
