@@ -1,7 +1,7 @@
 import { runQpdf } from "./qpdf.js";
 
 // qpdf page ranges: digits, commas, hyphens, r-prefixed (r1 = last), and z (last page).
-const RANGE_RE = /^[0-9rz,-]+$/i;
+const RANGE_RE = /^[0-9rz][0-9rz,-]*$/i;
 
 export function assertValidRange(range: string): void {
   if (!RANGE_RE.test(range) || range.length > 200) {

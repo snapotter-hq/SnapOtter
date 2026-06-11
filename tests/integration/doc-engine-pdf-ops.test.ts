@@ -53,6 +53,8 @@ describe.skipIf(!qpdfAvailable())("doc-engine pdf ops (requires qpdf)", () => {
     const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
     try {
       await expect(qpdfSplitRanges(PDF, "abc;rm", join(dir, "x.pdf"))).rejects.toThrow(/range/i);
+      await expect(qpdfSplitRanges(PDF, "-1", join(dir, "x.pdf"))).rejects.toThrow(/range/i);
+      await expect(qpdfSplitRanges(PDF, "--", join(dir, "x.pdf"))).rejects.toThrow(/range/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
