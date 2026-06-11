@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl imagemagick ghostscript libjxl-tools libopenjp2-tools
+  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf
 
 jobs:
   e2e-full:
