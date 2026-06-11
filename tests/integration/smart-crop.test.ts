@@ -56,7 +56,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
   }, 60_000);
 
   it("accepts default settings (subject mode)", async () => {
@@ -75,7 +75,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const result = JSON.parse(res.body);
@@ -108,7 +108,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const result = JSON.parse(res.body);
@@ -147,7 +147,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
   }, 60_000);
 
   it("subject mode with padding", async () => {
@@ -169,7 +169,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const result = JSON.parse(res.body);
@@ -208,7 +208,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
   }, 60_000);
 
   it("trim mode removes whitespace", async () => {
@@ -232,7 +232,7 @@ describe("Smart Crop", () => {
     });
 
     // trim on a blank image may 422 or succeed with a tiny result
-    expect([200, 422, 501]).toContain(res.statusCode);
+    expect([200, 202, 422, 501]).toContain(res.statusCode);
   }, 60_000);
 
   it("trim mode with padToSquare and targetSize", async () => {
@@ -259,7 +259,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([200, 202, 501]).toContain(res.statusCode);
 
     if (res.statusCode === 200) {
       const result = JSON.parse(res.body);
@@ -296,7 +296,7 @@ describe("Smart Crop", () => {
         body,
       });
 
-      expect([200, 501]).toContain(res.statusCode);
+      expect([200, 202, 501]).toContain(res.statusCode);
     },
     60_000,
   );
@@ -317,7 +317,7 @@ describe("Smart Crop", () => {
       body,
     });
 
-    expect([200, 422, 501]).toContain(res.statusCode);
+    expect([200, 202, 422, 501]).toContain(res.statusCode);
   }, 60_000);
 
   // ── Validation (always testable) ─────────────────────────────────

@@ -16,7 +16,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { hasAiJobHandler } from "../jobs/ai-handlers.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
@@ -30,6 +29,7 @@ import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectStream, putObject } from "../lib/object-storage.js";
+import { resolveToolPool } from "../lib/pool.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { getAuthUser, requireAuth } from "../plugins/auth.js";
@@ -63,11 +63,6 @@ const savePipelineSchema = z.object({
 });
 
 // ── Helpers ────────────────────────────────────────────────────
-
-function resolvePool(toolId: string): Pool {
-  if (hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId]) return "ai";
-  return "image";
-}
 
 interface ParsedStep {
   toolId: string;
@@ -335,7 +330,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         toolId: step.toolId,
         resolvedToolId,
         parsedSettings: settingsResult.data,
-        pool: resolvePool(resolvedToolId),
+        pool: resolveToolPool(resolvedToolId),
       });
     }
 
@@ -718,7 +713,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         toolId: step.toolId,
         resolvedToolId,
         parsedSettings: settingsResult.data,
-        pool: resolvePool(resolvedToolId),
+        pool: resolveToolPool(resolvedToolId),
       });
     }
 

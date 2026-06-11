@@ -17,7 +17,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { hasAiJobHandler } from "../jobs/ai-handlers.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
@@ -30,6 +29,7 @@ import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectStream, putObject } from "../lib/object-storage.js";
+import { resolveToolPool } from "../lib/pool.js";
 import { getAuthUser } from "../plugins/auth.js";
 import { updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
@@ -135,7 +135,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       // ── Create job ID and initial progress ────────────────────────
       const parentId = clientJobId || randomUUID();
       const userId = getAuthUser(request)?.id ?? null;
-      const pool: Pool = hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId] ? "ai" : "image";
+      const pool: Pool = resolveToolPool(toolId);
 
       // Insert the parent row BEFORE updateJobProgress, because the
       // progress persist layer does a check-then-insert that races

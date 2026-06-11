@@ -258,7 +258,7 @@ export const TOOLS: Tool[] = [
     route: "/image-enhancement",
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
-    executionHint: "long",
+    executionHint: "fast", // pure sharp/CV; optional deepEnhance defers to noise-removal
   },
   {
     id: "enhance-faces",

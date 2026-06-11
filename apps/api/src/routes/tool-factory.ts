@@ -11,6 +11,7 @@ import { trackEvent } from "../lib/analytics.js";
 import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
+import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { receiveUpload } from "../lib/upload-stream.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -323,13 +324,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         }
 
         const startTime = Date.now();
+        const pool = resolveToolPool(config.toolId);
 
         // Enqueue for the BullMQ worker
         await enqueueToolJob({
           jobId,
           toolId: config.toolId,
           userId: getAuthUser(request)?.id ?? null,
-          pool: "image",
+          pool,
           inputRefs: [inputKey],
           filename,
           settings,
@@ -338,8 +340,13 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           kind: "tool",
         });
 
+        // Long tools never block the HTTP request (spec 4.5): straight to SSE.
+        if (shouldSkipSyncWindow(toolMeta?.executionHint)) {
+          return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
+        }
+
         try {
-          const result = await waitForJob("image", jobId);
+          const result = await waitForJob(pool, jobId);
           if (result) {
             trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
               tool_id: config.toolId,

@@ -28,10 +28,19 @@ describe("modality metadata", () => {
     }
   });
 
-  it("AI tools are hinted long", () => {
+  it("AI tools are hinted long (except pure-CV ones)", () => {
     const ai = TOOLS.filter((t) => t.category === "ai");
     expect(ai.length).toBeGreaterThan(0);
-    for (const t of ai) expect(t.executionHint).toBe("long");
+    // image-enhancement is categorized "ai" but its core path is pure
+    // sharp/CV; only the optional deepEnhance invokes a model.
+    const pureCvAiTools = new Set(["image-enhancement"]);
+    for (const t of ai) {
+      if (pureCvAiTools.has(t.id)) {
+        expect(t.executionHint).toBe("fast");
+      } else {
+        expect(t.executionHint).toBe("long");
+      }
+    }
   });
 
   it("detects modality from mime", () => {
