@@ -117,6 +117,8 @@ export default defineConfig({
       jsqr: path.join(apiNodeModules, "jsqr"),
       pdfkit: path.join(apiNodeModules, "pdfkit"),
       sharp: path.join(apiNodeModules, "sharp"),
+      ioredis: path.join(apiNodeModules, "ioredis"),
+      bullmq: path.join(apiNodeModules, "bullmq"),
       "openid-client": path.join(apiNodeModules, "openid-client"),
       "opentype.js": path.join(apiNodeModules, "opentype.js"),
       "posthog-node": path.join(apiNodeModules, "posthog-node"),

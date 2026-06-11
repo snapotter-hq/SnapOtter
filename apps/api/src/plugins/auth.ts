@@ -909,6 +909,7 @@ function extractToken(request: FastifyRequest): string | null {
 
 const PUBLIC_PATHS = [
   "/api/v1/health",
+  "/api/v1/readyz",
   "/api/v1/config/",
   "/api/auth/",
   "/api/v1/download/",

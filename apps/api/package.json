@@ -33,6 +33,7 @@
     "exif-reader": "^2.0.3",
     "fastify": "^5.8.5",
     "fflate": "^0.8.3",
+    "ioredis": "^5.10.1",
     "js-yaml": "^4.2.0",
     "mupdf": "^1.27.0",
     "openid-client": "^6.8.4",

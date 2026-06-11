@@ -20,12 +20,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../apps/api/src/db/index.js";
-import {
-  drainPersistQueue,
-  recoverStaleJobs,
-  updateJobProgress,
-  updateSingleFileProgress,
-} from "../../apps/api/src/routes/progress.js";
+import { updateJobProgress, updateSingleFileProgress } from "../../apps/api/src/routes/progress.js";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 const FIXTURES = join(__dirname, "..", "fixtures");
@@ -61,8 +56,6 @@ const flushPersist = async (
     await new Promise((r) => setTimeout(r, 200));
     return;
   }
-  // Drain any pending persist writes before polling the DB
-  await drainPersistQueue(jobId);
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
@@ -334,7 +327,7 @@ describe("SSE progress endpoint", () => {
   it("returns SSE headers when connecting to progress stream", async () => {
     const jobId = randomUUID();
 
-    // Pre-populate a completed job so the SSE endpoint sends it immediately and closes
+    // Publish a completed event (stored in Redis terminal key)
     updateJobProgress({
       jobId,
       status: "completed",
@@ -343,7 +336,8 @@ describe("SSE progress endpoint", () => {
       failedFiles: 0,
       errors: [],
     });
-    await flushPersist(jobId);
+    // Wait for Redis pub/sub + setex round trip
+    await new Promise((r) => setTimeout(r, 500));
 
     const res = await app.inject({
       method: "GET",
@@ -379,6 +373,8 @@ describe("SSE progress endpoint", () => {
       failedFiles: 1,
       errors: [{ filename: "bad.png", error: "Invalid image" }],
     });
+    // Wait for Redis pub/sub + setex round trip
+    await new Promise((r) => setTimeout(r, 500));
 
     const res = await app.inject({
       method: "GET",
@@ -626,92 +622,30 @@ describe("updateSingleFileProgress direct calls", () => {
       percent: 75,
       stage: "encoding",
     });
-    await flushPersist(jobId, ["processing"]);
 
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect((job?.progress as { percent: number })?.percent).toBe(75);
+    // Poll for the expected percent value (both updates produce "processing"
+    // status, so status-based polling is insufficient)
+    const start = Date.now();
+    let finalPercent = 0;
+    while (Date.now() - start < 2000) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row) {
+        finalPercent = (row.progress as { percent: number })?.percent ?? 0;
+        if (finalPercent === 75) break;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    expect(finalPercent).toBe(75);
   });
 });
 
-// ── recoverStaleJobs ───────────────────────────────────────────
-describe("recoverStaleJobs", () => {
-  it("marks processing jobs as failed on recovery", async () => {
-    const jobId = randomUUID();
-
-    // Insert a processing job directly
-    await db.insert(schema.jobs).values({
-      id: jobId,
-      type: "batch",
-      status: "processing",
-      progress: { percent: 50 },
-      inputRefs: [],
-    });
-
-    await recoverStaleJobs();
-
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect(job?.status).toBe("failed");
-    expect((job?.error as { message: string })?.message).toContain("Server restarted");
-    expect(job?.completedAt).not.toBeNull();
-  });
-
-  it("marks queued jobs as failed on recovery", async () => {
-    const jobId = randomUUID();
-
-    await db.insert(schema.jobs).values({
-      id: jobId,
-      type: "batch",
-      status: "queued",
-      progress: { percent: 0 },
-      inputRefs: [],
-    });
-
-    await recoverStaleJobs();
-
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect(job?.status).toBe("failed");
-    expect((job?.error as { message: string })?.message).toContain("Server restarted");
-  });
-
-  it("does not modify completed jobs", async () => {
-    const jobId = randomUUID();
-
-    await db.insert(schema.jobs).values({
-      id: jobId,
-      type: "batch",
-      status: "completed",
-      progress: { percent: 100 },
-      inputRefs: [],
-      completedAt: new Date(),
-    });
-
-    await recoverStaleJobs();
-
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect(job?.status).toBe("completed");
-  });
-
-  it("does not modify already-failed jobs", async () => {
-    const jobId = randomUUID();
-
-    await db.insert(schema.jobs).values({
-      id: jobId,
-      type: "batch",
-      status: "failed",
-      progress: { percent: 0 },
-      inputRefs: [],
-      error: { message: "Original error" },
-      completedAt: new Date(),
-    });
-
-    await recoverStaleJobs();
-
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect((job?.error as { message: string })?.message).toBe("Original error");
-  });
-});
+// recoverStaleJobs was removed in the Redis transport migration.
+// Stale-job recovery is now handled by BullMQ's built-in stalled-job
+// mechanism. The four tests that exercised recoverStaleJobs were:
+//   - "marks processing jobs as failed on recovery"
+//   - "marks queued jobs as failed on recovery"
+//   - "does not modify completed jobs"
+//   - "does not modify already-failed jobs"
+// All four tested a deleted internal; equivalent coverage is provided
+// by BullMQ's stalled-job handler (Task 6 worker runtime).

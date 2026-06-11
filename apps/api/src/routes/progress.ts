@@ -5,13 +5,19 @@
  *
  * Sends Server-Sent Events with progress data until the job finishes.
  *
- * Progress is held in-memory for real-time SSE delivery and also
- * persisted to the `jobs` table so that state survives container restarts.
+ * Progress events are published to Redis pub/sub for cross-process
+ * delivery and also persisted to the `jobs` table for durability.
+ * Terminal events are cached in a Redis key (10-min TTL) so that
+ * SSE reconnects can replay the final frame without polling the DB.
  */
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
+import { createRedisConnection, sharedRedis } from "../jobs/connection.js";
+import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+
+// ── Exported interfaces (unchanged) ────────────────────────────
 
 export interface JobProgress {
   jobId: string;
@@ -36,31 +42,20 @@ export interface SingleFileProgress {
   result?: Record<string, unknown>;
 }
 
-/** In-memory store of job progress, keyed by jobId. */
-const jobProgressStore = new Map<string, JobProgress>();
+// ── Redis channels / keys ──────────────────────────────────────
 
-/** Terminal single-file events kept for SSE reconnect replay. */
-const singleFileCompletions = new Map<string, SingleFileProgress>();
+const progressChannel = () => `${bullPrefix()}:progress`;
+const terminalKey = (jobId: string) => `${bullPrefix()}:terminal:${jobId}`;
+const TERMINAL_TTL_S = 600;
 
-/** SSE listeners waiting for updates, keyed by jobId. */
-const listeners = new Map<string, Set<(data: JobProgress | SingleFileProgress) => void>>();
-
-// ── DB persistence helpers ──────────────────────────────────────────
+// ── DB persistence helpers ─────────────────────────────────────
 
 /**
- * Per-job serialization queues.  Fire-and-forget persist calls for the same
+ * Per-job serialization queues. Fire-and-forget persist calls for the same
  * jobId must run sequentially so that the final "completed" write is never
- * overwritten by a late-arriving "processing" write.  Without this, the
- * async Postgres round-trips can re-order concurrent writes.
+ * overwritten by a late-arriving "processing" write.
  */
-// TODO(phase-2): delete when progress persistence moves to BullMQ job events.
 const persistQueues = new Map<string, Promise<void>>();
-
-/** Await any pending persist writes for a specific job (used by tests). */
-export async function drainPersistQueue(jobId: string): Promise<void> {
-  const pending = persistQueues.get(jobId);
-  if (pending) await pending;
-}
 
 function enqueuePersist(jobId: string, fn: () => Promise<void>): void {
   const prev = persistQueues.get(jobId) ?? Promise.resolve();
@@ -157,90 +152,86 @@ async function persistSingleFileProgress(
   }
 }
 
-/**
- * Mark any jobs left in "processing" or "queued" state as failed.
- * Called once at startup to recover from unclean shutdown.
- */
-export async function recoverStaleJobs(): Promise<void> {
-  try {
-    const result = await db
-      .update(schema.jobs)
-      .set({
-        status: "failed",
-        error: { message: "Server restarted while job was in progress" },
-        completedAt: new Date(),
-      })
-      .where(eq(schema.jobs.status, "processing"));
-    const result2 = await db
-      .update(schema.jobs)
-      .set({
-        status: "failed",
-        error: { message: "Server restarted while job was queued" },
-        completedAt: new Date(),
-      })
-      .where(eq(schema.jobs.status, "queued"));
-    const total = (result.rowCount ?? 0) + (result2.rowCount ?? 0);
-    if (total > 0) {
-      console.log(`Recovered ${total} stale jobs from previous run`);
-    }
-  } catch {
-    // DB not ready
+async function persistDurable(
+  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
+): Promise<void> {
+  if (payload.type === "single") {
+    const { type: _, ...rest } = payload;
+    await persistSingleFileProgress(rest);
+  } else {
+    await persistJobProgress(payload);
   }
 }
 
-// ── Public API (unchanged signatures) ───────────────────────────────
+// ── Publish (Redis pub/sub + terminal cache + durable persist) ──
+
+function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
+  const json = JSON.stringify(payload);
+  void sharedRedis()
+    .publish(progressChannel(), json)
+    .catch(() => {});
+
+  const isTerminal =
+    payload.type === "single"
+      ? payload.phase === "complete" || payload.phase === "failed"
+      : payload.status === "completed" || payload.status === "failed";
+
+  if (isTerminal) {
+    void sharedRedis()
+      .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
+      .catch(() => {});
+  }
+
+  enqueuePersist(payload.jobId, () => persistDurable(payload));
+}
+
+// ── Public API (unchanged signatures) ──────────────────────────
 
 /**
- * Create or update progress for a job.
+ * Create or update progress for a batch job.
  */
 export function updateJobProgress(progress: JobProgress): void {
-  jobProgressStore.set(progress.jobId, progress);
-  enqueuePersist(progress.jobId, () => persistJobProgress(progress));
-  // Notify all SSE listeners (add type: "batch" so the frontend can distinguish
-  // batch events from single-file events in the shared SSE stream)
-  const subs = listeners.get(progress.jobId);
-  if (subs) {
-    const event = { ...progress, type: "batch" } as JobProgress & { type: "batch" };
-    for (const cb of subs) {
-      cb(event);
-    }
-    // If the job is done, clean up listeners after a brief delay
-    if (progress.status === "completed" || progress.status === "failed") {
-      setTimeout(() => {
-        listeners.delete(progress.jobId);
-        jobProgressStore.delete(progress.jobId);
-      }, 5000);
-    }
-  }
+  const event = { ...progress, type: "batch" } as JobProgress & { type: "batch" };
+  publish(event);
 }
 
 export function updateSingleFileProgress(progress: Omit<SingleFileProgress, "type">): void {
   const event: SingleFileProgress = { ...progress, type: "single" };
-  enqueuePersist(progress.jobId, () => persistSingleFileProgress(progress));
-
-  if (progress.phase === "complete" || progress.phase === "failed") {
-    if (singleFileCompletions.size >= 10_000) {
-      const oldest = singleFileCompletions.keys().next().value;
-      if (oldest) singleFileCompletions.delete(oldest);
-    }
-    singleFileCompletions.set(progress.jobId, event);
-    setTimeout(() => singleFileCompletions.delete(progress.jobId), 600_000);
-  }
-
-  const subs = listeners.get(progress.jobId);
-  if (subs) {
-    for (const cb of subs) {
-      cb(event);
-    }
-    if (progress.phase === "complete" || progress.phase === "failed") {
-      setTimeout(() => {
-        listeners.delete(progress.jobId);
-      }, 5000);
-    }
-  }
+  publish(event);
 }
 
+// ── SSE subscriber (module-level, shared across all connections) ─
+
+type FrameCallback = (json: string) => void;
+const sseListeners = new Map<string, Set<FrameCallback>>();
+let sseSubscriber: ReturnType<typeof createRedisConnection> | null = null;
+
+function ensureSubscriber(): void {
+  if (sseSubscriber) return;
+  sseSubscriber = createRedisConnection();
+  void sseSubscriber.subscribe(progressChannel());
+  sseSubscriber.on("message", (_channel: string, message: string) => {
+    try {
+      const parsed = JSON.parse(message) as { jobId?: string };
+      if (!parsed.jobId) return;
+      const subs = sseListeners.get(parsed.jobId);
+      if (subs) {
+        for (const cb of subs) {
+          cb(message);
+        }
+      }
+    } catch {
+      // Malformed message; ignore
+    }
+  });
+}
+
+// ── SSE endpoint ───────────────────────────────────────────────
+
 export async function registerProgressRoutes(app: FastifyInstance): Promise<void> {
+  // Ensure the Redis subscriber is running when routes are registered
+  ensureSubscriber();
+
   app.get(
     "/api/v1/jobs/:jobId/progress",
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
@@ -263,13 +254,12 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         ...getSecurityHeaders(),
       });
 
-      // Helper to send an SSE message
-      const sendEvent = (data: JobProgress | SingleFileProgress) => {
-        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      // Helper to send an SSE frame
+      const sendFrame = (json: string) => {
+        reply.raw.write(`data: ${json}\n\n`);
       };
 
-      // Send keepalive comments every 20s to prevent reverse proxies
-      // (Caddy, Nginx, ALBs) from killing idle SSE connections.
+      // Keepalive comments every 20s
       const keepaliveInterval = setInterval(() => {
         try {
           reply.raw.write(": keepalive\n\n");
@@ -278,60 +268,106 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         }
       }, 20_000);
 
-      // If the job already has progress, send it immediately
-      const existing = jobProgressStore.get(jobId);
-      if (existing) {
-        sendEvent({ ...existing, type: "batch" });
-        if (existing.status === "completed" || existing.status === "failed") {
+      // ── Replay on connect ────────────────────────────────────
+      // 1. Check the terminal cache in Redis
+      try {
+        const cached = await sharedRedis().get(terminalKey(jobId));
+        if (cached) {
+          sendFrame(cached);
           clearInterval(keepaliveInterval);
           reply.raw.end();
           return;
         }
+      } catch {
+        // Redis may be unavailable; fall through to DB
       }
 
-      const existingSingle = singleFileCompletions.get(jobId);
-      if (existingSingle) {
-        sendEvent(existingSingle);
-        clearInterval(keepaliveInterval);
-        reply.raw.end();
-        return;
-      }
-
-      // Subscribe to updates
-      if (!listeners.has(jobId)) {
-        listeners.set(jobId, new Set());
-      }
-
-      let ended = false;
-      const callback = (data: JobProgress | SingleFileProgress) => {
-        if (ended) return;
-        sendEvent(data);
+      // 2. Check the durable DB row for terminal state
+      try {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
         if (
-          ("status" in data && (data.status === "completed" || data.status === "failed")) ||
-          ("phase" in data && (data.phase === "complete" || data.phase === "failed"))
+          row &&
+          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
         ) {
-          ended = true;
-          clearInterval(keepaliveInterval);
-          const subs = listeners.get(jobId);
-          if (subs) {
-            subs.delete(callback);
-            if (subs.size === 0) listeners.delete(jobId);
+          // Synthesize a legacy event from the DB row
+          let syntheticJson: string;
+          if (row.type === "single") {
+            const phase = row.status === "completed" ? "complete" : "failed";
+            const errorMsg = (row.error as { message?: string } | null)?.message;
+            syntheticJson = JSON.stringify({
+              jobId,
+              type: "single",
+              phase,
+              percent: phase === "complete" ? 100 : 0,
+              ...(errorMsg ? { error: errorMsg } : {}),
+            });
+          } else {
+            syntheticJson = JSON.stringify({
+              jobId,
+              type: "batch",
+              status: row.status === "canceled" ? "failed" : row.status,
+              totalFiles: 0,
+              completedFiles: 0,
+              failedFiles: 0,
+              errors: [],
+            });
           }
+          sendFrame(syntheticJson);
+          clearInterval(keepaliveInterval);
           reply.raw.end();
+          return;
+        }
+      } catch {
+        // DB unavailable; fall through to live stream
+      }
+
+      // 3. Live-stream: subscribe to updates for this jobId
+      let ended = false;
+
+      const callback: FrameCallback = (json: string) => {
+        if (ended) return;
+        sendFrame(json);
+
+        // End the stream on terminal events
+        try {
+          const parsed = JSON.parse(json) as {
+            type?: string;
+            status?: string;
+            phase?: string;
+          };
+          const isTerminal =
+            (parsed.type === "single" &&
+              (parsed.phase === "complete" || parsed.phase === "failed")) ||
+            (parsed.type === "batch" &&
+              (parsed.status === "completed" || parsed.status === "failed"));
+          if (isTerminal) {
+            ended = true;
+            clearInterval(keepaliveInterval);
+            const subs = sseListeners.get(jobId);
+            if (subs) {
+              subs.delete(callback);
+              if (subs.size === 0) sseListeners.delete(jobId);
+            }
+            reply.raw.end();
+          }
+        } catch {
+          // Parse failure; keep streaming
         }
       };
 
-      listeners.get(jobId)?.add(callback);
+      if (!sseListeners.has(jobId)) {
+        sseListeners.set(jobId, new Set());
+      }
+      sseListeners.get(jobId)!.add(callback);
 
       // Clean up on client disconnect
       request.raw.on("close", () => {
+        ended = true;
         clearInterval(keepaliveInterval);
-        const subs = listeners.get(jobId);
+        const subs = sseListeners.get(jobId);
         if (subs) {
           subs.delete(callback);
-          if (subs.size === 0) {
-            listeners.delete(jobId);
-          }
+          if (subs.size === 0) sseListeners.delete(jobId);
         }
       });
     },
