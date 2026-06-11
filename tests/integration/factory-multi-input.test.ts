@@ -20,6 +20,9 @@ import {
 } from "./test-server.js";
 
 const PNG = readFileSync(join(__dirname, "..", "fixtures", "test-1x1.png"));
+const PNG_A = readFileSync(join(__dirname, "..", "fixtures", "test-1x1.png"));
+const PNG_B = readFileSync(join(__dirname, "..", "fixtures", "test-200x150.png"));
+const PNG_C = readFileSync(join(__dirname, "..", "fixtures", "test-blank.png"));
 
 // Minimal schema stand-in that satisfies the factory's safeParse call
 // without pulling in a zod dependency at the test root.
@@ -61,9 +64,9 @@ afterAll(async () => {
 describe("Factory multi-input (maxInputs)", () => {
   it("accepts 3 files for a maxInputs:3 tool, concatenates, and records 3 inputRefs", async () => {
     const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
-      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
-      { name: "file", filename: "c.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_A },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_B },
+      { name: "file", filename: "c.png", contentType: "image/png", content: PNG_C },
       { name: "settings", content: "{}" },
     ]);
 
@@ -89,7 +92,7 @@ describe("Factory multi-input (maxInputs)", () => {
     });
     expect(dl.statusCode).toBe(200);
 
-    const expected = Buffer.concat([PNG, PNG, PNG]);
+    const expected = Buffer.concat([PNG_A, PNG_B, PNG_C]);
     expect(dl.rawPayload.length).toBe(expected.length);
     expect(dl.rawPayload.equals(expected)).toBe(true);
 

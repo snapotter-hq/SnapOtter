@@ -281,6 +281,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               const errorMsg = maxInputs > 1 ? `${fname}: ${err.message}` : err.message;
               const body: Record<string, string> = { error: errorMsg };
               if (err.details) body.details = err.details;
+              // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
               return reply.status(err.statusCode).send(body);
             }
             throw err;
