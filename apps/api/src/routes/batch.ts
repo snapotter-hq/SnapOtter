@@ -144,7 +144,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         userId,
         toolId,
         pool: "system",
-        type: "batch-finalize",
+        type: "batch",
         status: "queued",
         inputRefs: [],
         settings: { flowChildCount: 0 },
