@@ -29,12 +29,15 @@ import Fastify from "fastify";
 import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { runMigrations } from "../../apps/api/src/db/migrate.js";
+import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
+import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import {
   authMiddleware,
   authRoutes,
   ensureBuiltinRoles,
   ensureDefaultAdmin,
+  requireAuth,
 } from "../../apps/api/src/plugins/auth.js";
 import { oidcRoutes } from "../../apps/api/src/plugins/oidc.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
@@ -184,6 +187,41 @@ export async function buildTestApp(): Promise<TestApp> {
     }
     return config;
   });
+
+  // Readiness probe (no auth)
+  app.get("/api/v1/readyz", async (_request, reply) => {
+    let postgres = false;
+    let redis = false;
+    try {
+      await db.select().from(schema.settings).limit(1);
+      postgres = true;
+    } catch {
+      /* db unreachable */
+    }
+    try {
+      redis = await pingRedis();
+    } catch {
+      /* redis unreachable */
+    }
+    const ok = postgres && redis;
+    return reply.code(ok ? 200 : 503).send({ ok, postgres, redis });
+  });
+
+  // Cancel a job (authenticated)
+  app.post(
+    "/api/v1/jobs/:jobId/cancel",
+    async (
+      request: import("fastify").FastifyRequest<{ Params: { jobId: string } }>,
+      reply: import("fastify").FastifyReply,
+    ) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
+
+      const { jobId } = request.params;
+      const canceled = await requestCancel(jobId);
+      return reply.send({ canceled });
+    },
+  );
 
   // Ensure Fastify is ready (all plugins loaded)
   await app.ready();

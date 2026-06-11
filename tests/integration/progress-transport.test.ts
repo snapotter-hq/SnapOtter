@@ -159,3 +159,37 @@ describe("Redis progress transport", () => {
     await db.delete(schema.jobs).where(eq(schema.jobs.id, jobId));
   });
 });
+
+// ── Cancel route auth ──────────────────────────────────────────
+
+describe("Cancel route auth", () => {
+  it("rejects unauthenticated cancel with 401", async () => {
+    const jobId = randomUUID();
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/jobs/${jobId}/cancel`,
+      // No authorization header
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = JSON.parse(res.body);
+    expect(body.error).toContain("Authentication required");
+  });
+
+  it("returns canceled:false for an unknown job when authenticated", async () => {
+    const jobId = randomUUID();
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/jobs/${jobId}/cancel`,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.canceled).toBe(false);
+  });
+});
