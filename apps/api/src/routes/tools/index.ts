@@ -16,6 +16,7 @@ import { registerColorize } from "./colorize.js";
 import { registerCompare } from "./compare.js";
 import { registerCompose } from "./compose.js";
 import { registerCompress } from "./compress.js";
+import { registerCompressPdf } from "./compress-pdf.js";
 import { registerCompressVideo } from "./compress-video.js";
 import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConvert } from "./convert.js";
@@ -35,6 +36,7 @@ import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerMemeGenerator } from "./meme-generator.js";
+import { registerMergePdf } from "./merge-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
@@ -48,9 +50,11 @@ import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
 import { registerRestorePhoto } from "./restore-photo.js";
 import { registerRotate } from "./rotate.js";
+import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerSharpening } from "./sharpening.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
+import { registerSplitPdf } from "./split-pdf.js";
 import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
@@ -158,6 +162,12 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "convert-audio", register: registerConvertAudio },
     { id: "trim-audio", register: registerTrimAudio },
     { id: "extract-audio", register: registerExtractAudio },
+
+    // PDF & Documents
+    { id: "merge-pdf", register: registerMergePdf },
+    { id: "split-pdf", register: registerSplitPdf },
+    { id: "compress-pdf", register: registerCompressPdf },
+    { id: "rotate-pdf", register: registerRotatePdf },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

@@ -276,6 +276,22 @@ export const ja: TranslationKeys = {
       name: "Extract Audio",
       description: "Pull the audio track out of a video",
     },
+    "merge-pdf": {
+      name: "Merge PDFs",
+      description: "Combine multiple PDFs into one",
+    },
+    "split-pdf": {
+      name: "Split PDF",
+      description: "Extract pages or split into parts",
+    },
+    "compress-pdf": {
+      name: "Compress PDF",
+      description: "Shrink PDF file size",
+    },
+    "rotate-pdf": {
+      name: "Rotate PDF",
+      description: "Rotate pages in a PDF",
+    },
     pipeline: { name: "Pipelineビルダー", description: "複数のツールをワークフローに連結" },
     processing: { canceled: "Processing canceled" },
     mediaPlayer: {
@@ -1295,6 +1311,39 @@ export const ja: TranslationKeys = {
       submit: "Extract",
       submitBatch: "Extract ({count} files)",
       progressLabel: "Extracting",
+    },
+    "merge-pdf": {
+      addFiles: "Add PDFs to merge",
+      needTwo: "At least two PDFs are required",
+      submit: "Merge",
+      submitBatch: "Merge ({count} files)",
+      progressLabel: "Merging",
+    },
+    "split-pdf": {
+      mode: "Split mode",
+      range: "Page range",
+      rangeHint: "e.g. 1-3, 5, 7-z",
+      everyN: "Pages per part",
+      submit: "Split",
+      submitBatch: "Split ({count} files)",
+      progressLabel: "Splitting",
+    },
+    "compress-pdf": {
+      preset: "Quality preset",
+      screen: "Screen (smallest)",
+      ebook: "Ebook (balanced)",
+      printer: "Printer (best quality)",
+      submit: "Compress",
+      submitBatch: "Compress ({count} files)",
+      progressLabel: "Compressing",
+    },
+    "rotate-pdf": {
+      angle: "Rotation angle",
+      range: "Page range",
+      rangeHint: "e.g. 1-3, 5, 1-z (all pages)",
+      submit: "Rotate",
+      submitBatch: "Rotate ({count} files)",
+      progressLabel: "Rotating",
     },
   },
   urlImport: {
