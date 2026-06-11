@@ -5,6 +5,12 @@
 # ============================================
 
 # ============================================
+# Stage 0: Static FFmpeg/FFprobe binaries
+# ============================================
+# Multi-arch (amd64 + arm64) static builds for video/audio processing.
+FROM mwader/static-ffmpeg:8.0 AS ffmpeg
+
+# ============================================
 # Stage 1: Build the frontend (Vite + React)
 # ============================================
 # Run on the native build platform to avoid QEMU crashes with esbuild on
@@ -25,6 +31,8 @@ COPY apps/web/postcss.config.js ./apps/web/
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
 COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./packages/image-engine/
+COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./packages/media-engine/
+COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
 # Install ALL dependencies (dev + prod needed for building)
@@ -193,6 +201,10 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
+    # Document engine: qpdf + LibreOffice headless
+    # WeasyPrint/calibre/pdfcpu arrive with the tools that need them (Phase 4+)
+    qpdf \
+    libreoffice-writer libreoffice-calc \
     gcc g++ \
     libgl1 libglib2.0-0 libgles2 \
     libegl1 libwayland-egl1 libwayland-client0 libwayland-cursor0 \
@@ -225,6 +237,10 @@ RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
 # Caire binary (content-aware seam carving)
 COPY --from=caire-builder /tmp/caire /usr/local/bin/caire
 
+# FFmpeg + FFprobe static binaries (video/audio engine)
+COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
+
 # libheif tools (heif-convert, heif-dec, heif-enc) built from source.
 # LD_LIBRARY_PATH ensures our custom 1.21.2 libs take precedence over distro libheif1.
 COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
@@ -241,7 +257,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install \
         Pillow==12.2.0 \
         numpy==1.26.4 \
-        opencv-python-headless==4.10.0.84
+        opencv-python-headless==4.10.0.84 \
+        pikepdf==10.8.0 \
+        PyMuPDF==1.27.2.3
 
 # On-demand AI feature installer and manifest
 COPY docker/feature-manifest.json /app/docker/feature-manifest.json
@@ -256,6 +274,8 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.js
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
 COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./packages/image-engine/
+COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./packages/media-engine/
+COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
 # Install production dependencies (tsx is now in prod deps)
@@ -276,6 +296,8 @@ COPY apps/api/static ./apps/api/static
 # Copy workspace packages source (referenced by API at runtime)
 COPY packages/shared/src ./packages/shared/src
 COPY packages/image-engine/src ./packages/image-engine/src
+COPY packages/media-engine/src ./packages/media-engine/src
+COPY packages/doc-engine/src ./packages/doc-engine/src
 COPY packages/ai/src ./packages/ai/src
 COPY packages/ai/python ./packages/ai/python
 
