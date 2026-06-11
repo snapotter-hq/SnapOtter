@@ -55,6 +55,8 @@ export interface ToolRegistryEntry {
   livePreview?: boolean;
   /** Override the default file-picker accept string (e.g. ".svg,.svgz"). */
   accept?: string;
+  /** Send all selected files in a single request instead of one-per-request. */
+  multiFile?: boolean;
   /** The settings component for this tool. */
   Settings: React.ComponentType<{
     onPreviewTransform?: (t: PreviewTransform) => void;
@@ -384,6 +386,51 @@ const ExtractAudioSettings = lazy(() =>
     default: m.ExtractAudioSettings,
   })),
 );
+const MergePdfSettings = lazy(() =>
+  import("@/components/tools/merge-pdf-settings").then((m) => ({
+    default: m.MergePdfSettings,
+  })),
+);
+const SplitPdfSettings = lazy(() =>
+  import("@/components/tools/split-pdf-settings").then((m) => ({
+    default: m.SplitPdfSettings,
+  })),
+);
+const CompressPdfSettings = lazy(() =>
+  import("@/components/tools/compress-pdf-settings").then((m) => ({
+    default: m.CompressPdfSettings,
+  })),
+);
+const RotatePdfSettings = lazy(() =>
+  import("@/components/tools/rotate-pdf-settings").then((m) => ({
+    default: m.RotatePdfSettings,
+  })),
+);
+const WordToPdfSettings = lazy(() =>
+  import("@/components/tools/word-to-pdf-settings").then((m) => ({
+    default: m.WordToPdfSettings,
+  })),
+);
+const CsvExcelSettings = lazy(() =>
+  import("@/components/tools/csv-excel-settings").then((m) => ({
+    default: m.CsvExcelSettings,
+  })),
+);
+const CsvJsonSettings = lazy(() =>
+  import("@/components/tools/csv-json-settings").then((m) => ({
+    default: m.CsvJsonSettings,
+  })),
+);
+const JsonXmlSettings = lazy(() =>
+  import("@/components/tools/json-xml-settings").then((m) => ({
+    default: m.JsonXmlSettings,
+  })),
+);
+const SplitCsvSettings = lazy(() =>
+  import("@/components/tools/split-csv-settings").then((m) => ({
+    default: m.SplitCsvSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -508,6 +555,19 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["convert-audio", { accept: AUDIO_INPUTS.join(","), Settings: ConvertAudioSettings }],
   ["trim-audio", { accept: AUDIO_INPUTS.join(","), Settings: TrimAudioSettings }],
   ["extract-audio", { accept: VIDEO_INPUTS.join(","), Settings: ExtractAudioSettings }],
+
+  // PDF & Document tools
+  ["merge-pdf", { accept: ".pdf", multiFile: true, Settings: MergePdfSettings }],
+  ["split-pdf", { accept: ".pdf", Settings: SplitPdfSettings }],
+  ["compress-pdf", { accept: ".pdf", Settings: CompressPdfSettings }],
+  ["rotate-pdf", { accept: ".pdf", Settings: RotatePdfSettings }],
+  ["word-to-pdf", { accept: ".docx,.doc,.odt,.rtf,.txt", Settings: WordToPdfSettings }],
+
+  // Data tools
+  ["csv-excel", { accept: ".csv,.xlsx", Settings: CsvExcelSettings }],
+  ["csv-json", { accept: ".csv,.json", Settings: CsvJsonSettings }],
+  ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],
+  ["split-csv", { accept: ".csv", Settings: SplitCsvSettings }],
 ];
 
 export const toolRegistry = new Map<string, ToolRegistryEntry>(

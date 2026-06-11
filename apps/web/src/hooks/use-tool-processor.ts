@@ -34,6 +34,10 @@ const AI_PYTHON_TOOLS = new Set<string>(PYTHON_SIDECAR_TOOLS);
 // Tools that are not Python sidecar but still need an extended XHR timeout.
 const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-expand"]);
 
+// Tools that send all selected files in a single request (e.g. merge-pdf).
+// The corresponding registry entries also set multiFile: true.
+const MULTI_FILE_TOOLS = new Set<string>(["merge-pdf"]);
+
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 
@@ -343,7 +347,11 @@ export function useToolProcessor(toolId: string) {
       delete cleanSettings._bgImageFile;
 
       const formData = new FormData();
-      formData.append("file", files[capturedIndex] ?? files[0]);
+      if (MULTI_FILE_TOOLS.has(toolId) && files.length > 1) {
+        for (const f of files) formData.append("file", f);
+      } else {
+        formData.append("file", files[capturedIndex] ?? files[0]);
+      }
       formData.append("settings", JSON.stringify(cleanSettings));
       if (bgImageFile) {
         formData.append("backgroundImage", bgImageFile);

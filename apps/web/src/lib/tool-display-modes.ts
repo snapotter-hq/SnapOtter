@@ -102,4 +102,17 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "convert-audio": "media-player",
   "trim-audio": "media-player",
   "extract-audio": "media-player",
+
+  // PDF & Document tools
+  "merge-pdf": "document",
+  "split-pdf": "no-comparison",
+  "compress-pdf": "document",
+  "rotate-pdf": "document",
+  "word-to-pdf": "document",
+
+  // Data tools
+  "csv-excel": "no-comparison",
+  "csv-json": "no-comparison",
+  "json-xml": "no-comparison",
+  "split-csv": "no-comparison",
 };

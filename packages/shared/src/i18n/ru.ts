@@ -1378,6 +1378,7 @@ export const ru: TranslationKeys = {
     "merge-pdf": {
       addFiles: "Add PDFs to merge",
       needTwo: "At least two PDFs are required",
+      orderHint: "{count} PDFs will merge in this order",
       submit: "Merge",
       submitBatch: "Merge ({count} files)",
       progressLabel: "Merging",

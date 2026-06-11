@@ -141,6 +141,33 @@ vi.mock("@/components/tools/color-blindness-settings", () => ({
 vi.mock("@/components/tools/ai-canvas-expand-settings", () => ({
   AiCanvasExpandSettings: () => null,
 }));
+vi.mock("@/components/tools/merge-pdf-settings", () => ({
+  MergePdfSettings: () => null,
+}));
+vi.mock("@/components/tools/split-pdf-settings", () => ({
+  SplitPdfSettings: () => null,
+}));
+vi.mock("@/components/tools/compress-pdf-settings", () => ({
+  CompressPdfSettings: () => null,
+}));
+vi.mock("@/components/tools/rotate-pdf-settings", () => ({
+  RotatePdfSettings: () => null,
+}));
+vi.mock("@/components/tools/word-to-pdf-settings", () => ({
+  WordToPdfSettings: () => null,
+}));
+vi.mock("@/components/tools/csv-excel-settings", () => ({
+  CsvExcelSettings: () => null,
+}));
+vi.mock("@/components/tools/csv-json-settings", () => ({
+  CsvJsonSettings: () => null,
+}));
+vi.mock("@/components/tools/json-xml-settings", () => ({
+  JsonXmlSettings: () => null,
+}));
+vi.mock("@/components/tools/split-csv-settings", () => ({
+  SplitCsvSettings: () => null,
+}));
 
 import { TOOLS } from "@snapotter/shared";
 import type { DisplayMode, ToolRegistryEntry } from "@/lib/tool-registry";
