@@ -7,7 +7,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Job } from "bullmq";
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { runMigrations } from "../../apps/api/src/db/migrate.js";
@@ -19,6 +19,7 @@ import {
   scheduleSystemJobs,
 } from "../../apps/api/src/jobs/system-jobs.js";
 import type { ObjectInfo } from "../../apps/api/src/lib/object-storage.js";
+import * as objectStorage from "../../apps/api/src/lib/object-storage.js";
 
 beforeAll(async () => {
   await runMigrations();
@@ -197,6 +198,51 @@ describe("runSystemJob", () => {
       "Unknown system job: system:bogus",
     );
   });
+
+  it("continues sweeping when a per-dir deletePrefix fails", async () => {
+    const failJobId = `fail-${randomUUID().slice(0, 8)}`;
+    const okJobId = `ok-${randomUUID().slice(0, 8)}`;
+
+    const failDir = join(env.WORKSPACE_PATH, "uploads", failJobId);
+    const okDir = join(env.WORKSPACE_PATH, "uploads", okJobId);
+
+    mkdirSync(failDir, { recursive: true });
+    writeFileSync(join(failDir, "a.txt"), "fail");
+    mkdirSync(okDir, { recursive: true });
+    writeFileSync(join(okDir, "b.txt"), "ok");
+
+    // Backdate both dirs so they are expired
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    utimesSync(join(failDir, "a.txt"), past, past);
+    utimesSync(failDir, past, past);
+    utimesSync(join(okDir, "b.txt"), past, past);
+    utimesSync(okDir, past, past);
+
+    const realDeletePrefix = objectStorage.deletePrefix;
+    const spy = vi
+      .spyOn(objectStorage, "deletePrefix")
+      .mockImplementation(async (prefix: string) => {
+        if (prefix.includes(failJobId)) {
+          throw new Error("S3 partial failure");
+        }
+        return realDeletePrefix(prefix);
+      });
+
+    try {
+      const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      const typed = result as { removed: number; failed: number };
+      expect(typed.removed).toBeGreaterThanOrEqual(1);
+      expect(typed.failed).toBeGreaterThanOrEqual(1);
+      // The ok dir should have been cleaned
+      expect(existsSync(okDir)).toBe(false);
+      // The fail dir should still exist (deletion failed)
+      expect(existsSync(failDir)).toBe(true);
+    } finally {
+      spy.mockRestore();
+      await rm(failDir, { recursive: true, force: true }).catch(() => {});
+      await rm(okDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
 });
 
 // -- scheduleSystemJobs -------------------------------------------------------
@@ -225,6 +271,32 @@ describe("scheduleSystemJobs", () => {
       await scheduleSystemJobs();
       const schedulers = await q.getJobSchedulers();
       const ids = schedulers.map((s) => s.key);
+      expect(ids).not.toContain(SYSTEM_JOBS.storageTtl);
+      expect(ids).toContain(SYSTEM_JOBS.sessionPurge);
+      expect(ids).toContain(SYSTEM_JOBS.retention);
+    } finally {
+      (env as Record<string, unknown>).CLEANUP_INTERVAL_MINUTES = orig;
+    }
+  });
+
+  it("removes stale storageTtl scheduler when CLEANUP_INTERVAL_MINUTES changes to 0", async () => {
+    const orig = env.CLEANUP_INTERVAL_MINUTES;
+    (env as Record<string, unknown>).CLEANUP_INTERVAL_MINUTES = 5;
+
+    try {
+      await scheduleSystemJobs();
+      const q = getQueue("system");
+      let schedulers = await q.getJobSchedulers();
+      let ids = schedulers.map((s) => s.key);
+      expect(ids).toContain(SYSTEM_JOBS.storageTtl);
+      expect(ids).toContain(SYSTEM_JOBS.sessionPurge);
+      expect(ids).toContain(SYSTEM_JOBS.retention);
+
+      // Operator disables cleanup; stale scheduler must be removed
+      (env as Record<string, unknown>).CLEANUP_INTERVAL_MINUTES = 0;
+      await scheduleSystemJobs();
+      schedulers = await q.getJobSchedulers();
+      ids = schedulers.map((s) => s.key);
       expect(ids).not.toContain(SYSTEM_JOBS.storageTtl);
       expect(ids).toContain(SYSTEM_JOBS.sessionPurge);
       expect(ids).toContain(SYSTEM_JOBS.retention);

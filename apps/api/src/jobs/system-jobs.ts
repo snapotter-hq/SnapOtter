@@ -32,6 +32,10 @@ export async function scheduleSystemJobs(): Promise<void> {
     await q.upsertJobScheduler(SYSTEM_JOBS.storageTtl, {
       every: env.CLEANUP_INTERVAL_MINUTES * 60_000,
     });
+  } else {
+    // A scheduler registered by a previous boot survives in Redis; remove it
+    // so setting CLEANUP_INTERVAL_MINUTES=0 actually disables the sweep.
+    await q.removeJobScheduler(SYSTEM_JOBS.storageTtl).catch(() => {});
   }
   await q.upsertJobScheduler(SYSTEM_JOBS.sessionPurge, { every: 60 * 60_000 });
   await q.upsertJobScheduler(SYSTEM_JOBS.retention, { every: 6 * 60 * 60_000 });
@@ -94,15 +98,15 @@ export function decideExpiry(
   return ageMs < cutoffMs ? "expired" : "keep";
 }
 
-async function storageTtlSweep(): Promise<{ removed: number }> {
+async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   const maxAgeMs = await getMaxAgeMs();
-  if (maxAgeMs <= 0) return { removed: 0 };
+  if (maxAgeMs <= 0) return { removed: 0, failed: 0 };
 
   const cutoffMs = Date.now() - maxAgeMs;
   const uploadDirs = await listJobDirs("uploads");
   const outputDirs = await listJobDirs("outputs");
   const allDirs = [...uploadDirs, ...outputDirs];
-  if (allDirs.length === 0) return { removed: 0 };
+  if (allDirs.length === 0) return { removed: 0, failed: 0 };
 
   // Batch-lookup job rows for dirs with unknown mtime (S3 backend)
   const unknownIds = [
@@ -124,16 +128,25 @@ async function storageTtlSweep(): Promise<{ removed: number }> {
   }
 
   let removed = 0;
+  const errors: string[] = [];
   for (const dir of allDirs) {
     if (decideExpiry(dir, cutoffMs, rowsById) === "expired") {
-      await deletePrefix(dir.key);
-      removed++;
+      try {
+        await deletePrefix(dir.key);
+        removed++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`${dir.key}: ${message}`);
+      }
     }
+  }
+  if (errors.length > 0) {
+    console.error(`Storage TTL: ${errors.length} dir(s) failed to delete:\n${errors.join("\n")}`);
   }
   if (removed > 0) {
     console.log(`Storage TTL: removed ${removed} expired job dirs`);
   }
-  return { removed };
+  return { removed, failed: errors.length };
 }
 
 // -- Retention sweep ----------------------------------------------------------
