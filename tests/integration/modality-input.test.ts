@@ -26,6 +26,19 @@ describe.skipIf(!ffmpegAvailable())("MediaInputHandler (requires ffmpeg)", () =>
     ).rejects.toThrow(InputValidationError);
   });
 
+  it("rejects a still image presented as video", async () => {
+    const buf = await readFile(join(process.cwd(), "tests/fixtures/test-1x1.png"));
+    await expect(
+      new MediaInputHandler("video").prepare(buf, "fake.mp4", { scratchDir }),
+    ).rejects.toThrow(/still image/i);
+  });
+
+  it("accepts a real video despite short duration", async () => {
+    const buf = await readFile(join(process.cwd(), "tests/fixtures/media/tiny.mp4"));
+    const out = await new MediaInputHandler("video").prepare(buf, "tiny.mp4", { scratchDir });
+    expect(out.filename).toBe("tiny.mp4");
+  });
+
   it("enforces the duration cap", async () => {
     const { env } = await import("../../apps/api/src/config.js");
     const original = env.MAX_AUDIO_DURATION_S;

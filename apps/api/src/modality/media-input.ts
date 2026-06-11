@@ -35,6 +35,18 @@ export class MediaInputHandler implements InputHandler {
       if (this.kind === "video" && !hasVideo) {
         throw new InputValidationError("File contains no video stream");
       }
+      // ffprobe reports still images as single-frame video streams in
+      // *_pipe/image2 containers with no duration; a video tool must
+      // reject those (carry-forward from phase-3 input-handler review).
+      const IMAGE_CONTAINER_RE =
+        /(^|,)(png_pipe|image2|bmp_pipe|gif_pipe|jpeg_pipe|tiff_pipe|webp_pipe|svg_pipe)($|,)/;
+      if (
+        this.kind === "video" &&
+        IMAGE_CONTAINER_RE.test(info.container) &&
+        info.durationS === null
+      ) {
+        throw new InputValidationError("File is a still image, not a video");
+      }
       if (this.kind === "audio" && !hasAudio) {
         throw new InputValidationError("File contains no audio stream");
       }
