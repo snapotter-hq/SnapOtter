@@ -1,11 +1,15 @@
 import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 export interface S3Config {
   bucket: string;
@@ -141,4 +145,176 @@ export async function deleteThumbnail(storedName: string): Promise<void> {
   } catch {
     // Thumbnail may not exist
   }
+}
+
+// ---------------------------------------------------------------------------
+// Generic object operations for uploads/ and outputs/ processing artifacts.
+// Called by apps/api/src/lib/object-storage.ts when STORAGE_MODE=s3.
+// Keys are passed verbatim (e.g. "outputs/<jobId>/result.png") and joined
+// with the configured S3_PREFIX, consistent with fileKey/thumbKey above.
+// ---------------------------------------------------------------------------
+
+export interface GenericObjectInfo {
+  key: string;
+  size: number;
+  mtimeMs: number;
+}
+
+function genericKey(key: string): string {
+  const prefix = cfg().prefix ? `${cfg().prefix}/` : "";
+  return `${prefix}${key}`;
+}
+
+export async function putGenericObject(key: string, data: Buffer): Promise<void> {
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: cfg().bucket,
+      Key: genericKey(key),
+      Body: data,
+    }),
+  );
+}
+
+export async function putGenericObjectStream(
+  key: string,
+  source: AsyncIterable<Buffer>,
+): Promise<void> {
+  const upload = new Upload({
+    client: getClient(),
+    params: {
+      Bucket: cfg().bucket,
+      Key: genericKey(key),
+      Body: source as unknown as Readable,
+    },
+  });
+  await upload.done();
+}
+
+export async function getGenericObjectStream(
+  key: string,
+  range?: { start: number; end?: number },
+): Promise<Readable> {
+  const params: { Bucket: string; Key: string; Range?: string } = {
+    Bucket: cfg().bucket,
+    Key: genericKey(key),
+  };
+  if (range) {
+    params.Range = `bytes=${range.start}-${range.end ?? ""}`;
+  }
+  const response = await getClient().send(new GetObjectCommand(params));
+  return response.Body as Readable;
+}
+
+export async function getGenericObjectSize(key: string): Promise<number> {
+  const response = await getClient().send(
+    new HeadObjectCommand({
+      Bucket: cfg().bucket,
+      Key: genericKey(key),
+    }),
+  );
+  return response.ContentLength ?? 0;
+}
+
+export async function deleteGenericObject(key: string): Promise<void> {
+  try {
+    await getClient().send(
+      new DeleteObjectCommand({
+        Bucket: cfg().bucket,
+        Key: genericKey(key),
+      }),
+    );
+  } catch {
+    // Object already gone or doesn't exist
+  }
+}
+
+export async function deleteGenericPrefix(prefix: string): Promise<void> {
+  const fullPrefix = genericKey(prefix.endsWith("/") ? prefix : `${prefix}/`);
+  let continuationToken: string | undefined;
+  do {
+    const list = await getClient().send(
+      new ListObjectsV2Command({
+        Bucket: cfg().bucket,
+        Prefix: fullPrefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    const keys = (list.Contents ?? []).map((o) => o.Key).filter((k): k is string => !!k);
+    if (keys.length > 0) {
+      // DeleteObjects supports up to 1000 keys per call
+      for (let i = 0; i < keys.length; i += 1000) {
+        const batch = keys.slice(i, i + 1000);
+        await getClient().send(
+          new DeleteObjectsCommand({
+            Bucket: cfg().bucket,
+            Delete: { Objects: batch.map((Key) => ({ Key })) },
+          }),
+        );
+      }
+    }
+    continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+  } while (continuationToken);
+}
+
+export async function listGenericObjects(prefix: string): Promise<GenericObjectInfo[]> {
+  const fullPrefix = genericKey(prefix.endsWith("/") ? prefix : `${prefix}/`);
+  const s3Prefix = cfg().prefix ? `${cfg().prefix}/` : "";
+  const out: GenericObjectInfo[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const list = await getClient().send(
+      new ListObjectsV2Command({
+        Bucket: cfg().bucket,
+        Prefix: fullPrefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    for (const obj of list.Contents ?? []) {
+      if (!obj.Key) continue;
+      // Strip the S3_PREFIX to return keys in the caller's namespace
+      const key =
+        s3Prefix && obj.Key.startsWith(s3Prefix) ? obj.Key.slice(s3Prefix.length) : obj.Key;
+      out.push({
+        key,
+        size: obj.Size ?? 0,
+        mtimeMs: obj.LastModified ? obj.LastModified.getTime() : 0,
+      });
+    }
+    continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return out;
+}
+
+// Lists the top-level "job directories" under a prefix (uploads/ or outputs/).
+// Uses ListObjectsV2 with Delimiter="/" to get CommonPrefixes. S3 does not
+// store directory mtime, so we set mtimeMs=0. The TTL sweeper should instead
+// rely on the jobs table's updatedAt column for expiry decisions; this listing
+// only provides the directory keys for matching against job records.
+export async function listGenericJobDirs(
+  prefix: "uploads" | "outputs",
+): Promise<GenericObjectInfo[]> {
+  const fullPrefix = genericKey(`${prefix}/`);
+  const s3Prefix = cfg().prefix ? `${cfg().prefix}/` : "";
+  const out: GenericObjectInfo[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const list = await getClient().send(
+      new ListObjectsV2Command({
+        Bucket: cfg().bucket,
+        Prefix: fullPrefix,
+        Delimiter: "/",
+        ContinuationToken: continuationToken,
+      }),
+    );
+    for (const cp of list.CommonPrefixes ?? []) {
+      if (!cp.Prefix) continue;
+      // Strip S3_PREFIX and trailing slash to normalize: "outputs/jobId"
+      let key =
+        s3Prefix && cp.Prefix.startsWith(s3Prefix) ? cp.Prefix.slice(s3Prefix.length) : cp.Prefix;
+      key = key.replace(/\/$/, "");
+      out.push({ key, size: 0, mtimeMs: 0 });
+    }
+    continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return out;
 }
