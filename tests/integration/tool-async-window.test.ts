@@ -1,0 +1,118 @@
+/**
+ * Integration tests for the factory's enqueue + sync-wait path.
+ *
+ * Verifies that a converted tool route (resize) returns the legacy
+ * envelope synchronously, that downloads work, and that the terminal
+ * SSE replay key is set in Redis.
+ */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
+import { bullPrefix } from "../../apps/api/src/jobs/types.js";
+import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
+
+const FIXTURES = join(__dirname, "..", "fixtures");
+const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
+
+let testApp: TestApp;
+let app: TestApp["app"];
+let adminToken: string;
+
+beforeAll(async () => {
+  testApp = await buildTestApp();
+  app = testApp.app;
+  adminToken = await loginAsAdmin(app);
+}, 30_000);
+
+afterAll(async () => {
+  await testApp.cleanup();
+}, 10_000);
+
+describe("Tool async window (sync-wait path)", () => {
+  it("returns 200 with legacy envelope keys", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    // (a) Exactly the legacy envelope keys
+    expect(result.jobId).toBeDefined();
+    expect(typeof result.jobId).toBe("string");
+    expect(result.downloadUrl).toBeDefined();
+    expect(typeof result.downloadUrl).toBe("string");
+    expect(typeof result.originalSize).toBe("number");
+    expect(typeof result.processedSize).toBe("number");
+    // previewUrl and savedFileId are optional
+    if (result.previewUrl !== undefined) {
+      expect(typeof result.previewUrl).toBe("string");
+    }
+    if (result.savedFileId !== undefined) {
+      expect(typeof result.savedFileId).toBe("string");
+    }
+
+    // (b) GET the downloadUrl returns 200 with bytes
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    expect(dlRes.rawPayload.length).toBeGreaterThan(0);
+
+    // (c) Terminal SSE replay key exists in Redis with phase:"complete"
+    const jobId = result.jobId;
+    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
+
+    // The worker emits the terminal frame; give Redis a moment to propagate
+    let cached: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      cached = await sharedRedis().get(terminalKeyName);
+      if (cached) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    expect(cached).not.toBeNull();
+    const parsed = JSON.parse(cached!);
+    expect(parsed.type).toBe("single");
+    expect(parsed.phase).toBe("complete");
+    expect(parsed.result).toBeDefined();
+    expect(parsed.result.downloadUrl).toBeDefined();
+  });
+
+  it("includes originalSize and processedSize in the envelope", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.originalSize).toBeGreaterThan(0);
+    expect(result.processedSize).toBeGreaterThan(0);
+    // Resized image should be different size than original
+    expect(result.processedSize).not.toBe(result.originalSize);
+  });
+});

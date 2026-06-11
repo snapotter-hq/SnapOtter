@@ -1,38 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { outpaint } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
+import { receiveUpload } from "../../lib/upload-stream.js";
 import { registerToolProcessFn } from "../tool-factory.js";
-
-const EXT_MAP: Record<string, string> = {
-  jpeg: "jpg",
-  jpg: "jpg",
-  png: "png",
-  webp: "webp",
-  tiff: "tiff",
-  gif: "gif",
-  avif: "avif",
-  heic: "heic",
-  heif: "heif",
-  jxl: "jxl",
-};
-
-const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
 
 const settingsSchema = z.object({
   extendTop: z.number().int().min(0).default(0),
@@ -47,6 +32,99 @@ const settingsSchema = z.object({
 });
 
 type Settings = z.infer<typeof settingsSchema>;
+
+// ── AI job handler ────────────────────────────────────────────────
+registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+  let format: string = settings.format;
+  let quality = settings.quality;
+
+  if (format === "auto") {
+    const detected = await resolveOutputFormat(input, data.filename);
+    format = detected.format === "jpeg" ? "jpg" : detected.format;
+    quality = detected.quality;
+  }
+
+  const resultBuffer = await outpaint(
+    input,
+    {
+      extendTop: settings.extendTop,
+      extendRight: settings.extendRight,
+      extendBottom: settings.extendBottom,
+      extendLeft: settings.extendLeft,
+      tier: settings.tier,
+    },
+    ctx.scratchDir,
+    (percent, stage) => ctx.report(percent, stage),
+  );
+
+  // Convert to requested output format
+  const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
+  let outputBuffer: Buffer;
+  let finalFormat = format;
+
+  if (needsNodeConversion) {
+    if (format === "heic" || format === "heif") {
+      outputBuffer = await encodeHeic(resultBuffer, quality);
+      finalFormat = format;
+    } else if (format === "jxl") {
+      outputBuffer = await encodeJxl(resultBuffer, quality);
+      finalFormat = "jxl";
+    } else {
+      outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
+      finalFormat = "avif";
+    }
+  } else if (format === "jpg" || format === "jpeg") {
+    outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
+    finalFormat = "jpg";
+  } else if (format === "webp") {
+    outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
+    finalFormat = "webp";
+  } else if (format === "tiff") {
+    outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
+    finalFormat = "tiff";
+  } else if (format === "gif") {
+    outputBuffer = await sharp(resultBuffer).gif().toBuffer();
+    finalFormat = "gif";
+  } else {
+    outputBuffer = resultBuffer;
+    finalFormat = "png";
+  }
+
+  const EXT_MAP: Record<string, string> = {
+    jpeg: "jpg",
+    jpg: "jpg",
+    png: "png",
+    webp: "webp",
+    tiff: "tiff",
+    gif: "gif",
+    avif: "avif",
+    heic: "heic",
+    heif: "heif",
+    jxl: "jxl",
+  };
+  const ext = EXT_MAP[finalFormat] || "png";
+  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_extended.${ext}`;
+
+  const CONTENT_TYPES: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    tiff: "image/tiff",
+    gif: "image/gif",
+    avif: "image/avif",
+    heic: "image/heic",
+    heif: "image/heif",
+    jxl: "image/jxl",
+  };
+
+  return {
+    buffer: outputBuffer,
+    filename: outputFilename,
+    contentType: CONTENT_TYPES[finalFormat] || "image/png",
+  };
+});
 
 export function registerAiCanvasExpand(app: FastifyInstance) {
   app.post(
@@ -64,21 +142,20 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         });
       }
 
+      const jobId = randomUUID();
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let inputKey: string | null = null;
 
       try {
         const parts = request.parts();
         for await (const part of parts) {
           if (part.type === "file") {
-            const chunks: Buffer[] = [];
-            for await (const chunk of part.file) {
-              chunks.push(chunk);
-            }
-            fileBuffer = Buffer.concat(chunks);
-            filename = sanitizeFilename(part.filename ?? "image");
+            const upload = await receiveUpload(part, jobId);
+            inputKey = upload.key;
+            filename = upload.filename;
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
@@ -95,9 +172,11 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         });
       }
 
-      if (!fileBuffer || fileBuffer.length === 0) {
+      if (!inputKey) {
         return reply.status(400).send({ error: "No image file provided" });
       }
+
+      fileBuffer = await getObjectBuffer(inputKey);
 
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
@@ -131,27 +210,13 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         });
       }
 
-      let format: string = settings.format;
-      let quality = settings.quality;
-
-      if (format === "auto") {
-        const detected = await resolveOutputFormat(fileBuffer, filename);
-        format = detected.format === "jpeg" ? "jpg" : detected.format;
-        quality = detected.quality;
-      }
-
       try {
-        // Decode HEIC/HEIF input
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
         }
-
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
         if (needsCliDecode(validation.format)) {
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
         }
-
-        // Auto-orient to fix EXIF rotation
         fileBuffer = await autoOrient(fileBuffer);
       } catch (err) {
         request.log.error({ err, toolId: "ai-canvas-expand" }, "Input decoding failed");
@@ -161,163 +226,44 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         });
       }
 
-      const originalSize = fileBuffer.length;
-      const jobId = randomUUID();
-      const progressJobId = clientJobId || jobId;
-      let workspacePath: string;
-      try {
-        workspacePath = await createWorkspace(jobId);
-        const inputPath = join(workspacePath, "input", filename);
-        await writeFile(inputPath, fileBuffer);
-      } catch (err) {
-        request.log.error({ err, toolId: "ai-canvas-expand" }, "Workspace creation failed");
-        return reply.status(422).send({
-          error: "AI canvas expand failed",
-          details: err instanceof Error ? err.message : "Unknown error",
-        });
+      const decodedKey = `uploads/${jobId}/${filename}`;
+      if (decodedKey !== inputKey) {
+        await putObject(decodedKey, fileBuffer);
+        inputKey = decodedKey;
+      } else {
+        await putObject(inputKey, fileBuffer);
       }
 
-      const log = request.log;
-      log.info(
-        {
-          toolId: "ai-canvas-expand",
-          imageSize: originalSize,
-          extendTop: settings.extendTop,
-          extendRight: settings.extendRight,
-          extendBottom: settings.extendBottom,
-          extendLeft: settings.extendLeft,
-          tier: settings.tier,
-          format,
-        },
-        "Starting AI canvas expand",
-      );
+      const progressJobId = clientJobId || jobId;
 
-      // Reply immediately so the HTTP connection closes within proxy timeout limits.
-      // The result will be delivered via the SSE progress channel.
-      reply.status(202).send({ jobId: progressJobId, async: true });
-
-      const onProgress = (percent: number, stage: string) => {
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "processing",
-          stage,
-          percent,
-        });
-      };
-
-      // Fire-and-forget: processing happens after the response is sent
-      (async () => {
-        const resultBuffer = await outpaint(
-          fileBuffer,
-          {
-            extendTop: settings.extendTop,
-            extendRight: settings.extendRight,
-            extendBottom: settings.extendBottom,
-            extendLeft: settings.extendLeft,
-            tier: settings.tier,
-          },
-          join(workspacePath, "output"),
-          onProgress,
-        );
-
-        // Convert to the requested output format using Sharp
-        const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
-        let outputBuffer: Buffer;
-        let finalFormat = format;
-
-        if (needsNodeConversion) {
-          if (format === "heic" || format === "heif") {
-            outputBuffer = await encodeHeic(resultBuffer, quality);
-            finalFormat = format;
-          } else if (format === "jxl") {
-            outputBuffer = await encodeJxl(resultBuffer, quality);
-            finalFormat = "jxl";
-          } else {
-            outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
-            finalFormat = "avif";
-          }
-        } else if (format === "jpg" || format === "jpeg") {
-          outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
-          finalFormat = "jpg";
-        } else if (format === "webp") {
-          outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
-          finalFormat = "webp";
-        } else if (format === "tiff") {
-          outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
-          finalFormat = "tiff";
-        } else if (format === "gif") {
-          outputBuffer = await sharp(resultBuffer).gif().toBuffer();
-          finalFormat = "gif";
-        } else {
-          outputBuffer = resultBuffer;
-          finalFormat = "png";
-        }
-
-        // Save output
-        const ext = EXT_MAP[finalFormat] || "png";
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_extended.${ext}`;
-        const outputPath = join(workspacePath, "output", outputFilename);
-        await writeFile(outputPath, outputBuffer);
-
-        // Generate browser-compatible preview for non-previewable formats
-        let previewUrl: string | undefined;
-        if (!BROWSER_PREVIEWABLE.has(finalFormat)) {
-          try {
-            const previewInput =
-              finalFormat === "heic" || finalFormat === "heif"
-                ? await decodeHeic(outputBuffer)
-                : outputBuffer;
-            const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-            const previewPath = join(workspacePath, "output", "preview.webp");
-            await writeFile(previewPath, previewBuffer);
-            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-          } catch {
-            // Non-fatal - frontend will show fallback
-          }
-        }
-
-        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "complete",
-          percent: 100,
-          result: {
-            jobId,
-            downloadUrl,
-            previewUrl,
-            originalSize,
-            processedSize: outputBuffer.length,
-          },
-        });
-
-        log.info({ toolId: "ai-canvas-expand", jobId, downloadUrl }, "AI canvas expand complete");
-      })().catch((err) => {
-        log.error({ err, toolId: "ai-canvas-expand" }, "AI canvas expand failed");
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "failed",
-          percent: 0,
-          error: err instanceof Error ? err.message : "AI canvas expand failed",
-        });
+      await enqueueToolJob({
+        jobId,
+        toolId,
+        userId: null,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings,
+        clientJobId: clientJobId ?? undefined,
+        kind: "ai-tool",
       });
+
+      return reply.status(202).send({ jobId: progressJobId, async: true });
     },
   );
 
-  // Register in the pipeline/batch registry so this tool can be used
-  // as a step in automation pipelines (without progress callbacks).
+  // Register in the pipeline/batch registry
   registerToolProcessFn({
     toolId: "ai-canvas-expand",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const s = settings as Settings;
 
-      // Decode HEIC/HEIF for pipeline/batch mode
       const ext = filename.split(".").pop()?.toLowerCase() ?? "";
       let buf = inputBuffer;
       if (["heic", "heif", "hif"].includes(ext)) {
         buf = await decodeHeic(buf);
       }
-      // Decode CLI-decoded formats for pipeline/batch mode
       const cliCheck = await validateImageBuffer(inputBuffer, filename);
       if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
         buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
@@ -325,6 +271,7 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
 
       const orientedBuffer = await autoOrient(buf);
       const jobId = randomUUID();
+      const { createWorkspace } = await import("../../lib/workspace.js");
       const workspacePath = await createWorkspace(jobId);
 
       const resultBuffer = await outpaint(

@@ -1,24 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import type { z } from "zod";
-import { autoSaveToLibrary, buildOutputName } from "../jobs/postprocess.js";
+import { env } from "../config.js";
+import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
 import { trackEvent } from "../lib/analytics.js";
-import { autoOrient } from "../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { sanitizeFilename } from "../lib/filename.js";
 import { decodeAnyFormat, decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import type { WorkerInput, WorkerOutput } from "../lib/image-worker.js";
+import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
-import { computeTimeout } from "../lib/timeout.js";
-import { getWorkerPool } from "../lib/worker-pool.js";
-import { createWorkspace } from "../lib/workspace.js";
+import { receiveUpload } from "../lib/upload-stream.js";
+import { getAuthUser } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
 
 /** Context passed to tool process functions for cooperative cancellation, scratch storage, and progress. */
@@ -61,18 +57,6 @@ export interface AnyToolRouteConfig {
 const toolRegistry = new Map<string, AnyToolRouteConfig>();
 
 /**
- * Worker threads are disabled for all tools.
- *
- * AI tools skip workers because they use the Python bridge.
- * Sharp-based tools skip workers because they complete in milliseconds
- * and the worker initialization (which imports the full tool registry
- * and reads SQLite) can deadlock under Docker volume filesystems.
- *
- * The Piscina pool is kept in the codebase for potential future use
- * with long-running CPU-bound operations.
- */
-
-/**
  * Retrieve a registered tool config by its ID.
  */
 export function getToolConfig(toolId: string): AnyToolRouteConfig | undefined {
@@ -103,12 +87,12 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
  *   - A "settings" field containing a JSON string
  *
  * The factory handles:
- *   - Multipart parsing
- *   - File validation
+ *   - Multipart parsing (streamed to object storage via receiveUpload)
+ *   - File validation + decode chain (HEIC, CLI, SVG, AVIF)
  *   - Settings validation via Zod
- *   - Workspace management
+ *   - Enqueue to BullMQ + sync-wait for the worker result
  *   - Error handling
- *   - Response formatting
+ *   - Response formatting (legacy envelope)
  */
 export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig<T>): void {
   // Register in the tool registry for batch processing (cast to type-erased form)
@@ -118,14 +102,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
     `/api/v1/tools/${config.toolId}`,
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let fileBuffer: Buffer | null = null;
+      const jobId = randomUUID();
       let filename = "image";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
       let clientJobId: string | null = null;
       let fileCount = 0;
+      let inputKey: string | null = null;
 
-      // Parse multipart parts
+      // Parse multipart parts (file parts stream to object storage)
       try {
         const parts = request.parts();
 
@@ -139,13 +124,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               }
               continue;
             }
-            // Consume the file stream into a buffer
-            const chunks: Buffer[] = [];
-            for await (const chunk of part.file) {
-              chunks.push(chunk);
-            }
-            fileBuffer = Buffer.concat(chunks);
-            filename = sanitizeFilename(part.filename ?? "image");
+            const upload = await receiveUpload(part, jobId, {
+              maxBytes:
+                env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
+            });
+            inputKey = upload.key;
+            filename = upload.filename;
           } else {
             // Field part
             if (part.fieldname === "settings") {
@@ -176,13 +160,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       }
 
       // Require a file
-      if (!fileBuffer || fileBuffer.length === 0) {
+      if (!inputKey) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      // Capture the original upload size before any decoding (HEIC, CLI)
-      // mutates fileBuffer into a larger intermediate PNG.
-      const uploadedSize = fileBuffer.length;
+      // Read back the uploaded file for validation/decode chain
+      let fileBuffer = await getObjectBuffer(inputKey);
 
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
@@ -199,6 +182,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       // Validate the uploaded image
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
+        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
@@ -213,6 +197,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           const ext = filename.match(/\.[^.]+$/)?.[0];
           if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         } catch (err) {
+          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -233,6 +218,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           try {
             await sharp(fileBuffer).metadata();
           } catch (err) {
+            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -250,6 +236,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           fileBuffer = decompressSvgz(fileBuffer);
           fileBuffer = sanitizeSvg(fileBuffer);
         } catch (err) {
+          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
           });
@@ -269,6 +256,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             const ext = filename.match(/\.[^.]+$/)?.[0];
             if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
           } catch (fallbackErr) {
+            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
             return reply.status(422).send({
               error: "Failed to decode AVIF file",
               details: stripInternalPaths(
@@ -283,6 +271,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Parse and validate settings
       if (settingsRaw && settingsRaw.length > 65536) {
+        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
         return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
       }
       let settings: T;
@@ -290,6 +279,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
         const result = config.settingsSchema.safeParse(parsed);
         if (!result.success) {
+          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({
             error: "Invalid settings",
             details: formatZodErrors(result.error.issues),
@@ -297,6 +287,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         }
         settings = result.data;
       } catch {
+        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
@@ -304,6 +295,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const bundleId = TOOL_BUNDLE_MAP[config.toolId];
       if (bundleId && !isToolInstalled(config.toolId)) {
         const bundle = getBundleForTool(config.toolId);
+        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
         return reply.status(501).send({
           error: "Feature not installed",
           code: "FEATURE_NOT_INSTALLED",
@@ -313,148 +305,57 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         });
       }
 
-      // Process the image (worker thread or main thread)
+      // If decode transformed the buffer, write the decoded version to
+      // a sibling key so the worker processes the decoded data.
+      const decodedName = filename;
+      const decodedKey = `uploads/${jobId}/${decodedName}`;
+      if (decodedKey !== inputKey) {
+        await putObject(decodedKey, fileBuffer);
+        inputKey = decodedKey;
+      } else {
+        // Buffer may have been mutated in-place (e.g. SVG sanitize).
+        // Re-upload so the worker sees the sanitized version.
+        await putObject(inputKey, fileBuffer);
+      }
+
       const startTime = Date.now();
+
+      // Enqueue for the BullMQ worker
+      await enqueueToolJob({
+        jobId,
+        toolId: config.toolId,
+        userId: getAuthUser(request)?.id ?? null,
+        pool: "image",
+        inputRefs: [inputKey],
+        filename,
+        settings,
+        fileId: fileId ?? undefined,
+        clientJobId: clientJobId ?? undefined,
+        kind: "tool",
+      });
+
       try {
-        let result: { buffer: Buffer; filename: string; contentType: string };
+        const result = await waitForJob("image", jobId);
+        if (result) {
+          trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
+            tool_id: config.toolId,
+            status: "completed",
+            duration_ms: Date.now() - startTime,
+            category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
+            is_ai_tool: getBundleForTool(config.toolId) !== null,
+          });
 
-        reportProgress(20, "Processing...");
-
-        // Offload to worker thread for non-AI tools.
-        // Falls back to main-thread processing on any worker error.
-        // Disabled in test environments where worker_threads can't load .ts files.
-        const useWorker = false;
-        if (useWorker) {
-          try {
-            const pool = getWorkerPool();
-            const workerInput: WorkerInput = {
-              toolId: config.toolId,
-              inputBuffer: fileBuffer,
-              settings,
-              filename,
-              inputFormat: validation.format,
-            };
-            const meta = await sharp(fileBuffer).metadata();
-            const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
-            const timeoutMs = computeTimeout(megapixels, "sharp");
-            const workerResult: WorkerOutput = await pool.run(workerInput, {
-              signal: AbortSignal.timeout(timeoutMs),
-            });
-            result = {
-              buffer: Buffer.from(workerResult.buffer),
-              filename: workerResult.filename,
-              contentType: workerResult.contentType,
-            };
-          } catch (workerErr) {
-            // Worker failed - fall back to main-thread processing
-            request.log.warn(
-              { workerErr, toolId: config.toolId },
-              "Worker processing failed, falling back to main thread",
-            );
-            const processBuffer = isSvg ? fileBuffer : await autoOrient(fileBuffer);
-            result = await config.process(processBuffer, settings, filename);
-          }
-        } else {
-          // AI tools: always main thread (they use Python bridge)
-          const processBuffer = isSvg ? fileBuffer : await autoOrient(fileBuffer);
-          result = await config.process(processBuffer, settings, filename);
+          return reply.send({
+            jobId,
+            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+            previewUrl: result.previewRef ? `/api/v1/download/${jobId}/preview.webp` : undefined,
+            originalSize: result.originalSize,
+            processedSize: result.processedSize,
+            savedFileId: result.savedFileId,
+          });
         }
-
-        reportProgress(75, "Saving...");
-
-        // Add a tool-specific suffix and fix extension mismatches
-        result.filename = buildOutputName(
-          result.filename,
-          filename,
-          config.toolId,
-          result.contentType,
-        );
-
-        // Create workspace and save output
-        const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
-        const outputPath = join(workspacePath, "output", result.filename);
-        await writeFile(outputPath, result.buffer);
-
-        // Generate a browser-previewable WebP thumbnail for formats that
-        // browsers cannot render in <img> tags (HEIC, TIFF, etc.)
-        // TODO(P2-T8): deduplicate with jobs/postprocess.ts when the factory moves to the job spine
-        const BROWSER_PREVIEWABLE = new Set([
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-          "image/svg+xml",
-          "image/bmp",
-          "image/avif",
-        ]);
-        let previewUrl: string | undefined;
-        if (!BROWSER_PREVIEWABLE.has(result.contentType)) {
-          reportProgress(85, "Generating preview...");
-          try {
-            let previewInput = result.buffer;
-            // Sharp can't decode HEIC - use system decoder first
-            if (result.contentType === "image/heic" || result.contentType === "image/heif") {
-              previewInput = await decodeHeic(result.buffer);
-            }
-            const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-            const previewPath = join(workspacePath, "output", "preview.webp");
-            await writeFile(previewPath, previewBuffer);
-            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-          } catch (previewErr) {
-            request.log.warn(
-              { previewErr, contentType: result.contentType, toolId: config.toolId },
-              "Failed to generate preview thumbnail, falling back to input buffer",
-            );
-            // Retry with the original input buffer (pre-processing) which
-            // was already validated and decoded during the intake phase.
-            try {
-              const fallbackBuffer = await sharp(fileBuffer).webp({ quality: 80 }).toBuffer();
-              const previewPath = join(workspacePath, "output", "preview.webp");
-              await writeFile(previewPath, fallbackBuffer);
-              previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-            } catch {
-              // Both attempts failed - frontend will use the upload preview as fallback
-            }
-          }
-        }
-
-        // Also save the original input for reference/download
-        const inputPath = join(workspacePath, "input", filename);
-        await writeFile(inputPath, fileBuffer);
-
-        reportProgress(95, "Finishing...");
-
-        // Auto-save to persistent file store when a fileId is provided
-        const savedFileId = await autoSaveToLibrary({
-          fileId: fileId ?? undefined,
-          userId: null,
-          buffer: result.buffer,
-          outName: result.filename,
-          contentType: result.contentType,
-          toolId: config.toolId,
-        });
-
-        trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
-          tool_id: config.toolId,
-          status: "completed",
-          duration_ms: Date.now() - startTime,
-          category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
-          is_ai_tool: getBundleForTool(config.toolId) !== null,
-        });
-
-        return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
-          previewUrl,
-          originalSize: uploadedSize,
-          processedSize: result.buffer.length,
-          savedFileId,
-        });
+        return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
       } catch (err) {
-        // Catch Sharp / processing errors and return a clean API error
-        const message = err instanceof Error ? err.message : "Image processing failed";
-        request.log.error({ err, toolId: config.toolId }, "Tool processing failed");
         trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
           tool_id: config.toolId,
           status: "failed",
@@ -462,11 +363,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
           is_ai_tool: getBundleForTool(config.toolId) !== null,
           error_code: err instanceof Error ? err.constructor.name : "UnknownError",
-          error_message: message.slice(0, 200),
+          error_message:
+            err instanceof Error ? err.message.slice(0, 200) : "Image processing failed",
         });
         return reply.status(422).send({
           error: "Processing failed",
-          details: stripInternalPaths(message),
+          details: err instanceof Error ? err.message : String(err),
         });
       }
     },

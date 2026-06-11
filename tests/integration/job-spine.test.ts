@@ -8,15 +8,10 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../apps/api/src/db/index.js";
-import {
-  requestCancel,
-  startCancelListener,
-  stopCancelListener,
-} from "../../apps/api/src/jobs/cancel.js";
+import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
 import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
 import { enqueueToolJob, waitForJob } from "../../apps/api/src/jobs/enqueue.js";
-import { bullPrefix, type ToolJobData, type ToolJobResult } from "../../apps/api/src/jobs/types.js";
-import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
+import { bullPrefix, type ToolJobData } from "../../apps/api/src/jobs/types.js";
 import { putObject } from "../../apps/api/src/lib/object-storage.js";
 import {
   registerToolProcessFn,
@@ -63,15 +58,12 @@ registerToolProcessFn({
 
 let testApp: TestApp;
 
+// Workers + cancel listener are started by test-server.ts (ensureSpine).
 beforeAll(async () => {
   testApp = await buildTestApp();
-  await startCancelListener();
-  startWorkers();
 }, 30_000);
 
 afterAll(async () => {
-  await closeWorkers();
-  await stopCancelListener();
   await testApp.cleanup();
 }, 10_000);
 

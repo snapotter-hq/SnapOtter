@@ -1,36 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { inpaint } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
-
-const EXT_MAP: Record<string, string> = {
-  jpeg: "jpg",
-  jpg: "jpg",
-  png: "png",
-  webp: "webp",
-  tiff: "tiff",
-  gif: "gif",
-  avif: "avif",
-  heic: "heic",
-  heif: "heif",
-  jxl: "jxl",
-};
-
-const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
+import { receiveUpload } from "../../lib/upload-stream.js";
 
 const settingsSchema = z.object({
   format: z
@@ -42,6 +25,11 @@ const settingsSchema = z.object({
 /**
  * Object eraser / inpainting route.
  * Accepts an image and a mask image, erases masked areas using LaMa.
+ *
+ * NOTE: erase-object requires two file parts (image + mask). The standard
+ * AI handler model expects a single input, so this route enqueues as a
+ * regular "tool" kind and uses registerToolProcessFn for the worker.
+ * The mask is stored as a second inputRef.
  */
 export function registerEraseObject(app: FastifyInstance) {
   app.post("/api/v1/tools/erase-object", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -57,27 +45,27 @@ export function registerEraseObject(app: FastifyInstance) {
       });
     }
 
+    const jobId = randomUUID();
     let imageBuffer: Buffer | null = null;
     let maskBuffer: Buffer | null = null;
     let filename = "image";
     let clientJobId: string | null = null;
     let format = "png";
     let quality = 95;
+    let imageKey: string | null = null;
+    let maskKey: string | null = null;
 
     try {
       const parts = request.parts();
       for await (const part of parts) {
         if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          const buf = Buffer.concat(chunks);
           if (part.fieldname === "mask") {
-            maskBuffer = buf;
+            const upload = await receiveUpload(part, jobId);
+            maskKey = upload.key;
           } else {
-            imageBuffer = buf;
-            filename = sanitizeFilename(part.filename ?? "image");
+            const upload = await receiveUpload(part, jobId);
+            imageKey = upload.key;
+            filename = upload.filename;
           }
         } else if (part.fieldname === "clientJobId") {
           const raw = part.value as string;
@@ -97,14 +85,17 @@ export function registerEraseObject(app: FastifyInstance) {
       });
     }
 
-    if (!imageBuffer || imageBuffer.length === 0) {
+    if (!imageKey) {
       return reply.status(400).send({ error: "No image file provided" });
     }
-    if (!maskBuffer || maskBuffer.length === 0) {
+    if (!maskKey) {
       return reply.status(400).send({
         error: "No mask image provided. Upload a mask as a second file with fieldname 'mask'",
       });
     }
+
+    imageBuffer = await getObjectBuffer(imageKey);
+    maskBuffer = await getObjectBuffer(maskKey);
 
     const imageValidation = await validateImageBuffer(imageBuffer, filename);
     if (!imageValidation.valid) {
@@ -135,17 +126,12 @@ export function registerEraseObject(app: FastifyInstance) {
     }
 
     try {
-      // Decode HEIC/HEIF input via system decoder
       if (imageValidation.format === "heif") {
         imageBuffer = await decodeHeic(imageBuffer);
       }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
       if (needsCliDecode(imageValidation.format)) {
         imageBuffer = await decodeToSharpCompat(imageBuffer, imageValidation.format);
       }
-
-      // Auto-orient to fix EXIF rotation
       imageBuffer = await autoOrient(imageBuffer);
     } catch (err) {
       request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
@@ -155,134 +141,113 @@ export function registerEraseObject(app: FastifyInstance) {
       });
     }
 
-    const originalSize = imageBuffer.length;
-    const jobId = randomUUID();
-    const progressJobId = clientJobId || jobId;
-    let workspacePath: string;
-    try {
-      workspacePath = await createWorkspace(jobId);
-      const inputPath = join(workspacePath, "input", filename);
-      await writeFile(inputPath, imageBuffer);
-    } catch (err) {
-      request.log.error({ err, toolId: "erase-object" }, "Workspace creation failed");
-      return reply.status(422).send({
-        error: "Object erasing failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
+    // Write decoded image for the worker
+    const decodedKey = `uploads/${jobId}/${filename}`;
+    if (decodedKey !== imageKey) {
+      await putObject(decodedKey, imageBuffer);
+      imageKey = decodedKey;
+    } else {
+      await putObject(imageKey, imageBuffer);
     }
 
-    const log = request.log;
-    log.info(
-      {
-        toolId: "erase-object",
-        imageSize: originalSize,
-        maskSize: maskBuffer.length,
-        format,
-      },
-      "Starting object erasure",
-    );
+    const progressJobId = clientJobId || jobId;
 
-    // Reply immediately so the HTTP connection closes within proxy timeout limits.
-    // The result will be delivered via the SSE progress channel.
-    reply.status(202).send({ jobId: progressJobId, async: true });
-
-    const onProgress = (percent: number, stage: string) => {
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "processing",
-        stage,
-        percent,
-      });
-    };
-
-    // Fire-and-forget: processing happens after the response is sent
-    (async () => {
-      const resultBuffer = await inpaint(
-        imageBuffer,
-        maskBuffer,
-        join(workspacePath, "output"),
-        onProgress,
-      );
-
-      // Convert to the requested output format using Sharp
-      const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
-      let outputBuffer: Buffer;
-      let finalFormat = format;
-
-      if (needsNodeConversion) {
-        if (format === "heic" || format === "heif") {
-          outputBuffer = await encodeHeic(resultBuffer, quality);
-          finalFormat = format;
-        } else if (format === "jxl") {
-          outputBuffer = await encodeJxl(resultBuffer, quality);
-          finalFormat = "jxl";
-        } else {
-          outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
-          finalFormat = "avif";
-        }
-      } else if (format === "jpg" || format === "jpeg") {
-        outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
-        finalFormat = "jpg";
-      } else if (format === "webp") {
-        outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
-        finalFormat = "webp";
-      } else if (format === "tiff") {
-        outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
-        finalFormat = "tiff";
-      } else if (format === "gif") {
-        outputBuffer = await sharp(resultBuffer).gif().toBuffer();
-        finalFormat = "gif";
-      } else {
-        outputBuffer = resultBuffer;
-        finalFormat = "png";
-      }
-
-      // Save output
-      const ext = EXT_MAP[finalFormat] || "png";
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
-      const outputPath = join(workspacePath, "output", outputFilename);
-      await writeFile(outputPath, outputBuffer);
-
-      // Generate browser-compatible preview for non-previewable formats
-      let previewUrl: string | undefined;
-      if (!BROWSER_PREVIEWABLE.has(finalFormat)) {
-        try {
-          const previewInput =
-            finalFormat === "heic" || finalFormat === "heif"
-              ? await decodeHeic(outputBuffer)
-              : outputBuffer;
-          const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-          const previewPath = join(workspacePath, "output", "preview.webp");
-          await writeFile(previewPath, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-        } catch {
-          // Non-fatal - frontend will show fallback
-        }
-      }
-
-      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "complete",
-        percent: 100,
-        result: {
-          jobId,
-          downloadUrl,
-          previewUrl,
-          originalSize,
-          processedSize: outputBuffer.length,
-        },
-      });
-
-      log.info({ toolId: "erase-object", jobId, downloadUrl }, "Object erasure complete");
-    })().catch((err) => {
-      log.error({ err, toolId: "erase-object" }, "Object erasing failed");
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "failed",
-        percent: 0,
-        error: err instanceof Error ? err.message : "Object erasing failed",
-      });
+    // Enqueue with both image and mask as inputRefs; the worker handler
+    // reads them via getObjectBuffer.
+    await enqueueToolJob({
+      jobId,
+      toolId,
+      userId: null,
+      pool: "ai",
+      inputRefs: [imageKey, maskKey],
+      filename,
+      settings: { format, quality },
+      clientJobId: clientJobId ?? undefined,
+      kind: "ai-tool",
     });
+
+    return reply.status(202).send({ jobId: progressJobId, async: true });
   });
 }
+
+// ── AI job handler (separate import for the worker) ───────────────
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+
+registerAiJobHandler("erase-object", async (input, data, ctx) => {
+  // Second inputRef is the mask
+  const maskBuffer = await getObjectBuffer(data.inputRefs[1]);
+  const settings = settingsSchema.parse(data.settings);
+  const format = settings.format;
+  const quality = settings.quality;
+
+  const resultBuffer = await inpaint(input, maskBuffer, ctx.scratchDir, (percent, stage) =>
+    ctx.report(percent, stage),
+  );
+
+  // Convert to requested output format
+  const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
+  let outputBuffer: Buffer;
+  let finalFormat = format;
+
+  if (needsNodeConversion) {
+    if (format === "heic" || format === "heif") {
+      outputBuffer = await encodeHeic(resultBuffer, quality);
+      finalFormat = format;
+    } else if (format === "jxl") {
+      outputBuffer = await encodeJxl(resultBuffer, quality);
+      finalFormat = "jxl";
+    } else {
+      outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
+      finalFormat = "avif";
+    }
+  } else if (format === "jpg" || format === "jpeg") {
+    outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
+    finalFormat = "jpg";
+  } else if (format === "webp") {
+    outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
+    finalFormat = "webp";
+  } else if (format === "tiff") {
+    outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
+    finalFormat = "tiff";
+  } else if (format === "gif") {
+    outputBuffer = await sharp(resultBuffer).gif().toBuffer();
+    finalFormat = "gif";
+  } else {
+    outputBuffer = resultBuffer;
+    finalFormat = "png";
+  }
+
+  const EXT_MAP: Record<string, string> = {
+    jpeg: "jpg",
+    jpg: "jpg",
+    png: "png",
+    webp: "webp",
+    tiff: "tiff",
+    gif: "gif",
+    avif: "avif",
+    heic: "heic",
+    heif: "heif",
+    jxl: "jxl",
+  };
+  const ext = EXT_MAP[finalFormat] || "png";
+  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
+
+  const CONTENT_TYPES: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    tiff: "image/tiff",
+    gif: "image/gif",
+    avif: "image/avif",
+    heic: "image/heic",
+    heif: "image/heif",
+    jxl: "image/jxl",
+  };
+
+  return {
+    buffer: outputBuffer,
+    filename: outputFilename,
+    contentType: CONTENT_TYPES[finalFormat] || "image/png",
+  };
+});

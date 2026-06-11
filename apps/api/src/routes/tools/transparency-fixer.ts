@@ -1,20 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { receiveUpload } from "../../lib/upload-stream.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const TOOL_ID = "transparency-fixer";
@@ -29,10 +29,6 @@ const settingsSchema = z.object({
 
 /**
  * Sharp-based defringe post-processing.
- *
- * Removes semi-transparent fringe pixels that rembg sometimes leaves around
- * hair, fur, and fine edges. Works by blurring the alpha channel and zeroing
- * out pixels whose alpha falls below a computed threshold.
  */
 async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer> {
   if (intensity <= 0) return buffer;
@@ -44,13 +40,11 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
   const pixelCount = info.width * info.height;
 
-  // Extract alpha channel
   const alpha = Buffer.alloc(pixelCount);
   for (let i = 0; i < pixelCount; i++) {
     alpha[i] = data[i * 4 + 3];
   }
 
-  // Blur the alpha channel
   const blurRadius = Math.max(0.3, Math.round(intensity / 20));
   const blurredAlphaRaw = await sharp(alpha, {
     raw: { width: info.width, height: info.height, channels: 1 },
@@ -59,7 +53,6 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
     .raw()
     .toBuffer();
 
-  // Threshold: zero out fringe pixels
   const threshold = Math.round(128 + (intensity / 100) * 80);
   const result = Buffer.from(data);
   for (let i = 0; i < pixelCount; i++) {
@@ -129,6 +122,31 @@ async function processTransparencyFix(
   return resultBuffer;
 }
 
+// ── AI job handler ────────────────────────────────────────────────
+registerAiJobHandler("transparency-fixer", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+
+  const resultBuffer = await processTransparencyFix(
+    input,
+    settings,
+    ctx.scratchDir,
+    (percent, stage) => ctx.report(Math.min(percent, 95), stage),
+  );
+
+  const outputExt = settings.outputFormat === "webp" ? "webp" : "png";
+  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
+  const contentType = outputExt === "webp" ? "image/webp" : "image/png";
+
+  return {
+    buffer: resultBuffer,
+    filename: outputFilename,
+    contentType,
+    resultPayload: {
+      filename: data.filename,
+    },
+  };
+});
+
 export function registerTransparencyFixer(app: FastifyInstance) {
   app.post(
     "/api/v1/tools/transparency-fixer",
@@ -144,19 +162,20 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         });
       }
 
+      const jobId = randomUUID();
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let inputKey: string | null = null;
 
       try {
         const parts = request.parts();
         for await (const part of parts) {
           if (part.type === "file") {
-            const chunks: Buffer[] = [];
-            for await (const chunk of part.file) chunks.push(chunk);
-            fileBuffer = Buffer.concat(chunks);
-            filename = sanitizeFilename(part.filename ?? "image");
+            const upload = await receiveUpload(part, jobId);
+            inputKey = upload.key;
+            filename = upload.filename;
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
@@ -173,9 +192,11 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         });
       }
 
-      if (!fileBuffer || fileBuffer.length === 0) {
+      if (!inputKey) {
         return reply.status(400).send({ error: "No image file provided" });
       }
+
+      fileBuffer = await getObjectBuffer(inputKey);
 
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
@@ -197,21 +218,16 @@ export function registerTransparencyFixer(app: FastifyInstance) {
       }
 
       try {
-        // Decode HEIC/HEIF before processing
         if (validation.format === "heif") {
           fileBuffer = await decodeHeic(fileBuffer);
           const ext = filename.match(/\.[^.]+$/)?.[0];
           if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         }
-
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
         if (needsCliDecode(validation.format)) {
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
           const ext = filename.match(/\.[^.]+$/)?.[0];
           if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
         }
-
-        // Auto-orient to fix EXIF rotation
         fileBuffer = await autoOrient(fileBuffer);
       } catch (err) {
         request.log.error({ err, toolId: TOOL_ID }, "Input decoding failed");
@@ -221,80 +237,29 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         });
       }
 
-      const originalSize = fileBuffer.length;
-      const jobId = randomUUID();
-      const progressJobId = clientJobId || jobId;
-      let workspacePath: string;
-      try {
-        workspacePath = await createWorkspace(jobId);
-        const inputPath = join(workspacePath, "input", filename);
-        await writeFile(inputPath, fileBuffer);
-      } catch (err) {
-        request.log.error({ err, toolId: TOOL_ID }, "Workspace creation failed");
-        return reply.status(422).send({
-          error: "Transparency fix failed",
-          details: err instanceof Error ? err.message : "Unknown error",
-        });
+      const decodedKey = `uploads/${jobId}/${filename}`;
+      if (decodedKey !== inputKey) {
+        await putObject(decodedKey, fileBuffer);
+        inputKey = decodedKey;
+      } else {
+        await putObject(inputKey, fileBuffer);
       }
 
-      const log = request.log;
-      log.info(
-        { toolId: TOOL_ID, imageSize: originalSize, model: DEFAULT_MODEL },
-        "Starting transparency fix",
-      );
+      const progressJobId = clientJobId || jobId;
 
-      // Reply immediately so the HTTP connection closes within proxy timeout limits.
-      // The result will be delivered via the SSE progress channel.
-      reply.status(202).send({ jobId: progressJobId, async: true });
-
-      const onProgress = (percent: number, stage: string) => {
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "processing",
-          stage,
-          percent: Math.min(percent, 95),
-        });
-      };
-
-      const outputExt = settings.outputFormat === "webp" ? "webp" : "png";
-
-      // Fire-and-forget: processing happens after the response is sent
-      (async () => {
-        const resultBuffer = await processTransparencyFix(
-          fileBuffer,
-          settings,
-          join(workspacePath, "output"),
-          onProgress,
-        );
-
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
-        await writeFile(join(workspacePath, "output", outputFilename), resultBuffer);
-
-        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "complete",
-          percent: 100,
-          result: {
-            jobId,
-            downloadUrl,
-            originalSize,
-            processedSize: resultBuffer.length,
-            filename,
-          },
-        });
-
-        log.info({ toolId: TOOL_ID, jobId, downloadUrl }, "Transparency fix complete");
-      })().catch((err) => {
-        log.error({ err, toolId: TOOL_ID }, "Transparency fix failed");
-        updateSingleFileProgress({
-          jobId: progressJobId,
-          phase: "failed",
-          percent: 0,
-          error: err instanceof Error ? err.message : "Transparency fix failed",
-        });
+      await enqueueToolJob({
+        jobId,
+        toolId: TOOL_ID,
+        userId: null,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings,
+        clientJobId: clientJobId ?? undefined,
+        kind: "ai-tool",
       });
+
+      return reply.status(202).send({ jobId: progressJobId, async: true });
     },
   );
 
@@ -306,6 +271,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
       const jobId = randomUUID();
+      const { createWorkspace } = await import("../../lib/workspace.js");
       const workspacePath = await createWorkspace(jobId);
 
       const resultBuffer = await processTransparencyFix(

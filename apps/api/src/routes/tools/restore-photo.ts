@@ -1,21 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { restorePhoto } from "@snapotter/ai";
 import { getBundleForTool } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeAnyFormat, decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
+import { receiveUpload } from "../../lib/upload-stream.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -26,6 +26,52 @@ const settingsSchema = z.object({
   denoiseStrength: z.number().min(0).max(100).default(25),
   colorize: z.boolean().default(false),
   colorizeStrength: z.number().min(0).max(100).default(85),
+});
+
+// ── AI job handler ────────────────────────────────────────────────
+registerAiJobHandler("restore-photo", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+
+  const result = await restorePhoto(
+    input,
+    ctx.scratchDir,
+    {
+      scratchRemoval: settings.scratchRemoval,
+      faceEnhancement: settings.faceEnhancement,
+      fidelity: settings.fidelity,
+      denoise: settings.denoise,
+      denoiseStrength: settings.denoiseStrength,
+      colorize: settings.colorize,
+      colorizeStrength: settings.colorizeStrength,
+    },
+    (percent, stage) => ctx.report(percent, stage),
+  );
+
+  const outputFormat = await resolveOutputFormat(input, data.filename);
+  let outputBuffer = result.buffer;
+  if (outputFormat.format !== "png") {
+    outputBuffer = await sharp(result.buffer)
+      .toFormat(outputFormat.format, { quality: outputFormat.quality })
+      .toBuffer();
+  }
+
+  const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
+
+  return {
+    buffer: outputBuffer,
+    filename: outputFilename,
+    contentType: outputFormat.contentType,
+    resultPayload: {
+      width: result.width,
+      height: result.height,
+      steps: result.steps,
+      scratchCoverage: result.scratchCoverage,
+      facesEnhanced: result.facesEnhanced,
+      isGrayscale: result.isGrayscale,
+      colorized: result.colorized,
+    },
+  };
 });
 
 /**
@@ -46,21 +92,20 @@ export function registerRestorePhoto(app: FastifyInstance) {
       });
     }
 
+    const jobId = randomUUID();
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let inputKey: string | null = null;
 
     try {
       const parts = request.parts();
       for await (const part of parts) {
         if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "image");
+          const upload = await receiveUpload(part, jobId);
+          inputKey = upload.key;
+          filename = upload.filename;
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
@@ -77,9 +122,11 @@ export function registerRestorePhoto(app: FastifyInstance) {
       });
     }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
+    if (!inputKey) {
       return reply.status(400).send({ error: "No image file provided" });
     }
+
+    fileBuffer = await getObjectBuffer(inputKey);
 
     const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
@@ -101,30 +148,17 @@ export function registerRestorePhoto(app: FastifyInstance) {
     }
 
     try {
-      // Decode HEIC/HEIF input
       if (validation.format === "heif") {
         fileBuffer = await decodeHeic(fileBuffer);
       }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
       if (needsCliDecode(validation.format)) {
         fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
       }
-
-      // Auto-orient to fix EXIF rotation
       fileBuffer = await autoOrient(fileBuffer);
-
-      // AVIF can pass metadata validation but fail pixel decode when
-      // Sharp's bundled libheif lacks support for the bitstream version.
-      // Convert early (the sidecar needs PNG anyway); fall back to ImageMagick.
       if (validation.format === "avif") {
         try {
           fileBuffer = await sharp(fileBuffer).png().toBuffer();
         } catch {
-          request.log.warn(
-            { toolId: "restore-photo" },
-            "Sharp AVIF decode failed, using ImageMagick",
-          );
           fileBuffer = await decodeAnyFormat(fileBuffer, "avif");
         }
       }
@@ -136,118 +170,29 @@ export function registerRestorePhoto(app: FastifyInstance) {
       });
     }
 
-    const originalSize = fileBuffer.length;
-    const jobId = randomUUID();
-    const progressJobId = clientJobId || jobId;
-    let workspacePath: string;
-    try {
-      workspacePath = await createWorkspace(jobId);
-      const inputPath = join(workspacePath, "input", filename);
-      await writeFile(inputPath, fileBuffer);
-    } catch (err) {
-      request.log.error({ err, toolId: "restore-photo" }, "Workspace creation failed");
-      return reply.status(422).send({
-        error: "Photo restoration failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
+    const decodedKey = `uploads/${jobId}/${filename}`;
+    if (decodedKey !== inputKey) {
+      await putObject(decodedKey, fileBuffer);
+      inputKey = decodedKey;
+    } else {
+      await putObject(inputKey, fileBuffer);
     }
 
-    const log = request.log;
-    log.info({ toolId: "restore-photo", imageSize: originalSize }, "Starting photo restoration");
+    const progressJobId = clientJobId || jobId;
 
-    // Reply immediately so the HTTP connection closes within proxy timeout limits.
-    // The result will be delivered via the SSE progress channel.
-    reply.status(202).send({ jobId: progressJobId, async: true });
-
-    const onProgress = (percent: number, stage: string) => {
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "processing",
-        stage,
-        percent,
-      });
-    };
-
-    // Fire-and-forget: processing happens after the response is sent
-    (async () => {
-      // Process with Python sidecar
-      const result = await restorePhoto(
-        fileBuffer,
-        join(workspacePath, "output"),
-        {
-          scratchRemoval: settings.scratchRemoval,
-          faceEnhancement: settings.faceEnhancement,
-          fidelity: settings.fidelity,
-          denoise: settings.denoise,
-          denoiseStrength: settings.denoiseStrength,
-          colorize: settings.colorize,
-          colorizeStrength: settings.colorizeStrength,
-        },
-        onProgress,
-      );
-
-      // Resolve output format to match input
-      const outputFormat = await resolveOutputFormat(fileBuffer, filename);
-      let outputBuffer = result.buffer;
-
-      // Convert from PNG (Python output) to target format
-      if (outputFormat.format !== "png") {
-        outputBuffer = await sharp(result.buffer)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
-      }
-
-      // Save output
-      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
-      const outputPath = join(workspacePath, "output", outputFilename);
-      await writeFile(outputPath, outputBuffer);
-
-      // Generate browser-compatible preview for non-previewable formats
-      const BROWSER_PREVIEWABLE = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
-      let previewUrl: string | undefined;
-      if (!BROWSER_PREVIEWABLE.has(ext)) {
-        try {
-          const previewBuffer = await sharp(outputBuffer).webp({ quality: 80 }).toBuffer();
-          const previewPath = join(workspacePath, "output", "preview.webp");
-          await writeFile(previewPath, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-        } catch {
-          // Non-fatal
-        }
-      }
-
-      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "complete",
-        percent: 100,
-        result: {
-          jobId,
-          downloadUrl,
-          previewUrl,
-          originalSize,
-          processedSize: outputBuffer.length,
-          width: result.width,
-          height: result.height,
-          steps: result.steps,
-          scratchCoverage: result.scratchCoverage,
-          facesEnhanced: result.facesEnhanced,
-          isGrayscale: result.isGrayscale,
-          colorized: result.colorized,
-        },
-      });
-
-      log.info({ toolId: "restore-photo", jobId, downloadUrl }, "Photo restoration complete");
-    })().catch((err) => {
-      log.error({ err, toolId: "restore-photo" }, "Photo restoration failed");
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "failed",
-        percent: 0,
-        error: err instanceof Error ? err.message : "Photo restoration failed",
-      });
+    await enqueueToolJob({
+      jobId,
+      toolId: "restore-photo",
+      userId: null,
+      pool: "ai",
+      inputRefs: [inputKey],
+      filename,
+      settings,
+      clientJobId: clientJobId ?? undefined,
+      kind: "ai-tool",
     });
+
+    return reply.status(202).send({ jobId: progressJobId, async: true });
   });
 
   // Register in the pipeline/batch registry
@@ -266,6 +211,7 @@ export function registerRestorePhoto(app: FastifyInstance) {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
       const jobId = randomUUID();
+      const { createWorkspace } = await import("../../lib/workspace.js");
       const workspacePath = await createWorkspace(jobId);
       const result = await restorePhoto(orientedBuffer, join(workspacePath, "output"), {
         scratchRemoval: s.scratchRemoval,

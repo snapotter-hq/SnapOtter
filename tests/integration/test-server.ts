@@ -26,11 +26,18 @@ import { eq } from "drizzle-orm";
 // 2. Import app modules. config.ts already captured our env vars.
 // ---------------------------------------------------------------------------
 import Fastify from "fastify";
+import { afterAll } from "vitest";
 import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { runMigrations } from "../../apps/api/src/db/migrate.js";
-import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
+import {
+  requestCancel,
+  startCancelListener,
+  stopCancelListener,
+} from "../../apps/api/src/jobs/cancel.js";
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
+import { closeQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
+import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import {
   authMiddleware,
@@ -61,6 +68,27 @@ import { userFileRoutes } from "../../apps/api/src/routes/user-files.js";
 // ensures the __drizzle_migrations journal is consistent in each fork).
 await runMigrations();
 
+// ── Job spine lifecycle (once per fork) ────────────────────────────
+// Workers idle when unused; starting them for every integration file is cheap.
+let spineStarted = false;
+
+async function ensureSpine(): Promise<void> {
+  if (spineStarted) return;
+  spineStarted = true;
+  await startCancelListener();
+  startWorkers();
+}
+
+// Module-scope afterAll: vitest registers this into any importing file's
+// suite, so every fork cleans up workers and cancel listener on exit.
+afterAll(async () => {
+  if (spineStarted) {
+    await closeWorkers();
+    await stopCancelListener();
+    await closeQueueEvents();
+  }
+}, 10_000);
+
 // ---------------------------------------------------------------------------
 // 3. Public API
 // ---------------------------------------------------------------------------
@@ -70,6 +98,9 @@ export interface TestApp {
 }
 
 export async function buildTestApp(): Promise<TestApp> {
+  // Start the BullMQ job spine (idempotent, once per fork)
+  await ensureSpine();
+
   // Seed built-in roles and default admin user (both idempotent)
   await ensureBuiltinRoles();
   await ensureDefaultAdmin();

@@ -1,19 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { noiseRemoval } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
-import { updateSingleFileProgress } from "../progress.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { receiveUpload } from "../../lib/upload-stream.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -23,6 +23,42 @@ const settingsSchema = z.object({
   colorNoise: z.union([z.number(), z.string()]).transform(Number).default(30),
   format: z.enum(["original", "png", "jpeg", "webp", "avif", "jxl"]).default("original"),
   quality: z.union([z.number(), z.string()]).transform(Number).default(90),
+});
+
+// ── AI job handler ────────────────────────────────────────────────
+registerAiJobHandler("noise-removal", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+
+  const result = await noiseRemoval(
+    input,
+    ctx.scratchDir,
+    {
+      tier: settings.tier,
+      strength: settings.strength,
+      detailPreservation: settings.detailPreservation,
+      colorNoise: settings.colorNoise,
+      format: settings.format,
+      quality: settings.quality,
+    },
+    (percent, stage) => ctx.report(percent, stage),
+  );
+
+  const ext = result.format === "jpeg" ? "jpg" : result.format;
+  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
+
+  const CONTENT_TYPES: Record<string, string> = {
+    png: "image/png",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    webp: "image/webp",
+    avif: "image/avif",
+  };
+
+  return {
+    buffer: result.buffer,
+    filename: outputFilename,
+    contentType: CONTENT_TYPES[result.format] || "image/png",
+  };
 });
 
 /**
@@ -43,21 +79,20 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       });
     }
 
+    const jobId = randomUUID();
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let inputKey: string | null = null;
 
     try {
       const parts = request.parts();
       for await (const part of parts) {
         if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "image");
+          const upload = await receiveUpload(part, jobId);
+          inputKey = upload.key;
+          filename = upload.filename;
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
@@ -74,9 +109,11 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       });
     }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
+    if (!inputKey) {
       return reply.status(400).send({ error: "No image file provided" });
     }
+
+    fileBuffer = await getObjectBuffer(inputKey);
 
     const validation = await validateImageBuffer(fileBuffer, filename);
     if (!validation.valid) {
@@ -113,84 +150,32 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       });
     }
 
-    const originalSize = fileBuffer.length;
-    const jobId = randomUUID();
-    const progressJobId = clientJobId || jobId;
-    let workspacePath: string;
-    try {
-      workspacePath = await createWorkspace(jobId);
-    } catch (err) {
-      request.log.error({ err, toolId: "noise-removal" }, "Workspace creation failed");
-      return reply.status(422).send({
-        error: "Noise removal failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
+    const decodedKey = `uploads/${jobId}/${filename}`;
+    if (decodedKey !== inputKey) {
+      await putObject(decodedKey, fileBuffer);
+      inputKey = decodedKey;
+    } else {
+      await putObject(inputKey, fileBuffer);
     }
 
-    const log = request.log;
-    log.info(
-      { toolId: "noise-removal", imageSize: originalSize, tier: parsed.tier },
-      "Starting noise removal",
-    );
+    const progressJobId = clientJobId || jobId;
 
-    reply.status(202).send({ jobId: progressJobId, async: true });
-
-    const onProgress = (percent: number, stage: string) => {
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "processing",
-        stage,
-        percent,
-      });
-    };
-
-    (async () => {
-      const result = await noiseRemoval(
-        fileBuffer,
-        join(workspacePath, "output"),
-        {
-          tier: parsed.tier,
-          strength: parsed.strength,
-          detailPreservation: parsed.detailPreservation,
-          colorNoise: parsed.colorNoise,
-          format: parsed.format,
-          quality: parsed.quality,
-        },
-        onProgress,
-      );
-
-      const ext = result.format === "jpeg" ? "jpg" : result.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
-      const outputPath = join(workspacePath, "output", outputFilename);
-      await writeFile(outputPath, result.buffer);
-
-      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "complete",
-        percent: 100,
-        result: {
-          jobId,
-          downloadUrl,
-          originalSize,
-          processedSize: result.buffer.length,
-        },
-      });
-
-      log.info({ toolId: "noise-removal", jobId, downloadUrl }, "Noise removal complete");
-    })().catch((err) => {
-      log.error({ err, toolId: "noise-removal" }, "Noise removal failed");
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "failed",
-        percent: 0,
-        error: err instanceof Error ? err.message : "Noise removal failed",
-      });
+    await enqueueToolJob({
+      jobId,
+      toolId,
+      userId: null,
+      pool: "ai",
+      inputRefs: [inputKey],
+      filename,
+      settings: parsed,
+      clientJobId: clientJobId ?? undefined,
+      kind: "ai-tool",
     });
+
+    return reply.status(202).send({ jobId: progressJobId, async: true });
   });
 
-  // Register in the pipeline/batch registry so this tool can be used
-  // as a step in automation pipelines (without progress callbacks).
+  // Register in the pipeline/batch registry
   registerToolProcessFn({
     toolId: "noise-removal",
     settingsSchema: z.object({
@@ -205,6 +190,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
       const jobId = randomUUID();
+      const { createWorkspace } = await import("../../lib/workspace.js");
       const workspacePath = await createWorkspace(jobId);
       const result = await noiseRemoval(orientedBuffer, join(workspacePath, "output"), {
         tier: s.tier,
