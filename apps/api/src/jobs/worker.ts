@@ -84,7 +84,8 @@ export function buildLegacyResultPayload(
     processedSize: jobResult.processedSize,
   };
   if (jobResult.previewRef) {
-    payload.previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+    const previewFilename = jobResult.previewRef.split("/").pop();
+    payload.previewUrl = `/api/v1/download/${jobId}/${previewFilename}`;
   }
   if (jobResult.savedFileId) {
     payload.savedFileId = jobResult.savedFileId;

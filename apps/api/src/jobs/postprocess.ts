@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
 import { putObject } from "../lib/object-storage.js";
+import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 
 // ── Content-type to extension map ──────────────────────────────
 
@@ -87,9 +88,9 @@ const BROWSER_PREVIEWABLE = new Set([
 ]);
 
 /**
- * Generate a browser-previewable WebP thumbnail for formats that browsers
+ * Generate a browser-previewable thumbnail for formats that browsers
  * cannot render in <img> tags. Writes to object storage under
- * `outputs/<jobId>/preview.webp`.
+ * `outputs/<jobId>/preview.<ext>` (webp for images/video, png for PDF).
  *
  * Returns the object key on success, undefined when the format is already
  * previewable or when generation fails (non-fatal).
@@ -100,6 +101,24 @@ export async function generatePreview(
   jobId: string,
   fallbackInput?: Buffer,
 ): Promise<string | undefined> {
+  // Per-modality dispatch (before the image logic)
+  if (contentType.startsWith("video/")) {
+    const poster = await videoPosterPreview(buffer);
+    if (!poster) return undefined;
+    const key = `outputs/${jobId}/preview.webp`;
+    await putObject(key, poster);
+    return key;
+  }
+  if (contentType.startsWith("audio/")) return undefined; // no preview (spec 4.5)
+  if (contentType === "application/pdf") {
+    const page = await pdfFirstPagePreview(buffer);
+    if (!page) return undefined;
+    const key = `outputs/${jobId}/preview.png`;
+    await putObject(key, page);
+    return key;
+  }
+
+  // Image logic unchanged below
   if (BROWSER_PREVIEWABLE.has(contentType)) return undefined;
 
   const key = `outputs/${jobId}/preview.webp`;
