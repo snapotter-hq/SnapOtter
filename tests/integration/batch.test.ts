@@ -6,10 +6,13 @@
  * non-existent tools, and ZIP response format validation.
  */
 
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
+import { bullPrefix } from "../../apps/api/src/jobs/types.js";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 const FIXTURES = join(__dirname, "..", "fixtures");
@@ -523,5 +526,58 @@ describe("Batch preserves upload order", () => {
     expect(fileResults["0"]).toContain("alpha");
     expect(fileResults["1"]).toContain("beta");
     expect(fileResults["2"]).toContain("gamma");
+  });
+});
+
+// ── Legacy batch SSE semantics ────────────────────────────────
+describe("Legacy batch SSE wire parity", () => {
+  it("terminal SSE frame has completedFiles === totalFiles on mixed batch", async () => {
+    // Mixed batch: 2 valid images + 1 invalid file (fails pre-validation)
+    const clientJobId = randomUUID();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good1.png", contentType: "image/png", content: PNG },
+      {
+        name: "file",
+        filename: "bad.txt",
+        contentType: "text/plain",
+        content: Buffer.from("not an image"),
+      },
+      { name: "file", filename: "good2.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize/batch",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+      body,
+    });
+
+    // Batch succeeds overall (2 of 3 files processed)
+    expect(res.statusCode).toBe(200);
+
+    // Read the terminal SSE replay frame from Redis
+    const terminalKeyName = `${bullPrefix()}:terminal:${clientJobId}`;
+    let frame: string | null = null;
+    for (let i = 0; i < 40; i++) {
+      frame = await sharedRedis().get(terminalKeyName);
+      if (frame) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    expect(frame).not.toBeNull();
+    const parsed = JSON.parse(frame!);
+
+    // Legacy semantics: completedFiles = total finished (successes + failures)
+    expect(parsed.totalFiles).toBe(3);
+    expect(parsed.completedFiles).toBe(3);
+    expect(parsed.failedFiles).toBe(1);
+    expect(parsed.status).toBe("completed");
+    expect(parsed.type).toBe("batch");
   });
 });

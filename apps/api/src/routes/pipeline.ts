@@ -104,6 +104,8 @@ function buildPipelineFlowTree(opts: {
   const stepJobIds = parsedSteps.map((_: unknown, i: number) => `${jobId}-s${i}`);
 
   // Build bottom-up: step 0 is the deepest leaf
+  // Steps swallow failures via return markers, so a retry would never
+  // run; attempts: 1 makes that explicit.
   let currentNode: FlowJob = {
     name: parsedSteps[0].resolvedToolId,
     queueName: queueName(parsedSteps[0].pool),
@@ -121,7 +123,7 @@ function buildPipelineFlowTree(opts: {
       filename,
       settings: parsedSteps[0].parsedSettings,
     } satisfies ToolJobData,
-    opts: { jobId: stepJobIds[0] },
+    opts: { jobId: stepJobIds[0], attempts: 1 },
   };
 
   for (let i = 1; i < totalSteps; i++) {
@@ -142,7 +144,7 @@ function buildPipelineFlowTree(opts: {
         filename,
         settings: parsedSteps[i].parsedSettings,
       } satisfies ToolJobData,
-      opts: { jobId: stepJobIds[i] },
+      opts: { jobId: stepJobIds[i], attempts: 1 },
       children: [currentNode],
     };
   }
@@ -165,7 +167,7 @@ function buildPipelineFlowTree(opts: {
       filename,
       settings: {},
     } satisfies ToolJobData,
-    opts: { jobId },
+    opts: { jobId, attempts: 1 },
     children: [currentNode],
   };
 
@@ -879,7 +881,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         filename: "",
         settings: { flowChildCount: perFileChildren.length },
       } satisfies ToolJobData,
-      opts: { jobId: parentId },
+      opts: { jobId: parentId, attempts: 1 },
       children: perFileChildren,
     };
 

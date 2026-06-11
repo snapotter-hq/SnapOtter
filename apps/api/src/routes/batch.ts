@@ -249,7 +249,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             filename: processFilename,
             settings,
           } satisfies ToolJobData,
-          opts: { jobId: childId },
+          // Children swallow failures via return markers, so a retry would
+          // never run; attempts: 1 makes that explicit.
+          opts: { jobId: childId, attempts: 1 },
         });
 
         flowChildIndex++;
@@ -283,7 +285,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           filename: "",
           settings: { flowChildCount: flowChildren.length },
         } satisfies ToolJobData,
-        opts: { jobId: parentId },
+        opts: { jobId: parentId, attempts: 1 },
         children: flowChildren,
       };
 

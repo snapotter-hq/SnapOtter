@@ -3,7 +3,13 @@
  *
  * Children record their outcomes (success/failure) in Redis counters
  * keyed by the parent batch job ID. This drives the batch-type SSE
- * progress events that match the legacy shape exactly.
+ * progress events that match the legacy (1.x p-queue) wire format:
+ *
+ *   completedFiles = total finished (successes + failures)
+ *   failedFiles    = failures only (a subset of completedFiles)
+ *   finished       = completedFiles >= totalFiles
+ *   terminal status: "completed" when at least one success (done > 0),
+ *                    "failed" only when every file failed
  */
 
 import { updateJobProgress } from "../routes/progress.js";
@@ -15,6 +21,11 @@ import { bullPrefix } from "./types.js";
  *
  * Called by batch-child workers (success and failure paths) and by
  * pipeline-finalize workers when they are part of a pipeline-batch.
+ *
+ * Wire format matches the legacy 1.x batch SSE frames:
+ *   completedFiles = done + failed (total finished)
+ *   failedFiles    = failed count only
+ *   terminal status: "completed" when done > 0, else "failed"
  */
 export async function recordChildOutcome(
   parentId: string,
@@ -30,15 +41,22 @@ export async function recordChildOutcome(
   await r.expire(`${base}:done`, 3600);
   await r.expire(`${base}:failed`, 3600);
   await r.expire(`${base}:errors`, 3600);
-  const completedFiles = error ? other : done;
-  const failedFiles = error ? done : other;
+
+  // Resolve per-counter values regardless of which counter was just bumped
+  const doneCount = error ? other : done;
+  const failedCount = error ? done : other;
+
+  // Legacy semantics: completedFiles = total finished (successes + failures)
+  const completedFiles = doneCount + failedCount;
+  const failedFiles = failedCount;
+
   const errors: Array<{ filename: string; error: string }> = (
     await r.lrange(`${base}:errors`, 0, 99)
   ).map((e) => JSON.parse(e));
-  const finished = completedFiles + failedFiles >= totalFiles;
+  const finished = completedFiles >= totalFiles;
   updateJobProgress({
     jobId: parentId,
-    status: finished ? (completedFiles > 0 ? "completed" : "failed") : "processing",
+    status: finished ? (doneCount > 0 ? "completed" : "failed") : "processing",
     totalFiles,
     completedFiles,
     failedFiles,

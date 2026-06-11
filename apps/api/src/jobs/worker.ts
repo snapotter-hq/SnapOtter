@@ -527,9 +527,11 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
  *
  * Each child records exactly once: the success path calls
  * recordChildOutcome after processToolJob returns; the failure path
- * calls it in the catch block. processToolJob's internal error
- * handling writes the DB row to "failed" before re-throwing, so the
- * DB state is accurate regardless.
+ * calls it in the catch block. Flow children are enqueued with
+ * attempts: 1 (set in batch.ts / pipeline.ts), so every failure is
+ * final and processToolJob always writes the terminal DB row before
+ * rethrowing. If attempts were ever raised above 1, non-final
+ * failures would skip the DB write and leave the row "processing".
  */
 async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> {
   try {
