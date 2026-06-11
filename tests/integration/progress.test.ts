@@ -222,7 +222,7 @@ describe("Batch progress tracking", () => {
     // Should have error info for the failed file
     if (job?.error) {
       const errorObj = job.error as { message: string };
-      const errors = JSON.parse(errorObj.message);
+      const errors = errorObj.details;
       expect(errors.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -474,7 +474,7 @@ describe("updateJobProgress direct calls", () => {
     expect(job?.status).toBe("failed");
     expect(job?.error).not.toBeNull();
     const errorObj = job?.error as { message: string };
-    const errors = JSON.parse(errorObj.message);
+    const errors = errorObj.details;
     expect(errors).toHaveLength(2);
   });
 

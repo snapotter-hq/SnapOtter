@@ -89,7 +89,10 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
         .set({
           status: progress.status,
           progress: { percent },
-          error: progress.errors.length > 0 ? { message: JSON.stringify(progress.errors) } : null,
+          error:
+            progress.errors.length > 0
+              ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
+              : null,
           completedAt:
             progress.status === "completed" || progress.status === "failed" ? new Date() : null,
         })
@@ -101,7 +104,10 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
         status: progress.status,
         progress: { percent },
         inputRefs: [],
-        error: progress.errors.length > 0 ? { message: JSON.stringify(progress.errors) } : null,
+        error:
+          progress.errors.length > 0
+            ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
+            : null,
       });
     }
   } catch {
