@@ -49,6 +49,12 @@ export const ru: TranslationKeys = {
     format: "Формат и конвертация",
     ai: "AI-инструменты",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Изменение размера",

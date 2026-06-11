@@ -1,4 +1,10 @@
-import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import {
+  CATEGORIES,
+  MODALITIES,
+  PYTHON_SIDECAR_TOOLS,
+  TOOL_BUNDLE_MAP,
+  TOOLS,
+} from "@snapotter/shared";
 import { Clock, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -8,7 +14,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useMobile } from "@/hooks/use-mobile";
 import { ICON_MAP } from "@/lib/icon-map";
-import { getCategoryName, getToolName } from "@/lib/tool-i18n";
+import { getCategoryName, getModalityName, getToolName } from "@/lib/tool-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -281,68 +287,103 @@ export function HomePage() {
             </div>
           </div>
 
-          {/* All tools by category */}
+          {/* All tools by modality and category */}
           <div className="p-4">
             <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-3">
               {t.homePage.allTools}
             </h3>
-            {CATEGORIES.map((category) => {
-              const categoryTools = TOOLS.filter((t) => t.category === category.id);
-              if (categoryTools.length === 0) return null;
+            {MODALITIES.filter((m) => {
+              if (m.id === "file") return false;
+              const key = m.id;
+              return TOOLS.some(
+                (tool) => tool.modality === key || (key === "document" && tool.modality === "file"),
+              );
+            }).map((modality) => {
+              const ModalityIcon = ICON_MAP[modality.icon] as React.ComponentType<{
+                className?: string;
+              }>;
+              const modalityTools = TOOLS.filter(
+                (tool) =>
+                  tool.modality === modality.id ||
+                  (modality.id === "document" && tool.modality === "file"),
+              );
+              const categoryMap = new Map<string, typeof TOOLS>();
+              for (const tool of modalityTools) {
+                const list = categoryMap.get(tool.category) ?? [];
+                list.push(tool);
+                categoryMap.set(tool.category, list);
+              }
               return (
-                <div key={category.id} className="mb-4">
-                  <p
-                    className="text-xs font-medium text-muted-foreground mb-1.5"
-                    style={{ color: category.color }}
-                  >
-                    {getCategoryName(t, category.id, category.name)}
-                  </p>
-                  <div className="space-y-0.5">
-                    {categoryTools.map((tool) => {
-                      const Icon =
-                        (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ??
-                        ICON_MAP.FileImage;
-                      const status = getToolStatus(tool.id);
-                      return (
-                        <button
-                          key={tool.id}
-                          type="button"
-                          onClick={() => navigate(tool.route)}
-                          className="flex items-center gap-2.5 w-full py-1.5 px-2 rounded-lg text-start transition-colors hover:bg-muted text-foreground"
-                        >
-                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm">{getToolName(t, tool.id, tool.name)}</span>
-                          {status === "not_installed" && (
-                            <>
-                              <Download
-                                className="h-3.5 w-3.5 text-muted-foreground ms-auto"
-                                aria-hidden="true"
-                              />
-                              <span className="sr-only">{t.a11y.notInstalled}</span>
-                            </>
-                          )}
-                          {status === "queued" && (
-                            <>
-                              <Clock
-                                className="h-3.5 w-3.5 text-muted-foreground ms-auto"
-                                aria-hidden="true"
-                              />
-                              <span className="sr-only">{t.a11y.queued}</span>
-                            </>
-                          )}
-                          {status === "installing" && (
-                            <>
-                              <Loader2
-                                className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin"
-                                aria-hidden="true"
-                              />
-                              <span className="sr-only">{t.a11y.installing}</span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })}
+                <div key={modality.id} className="mb-5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {ModalityIcon && (
+                      <ModalityIcon className="h-4 w-4 text-foreground/70 shrink-0" />
+                    )}
+                    <p className="text-xs font-bold uppercase text-foreground/70 tracking-wider">
+                      {getModalityName(
+                        t,
+                        modality.id,
+                        modality.id === "document" ? "Documents & Files" : modality.name,
+                      )}
+                    </p>
                   </div>
+                  {CATEGORIES.filter((cat) => categoryMap.has(cat.id)).map((category) => (
+                    <div key={category.id} className="mb-4">
+                      <p
+                        className="text-xs font-medium text-muted-foreground mb-1.5"
+                        style={{ color: category.color }}
+                      >
+                        {getCategoryName(t, category.id, category.name)}
+                      </p>
+                      <div className="space-y-0.5">
+                        {categoryMap.get(category.id)?.map((tool) => {
+                          const Icon =
+                            (ICON_MAP[tool.icon] as React.ComponentType<{
+                              className?: string;
+                            }>) ?? ICON_MAP.FileImage;
+                          const status = getToolStatus(tool.id);
+                          return (
+                            <button
+                              key={tool.id}
+                              type="button"
+                              onClick={() => navigate(tool.route)}
+                              className="flex items-center gap-2.5 w-full py-1.5 px-2 rounded-lg text-start transition-colors hover:bg-muted text-foreground"
+                            >
+                              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-sm">{getToolName(t, tool.id, tool.name)}</span>
+                              {status === "not_installed" && (
+                                <>
+                                  <Download
+                                    className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="sr-only">{t.a11y.notInstalled}</span>
+                                </>
+                              )}
+                              {status === "queued" && (
+                                <>
+                                  <Clock
+                                    className="h-3.5 w-3.5 text-muted-foreground ms-auto"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="sr-only">{t.a11y.queued}</span>
+                                </>
+                              )}
+                              {status === "installing" && (
+                                <>
+                                  <Loader2
+                                    className="h-3.5 w-3.5 text-muted-foreground ms-auto animate-spin"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="sr-only">{t.a11y.installing}</span>
+                                </>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             })}

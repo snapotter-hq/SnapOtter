@@ -49,6 +49,12 @@ export const uk: TranslationKeys = {
     format: "Формат і конвертація",
     ai: "AI-інструменти",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Зміна розміру",

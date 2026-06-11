@@ -49,6 +49,12 @@ export const id: TranslationKeys = {
     format: "Format & Konversi",
     ai: "Alat AI",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Ubah Ukuran",

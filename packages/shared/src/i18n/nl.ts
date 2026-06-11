@@ -49,6 +49,12 @@ export const nl: TranslationKeys = {
     format: "Formaat & Conversie",
     ai: "AI-tools",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Formaat wijzigen",

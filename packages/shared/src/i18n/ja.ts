@@ -49,6 +49,12 @@ export const ja: TranslationKeys = {
     format: "フォーマットと変換",
     ai: "AIツール",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "リサイズ",

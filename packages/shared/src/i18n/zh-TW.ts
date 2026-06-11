@@ -49,6 +49,12 @@ export const zhTW: TranslationKeys = {
     format: "格式與轉換",
     ai: "AI工具",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "調整大小",

@@ -49,6 +49,12 @@ export const tr: TranslationKeys = {
     format: "Biçim ve Dönüştürme",
     ai: "AI Araçları",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Boyutlandır",

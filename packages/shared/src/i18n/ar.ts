@@ -49,6 +49,12 @@ export const ar: TranslationKeys = {
     format: "التنسيق والتحويل",
     ai: "أدوات AI",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "تغيير الحجم",

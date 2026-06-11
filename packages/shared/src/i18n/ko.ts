@@ -49,6 +49,12 @@ export const ko: TranslationKeys = {
     format: "포맷 및 변환",
     ai: "AI 도구",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "리사이즈",

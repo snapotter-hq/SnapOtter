@@ -49,6 +49,12 @@ export const zhCN: TranslationKeys = {
     format: "格式与转换",
     ai: "AI 工具",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "调整大小",

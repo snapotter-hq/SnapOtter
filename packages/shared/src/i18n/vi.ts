@@ -49,6 +49,12 @@ export const vi: TranslationKeys = {
     format: "Định dạng & Chuyển đổi",
     ai: "Công cụ AI",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Thay đổi kích thước",

@@ -49,6 +49,12 @@ export const ptBR: TranslationKeys = {
     format: "Formato e conversao",
     ai: "Ferramentas de AI",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Redimensionar",

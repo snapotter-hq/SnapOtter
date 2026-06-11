@@ -47,6 +47,12 @@ export const en = {
     format: "Format & Conversion",
     ai: "AI Tools",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Resize",

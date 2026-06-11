@@ -49,6 +49,12 @@ export const sv: TranslationKeys = {
     format: "Format & Konvertering",
     ai: "AI-verktyg",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Andra storlek",

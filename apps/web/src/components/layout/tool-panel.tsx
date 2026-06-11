@@ -1,7 +1,8 @@
-import { CATEGORIES, TOOLS } from "@snapotter/shared";
+import { CATEGORIES, MODALITIES, TOOLS } from "@snapotter/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { getCategoryName } from "@/lib/tool-i18n";
+import { ICON_MAP } from "@/lib/icon-map";
+import { getCategoryName, getModalityName } from "@/lib/tool-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { SearchBar } from "../common/search-bar";
@@ -38,14 +39,17 @@ export function ToolPanel() {
     );
   }, [search, visibleTools]);
 
-  const groupedTools = useMemo(() => {
-    const groups = new Map<string, typeof TOOLS>();
+  const groupedByModality = useMemo(() => {
+    const byModality = new Map<string, Map<string, typeof TOOLS>>();
     for (const tool of filteredTools) {
-      const list = groups.get(tool.category) || [];
+      const key = tool.modality === "file" ? "document" : tool.modality;
+      const cats = byModality.get(key) ?? new Map<string, typeof TOOLS>();
+      const list = cats.get(tool.category) ?? [];
       list.push(tool);
-      groups.set(tool.category, list);
+      cats.set(tool.category, list);
+      byModality.set(key, cats);
     }
-    return groups;
+    return byModality;
   }, [filteredTools]);
 
   return (
@@ -54,18 +58,41 @@ export function ToolPanel() {
         <SearchBar value={search} onChange={setSearch} />
       </div>
       <div className="px-3 pb-4 flex-1">
-        {CATEGORIES.filter((cat) => groupedTools.has(cat.id)).map((category) => (
-          <div key={category.id} className="mb-4">
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
-              {getCategoryName(t, category.id, category.name)}
-            </h3>
-            <div className="space-y-0.5">
-              {groupedTools.get(category.id)?.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} />
-              ))}
-            </div>
-          </div>
-        ))}
+        {MODALITIES.filter((m) => m.id !== "file" && groupedByModality.has(m.id)).map(
+          (modality) => {
+            const ModalityIcon = ICON_MAP[modality.icon] as React.ComponentType<{
+              className?: string;
+            }>;
+            const categoryMap = groupedByModality.get(modality.id);
+            if (!categoryMap) return null;
+            return (
+              <div key={modality.id} className="mb-5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  {ModalityIcon && <ModalityIcon className="h-4 w-4 text-foreground/70 shrink-0" />}
+                  <h2 className="text-xs font-bold uppercase text-foreground/70 tracking-wider">
+                    {getModalityName(
+                      t,
+                      modality.id,
+                      modality.id === "document" ? "Documents & Files" : modality.name,
+                    )}
+                  </h2>
+                </div>
+                {CATEGORIES.filter((cat) => categoryMap.has(cat.id)).map((category) => (
+                  <div key={category.id} className="mb-4">
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+                      {getCategoryName(t, category.id, category.name)}
+                    </h3>
+                    <div className="space-y-0.5">
+                      {categoryMap.get(category.id)?.map((tool) => (
+                        <ToolCard key={tool.id} tool={tool} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          },
+        )}
         {filteredTools.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">No tools found</p>
         )}

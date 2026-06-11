@@ -49,6 +49,12 @@ export const it: TranslationKeys = {
     format: "Formato e conversione",
     ai: "Strumenti IA",
   },
+  modalities: {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    documentsAndFiles: "Documents & Files",
+  },
   tools: {
     resize: {
       name: "Ridimensiona",
