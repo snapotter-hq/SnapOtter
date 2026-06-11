@@ -146,4 +146,28 @@ describe("Factory multi-input (maxInputs)", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toBe("Too many files (max 3)");
   });
+
+  it("prefixes validation error with filename for multi-input tools", async () => {
+    const garbage = Buffer.from(Array.from({ length: 64 }, () => Math.floor(Math.random() * 256)));
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "bad.png", contentType: "image/png", content: garbage },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/multi-concat",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/^bad\.png:/);
+  });
 });

@@ -278,7 +278,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             fname = prepared.filename;
           } catch (err) {
             if (err instanceof InputValidationError) {
-              const body: Record<string, string> = { error: err.message };
+              const errorMsg = maxInputs > 1 ? `${fname}: ${err.message}` : err.message;
+              const body: Record<string, string> = { error: errorMsg };
               if (err.details) body.details = err.details;
               return reply.status(err.statusCode).send(body);
             }

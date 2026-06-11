@@ -296,7 +296,7 @@ describe("Duplicate file fields in multipart", () => {
     // Tool factory rejects multiple file parts with 400
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/one image at a time/i);
+    expect(json.error).toMatch(/too many files/i);
   });
 });
 

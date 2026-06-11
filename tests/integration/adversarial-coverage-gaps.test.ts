@@ -908,7 +908,7 @@ describe("Multipart with extra unexpected fields", () => {
     // Two file parts trigger the "one image at a time" rejection.
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/one image at a time/i);
+    expect(json.error).toMatch(/too many files/i);
   });
 });
 
