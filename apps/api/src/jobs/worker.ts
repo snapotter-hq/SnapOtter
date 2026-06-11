@@ -8,9 +8,18 @@
  * Each tool job gets:
  *   - A per-job scratch directory (cleaned up in finally)
  *   - An AbortController registered for cooperative cancellation
- *   - A timeout guard that aborts the signal when exceeded
+ *   - A timeout guard that aborts the signal with reason "timeout"
  *   - Durable DB row updates at each lifecycle stage
  *   - Progress events via Redis pub/sub (updateSingleFileProgress)
+ *
+ * Timeout vs cancel: the timeout guard calls ac.abort("timeout") so
+ * signal.reason === "timeout" distinguishes it from a user cancel
+ * (which calls ac.abort() with no args, yielding an AbortError
+ * DOMException reason). Timed-out jobs get status "failed" and are
+ * retried per the queue's attempts policy; canceled jobs get status
+ * "canceled" and are never retried. Terminal DB writes and SSE frames
+ * are deferred until the final attempt so intermediate retries stay
+ * invisible to the client.
  */
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -32,15 +41,17 @@ import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } fro
 
 // ── Helpers ────────────────────────────────────────────────────
 
+/** SCRATCH_PATH defaults to "" in the env schema; the empty string
+ *  intentionally falls through to the OS tmpdir. */
 function scratchRoot(): string {
   return env.SCRATCH_PATH || join(tmpdir(), "snapotter-scratch");
 }
 
 function timeoutMsFor(pool: Pool): number {
   if (pool === "ai" || pool === "media") {
-    return (env.JOB_TIMEOUT_LONG_S || 7200) * 1000;
+    return env.JOB_TIMEOUT_LONG_S * 1000;
   }
-  return (env.JOB_TIMEOUT_FAST_S || 120) * 1000;
+  return env.JOB_TIMEOUT_FAST_S * 1000;
 }
 
 // ── Legacy result payload ──────────────────────────────────────
@@ -89,9 +100,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const ac = registerCancelable(jobId);
   const signal = ac.signal;
 
-  // Timeout guard
+  // Timeout guard (0 means unlimited; only arm when positive)
   const timeoutMs = timeoutMsFor(data.pool);
-  const timeoutHandle = setTimeout(() => ac.abort(), timeoutMs);
+  const timeoutHandle =
+    timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
 
   // Per-job scratch directory
   const scratchDir = join(scratchRoot(), jobId);
@@ -224,46 +236,58 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     return jobResult;
   } catch (err) {
     const durationMs = Date.now() - startTime;
-    const isCanceled = signal.aborted;
+    const isTimeout = signal.aborted && signal.reason === "timeout";
+    const isCanceled = signal.aborted && !isTimeout;
     const errorMessage = err instanceof Error ? err.message : String(err);
+    const finalError = isCanceled
+      ? "Canceled"
+      : isTimeout
+        ? `Timed out after ${Math.round(timeoutMs / 1000)}s`
+        : errorMessage;
+
+    const maxAttempts = job.opts.attempts ?? 1;
+    const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
 
     const progressJobId = data.clientJobId ?? jobId;
-    const finalError = isCanceled ? "Canceled" : errorMessage;
 
-    // Update durable row to the terminal status.
-    await db
-      .update(schema.jobs)
-      .set({
-        status: isCanceled ? "canceled" : "failed",
-        completedAt: new Date(),
-        durationMs,
-        error: { message: finalError },
-      })
-      .where(eq(schema.jobs.id, jobId))
-      .catch(() => {});
+    // When the job will be retried, do NOT write a terminal DB row or
+    // emit a terminal SSE frame. The row stays "processing" and the
+    // next attempt overwrites startedAt/attempts as usual.
+    if (!willRetry) {
+      await db
+        .update(schema.jobs)
+        .set({
+          status: isCanceled ? "canceled" : "failed",
+          completedAt: new Date(),
+          durationMs,
+          error: { message: finalError },
+        })
+        .where(eq(schema.jobs.id, jobId))
+        .catch(() => {});
 
-    if (isCanceled) {
-      // Emit an ephemeral terminal event for live SSE clients. Uses
-      // publishEphemeral to set the terminal replay key without
-      // persisting to the DB row (which stays "canceled").
-      publishEphemeral({
-        jobId: progressJobId,
-        type: "single",
-        phase: "failed",
-        percent: 0,
-        error: "Canceled",
-      });
-    } else {
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "failed",
-        percent: 0,
-        error: errorMessage,
-      });
+      if (isCanceled) {
+        // Ephemeral terminal event for live SSE clients. Uses
+        // publishEphemeral so the replay key is set without
+        // overwriting the DB row (which stays "canceled").
+        publishEphemeral({
+          jobId: progressJobId,
+          type: "single",
+          phase: "failed",
+          percent: 0,
+          error: "Canceled",
+        });
+      } else {
+        updateSingleFileProgress({
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: finalError,
+        });
+      }
     }
 
-    // Canceled jobs must not be retried by BullMQ
     if (isCanceled) throw new UnrecoverableError("Canceled");
+    if (isTimeout) throw new Error(finalError);
     throw err;
   } finally {
     clearTimeout(timeoutHandle);
@@ -285,7 +309,7 @@ export function startWorkers(): void {
 
     const processor = async (job: Job<ToolJobData>): Promise<ToolJobResult> => {
       if (pool === "system") {
-        return runSystemJob(job) as Promise<ToolJobResult>;
+        return runSystemJob(job);
       }
       return processToolJob(job);
     };
@@ -297,7 +321,7 @@ export function startWorkers(): void {
     });
 
     worker.on("error", (err) => {
-      console.error(`Worker error [${pool}]:`, err.message);
+      console.error(`Worker error [${pool}]:`, err);
     });
 
     workers.push(worker);

@@ -378,6 +378,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         // Generate a browser-previewable WebP thumbnail for formats that
         // browsers cannot render in <img> tags (HEIC, TIFF, etc.)
+        // TODO(P2-T8): deduplicate with jobs/postprocess.ts when the factory moves to the job spine
         const BROWSER_PREVIEWABLE = new Set([
           "image/jpeg",
           "image/png",
