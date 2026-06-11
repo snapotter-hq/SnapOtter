@@ -1,5 +1,23 @@
+import { detectModalityFromMime, type Modality } from "@snapotter/shared";
 import { create } from "zustand";
 import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
+
+export type PreviewKind = "image" | "video" | "audio" | "document" | "none";
+
+export function previewKindFor(modality: Modality): PreviewKind {
+  switch (modality) {
+    case "image":
+      return "image";
+    case "video":
+      return "video";
+    case "audio":
+      return "audio";
+    case "document":
+      return "document";
+    default:
+      return "none";
+  }
+}
 
 export interface FileEntry {
   file: File;
@@ -15,6 +33,8 @@ export interface FileEntry {
   status: "pending" | "processing" | "completed" | "failed";
   error: string | null;
   serverFileId?: string;
+  modality: Modality;
+  previewKind: PreviewKind;
 }
 
 // ---------------------------------------------------------------------------
@@ -22,6 +42,7 @@ export interface FileEntry {
 // ---------------------------------------------------------------------------
 
 function createEntry(file: File): FileEntry {
+  const modality = detectModalityFromMime(file.type);
   return {
     file,
     blobUrl: URL.createObjectURL(file),
@@ -36,6 +57,8 @@ function createEntry(file: File): FileEntry {
     status: "pending",
     error: null,
     serverFileId: undefined,
+    modality,
+    previewKind: previewKindFor(modality),
   };
 }
 
