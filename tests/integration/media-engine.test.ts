@@ -33,6 +33,23 @@ describe.skipIf(!ffmpegAvailable())("media-engine (requires ffmpeg)", () => {
     }
   });
 
+  it("fails cleanly when onProgress throws", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "media-engine-"));
+    try {
+      const out = join(dir, "out.mp4");
+      await expect(
+        runFfmpeg(["-i", FIXTURE, "-c:v", "libx264", "-preset", "ultrafast", out], {
+          timeoutMs: 60_000,
+          onProgress: () => {
+            throw new Error("callback boom");
+          },
+        }),
+      ).rejects.toThrow("callback boom");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects on abort", async () => {
     const dir = mkdtempSync(join(tmpdir(), "media-engine-"));
     try {

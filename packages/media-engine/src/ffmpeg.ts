@@ -56,7 +56,12 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
         if (lineEnd === -1) break;
         const block = buffer.slice(0, lineEnd);
         buffer = buffer.slice(lineEnd + 1);
-        opts.onProgress?.(parseProgressBlock(block));
+        try {
+          opts.onProgress?.(parseProgressBlock(block));
+        } catch (cbErr) {
+          fail(cbErr instanceof Error ? cbErr : new Error(String(cbErr)));
+          return;
+        }
         idx = buffer.indexOf("progress=");
       }
     });
@@ -64,12 +69,12 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       stderrTail = (stderrTail + chunk.toString("utf8")).slice(-STDERR_RING_MAX);
     });
     child.on("error", (err) => fail(err));
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       cleanup();
       if (code === 0) resolvePromise();
-      else reject(new Error(`ffmpeg exited ${code}: ${stderrTail.slice(-2000)}`));
+      else reject(new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail.slice(-2000)}`));
     });
   });
 }

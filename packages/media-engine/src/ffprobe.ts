@@ -60,12 +60,12 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
       clearTimeout(timer);
       reject(e);
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (code === 0) resolvePromise(out);
-      else reject(new Error(`ffprobe exited ${code}: ${err.slice(-1000)}`));
+      else reject(new Error(`ffprobe exited ${code ?? signal}: ${err.slice(-1000)}`));
     });
   });
   const parsed = JSON.parse(stdout) as {
