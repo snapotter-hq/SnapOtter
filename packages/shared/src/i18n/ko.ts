@@ -279,6 +279,10 @@ export const ko: TranslationKeys = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "word-to-pdf": {
+      name: "Word to PDF",
+      description: "Convert Word documents to PDF",
+    },
     pipeline: { name: "Pipeline 빌더", description: "여러 도구를 워크플로로 연결" },
     processing: { canceled: "Processing canceled" },
     mediaPlayer: {
@@ -1329,6 +1333,11 @@ export const ko: TranslationKeys = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "word-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
   },
   urlImport: {

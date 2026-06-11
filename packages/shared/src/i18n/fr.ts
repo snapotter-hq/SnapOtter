@@ -330,6 +330,10 @@ export const fr: TranslationKeys = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "word-to-pdf": {
+      name: "Word to PDF",
+      description: "Convert Word documents to PDF",
+    },
     pipeline: {
       name: "Constructeur de Pipeline",
       description: "Enchainez plusieurs outils dans un flux de travail",
@@ -1392,6 +1396,11 @@ export const fr: TranslationKeys = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "word-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
   },
   urlImport: {

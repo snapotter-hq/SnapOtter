@@ -279,6 +279,10 @@ export const zhCN: TranslationKeys = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "word-to-pdf": {
+      name: "Word to PDF",
+      description: "Convert Word documents to PDF",
+    },
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
     processing: { canceled: "Processing canceled" },
     mediaPlayer: {
@@ -1321,6 +1325,11 @@ export const zhCN: TranslationKeys = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "word-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
   },
   urlImport: {

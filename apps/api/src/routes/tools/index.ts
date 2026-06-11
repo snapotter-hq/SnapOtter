@@ -67,6 +67,7 @@ import { registerVectorize } from "./vectorize.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkText } from "./watermark-text.js";
+import { registerWordToPdf } from "./word-to-pdf.js";
 
 /**
  * Registry that imports and registers all tool routes.
@@ -168,6 +169,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "split-pdf", register: registerSplitPdf },
     { id: "compress-pdf", register: registerCompressPdf },
     { id: "rotate-pdf", register: registerRotatePdf },
+    { id: "word-to-pdf", register: registerWordToPdf },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

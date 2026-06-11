@@ -745,6 +745,17 @@ export const TOOLS: Tool[] = [
     acceptedInputs: [".pdf"],
     executionHint: "fast",
   },
+  {
+    id: "word-to-pdf",
+    name: "Word to PDF",
+    description: "Convert Word documents to PDF",
+    category: "documents",
+    icon: "FileText",
+    route: "/word-to-pdf",
+    modality: "document",
+    acceptedInputs: [".docx", ".doc", ".odt", ".rtf", ".txt"],
+    executionHint: "long",
+  },
 ];
 
 export const SOCIAL_MEDIA_PRESETS: SocialMediaPreset[] = [

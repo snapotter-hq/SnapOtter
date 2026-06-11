@@ -284,6 +284,10 @@ export const en = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "word-to-pdf": {
+      name: "Word to PDF",
+      description: "Convert Word documents to PDF",
+    },
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
     processing: { canceled: "Processing canceled" },
     mediaPlayer: {
@@ -1336,6 +1340,11 @@ export const en = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "word-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
   },
   urlImport: {
