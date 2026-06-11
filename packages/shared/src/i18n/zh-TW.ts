@@ -1444,6 +1444,10 @@ export const zhTW: TranslationKeys = {
       maxSplitGrid: "最大分割格線",
       maxPdfPages: "最大PDF頁數",
       sessionDuration: "工作階段時長",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "安全性",

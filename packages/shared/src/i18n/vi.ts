@@ -1514,6 +1514,10 @@ export const vi: TranslationKeys = {
       maxSplitGrid: "Lưới tách tối đa",
       maxPdfPages: "Số trang PDF tối đa",
       sessionDuration: "Thời lượng phiên",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Bảo mật",

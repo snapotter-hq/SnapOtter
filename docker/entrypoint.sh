@@ -126,7 +126,7 @@ if [ "$(id -u)" = "0" ]; then
   fi
 
   # Ensure all writable subdirectories exist before chown
-  mkdir -p /data/files /data/ai/models /data/ai/pip-cache /data/ai/venv /tmp/workspace
+  mkdir -p /data/files /data/logs /data/ai/models /data/ai/pip-cache /data/ai/venv /tmp/workspace
 
   # Chown writable directories (/data is the persistent volume, /tmp/workspace is ephemeral).
   # /app and /opt/venv are read-only at runtime -- no chown needed.

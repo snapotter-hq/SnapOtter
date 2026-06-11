@@ -1472,6 +1472,10 @@ export const ja: TranslationKeys = {
       maxSplitGrid: "最大分割グリッド",
       maxPdfPages: "最大PDFページ数",
       sessionDuration: "セッション期間",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "セキュリティ",

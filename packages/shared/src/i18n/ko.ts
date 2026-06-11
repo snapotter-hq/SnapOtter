@@ -1457,6 +1457,10 @@ export const ko: TranslationKeys = {
       maxSplitGrid: "최대 분할 그리드",
       maxPdfPages: "최대 PDF 페이지 수",
       sessionDuration: "세션 기간",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "보안",

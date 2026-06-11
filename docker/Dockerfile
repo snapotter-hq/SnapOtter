@@ -316,6 +316,7 @@ ENV PORT=1349 \
     SESSION_DURATION_HOURS=168 \
     LOGIN_ATTEMPT_LIMIT=30 \
     LOG_LEVEL=info \
+    LOG_DIR=/data/logs \
     TRUST_PROXY=true \
     OIDC_ENABLED=false \
     EXTERNAL_URL= \

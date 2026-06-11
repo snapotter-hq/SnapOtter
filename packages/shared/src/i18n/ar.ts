@@ -1506,6 +1506,10 @@ export const ar: TranslationKeys = {
       maxSplitGrid: "شبكة التقسيم القصوى",
       maxPdfPages: "صفحات PDF القصوى",
       sessionDuration: "مدة الجلسة",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "الأمان",

@@ -1515,6 +1515,10 @@ export const it: TranslationKeys = {
       maxSplitGrid: "Griglia divisione massima",
       maxPdfPages: "Pagine PDF massime",
       sessionDuration: "Durata della sessione",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Sicurezza",

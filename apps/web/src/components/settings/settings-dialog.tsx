@@ -513,6 +513,8 @@ function SystemSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [bundleLoading, setBundleLoading] = useState(false);
+  const [bundleError, setBundleError] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
@@ -695,6 +697,46 @@ function SystemSection() {
             {saveMsg}
           </span>
         )}
+      </div>
+
+      <div className="pt-4 border-t border-border">
+        <SettingRow
+          label={t.settings.system.supportBundleButton}
+          description={t.settings.system.supportBundleDescription}
+        >
+          <button
+            type="button"
+            disabled={bundleLoading}
+            onClick={async () => {
+              setBundleLoading(true);
+              setBundleError(null);
+              try {
+                const res = await fetch("/api/v1/admin/support-bundle", {
+                  headers: formatHeaders(),
+                });
+                if (!res.ok) throw new Error(`${res.status}`);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const cd = res.headers.get("Content-Disposition") || "";
+                const filenameMatch = cd.match(/filename=([^\s;]+)/);
+                a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                setBundleError(t.settings.system.supportBundleFailed);
+              } finally {
+                setBundleLoading(false);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {bundleLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+            {t.settings.system.supportBundleButton}
+          </button>
+        </SettingRow>
+        {bundleError && <p className="text-sm text-destructive mt-2">{bundleError}</p>}
       </div>
     </div>
   );

@@ -1522,6 +1522,10 @@ export const fr: TranslationKeys = {
       maxSplitGrid: "Grille de decoupage maximale",
       maxPdfPages: "Pages PDF maximales",
       sessionDuration: "Duree de la session",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Securite",

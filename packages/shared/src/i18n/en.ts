@@ -1464,6 +1464,10 @@ export const en = {
       maxSplitGrid: "Max Split Grid",
       maxPdfPages: "Max PDF Pages",
       sessionDuration: "Session Duration",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Security",

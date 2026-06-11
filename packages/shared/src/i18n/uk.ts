@@ -1515,6 +1515,10 @@ export const uk: TranslationKeys = {
       maxSplitGrid: "Макс. сітка розділення",
       maxPdfPages: "Макс. сторінок PDF",
       sessionDuration: "Тривалість сесії",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Безпека",

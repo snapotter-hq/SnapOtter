@@ -1517,6 +1517,10 @@ export const nl: TranslationKeys = {
       maxSplitGrid: "Max splitraster",
       maxPdfPages: "Max PDF-pagina's",
       sessionDuration: "Sessieduur",
+      supportBundleButton: "Download Support Bundle",
+      supportBundleDescription:
+        "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
+      supportBundleFailed: "Failed to download support bundle.",
     },
     security: {
       heading: "Beveiliging",
