@@ -1,20 +1,19 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import sharp from "sharp";
 import type { z } from "zod";
 import { env } from "../config.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
 import { trackEvent } from "../lib/analytics.js";
-import { autoOrient } from "../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
-import { validateImageBuffer } from "../lib/file-validation.js";
-import { decodeAnyFormat, decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
-import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { receiveUpload } from "../lib/upload-stream.js";
+import { InputValidationError } from "../modality/contract.js";
+import { inputHandlerFor } from "../modality/input-handler.js";
 import { getAuthUser } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
 
@@ -181,203 +180,136 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       reportProgress(5, "Validating...");
 
-      // Validate the uploaded image
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
+      // Resolve the tool's modality (default "image" for registry-only test tools)
+      const toolMeta = TOOLS.find((t) => t.id === config.toolId);
+      const modality = toolMeta?.modality ?? "image";
 
-      // Decode HEIC/HEIF input via system heif-dec (Sharp's bundled libheif
-      // lacks the HEVC decoder needed for iPhone photos).
-      // The decoded buffer is PNG, so update the filename extension to match.
-      const isHeif = validation.format === "heif";
-      if (isHeif) {
-        reportProgress(10, "Decoding HEIC...");
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        } catch (err) {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
-        }
-      }
-
-      // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools.
-      // The decoded buffer is PNG, so update the filename extension to match.
-      // Pass the original file extension so RAW decoder can use the correct
-      // temp file suffix (e.g. .cr3, .nef) for format identification.
-      if (needsCliDecode(validation.format)) {
-        reportProgress(10, "Decoding...");
-        try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch {
-          try {
-            await sharp(fileBuffer).metadata();
-          } catch (err) {
-            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-            return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-            });
-          }
-        }
-        const ext = filename.match(/\.[^.]+$/)?.[0];
-        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-      }
-
-      // Sanitize SVG input to prevent XXE, SSRF, and script injection
-      const isSvg = validation.format === "svg";
-      if (isSvg) {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
-        }
-      }
-
-      // AVIF can pass metadata validation but fail pixel decode when
-      // Sharp's bundled libheif lacks support for the bitstream version.
-      // A 1x1 resize forces a minimal pixel decode to catch this early.
-      if (validation.format === "avif") {
-        try {
-          await sharp(fileBuffer).resize(1).raw().toBuffer();
-        } catch {
-          try {
-            reportProgress(10, "Decoding...");
-            fileBuffer = await decodeAnyFormat(fileBuffer, "avif");
-            const ext = filename.match(/\.[^.]+$/)?.[0];
-            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-          } catch (fallbackErr) {
-            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-            return reply.status(422).send({
-              error: "Failed to decode AVIF file",
-              details: stripInternalPaths(
-                fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
-              ),
-            });
-          }
-        }
-      }
-
-      // Auto-orient non-SVG images: physically rotate pixels to match
-      // the EXIF orientation tag so the worker sees upright pixels.
-      if (!isSvg) {
-        fileBuffer = await autoOrient(fileBuffer);
-      }
-
-      reportProgress(15, "Preparing...");
-
-      // Parse and validate settings
-      if (settingsRaw && settingsRaw.length > 65536) {
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
-      }
-      let settings: T;
+      // Per-request scratch dir for handlers that need temp files
+      const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
+      await mkdir(scratchDir, { recursive: true });
       try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = config.settingsSchema.safeParse(parsed);
-        if (!result.success) {
+        // Modality-specific input validation and normalization
+        try {
+          const prepared = await inputHandlerFor(modality).prepare(fileBuffer, filename, {
+            scratchDir,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (err) {
+          if (err instanceof InputValidationError) {
+            const body: Record<string, string> = { error: err.message };
+            if (err.details) body.details = err.details;
+            return reply.status(err.statusCode).send(body);
+          }
+          throw err;
+        }
+
+        reportProgress(15, "Preparing...");
+
+        // Parse and validate settings
+        if (settingsRaw && settingsRaw.length > 65536) {
           // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-          return reply.status(400).send({
-            error: "Invalid settings",
-            details: formatZodErrors(result.error.issues),
+          return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
+        }
+        let settings: T;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = config.settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
+            return reply.status(400).send({
+              error: "Invalid settings",
+              details: formatZodErrors(result.error.issues),
+            });
+          }
+          settings = result.data;
+        } catch {
+          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        // Guard: check if the tool's AI feature bundle is installed
+        const bundleId = TOOL_BUNDLE_MAP[config.toolId];
+        if (bundleId && !isToolInstalled(config.toolId)) {
+          const bundle = getBundleForTool(config.toolId);
+          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
+          return reply.status(501).send({
+            error: "Feature not installed",
+            code: "FEATURE_NOT_INSTALLED",
+            feature: bundleId,
+            featureName: bundle?.name ?? bundleId,
+            estimatedSize: bundle?.estimatedSize ?? "unknown",
           });
         }
-        settings = result.data;
-      } catch {
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
 
-      // Guard: check if the tool's AI feature bundle is installed
-      const bundleId = TOOL_BUNDLE_MAP[config.toolId];
-      if (bundleId && !isToolInstalled(config.toolId)) {
-        const bundle = getBundleForTool(config.toolId);
-        // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
-        return reply.status(501).send({
-          error: "Feature not installed",
-          code: "FEATURE_NOT_INSTALLED",
-          feature: bundleId,
-          featureName: bundle?.name ?? bundleId,
-          estimatedSize: bundle?.estimatedSize ?? "unknown",
+        // If decode/orient transformed the buffer or changed the filename,
+        // write the final version so the worker processes the correct data.
+        // Skip re-upload when the buffer is reference-identical to the
+        // originally streamed bytes and the filename hasn't changed.
+        const decodedName = filename;
+        const decodedKey = `uploads/${jobId}/${decodedName}`;
+        if (decodedKey !== inputKey) {
+          await putObject(decodedKey, fileBuffer);
+          inputKey = decodedKey;
+        } else if (fileBuffer !== originalBuffer) {
+          await putObject(inputKey, fileBuffer);
+        }
+
+        const startTime = Date.now();
+
+        // Enqueue for the BullMQ worker
+        await enqueueToolJob({
+          jobId,
+          toolId: config.toolId,
+          userId: getAuthUser(request)?.id ?? null,
+          pool: "image",
+          inputRefs: [inputKey],
+          filename,
+          settings,
+          fileId: fileId ?? undefined,
+          clientJobId: clientJobId ?? undefined,
+          kind: "tool",
         });
-      }
 
-      // If decode/orient transformed the buffer or changed the filename,
-      // write the final version so the worker processes the correct data.
-      // Skip re-upload when the buffer is reference-identical to the
-      // originally streamed bytes and the filename hasn't changed.
-      const decodedName = filename;
-      const decodedKey = `uploads/${jobId}/${decodedName}`;
-      if (decodedKey !== inputKey) {
-        await putObject(decodedKey, fileBuffer);
-        inputKey = decodedKey;
-      } else if (fileBuffer !== originalBuffer) {
-        await putObject(inputKey, fileBuffer);
-      }
+        try {
+          const result = await waitForJob("image", jobId);
+          if (result) {
+            trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
+              tool_id: config.toolId,
+              status: "completed",
+              duration_ms: Date.now() - startTime,
+              category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
+              is_ai_tool: getBundleForTool(config.toolId) !== null,
+            });
 
-      const startTime = Date.now();
-
-      // Enqueue for the BullMQ worker
-      await enqueueToolJob({
-        jobId,
-        toolId: config.toolId,
-        userId: getAuthUser(request)?.id ?? null,
-        pool: "image",
-        inputRefs: [inputKey],
-        filename,
-        settings,
-        fileId: fileId ?? undefined,
-        clientJobId: clientJobId ?? undefined,
-        kind: "tool",
-      });
-
-      try {
-        const result = await waitForJob("image", jobId);
-        if (result) {
+            return reply.send({
+              jobId,
+              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+              previewUrl: result.previewRef ? `/api/v1/download/${jobId}/preview.webp` : undefined,
+              originalSize: result.originalSize,
+              processedSize: result.processedSize,
+              savedFileId: result.savedFileId,
+            });
+          }
+          return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
+        } catch (err) {
           trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
             tool_id: config.toolId,
-            status: "completed",
+            status: "failed",
             duration_ms: Date.now() - startTime,
             category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
             is_ai_tool: getBundleForTool(config.toolId) !== null,
+            error_code: err instanceof Error ? err.constructor.name : "UnknownError",
+            error_message:
+              err instanceof Error ? err.message.slice(0, 200) : "Image processing failed",
           });
-
-          return reply.send({
-            jobId,
-            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
-            previewUrl: result.previewRef ? `/api/v1/download/${jobId}/preview.webp` : undefined,
-            originalSize: result.originalSize,
-            processedSize: result.processedSize,
-            savedFileId: result.savedFileId,
+          return reply.status(422).send({
+            error: "Processing failed",
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
-        return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
-      } catch (err) {
-        trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
-          tool_id: config.toolId,
-          status: "failed",
-          duration_ms: Date.now() - startTime,
-          category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
-          is_ai_tool: getBundleForTool(config.toolId) !== null,
-          error_code: err instanceof Error ? err.constructor.name : "UnknownError",
-          error_message:
-            err instanceof Error ? err.message.slice(0, 200) : "Image processing failed",
-        });
-        return reply.status(422).send({
-          error: "Processing failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+      } finally {
+        await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
     },
   );

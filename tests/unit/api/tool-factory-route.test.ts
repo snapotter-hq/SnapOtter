@@ -103,6 +103,24 @@ vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
   isToolInstalled: vi.fn(() => true),
 }));
 
+// Media/document handlers are loaded transitively via input-handler.ts
+vi.mock("@snapotter/media-engine", () => ({
+  probeMedia: vi.fn(),
+  ffmpegAvailable: vi.fn(() => false),
+  resolveFfmpeg: vi.fn(() => null),
+  resolveFfprobe: vi.fn(() => null),
+}));
+
+vi.mock("@snapotter/doc-engine", () => ({
+  qpdfAvailable: vi.fn(() => false),
+  qpdfCheck: vi.fn(),
+  qpdfPageCount: vi.fn(),
+  sofficeAvailable: vi.fn(() => false),
+  resolveQpdf: vi.fn(() => null),
+  resolveSoffice: vi.fn(() => null),
+  resolveGs: vi.fn(() => null),
+}));
+
 vi.mock("../../../apps/api/src/lib/errors.js", () => ({
   formatZodErrors: (issues: Array<{ message: string }>) => issues.map((i) => i.message).join("; "),
   stripInternalPaths: (msg: string) => msg,
