@@ -29,6 +29,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { resolveConcurrency } from "../lib/env.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
@@ -341,7 +342,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           jobId: progressJobId,
           phase: "failed",
           percent: 0,
-          error: finalError,
+          error: stripInternalPaths(finalError),
         });
       }
     }
