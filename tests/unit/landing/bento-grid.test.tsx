@@ -14,6 +14,10 @@ vi.mock("framer-motion", () => ({
 }));
 
 import { BentoGrid } from "@landing/components/bento-grid";
+import { CATEGORIES, TOOLS } from "@snapotter/shared";
+
+const TOTAL = TOOLS.length;
+const AI_COUNT = TOOLS.filter((t) => t.category === "ai").length;
 
 afterEach(cleanup);
 
@@ -36,12 +40,12 @@ describe("BentoGrid", () => {
   it("shows all tools by default", () => {
     render(<BentoGrid />);
     const text = getCountText();
-    expect(text).toMatch(/Showing 53 of 53 tools/);
+    expect(text).toBe(`Showing ${TOTAL} of ${TOTAL} tools`);
   });
 
   it("renders category filter pills including All", () => {
     render(<BentoGrid />);
-    expect(screen.getByText((_, el) => el?.textContent === "All (53)")).toBeDefined();
+    expect(screen.getByText((_, el) => el?.textContent === `All (${TOTAL})`)).toBeDefined();
     expect(screen.getByText(/Essentials/)).toBeDefined();
     expect(screen.getByText(/AI Tools/)).toBeDefined();
     expect(screen.getByText(/Optimization/)).toBeDefined();
@@ -53,7 +57,7 @@ describe("BentoGrid", () => {
     fireEvent.change(input, { target: { value: "resize" } });
     expect(screen.getByText("Resize")).toBeDefined();
     const text = getCountText();
-    expect(text).toMatch(/Showing \d+ of 53 tools/);
+    expect(text).toMatch(new RegExp(`Showing \\d+ of ${TOTAL} tools`));
     expect(screen.queryByText("OCR / Text Extraction")).toBeNull();
   });
 
@@ -62,7 +66,7 @@ describe("BentoGrid", () => {
     const aiButton = screen.getByText(/AI Tools/);
     fireEvent.click(aiButton);
     const text = getCountText();
-    expect(text).toMatch(/Showing 16 of 53 tools/);
+    expect(text).toBe(`Showing ${AI_COUNT} of ${TOTAL} tools`);
     expect(screen.getByText("Remove Background")).toBeDefined();
     expect(screen.queryByText("Resize")).toBeNull();
   });
@@ -73,7 +77,7 @@ describe("BentoGrid", () => {
     fireEvent.change(input, { target: { value: "xyznonexistent" } });
     expect(screen.getByText("No tools found. Try a different search.")).toBeDefined();
     const text = getCountText();
-    expect(text).toMatch(/Showing 0 of 53 tools/);
+    expect(text).toBe(`Showing 0 of ${TOTAL} tools`);
   });
 
   it("combines search and category filter", () => {
@@ -89,9 +93,9 @@ describe("BentoGrid", () => {
   it("clicking All resets category filter", () => {
     render(<BentoGrid />);
     fireEvent.click(screen.getByText(/AI Tools/));
-    expect(getCountText()).toMatch(/Showing 16 of 53 tools/);
-    fireEvent.click(screen.getByText((_, el) => el?.textContent === "All (53)"));
-    expect(getCountText()).toMatch(/Showing 53 of 53 tools/);
+    expect(getCountText()).toBe(`Showing ${AI_COUNT} of ${TOTAL} tools`);
+    fireEvent.click(screen.getByText((_, el) => el?.textContent === `All (${TOTAL})`));
+    expect(getCountText()).toBe(`Showing ${TOTAL} of ${TOTAL} tools`);
   });
 
   it("renders each tool with name and description", () => {
@@ -100,20 +104,13 @@ describe("BentoGrid", () => {
     expect(screen.getByText("Freeform crop, aspect ratio presets, shape crop")).toBeDefined();
   });
 
-  it("renders all 8 category pills", () => {
+  it("renders all category pills", () => {
     render(<BentoGrid />);
-    const categoryNames = [
-      "Essentials",
-      "Optimization",
-      "Adjustments",
-      "AI Tools",
-      "Watermark & Overlay",
-      "Utilities",
-      "Layout & Composition",
-      "Format & Conversion",
-    ];
-    for (const name of categoryNames) {
-      expect(screen.getByText(new RegExp(name))).toBeDefined();
+    for (const cat of CATEGORIES) {
+      const count = TOOLS.filter((t) => t.category === cat.id).length;
+      expect(
+        screen.getByText((_, el) => el?.textContent === `${cat.name} (${count})`),
+      ).toBeDefined();
     }
   });
 });

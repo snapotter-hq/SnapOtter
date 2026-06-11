@@ -1989,7 +1989,7 @@ export const nl: TranslationKeys = {
       heading: "Over",
       appName: "SnapOtter",
       appDescription:
-        "Een zelf-gehoste, privacy-first beeldverwerkingssuite met 50+ tools. Schalen, comprimeren, converteren, watermerken en je beeldworkflows automatiseren zonder data naar de cloud te sturen.",
+        "Een zelf-gehoste, privacy-first beeldverwerkingssuite met 70+ tools. Schalen, comprimeren, converteren, watermerken en je beeldworkflows automatiseren zonder data naar de cloud te sturen.",
       versionLabel: "Versie:",
       linksHeading: "Links",
       githubLink: "GitHub-repository",
@@ -2035,7 +2035,7 @@ export const nl: TranslationKeys = {
       "Geen limieten. Geen verborgen plafonds.",
       "Werkt volledig offline.",
       "Onbeperkte batchverwerking.",
-      "51 afbeeldingstools.",
+      "70+ tools.",
       "16 AI-modellen. Jouw hardware.",
       "Razendsnel. Gebouwd op Sharp.",
       "Geschikt voor air-gapped netwerken.",

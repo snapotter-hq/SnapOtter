@@ -1912,7 +1912,7 @@ export const zhTW: TranslationKeys = {
       heading: "關於",
       appName: "SnapOtter",
       appDescription:
-        "自架式、隱私優先的影像處理套件，內含53個工具。調整大小、壓縮、轉檔、加入浮水印，自動化影像工作流程，無需將資料傳送到雲端。",
+        "自架式、隱私優先的影像處理套件，內含70+個工具。調整大小、壓縮、轉檔、加入浮水印，自動化影像工作流程，無需將資料傳送到雲端。",
       versionLabel: "版本：",
       linksHeading: "連結",
       githubLink: "GitHub儲存庫",
@@ -1957,7 +1957,7 @@ export const zhTW: TranslationKeys = {
       "無限制，無隱藏上限。",
       "完全離線可用。",
       "無限批次處理。",
-      "53個影像工具。",
+      "70+個影像工具。",
       "15個AI模型，在你的硬體上執行。",
       "極速處理，基於Sharp打造。",
       "支援內網部署。",

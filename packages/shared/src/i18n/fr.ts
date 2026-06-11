@@ -1997,7 +1997,7 @@ export const fr: TranslationKeys = {
       heading: "A propos",
       appName: "SnapOtter",
       appDescription:
-        "Une suite de traitement d'images auto-hebergee, axee sur la confidentialite, avec 53 outils. Redimensionnez, compressez, convertissez, ajoutez des filigranes et automatisez vos flux de travail sans envoyer de donnees vers le cloud.",
+        "Une suite de traitement d'images auto-hebergee, axee sur la confidentialite, avec 70+ outils. Redimensionnez, compressez, convertissez, ajoutez des filigranes et automatisez vos flux de travail sans envoyer de donnees vers le cloud.",
       versionLabel: "Version :",
       linksHeading: "Liens",
       githubLink: "Depot GitHub",
@@ -2045,7 +2045,7 @@ export const fr: TranslationKeys = {
       "Sans limites. Sans plafonds caches.",
       "Fonctionne entierement hors ligne.",
       "Traitement par lot illimite.",
-      "53 outils image.",
+      "70+ outils image.",
       "15 modeles AI. Votre materiel.",
       "Ultra rapide. Propulse par Sharp.",
       "Pret pour les reseaux isoles.",

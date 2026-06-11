@@ -1999,7 +1999,7 @@ export const de: TranslationKeys = {
       heading: "Info",
       appName: "SnapOtter",
       appDescription:
-        "Eine selbst gehostete, datenschutzorientierte Bildverarbeitungssuite mit 53 Werkzeugen. Skalieren, komprimieren, konvertieren, mit Wasserzeichen versehen und Bildablaeufe automatisieren, ohne Daten in die Cloud zu senden.",
+        "Eine selbst gehostete, datenschutzorientierte Bildverarbeitungssuite mit 70+ Werkzeugen. Skalieren, komprimieren, konvertieren, mit Wasserzeichen versehen und Bildablaeufe automatisieren, ohne Daten in die Cloud zu senden.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub-Repository",
@@ -2047,7 +2047,7 @@ export const de: TranslationKeys = {
       "Keine Limits. Keine versteckten Grenzen.",
       "Funktioniert komplett offline.",
       "Unbegrenzte Stapelverarbeitung.",
-      "53 Bildwerkzeuge.",
+      "70+ Bildwerkzeuge.",
       "16 AI-Modelle. Ihre Hardware.",
       "Blitzschnell. Basiert auf Sharp.",
       "Geeignet fuer abgeschottete Netzwerke.",

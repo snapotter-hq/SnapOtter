@@ -1934,7 +1934,7 @@ export const en = {
       heading: "About",
       appName: "SnapOtter",
       appDescription:
-        "A self-hosted, privacy-first image processing suite with 53 tools. Resize, compress, convert, watermark, and automate your image workflows without sending data to the cloud.",
+        "A self-hosted, privacy-first image processing suite with 70+ tools. Resize, compress, convert, watermark, and automate your image workflows without sending data to the cloud.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub Repository",
@@ -1980,7 +1980,7 @@ export const en = {
       "No limits. No hidden caps.",
       "Works fully offline.",
       "Unlimited batch processing.",
-      "53 image tools.",
+      "70+ tools.",
       "16 AI models. Your hardware.",
       "Lightning fast. Built on Sharp.",
       "Air-gapped ready.",
