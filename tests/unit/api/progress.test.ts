@@ -1,8 +1,8 @@
 /**
  * Unit tests for the progress tracking module.
  *
- * Tests updateJobProgress, updateSingleFileProgress, recoverStaleJobs,
- * and the in-memory pub/sub listener system.
+ * Tests updateJobProgress, updateSingleFileProgress, and the
+ * in-memory pub/sub listener system.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,7 +34,6 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 
 import type { JobProgress } from "../../../apps/api/src/routes/progress.js";
 import {
-  recoverStaleJobs,
   updateJobProgress,
   updateSingleFileProgress,
 } from "../../../apps/api/src/routes/progress.js";
@@ -157,12 +156,6 @@ describe("updateSingleFileProgress", () => {
         result: { text: "OCR result" },
       }),
     ).not.toThrow();
-  });
-});
-
-describe("recoverStaleJobs", () => {
-  it("does not throw when called", () => {
-    expect(() => recoverStaleJobs()).not.toThrow();
   });
 });
 

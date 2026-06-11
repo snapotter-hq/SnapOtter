@@ -1,16 +1,12 @@
 /**
  * Unit tests for the createToolRoute factory -- the central route handler
- * that powers all standard tools. Tests the multipart parsing, validation,
- * format decoding, settings validation, output naming, and error handling
- * without spinning up a real Fastify server.
+ * that powers all standard tools. Tests multipart parsing, validation,
+ * settings validation, job enqueue/wait, and error handling without
+ * spinning up a real Fastify server or requiring Postgres/Redis.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
-
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
-}));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
@@ -24,7 +20,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   },
   pool: {},
   closeDb: async () => {},
-  schema: { settings: {}, userFiles: { id: {} } },
+  schema: { settings: {}, userFiles: { id: {} }, jobs: { id: {}, status: {} } },
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -32,7 +28,42 @@ vi.mock("../../../apps/api/src/config.js", () => ({
     WORKSPACE_PATH: "/tmp/test",
     MAX_MEGAPIXELS: 100,
     MAX_SVG_SIZE_MB: 10,
+    MAX_UPLOAD_SIZE_MB: 50,
   },
+}));
+
+vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
+  enqueueToolJob: vi.fn().mockResolvedValue({}),
+  waitForJob: vi.fn().mockResolvedValue({
+    outputRefs: ["outputs/mock-job/result.png"],
+    filename: "result.png",
+    contentType: "image/png",
+    originalSize: 100,
+    processedSize: 80,
+  }),
+}));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+  getObjectBuffer: vi.fn(() => Promise.resolve(Buffer.from("png-data"))),
+  putObject: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
+  receiveUpload: vi.fn((_part: unknown, jobId: string) =>
+    Promise.resolve({
+      key: `uploads/${jobId}/test.png`,
+      filename: "test.png",
+      size: 100,
+    }),
+  ),
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  updateSingleFileProgress: vi.fn(),
+}));
+
+vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
+  getAuthUser: vi.fn(() => null),
 }));
 
 vi.mock("../../../apps/api/src/lib/analytics.js", () => ({
@@ -55,6 +86,7 @@ vi.mock("../../../apps/api/src/lib/filename.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
   decodeToSharpCompat: vi.fn(),
+  decodeAnyFormat: vi.fn(),
   needsCliDecode: vi.fn(() => false),
 }));
 
@@ -65,14 +97,6 @@ vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
 vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
   decompressSvgz: vi.fn((b: Buffer) => b),
   sanitizeSvg: vi.fn((b: Buffer) => b),
-}));
-
-vi.mock("../../../apps/api/src/lib/worker-pool.js", () => ({
-  getWorkerPool: vi.fn(),
-}));
-
-vi.mock("../../../apps/api/src/lib/timeout.js", () => ({
-  computeTimeout: vi.fn(() => 30000),
 }));
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
@@ -88,11 +112,13 @@ vi.mock("sharp", () => ({
   default: vi.fn(() => ({
     metadata: () => Promise.resolve({ width: 100, height: 100 }),
     webp: () => ({ toBuffer: () => Promise.resolve(Buffer.from("webp")) }),
+    resize: () => ({ raw: () => ({ toBuffer: () => Promise.resolve(Buffer.from("raw")) }) }),
   })),
 }));
 
 // ── Imports ─────────────────────────────────────────────────────────────
 
+import { waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
 import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -369,7 +395,7 @@ describe("createToolRoute", () => {
       // This validates the guard code path exists without false positives.
     });
 
-    it("successfully processes a valid image and returns download URL", async () => {
+    it("returns 200 success envelope when waitForJob resolves", async () => {
       const app = createMockApp();
       const id = uniqueId();
       createToolRoute(app as never, makeMockConfig(id));
@@ -386,20 +412,35 @@ describe("createToolRoute", () => {
         expect.objectContaining({
           jobId: expect.any(String),
           downloadUrl: expect.stringContaining("/api/v1/download/"),
-          originalSize: expect.any(Number),
-          processedSize: expect.any(Number),
+          originalSize: 100,
+          processedSize: 80,
         }),
       );
     });
 
-    it("returns 422 when processing throws an error", async () => {
+    it("returns 202 when waitForJob returns null (sync window expired)", async () => {
+      vi.mocked(waitForJob).mockResolvedValueOnce(null);
       const app = createMockApp();
       const id = uniqueId();
-      const config = makeMockConfig(id);
-      (config.process as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Sharp exploded"),
-      );
-      createToolRoute(app as never, config);
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[`/api/v1/tools/${id}`];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ async: true }));
+    });
+
+    it("returns 422 when waitForJob rejects", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
+      const app = createMockApp();
+      const id = uniqueId();
+      createToolRoute(app as never, makeMockConfig(id));
       const handler = app.routes[`/api/v1/tools/${id}`];
       const reply = createMockReply();
       const req = createMockRequest({
@@ -421,8 +462,7 @@ describe("createToolRoute", () => {
     it("uses empty settings when none are provided", async () => {
       const app = createMockApp();
       const id = uniqueId();
-      const config = makeMockConfig(id);
-      createToolRoute(app as never, config);
+      createToolRoute(app as never, makeMockConfig(id));
       const handler = app.routes[`/api/v1/tools/${id}`];
       const reply = createMockReply();
       const req = createMockRequest({
@@ -434,77 +474,6 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: expect.any(String) }),
       );
-    });
-  });
-
-  describe("output filename logic", () => {
-    it("appends toolId suffix when filename unchanged", async () => {
-      const app = createMockApp();
-      const id = uniqueId();
-      const config = makeMockConfig(id);
-      (config.process as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        buffer: Buffer.from("out"),
-        filename: "photo.png",
-        contentType: "image/png",
-      });
-      createToolRoute(app as never, config);
-      const handler = app.routes[`/api/v1/tools/${id}`];
-      const reply = createMockReply();
-      const req = createMockRequest({
-        fileBuffer: Buffer.from("png-data"),
-        filename: "photo.png",
-      });
-
-      await handler(req, reply);
-
-      const sentData = (reply.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(sentData.downloadUrl).toContain(`photo_${id}.png`);
-    });
-
-    it("does not add suffix when tool changes the filename", async () => {
-      const app = createMockApp();
-      const id = uniqueId();
-      const config = makeMockConfig(id);
-      (config.process as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        buffer: Buffer.from("out"),
-        filename: "converted.jpg",
-        contentType: "image/jpeg",
-      });
-      createToolRoute(app as never, config);
-      const handler = app.routes[`/api/v1/tools/${id}`];
-      const reply = createMockReply();
-      const req = createMockRequest({
-        fileBuffer: Buffer.from("png-data"),
-        filename: "photo.png",
-      });
-
-      await handler(req, reply);
-
-      const sentData = (reply.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(sentData.downloadUrl).toContain("converted.jpg");
-    });
-
-    it("fixes extension mismatch between content-type and filename", async () => {
-      const app = createMockApp();
-      const id = uniqueId();
-      const config = makeMockConfig(id);
-      (config.process as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        buffer: Buffer.from("out"),
-        filename: "output.png",
-        contentType: "image/jpeg",
-      });
-      createToolRoute(app as never, config);
-      const handler = app.routes[`/api/v1/tools/${id}`];
-      const reply = createMockReply();
-      const req = createMockRequest({
-        fileBuffer: Buffer.from("png-data"),
-        filename: "input.bmp",
-      });
-
-      await handler(req, reply);
-
-      const sentData = (reply.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(sentData.downloadUrl).toContain(".jpg");
     });
   });
 
