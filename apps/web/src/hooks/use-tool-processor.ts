@@ -252,6 +252,7 @@ export function useToolProcessor(toolId: string) {
             eventSourceRef.current = null;
           }
           if (elapsedRef.current) clearInterval(elapsedRef.current);
+          clearActiveJob();
           useFileStore.getState().updateEntry(capturedIndex, {
             status: "failed",
             error: "Processing timed out",

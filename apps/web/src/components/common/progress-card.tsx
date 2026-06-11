@@ -1,4 +1,5 @@
 import { Loader2, Upload, X } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFileStore } from "@/stores/file-store";
 
@@ -15,6 +16,7 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
   const { t } = useTranslation();
   const activeJobId = useFileStore((s) => s.activeJobId);
   const cancelCurrentJob = useFileStore((s) => s.cancelCurrentJob);
+  const [canceling, setCanceling] = useState(false);
 
   if (!active) return null;
 
@@ -54,8 +56,16 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
       {activeJobId && cancelCurrentJob && (
         <button
           type="button"
-          onClick={() => cancelCurrentJob()}
-          className="w-full py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center gap-1.5 transition-colors"
+          disabled={canceling}
+          onClick={async () => {
+            setCanceling(true);
+            try {
+              await cancelCurrentJob();
+            } finally {
+              setCanceling(false);
+            }
+          }}
+          className="w-full py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <X className="h-3 w-3" />
           {t.common.cancel}
