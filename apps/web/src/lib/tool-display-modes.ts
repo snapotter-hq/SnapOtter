@@ -15,7 +15,9 @@ export type DisplayMode =
   | "interactive-eraser"
   | "interactive-split"
   | "no-dropzone"
-  | "custom-results";
+  | "custom-results"
+  | "media-player"
+  | "document";
 
 export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   // Essentials

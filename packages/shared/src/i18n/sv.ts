@@ -274,6 +274,14 @@ export const sv: TranslationKeys = {
       description: "Kedja samman flera verktyg till ett arbetsflode",
     },
     processing: { canceled: "Processing canceled" },
+    mediaPlayer: {
+      unsupported: "Your browser does not support this media format.",
+    },
+    documentView: {
+      loadFailed: "Failed to load document.",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+    },
   },
   toolSettings: {
     compress: {

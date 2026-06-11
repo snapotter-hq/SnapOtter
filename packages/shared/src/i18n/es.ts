@@ -261,6 +261,14 @@ export const es: TranslationKeys = {
       description: "Encadena multiples herramientas en un flujo de trabajo",
     },
     processing: { canceled: "Processing canceled" },
+    mediaPlayer: {
+      unsupported: "Your browser does not support this media format.",
+    },
+    documentView: {
+      loadFailed: "Failed to load document.",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+    },
   },
   toolSettings: {
     compress: {

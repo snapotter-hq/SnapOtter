@@ -222,6 +222,14 @@ export const zhTW: TranslationKeys = {
     },
     pipeline: { name: "Pipeline建構器", description: "將多個工具串聯為工作流程" },
     processing: { canceled: "Processing canceled" },
+    mediaPlayer: {
+      unsupported: "Your browser does not support this media format.",
+    },
+    documentView: {
+      loadFailed: "Failed to load document.",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+    },
   },
   toolSettings: {
     compress: {

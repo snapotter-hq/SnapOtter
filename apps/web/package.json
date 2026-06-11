@@ -24,6 +24,7 @@
     "konva": "^10",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
+    "pdfjs-dist": "^6.0.227",
     "posthog-js": "^1.377.0",
     "qr-code-styling": "^1.9.2",
     "react": "^19.2.7",

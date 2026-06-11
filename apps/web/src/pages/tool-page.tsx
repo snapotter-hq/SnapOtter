@@ -7,7 +7,7 @@ import {
   FileImage,
   Loader2,
 } from "lucide-react";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Crop } from "react-image-crop";
 import { Link, useParams } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
@@ -40,6 +40,13 @@ import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useQrStore } from "@/stores/qr-store";
 import { useSplitStore } from "@/stores/split-store";
+
+const MediaPlayerView = lazy(() =>
+  import("@/components/tools/media-player-view").then((m) => ({ default: m.MediaPlayerView })),
+);
+const DocumentView = lazy(() =>
+  import("@/components/tools/document-view").then((m) => ({ default: m.DocumentView })),
+);
 
 /** Formats that browsers can render in <img> tags. */
 const BROWSER_PREVIEWABLE_EXTS = new Set([
@@ -466,6 +473,24 @@ export function ToolPage() {
         <div className="text-center text-muted-foreground">
           <p className="text-sm">{t.toolPage.configureAndGenerate}</p>
         </div>
+      );
+    }
+
+    // Media player: native <video>/<audio> element
+    if (displayMode === "media-player" && hasFile) {
+      return (
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <MediaPlayerView />
+        </Suspense>
+      );
+    }
+
+    // Document viewer: pdf.js canvas with pagination
+    if (displayMode === "document" && hasFile) {
+      return (
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <DocumentView />
+        </Suspense>
       );
     }
 

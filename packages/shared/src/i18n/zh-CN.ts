@@ -223,6 +223,14 @@ export const zhCN: TranslationKeys = {
     },
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
     processing: { canceled: "Processing canceled" },
+    mediaPlayer: {
+      unsupported: "Your browser does not support this media format.",
+    },
+    documentView: {
+      loadFailed: "Failed to load document.",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+    },
   },
   toolSettings: {
     compress: {

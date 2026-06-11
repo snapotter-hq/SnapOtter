@@ -228,6 +228,14 @@ export const en = {
     },
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
     processing: { canceled: "Processing canceled" },
+    mediaPlayer: {
+      unsupported: "Your browser does not support this media format.",
+    },
+    documentView: {
+      loadFailed: "Failed to load document.",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+    },
   },
   toolSettings: {
     compress: {
