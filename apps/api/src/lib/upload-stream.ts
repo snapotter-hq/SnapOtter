@@ -1,8 +1,14 @@
 import type { MultipartFile } from "@fastify/multipart";
+import { sanitizeFilename } from "./filename.js";
 import { putObjectStream } from "./object-storage.js";
 
 export interface ReceivedUpload {
   key: string;
+  /**
+   * Canonically sanitized filename (lib/filename.ts), the exact basename
+   * embedded in `key`. Callers MUST use this value when building download
+   * URLs or lookups; do NOT re-sanitize.
+   */
   filename: string;
   size: number;
 }
@@ -16,7 +22,7 @@ export async function receiveUpload(
   jobId: string,
   opts: { maxBytes?: number } = {},
 ): Promise<ReceivedUpload> {
-  const filename = (part.filename || "upload").replace(/[/\\\0]/g, "_");
+  const filename = sanitizeFilename(part.filename || "upload");
   const key = `uploads/${jobId}/${filename}`;
   const size = await putObjectStream(key, part.file, { maxBytes: opts.maxBytes });
   return { key, filename, size };
