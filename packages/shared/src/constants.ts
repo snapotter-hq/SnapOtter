@@ -1,3 +1,4 @@
+import { IMAGE_INPUTS } from "./modality.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -20,6 +21,9 @@ export const TOOLS: Tool[] = [
     category: "essentials",
     icon: "Maximize2",
     route: "/resize",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "crop",
@@ -28,6 +32,9 @@ export const TOOLS: Tool[] = [
     category: "essentials",
     icon: "Crop",
     route: "/crop",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "rotate",
@@ -36,6 +43,9 @@ export const TOOLS: Tool[] = [
     category: "essentials",
     icon: "RotateCw",
     route: "/rotate",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "convert",
@@ -44,6 +54,9 @@ export const TOOLS: Tool[] = [
     category: "essentials",
     icon: "FileOutput",
     route: "/convert",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "compress",
@@ -52,6 +65,9 @@ export const TOOLS: Tool[] = [
     category: "essentials",
     icon: "Minimize2",
     route: "/compress",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // Optimization
   {
@@ -62,6 +78,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "Globe",
     route: "/optimize-for-web",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "strip-metadata",
@@ -70,6 +89,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "ShieldOff",
     route: "/strip-metadata",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "edit-metadata",
@@ -78,6 +100,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "PenLine",
     route: "/edit-metadata",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "bulk-rename",
@@ -86,6 +111,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "FilePen",
     route: "/bulk-rename",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "image-to-pdf",
@@ -94,6 +122,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "FileText",
     route: "/image-to-pdf",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "favicon",
@@ -102,6 +133,9 @@ export const TOOLS: Tool[] = [
     category: "optimization",
     icon: "AppWindow",
     route: "/favicon",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // Adjustments
   {
@@ -111,6 +145,9 @@ export const TOOLS: Tool[] = [
     category: "adjustments",
     icon: "SlidersHorizontal",
     route: "/adjust-colors",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "sharpening",
@@ -119,6 +156,9 @@ export const TOOLS: Tool[] = [
     category: "adjustments",
     icon: "Focus",
     route: "/sharpening",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "replace-color",
@@ -127,6 +167,9 @@ export const TOOLS: Tool[] = [
     category: "adjustments",
     icon: "Pipette",
     route: "/replace-color",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "color-blindness",
@@ -135,6 +178,9 @@ export const TOOLS: Tool[] = [
     category: "adjustments",
     icon: "Eye",
     route: "/color-blindness",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // AI Tools
   {
@@ -144,6 +190,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Eraser",
     route: "/remove-background",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "upscale",
@@ -152,6 +201,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "ZoomIn",
     route: "/upscale",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "erase-object",
@@ -160,6 +212,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Wand",
     route: "/erase-object",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "ocr",
@@ -168,6 +223,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "ScanText",
     route: "/ocr",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "blur-faces",
@@ -176,6 +234,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "EyeOff",
     route: "/blur-faces",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "smart-crop",
@@ -184,6 +245,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Crosshair",
     route: "/smart-crop",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "image-enhancement",
@@ -192,6 +256,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Sparkles",
     route: "/image-enhancement",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "enhance-faces",
@@ -200,6 +267,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "ScanFace",
     route: "/enhance-faces",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "colorize",
@@ -208,6 +278,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Palette",
     route: "/colorize",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "noise-removal",
@@ -216,6 +289,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "AudioLines",
     route: "/noise-removal",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "red-eye-removal",
@@ -224,6 +300,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "ScanEye",
     route: "/red-eye-removal",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "restore-photo",
@@ -232,6 +311,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Undo2",
     route: "/restore-photo",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "passport-photo",
@@ -240,6 +322,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "UserCheck",
     route: "/passport-photo",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "content-aware-resize",
@@ -248,6 +333,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Scaling",
     route: "/content-aware-resize",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "ai-canvas-expand",
@@ -256,6 +344,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "Expand",
     route: "/ai-canvas-expand",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   {
     id: "transparency-fixer",
@@ -264,6 +355,9 @@ export const TOOLS: Tool[] = [
     category: "ai",
     icon: "ShieldCheck",
     route: "/transparency-fixer",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
   },
   // Watermark & Overlay
   {
@@ -273,6 +367,9 @@ export const TOOLS: Tool[] = [
     category: "watermark",
     icon: "Type",
     route: "/watermark-text",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "watermark-image",
@@ -281,6 +378,9 @@ export const TOOLS: Tool[] = [
     category: "watermark",
     icon: "Image",
     route: "/watermark-image",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "text-overlay",
@@ -289,6 +389,9 @@ export const TOOLS: Tool[] = [
     category: "watermark",
     icon: "TextCursorInput",
     route: "/text-overlay",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "compose",
@@ -297,6 +400,9 @@ export const TOOLS: Tool[] = [
     category: "watermark",
     icon: "Layers",
     route: "/compose",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "meme-generator",
@@ -305,6 +411,9 @@ export const TOOLS: Tool[] = [
     category: "watermark",
     icon: "Laugh",
     route: "/meme-generator",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // Utilities
   {
@@ -314,6 +423,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Info",
     route: "/info",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "compare",
@@ -322,6 +434,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Columns2",
     route: "/compare",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "find-duplicates",
@@ -330,6 +445,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Copy",
     route: "/find-duplicates",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "color-palette",
@@ -338,6 +456,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Droplets",
     route: "/color-palette",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "qr-generate",
@@ -346,6 +467,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "QrCode",
     route: "/qr-generate",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "html-to-image",
@@ -354,6 +478,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Globe",
     route: "/html-to-image",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "barcode-read",
@@ -362,6 +489,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "ScanLine",
     route: "/barcode-read",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "image-to-base64",
@@ -370,6 +500,9 @@ export const TOOLS: Tool[] = [
     category: "utilities",
     icon: "Code",
     route: "/image-to-base64",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // Layout & Composition
   {
@@ -379,6 +512,9 @@ export const TOOLS: Tool[] = [
     category: "layout",
     icon: "LayoutGrid",
     route: "/collage",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "stitch",
@@ -387,6 +523,9 @@ export const TOOLS: Tool[] = [
     category: "layout",
     icon: "Columns2",
     route: "/stitch",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "split",
@@ -395,6 +534,9 @@ export const TOOLS: Tool[] = [
     category: "layout",
     icon: "Grid3x3",
     route: "/split",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "border",
@@ -403,6 +545,9 @@ export const TOOLS: Tool[] = [
     category: "layout",
     icon: "Frame",
     route: "/border",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "beautify",
@@ -411,6 +556,9 @@ export const TOOLS: Tool[] = [
     category: "layout",
     icon: "ImagePlus",
     route: "/beautify",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   // Format & Conversion
   {
@@ -420,6 +568,9 @@ export const TOOLS: Tool[] = [
     category: "format",
     icon: "FileImage",
     route: "/svg-to-raster",
+    modality: "image",
+    acceptedInputs: [".svg", ".svgz"],
+    executionHint: "fast",
   },
   {
     id: "vectorize",
@@ -428,6 +579,9 @@ export const TOOLS: Tool[] = [
     category: "format",
     icon: "PenTool",
     route: "/vectorize",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "gif-tools",
@@ -437,6 +591,9 @@ export const TOOLS: Tool[] = [
     category: "format",
     icon: "Film",
     route: "/gif-tools",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
   {
     id: "pdf-to-image",
@@ -445,6 +602,9 @@ export const TOOLS: Tool[] = [
     category: "format",
     icon: "BookImage",
     route: "/pdf-to-image",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
   },
 ];
 

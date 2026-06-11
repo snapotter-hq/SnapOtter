@@ -1,3 +1,5 @@
+import type { Modality } from "./modality.js";
+
 export interface Tool {
   id: string;
   name: string;
@@ -5,6 +7,10 @@ export interface Tool {
   category: ToolCategory;
   icon: string;
   route: string;
+  modality: Modality;
+  acceptedInputs: string[];
+  executionHint: "fast" | "long";
+  maxInputSizeMB?: number;
   shortcut?: string;
   disabled?: boolean;
   experimental?: boolean;
