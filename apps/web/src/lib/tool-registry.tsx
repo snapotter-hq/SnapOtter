@@ -4,6 +4,8 @@
  * Maps each toolId to its settings component, display mode, and capabilities.
  * Adding a new tool means adding one entry here instead of editing a 750-line file.
  */
+
+import { AUDIO_INPUTS, VIDEO_INPUTS } from "@snapotter/shared";
 import type React from "react";
 import { lazy } from "react";
 import type { Crop } from "react-image-crop";
@@ -342,6 +344,46 @@ const ColorBlindnessSettings = lazy(() =>
     default: m.ColorBlindnessSettings,
   })),
 );
+const ConvertVideoSettings = lazy(() =>
+  import("@/components/tools/convert-video-settings").then((m) => ({
+    default: m.ConvertVideoSettings,
+  })),
+);
+const CompressVideoSettings = lazy(() =>
+  import("@/components/tools/compress-video-settings").then((m) => ({
+    default: m.CompressVideoSettings,
+  })),
+);
+const TrimVideoSettings = lazy(() =>
+  import("@/components/tools/trim-video-settings").then((m) => ({
+    default: m.TrimVideoSettings,
+  })),
+);
+const MuteVideoSettings = lazy(() =>
+  import("@/components/tools/mute-video-settings").then((m) => ({
+    default: m.MuteVideoSettings,
+  })),
+);
+const VideoToGifSettings = lazy(() =>
+  import("@/components/tools/video-to-gif-settings").then((m) => ({
+    default: m.VideoToGifSettings,
+  })),
+);
+const ConvertAudioSettings = lazy(() =>
+  import("@/components/tools/convert-audio-settings").then((m) => ({
+    default: m.ConvertAudioSettings,
+  })),
+);
+const TrimAudioSettings = lazy(() =>
+  import("@/components/tools/trim-audio-settings").then((m) => ({
+    default: m.TrimAudioSettings,
+  })),
+);
+const ExtractAudioSettings = lazy(() =>
+  import("@/components/tools/extract-audio-settings").then((m) => ({
+    default: m.ExtractAudioSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -454,6 +496,18 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["transparency-fixer", { Settings: TransparencyFixerSettings }],
   ["content-aware-resize", { Settings: ContentAwareResizeSettings }],
   ["ai-canvas-expand", { Settings: AiCanvasExpandSettings }],
+
+  // Video tools
+  ["convert-video", { accept: VIDEO_INPUTS.join(","), Settings: ConvertVideoSettings }],
+  ["compress-video", { accept: VIDEO_INPUTS.join(","), Settings: CompressVideoSettings }],
+  ["trim-video", { accept: VIDEO_INPUTS.join(","), Settings: TrimVideoSettings }],
+  ["mute-video", { accept: VIDEO_INPUTS.join(","), Settings: MuteVideoSettings }],
+  ["video-to-gif", { accept: VIDEO_INPUTS.join(","), Settings: VideoToGifSettings }],
+
+  // Audio tools
+  ["convert-audio", { accept: AUDIO_INPUTS.join(","), Settings: ConvertAudioSettings }],
+  ["trim-audio", { accept: AUDIO_INPUTS.join(","), Settings: TrimAudioSettings }],
+  ["extract-audio", { accept: VIDEO_INPUTS.join(","), Settings: ExtractAudioSettings }],
 ];
 
 export const toolRegistry = new Map<string, ToolRegistryEntry>(

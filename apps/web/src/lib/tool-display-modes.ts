@@ -90,4 +90,16 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "transparency-fixer": "before-after",
   "content-aware-resize": "side-by-side",
   "ai-canvas-expand": "before-after",
+
+  // Video tools
+  "convert-video": "media-player",
+  "compress-video": "media-player",
+  "trim-video": "media-player",
+  "mute-video": "media-player",
+  "video-to-gif": "side-by-side",
+
+  // Audio tools
+  "convert-audio": "media-player",
+  "trim-audio": "media-player",
+  "extract-audio": "media-player",
 };
