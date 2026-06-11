@@ -80,4 +80,18 @@ describe.skipIf(!qpdfAvailable())("split-pdf (requires qpdf)", () => {
     const entries = zip.getEntries();
     expect(entries.length).toBe(3);
   }, 60_000);
+
+  it("rejects an invalid range at the schema level", async () => {
+    const res = await runTool({ mode: "range", range: "abc;x" });
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toBe("Invalid settings");
+  });
+
+  it("rejects range mode without a range field", async () => {
+    const res = await runTool({ mode: "range" });
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toBe("Invalid settings");
+  });
 });

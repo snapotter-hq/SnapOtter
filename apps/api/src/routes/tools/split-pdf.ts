@@ -10,7 +10,11 @@ import { createToolRoute } from "../tool-factory.js";
 const settingsSchema = z
   .object({
     mode: z.enum(["range", "every"]).default("range"),
-    range: z.string().max(200).optional(),
+    range: z
+      .string()
+      .max(200)
+      .regex(/^[0-9rz][0-9rz,-]*$/i, "Invalid page range")
+      .optional(),
     everyN: z.number().int().min(1).max(500).optional(),
   })
   .refine(

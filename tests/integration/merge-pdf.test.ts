@@ -71,6 +71,7 @@ describe.skipIf(!qpdfAvailable())("merge-pdf (requires qpdf)", () => {
     // with a generic "Processing failed" error (the factory strips internal details)
     expect(res.statusCode).toBe(422);
     const parsed = JSON.parse(res.body);
-    expect(parsed.error).toBeDefined();
+    expect(parsed.error).toBe("Processing failed");
+    expect(parsed.details).toMatch(/at least two/i);
   }, 60_000);
 });
