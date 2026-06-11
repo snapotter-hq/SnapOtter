@@ -13,7 +13,7 @@ import {
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
 } from "../../lib/bg-effects.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -131,7 +131,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       } catch (err) {
         return reply.status(400).send({
           error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
 
@@ -188,7 +188,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
         request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
         return reply.status(422).send({
           error: "Background removal failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
 
@@ -244,7 +244,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       } catch (err) {
         return reply.status(400).send({
           error: "Failed to parse request",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
 
@@ -338,7 +338,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
         request.log.error({ err }, "Effects processing failed");
         return reply.status(422).send({
           error: "Effects processing failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

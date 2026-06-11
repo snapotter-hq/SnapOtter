@@ -8,7 +8,7 @@ import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -188,7 +188,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
       } catch (err) {
         return reply.status(400).send({
           error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
 
@@ -233,7 +233,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         request.log.error({ err, toolId: TOOL_ID }, "Input decoding failed");
         return reply.status(422).send({
           error: "Transparency fix failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
 

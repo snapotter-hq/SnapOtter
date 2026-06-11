@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -26,10 +27,9 @@ const settingsSchema = z.object({
  * Object eraser / inpainting route.
  * Accepts an image and a mask image, erases masked areas using LaMa.
  *
- * NOTE: erase-object requires two file parts (image + mask). The standard
- * AI handler model expects a single input, so this route enqueues as a
- * regular "tool" kind and uses registerToolProcessFn for the worker.
- * The mask is stored as a second inputRef.
+ * Enqueues with kind "ai-tool" and uses registerAiJobHandler for the
+ * worker. The mask is passed as the second entry in inputRefs and read
+ * via getObjectBuffer(data.inputRefs[1]) inside the handler.
  */
 export function registerEraseObject(app: FastifyInstance) {
   app.post("/api/v1/tools/erase-object", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -81,7 +81,7 @@ export function registerEraseObject(app: FastifyInstance) {
     } catch (err) {
       return reply.status(400).send({
         error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
+        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
     }
 
@@ -137,7 +137,7 @@ export function registerEraseObject(app: FastifyInstance) {
       request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
       return reply.status(422).send({
         error: "Object erasing failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
 

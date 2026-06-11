@@ -51,13 +51,23 @@ describe("Tool async window (sync-wait path)", () => {
     const result = JSON.parse(res.body);
 
     // (a) Exactly the legacy envelope keys
-    expect(result.jobId).toBeDefined();
+    const REQUIRED_KEYS = ["jobId", "downloadUrl", "originalSize", "processedSize"];
+    const ALLOWED_KEYS = [...REQUIRED_KEYS, "previewUrl", "savedFileId"];
+    const actualKeys = Object.keys(result);
+
+    // Every required key must be present
+    for (const key of REQUIRED_KEYS) {
+      expect(actualKeys).toContain(key);
+    }
+    // Every key in the response must be in the allowed set
+    for (const key of actualKeys) {
+      expect(ALLOWED_KEYS).toContain(key);
+    }
+
     expect(typeof result.jobId).toBe("string");
-    expect(result.downloadUrl).toBeDefined();
     expect(typeof result.downloadUrl).toBe("string");
     expect(typeof result.originalSize).toBe("number");
     expect(typeof result.processedSize).toBe("number");
-    // previewUrl and savedFileId are optional
     if (result.previewUrl !== undefined) {
       expect(typeof result.previewUrl).toBe("string");
     }
