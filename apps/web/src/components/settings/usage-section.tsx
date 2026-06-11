@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet } from "@/lib/api";
-import { format } from "@/lib/format";
+import { format, formatFileSize } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface UsageData {
@@ -12,13 +12,6 @@ interface UsageData {
   perUser: Array<{ username: string | null; runs: number; bytesIn: string }>;
   durations: Array<{ pool: string; p50Ms: number | null; p95Ms: number | null }>;
   storage: { libraryBytes: string; libraryFiles: number };
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export function UsageSection() {
@@ -94,30 +87,34 @@ export function UsageSection() {
               <p className="text-sm text-muted-foreground">{t.settings.usage.noData}</p>
             ) : (
               <div className="space-y-1.5">
-                {data.jobsPerDay.map((row) => {
-                  const max = Math.max(...data.jobsPerDay.map((r) => r.total), 1);
-                  const pct = (row.total / max) * 100;
-                  return (
-                    <div key={row.day} className="flex items-center gap-3 text-xs">
-                      <span className="w-20 shrink-0 text-muted-foreground font-mono">
-                        {row.day}
-                      </span>
-                      <div className="flex-1 h-5 bg-muted/30 rounded overflow-hidden relative">
-                        <div
-                          className="absolute inset-y-0 start-0 bg-primary/70 rounded"
-                          style={{ width: `${pct}%` }}
-                        />
-                        <span className="absolute inset-y-0 start-0 flex items-center ps-2 text-foreground font-medium z-10">
-                          {row.total}
+                {(() => {
+                  const maxJobsTotal = Math.max(...data.jobsPerDay.map((r) => r.total), 1);
+                  return data.jobsPerDay.map((row) => {
+                    const pct = (row.total / maxJobsTotal) * 100;
+                    return (
+                      <div key={row.day} className="flex items-center gap-3 text-xs">
+                        <span className="w-20 shrink-0 text-muted-foreground font-mono">
+                          {row.day}
+                        </span>
+                        <div className="flex-1 h-5 bg-muted/30 rounded overflow-hidden relative">
+                          <div
+                            className="absolute inset-y-0 start-0 bg-primary/70 rounded"
+                            style={{ width: `${pct}%` }}
+                          />
+                          <span className="absolute inset-y-0 start-0 flex items-center ps-2 text-foreground font-medium z-10">
+                            {row.total}
+                          </span>
+                        </div>
+                        <span className="w-14 shrink-0 text-end text-green-600 dark:text-green-400">
+                          {row.completed}
+                        </span>
+                        <span className="w-10 shrink-0 text-end text-destructive">
+                          {row.failed}
                         </span>
                       </div>
-                      <span className="w-14 shrink-0 text-end text-green-600 dark:text-green-400">
-                        {row.completed}
-                      </span>
-                      <span className="w-10 shrink-0 text-end text-destructive">{row.failed}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-1">
                   <span className="w-20 shrink-0" />
                   <span className="flex-1" />
@@ -137,26 +134,28 @@ export function UsageSection() {
               <p className="text-sm text-muted-foreground">{t.settings.usage.noData}</p>
             ) : (
               <div className="space-y-1.5">
-                {data.topTools.map((row) => {
-                  const max = Math.max(...data.topTools.map((r) => r.runs), 1);
-                  const pct = (row.runs / max) * 100;
-                  return (
-                    <div key={row.toolId} className="flex items-center gap-3 text-xs">
-                      <span className="w-32 shrink-0 text-foreground font-medium truncate">
-                        {row.toolId}
-                      </span>
-                      <div className="flex-1 h-5 bg-muted/30 rounded overflow-hidden relative">
-                        <div
-                          className="absolute inset-y-0 start-0 bg-primary/50 rounded"
-                          style={{ width: `${pct}%` }}
-                        />
+                {(() => {
+                  const maxToolRuns = Math.max(...data.topTools.map((r) => r.runs), 1);
+                  return data.topTools.map((row) => {
+                    const pct = (row.runs / maxToolRuns) * 100;
+                    return (
+                      <div key={row.toolId} className="flex items-center gap-3 text-xs">
+                        <span className="w-32 shrink-0 text-foreground font-medium truncate">
+                          {row.toolId}
+                        </span>
+                        <div className="flex-1 h-5 bg-muted/30 rounded overflow-hidden relative">
+                          <div
+                            className="absolute inset-y-0 start-0 bg-primary/50 rounded"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="w-12 shrink-0 text-end text-muted-foreground font-mono">
+                          {row.runs}
+                        </span>
                       </div>
-                      <span className="w-12 shrink-0 text-end text-muted-foreground font-mono">
-                        {row.runs}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>
@@ -196,7 +195,7 @@ export function UsageSection() {
                         {row.runs}
                       </td>
                       <td className="py-1.5 text-end text-muted-foreground font-mono">
-                        {formatBytes(Number(row.bytesIn))}
+                        {formatFileSize(Number(row.bytesIn))}
                       </td>
                     </tr>
                   ))}
@@ -253,7 +252,7 @@ export function UsageSection() {
               </h4>
               <div className="space-y-2">
                 <p className="text-2xl font-bold text-foreground">
-                  {formatBytes(Number(data.storage.libraryBytes))}
+                  {formatFileSize(Number(data.storage.libraryBytes))}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {format(t.settings.usage.storageFiles, { count: data.storage.libraryFiles })}

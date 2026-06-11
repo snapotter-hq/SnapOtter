@@ -3,15 +3,8 @@ import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-r
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet } from "@/lib/api";
-import { format } from "@/lib/format";
+import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
 
 function formatTimeRemaining(ms: number): string {
   if (ms < 60000) return "Less than a minute left";
@@ -131,7 +124,7 @@ export function AiFeaturesSection() {
 
       {diskUsage !== null && (
         <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-          {format(t.settings.aiFeatures.diskUsage, { size: formatBytes(diskUsage) })}
+          {format(t.settings.aiFeatures.diskUsage, { size: formatFileSize(diskUsage) })}
         </p>
       )}
     </div>
