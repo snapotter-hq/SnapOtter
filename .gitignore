@@ -5,7 +5,7 @@ dist/
 *.db-journal
 *.db-wal
 *.db-shm
-data/
+/data/
 tmp/
 .env
 .env.local
