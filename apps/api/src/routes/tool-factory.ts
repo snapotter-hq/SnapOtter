@@ -24,6 +24,41 @@ export interface ToolProcessCtx {
   report: (percent: number, stage?: string) => void;
 }
 
+// ── V2 process contract (ref-based, multi-input) ──────────────
+
+export interface ToolProcessInputV2 {
+  buffer: Buffer;
+  filename: string;
+  ref: string;
+}
+
+export interface ToolProcessCtxV2 {
+  inputs: ToolProcessInputV2[];
+  settings: unknown;
+  scratchDir: string;
+  signal: AbortSignal;
+  report: (percent: number, stage?: string) => void;
+}
+
+export interface ToolProcessResultV2 {
+  /** Exactly one of buffer | scratchPath must be set. */
+  buffer?: Buffer;
+  scratchPath?: string;
+  filename: string;
+  contentType: string;
+  resultPayload?: Record<string, unknown>;
+  extraOutputs?: Array<{
+    name: string;
+    buffer?: Buffer;
+    scratchPath?: string;
+    contentType: string;
+  }>;
+}
+
+export type ToolProcessV2 = (ctx: ToolProcessCtxV2) => Promise<ToolProcessResultV2>;
+
+// ── Tool route config ─────────────────────────────────────────
+
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
   toolId: string;
@@ -36,6 +71,8 @@ export interface ToolRouteConfig<T> {
     filename: string,
     ctx?: ToolProcessCtx,
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
+  /** Optional v2 process function. When set, the worker calls this instead of the legacy process. */
+  processV2?: ToolProcessV2;
 }
 
 /** Type-erased config stored in the registry (settings type is widened to avoid variance issues). */
@@ -48,6 +85,26 @@ export interface AnyToolRouteConfig {
     filename: string,
     ctx?: ToolProcessCtx,
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
+  processV2?: ToolProcessV2;
+}
+
+// ── Legacy adapter ────────────────────────────────────────────
+
+/**
+ * Wraps a legacy process function as a ToolProcessV2. The first input
+ * is forwarded as the primary buffer/filename; extra inputs are ignored
+ * (legacy tools accept only one input).
+ */
+function adaptLegacyProcess(config: AnyToolRouteConfig): ToolProcessV2 {
+  return async (ctx) => {
+    const primary = ctx.inputs[0];
+    const result = await config.process(primary.buffer, ctx.settings, primary.filename, {
+      signal: ctx.signal,
+      scratchDir: ctx.scratchDir,
+      report: ctx.report,
+    });
+    return { buffer: result.buffer, filename: result.filename, contentType: result.contentType };
+  };
 }
 
 /**
@@ -74,8 +131,12 @@ export function getRegisteredToolIds(): string[] {
  * Register a tool's process function in the pipeline/batch registry
  * without creating an HTTP route. Use this for tools that have their
  * own custom HTTP route but should still be usable in pipelines.
+ *
+ * Resolves processV2: uses the config's processV2 when provided,
+ * otherwise wraps the legacy process function via adaptLegacyProcess.
  */
 export function registerToolProcessFn(config: AnyToolRouteConfig): void {
+  config.processV2 = config.processV2 ?? adaptLegacyProcess(config);
   toolRegistry.set(config.toolId, config);
 }
 
@@ -95,8 +156,11 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
  *   - Response formatting (legacy envelope)
  */
 export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig<T>): void {
-  // Register in the tool registry for batch processing (cast to type-erased form)
-  toolRegistry.set(config.toolId, config as AnyToolRouteConfig);
+  // Register in the tool registry for batch processing (cast to type-erased form).
+  // Resolve processV2 so the worker always has one available.
+  const erased = config as AnyToolRouteConfig;
+  erased.processV2 = erased.processV2 ?? adaptLegacyProcess(erased);
+  toolRegistry.set(config.toolId, erased);
 
   app.post(
     `/api/v1/tools/${config.toolId}`,

@@ -21,7 +21,7 @@
  * are deferred until the final attempt so intermediate retries stay
  * invisible to the client.
  */
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
@@ -32,7 +32,11 @@ import { resolveConcurrency } from "../lib/env.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
-import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
+import {
+  getToolConfig,
+  type ToolProcessCtx,
+  type ToolProcessInputV2,
+} from "../routes/tool-factory.js";
 import { hasAiJobHandler, runAiToolJob } from "./ai-handlers.js";
 import { recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
@@ -123,8 +127,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       })
       .where(eq(schema.jobs.id, jobId));
 
-    // Load input from object storage
-    const inputBuffer = await getObjectBuffer(data.inputRefs[0]);
+    // Load all input refs from object storage. The primary input keeps
+    // the client-facing filename; secondary inputs derive filenames from
+    // their ref basenames.
+    const inputs: ToolProcessInputV2[] = await Promise.all(
+      data.inputRefs.map(async (ref) => ({
+        ref,
+        buffer: await getObjectBuffer(ref),
+        filename: ref.split("/").slice(2).join("/") || data.filename,
+      })),
+    );
+    inputs[0].filename = data.filename; // primary keeps the client-facing name
+    const inputBuffer = inputs[0].buffer; // existing metrics/size/preview paths
 
     // Progress reporter: emits both Redis pub/sub and BullMQ job progress
     const progressJobId = data.clientJobId ?? jobId;
@@ -161,10 +175,45 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     } else {
       const config = getToolConfig(data.toolId);
       if (!config) throw new Error(`No tool config for ${data.toolId}`);
-      const result = await config.process(inputBuffer, data.settings, data.filename, ctx);
-      resultBuffer = result.buffer;
+
+      // Use the resolved v2 process function (adapter or native)
+      if (!config.processV2) throw new Error(`No processV2 for ${data.toolId}`);
+      const result = await config.processV2({
+        inputs,
+        settings: data.settings,
+        scratchDir,
+        signal,
+        report,
+      });
+
+      // Resolve buffer OR scratchPath for the primary output
+      if (result.buffer) {
+        resultBuffer = result.buffer;
+      } else if (result.scratchPath) {
+        resultBuffer = await readFile(result.scratchPath);
+      } else {
+        throw new Error(`Tool ${data.toolId} returned neither buffer nor scratchPath`);
+      }
       resultFilename = result.filename;
       resultContentType = result.contentType;
+      resultPayload = result.resultPayload;
+
+      // Resolve extra outputs with the same buffer/scratchPath duality
+      if (result.extraOutputs) {
+        extraOutputs = await Promise.all(
+          result.extraOutputs.map(async (extra) => {
+            let buf: Buffer;
+            if (extra.buffer) {
+              buf = extra.buffer;
+            } else if (extra.scratchPath) {
+              buf = await readFile(extra.scratchPath);
+            } else {
+              throw new Error(`Extra output "${extra.name}" has neither buffer nor scratchPath`);
+            }
+            return { name: extra.name, buffer: buf, contentType: extra.contentType };
+          }),
+        );
+      }
     }
 
     // Build output name with tool suffix and extension fixup
