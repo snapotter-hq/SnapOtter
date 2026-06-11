@@ -179,6 +179,7 @@ const app = Fastify({
       targets: [
         { target: "pino/file", options: { destination: 1 } },
         {
+          // Rotate at 10 MB, keep 5 files
           target: "pino-roll",
           options: {
             file: join(env.LOG_DIR, "snapotter"),

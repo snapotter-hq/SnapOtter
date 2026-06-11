@@ -56,9 +56,7 @@ export async function queueCounts(): Promise<{
 }
 
 /** Per-pool job counts (for Prometheus metrics). */
-export async function perPoolCounts(): Promise<
-  Record<string, { active: number; waiting: number }>
-> {
+export async function perPoolCounts(): Promise<Record<Pool, { active: number; waiting: number }>> {
   const result: Record<string, { active: number; waiting: number }> = {};
   for (const pool of POOLS) {
     const q = queues.get(pool);

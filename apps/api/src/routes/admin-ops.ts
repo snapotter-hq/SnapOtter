@@ -7,6 +7,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { formatZodErrors } from "../lib/errors.js";
 import { metricsText } from "../lib/metrics.js";
 import { requirePermission } from "../permissions.js";
 
@@ -28,7 +29,11 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
     if (!admin) return;
     const parsed = logLevelSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: "Invalid log level", details: parsed.error.issues });
+      return reply.status(400).send({
+        error: "Invalid log level",
+        code: "VALIDATION_ERROR",
+        details: formatZodErrors(parsed.error.issues),
+      });
     }
     app.log.level = parsed.data.level;
     return { level: app.log.level };

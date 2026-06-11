@@ -66,42 +66,42 @@ describe("GET/POST /api/v1/admin/log-level", () => {
   });
 
   it("POST changes level and GET reflects it", async () => {
-    // POST a new level
-    const postRes = await app.inject({
-      method: "POST",
-      url: "/api/v1/admin/log-level",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": "application/json",
-      },
-      payload: { level: "debug" },
-    });
-    expect(postRes.statusCode).toBe(200);
-    const postBody = JSON.parse(postRes.body);
-    expect(postBody.level).toBe("debug");
+    try {
+      // POST a new level
+      const postRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/log-level",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        payload: { level: "debug" },
+      });
+      expect(postRes.statusCode).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+      expect(postBody.level).toBe("debug");
 
-    // GET should reflect the new level
-    const getRes = await app.inject({
-      method: "GET",
-      url: "/api/v1/admin/log-level",
-      headers: { authorization: `Bearer ${adminToken}` },
-    });
-    expect(getRes.statusCode).toBe(200);
-    const getBody = JSON.parse(getRes.body);
-    expect(getBody.level).toBe("debug");
-
-    // Flip it back
-    const resetRes = await app.inject({
-      method: "POST",
-      url: "/api/v1/admin/log-level",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": "application/json",
-      },
-      payload: { level: "info" },
-    });
-    expect(resetRes.statusCode).toBe(200);
-    expect(JSON.parse(resetRes.body).level).toBe("info");
+      // GET should reflect the new level
+      const getRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/admin/log-level",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(getRes.statusCode).toBe(200);
+      const getBody = JSON.parse(getRes.body);
+      expect(getBody.level).toBe("debug");
+    } finally {
+      // Always restore "info" so other tests are not affected
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/log-level",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        payload: { level: "info" },
+      });
+    }
   });
 
   it("returns 400 for invalid level", async () => {
