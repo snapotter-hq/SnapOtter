@@ -13,6 +13,11 @@ import { env } from "../config.js";
 export interface ObjectInfo {
   key: string;
   size: number;
+  /**
+   * Last-modified time in epoch milliseconds. 0 means UNKNOWN (the S3 backend
+   * cannot cheaply provide directory mtimes): callers MUST NOT time-expire
+   * entries with mtimeMs === 0; resolve their age from the jobs table instead.
+   */
   mtimeMs: number;
 }
 
@@ -161,7 +166,9 @@ export async function deletePrefix(prefix: string): Promise<void> {
 }
 
 export async function listObjects(prefix: string): Promise<ObjectInfo[]> {
-  if (!/^(uploads|outputs)\//.test(prefix)) throw new Error(`Invalid prefix: ${prefix}`);
+  if (!/^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/?$/.test(prefix) || prefix.includes("..")) {
+    throw new Error(`Invalid prefix: ${prefix}`);
+  }
   if (useS3()) {
     const s3 = await getS3();
     return s3.listGenericObjects(prefix);
