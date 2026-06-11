@@ -67,10 +67,6 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
   sanitizeSvg: vi.fn((b: Buffer) => b),
 }));
 
-vi.mock("../../../apps/api/src/lib/workspace.js", () => ({
-  createWorkspace: vi.fn(() => Promise.resolve("/tmp/workspace/job-1")),
-}));
-
 vi.mock("../../../apps/api/src/lib/worker-pool.js", () => ({
   getWorkerPool: vi.fn(),
 }));

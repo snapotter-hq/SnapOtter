@@ -10,7 +10,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { putObject } from "../../lib/object-storage.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const targetSizeSchema = z.object({
@@ -292,18 +292,18 @@ export function registerImageToPdf(app: FastifyInstance) {
       }
 
       let totalProcessedSize = 0;
-      const pdfEntries = new Map<string, Buffer>();
+      const pdfNames: string[] = [];
 
       for (let i = 0; i < imageBuffers.length; i++) {
         const pdfBuffer = await buildPdf([imageBuffers[i]]);
         const baseName = files[i].filename.replace(/\.[^.]+$/, "");
         const pdfName = `${baseName}.pdf`;
         await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
-        pdfEntries.set(pdfName, pdfBuffer);
+        pdfNames.push(pdfName);
         totalProcessedSize += pdfBuffer.length;
       }
 
-      // Build ZIP in memory
+      // Build ZIP by streaming each entry from object storage (O(1-entry) peak)
       const zipFilename = "images.zip";
       const archive = archiver("zip", { zlib: { level: 5 } });
       const zipChunks: Buffer[] = [];
@@ -312,7 +312,8 @@ export function registerImageToPdf(app: FastifyInstance) {
         archive.on("end", resolve);
         archive.on("error", reject);
       });
-      for (const [name, buf] of pdfEntries) {
+      for (const name of pdfNames) {
+        const buf = await getObjectBuffer(`outputs/${jobId}/${name}`);
         archive.append(buf, { name });
       }
       await archive.finalize();

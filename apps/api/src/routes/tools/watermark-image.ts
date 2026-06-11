@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -7,6 +8,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -225,9 +227,6 @@ export function registerWatermarkImage(app: FastifyInstance) {
       const result = await sharp(mainBuffer)
         .composite([{ input: wmBuffer, top, left }])
         .toBuffer();
-
-      const { randomUUID } = await import("node:crypto");
-      const { putObject } = await import("../../lib/object-storage.js");
 
       const jobId = randomUUID();
       await putObject(`outputs/${jobId}/${filename}`, result);
