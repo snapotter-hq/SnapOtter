@@ -514,9 +514,10 @@ async function shutdown(signal: string) {
   }
 
   try {
-    const { shutdownDispatcher } = await import("@snapotter/ai");
+    const { shutdownDispatcher, shutdownDocsDispatcher } = await import("@snapotter/ai");
     shutdownDispatcher();
-    console.log("Python dispatcher shut down");
+    await shutdownDocsDispatcher();
+    console.log("Python dispatchers shut down");
   } catch {
     // AI package may not be available
   }

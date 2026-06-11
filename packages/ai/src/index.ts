@@ -2,9 +2,13 @@ export { removeBackground } from "./background-removal.js";
 export type { DispatcherStatus } from "./bridge.js";
 export {
   getDispatcherStatus,
+  getDocsDispatcher,
   initDispatcher,
   isGpuAvailable,
+  PythonDispatcher,
+  runDocsScript,
   shutdownDispatcher,
+  shutdownDocsDispatcher,
 } from "./bridge.js";
 export { colorize } from "./colorization.js";
 export type { DetectFacesResult, FaceRegion } from "./face-detection.js";

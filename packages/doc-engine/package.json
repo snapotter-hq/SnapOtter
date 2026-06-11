@@ -12,6 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@snapotter/ai": "workspace:*",
     "@snapotter/shared": "workspace:*"
   },
   "devDependencies": {

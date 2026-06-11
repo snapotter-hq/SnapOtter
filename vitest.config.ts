@@ -94,6 +94,7 @@ export default defineConfig({
       "@/components/navbar": path.resolve(__dirname, "apps/landing/src/components/navbar"),
       "@": path.resolve(__dirname, "apps/web/src"),
       "framer-motion": path.join(landingNodeModules, "framer-motion"),
+      "@snapotter/ai": path.resolve(__dirname, "packages/ai/src/index.ts"),
       "@snapotter/enterprise": path.resolve(__dirname, "packages/enterprise/src/index.ts"),
       "@snapotter/image-engine": path.resolve(__dirname, "packages/image-engine/src/index.ts"),
       "@snapotter/media-engine": path.resolve(__dirname, "packages/media-engine/src/index.ts"),

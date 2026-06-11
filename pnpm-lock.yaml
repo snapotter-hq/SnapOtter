@@ -490,6 +490,9 @@ importers:
 
   packages/doc-engine:
     dependencies:
+      '@snapotter/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@snapotter/shared':
         specifier: workspace:*
         version: link:../shared

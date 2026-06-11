@@ -52,6 +52,22 @@ ALLOWED_SCRIPTS = {
 # No path separators, no dots, no spaces, no special characters.
 _SCRIPT_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
+# ── Dispatcher profiles ───────────────────────────────────────────────
+# The "ai" profile (default) uses ALLOWED_SCRIPTS for the full AI tool set
+# and pre-imports heavy ML libraries. The "docs" profile replaces the
+# allowlist with a lean set of document-processing scripts and skips all
+# heavy AI imports so the instance starts fast.
+
+DISPATCHER_PROFILE = os.environ.get("DISPATCHER_PROFILE", "ai")
+
+DOCS_SCRIPTS = {
+    "doc_pagecount",
+    "doc_health",
+}
+
+if DISPATCHER_PROFILE == "docs":
+    ALLOWED_SCRIPTS = DOCS_SCRIPTS
+
 
 INSTALLED_PATH = os.path.join(os.environ.get("DATA_DIR", "/data"), "ai", "installed.json")
 MODELS_DIR = os.path.join(os.environ.get("DATA_DIR", "/data"), "ai", "models")
@@ -85,39 +101,10 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
-# ── basicsr / torchvision compatibility shim ──────────────────────────
-# basicsr 1.4.2 (pulled in by realesrgan) does:
-#   from torchvision.transforms.functional_tensor import rgb_to_grayscale
-# but torchvision >= 0.17 removed the functional_tensor submodule,
-# merging everything into torchvision.transforms.functional.
-# We install a shim module ONCE here so every script in this process
-# benefits, rather than relying on each script to patch individually.
-try:
-    import torchvision.transforms.functional_tensor  # noqa: F401
-except (ImportError, ModuleNotFoundError):
-    try:
-        import types
-        import torchvision.transforms.functional as _F
-        import torchvision.transforms
-
-        _shim = types.ModuleType("torchvision.transforms.functional_tensor")
-        _shim.__getattr__ = lambda name: getattr(_F, name)
-        _shim.rgb_to_grayscale = _F.rgb_to_grayscale
-        sys.modules["torchvision.transforms.functional_tensor"] = _shim
-        torchvision.transforms.functional_tensor = _shim
-        print("[dispatcher] Installed torchvision.transforms.functional_tensor shim",
-              file=sys.stderr, flush=True)
-    except (ImportError, AttributeError):
-        # torchvision not installed yet — shim not needed until
-        # the upscale-enhance bundle is installed.
-        pass
-except Exception:
-    # Catch-all so dispatcher startup is never blocked.
-    pass
-
 # ── Pre-import heavy libraries ──────────────────────────────────────
 # These imports are the main source of cold-start latency.
 # By importing once at startup, subsequent requests skip the import cost.
+# The docs profile skips all of these so it starts lean and fast.
 
 available_modules = {}
 
@@ -129,17 +116,48 @@ def _try_import(name, import_fn):
         print(f"[dispatcher] Module '{name}' not available: {e}", file=sys.stderr, flush=True)
 
 
-_try_import("PIL", lambda: __import__("PIL"))
-_try_import("mediapipe", lambda: __import__("mediapipe"))
-_try_import("numpy", lambda: __import__("numpy"))
-_try_import("gpu", lambda: __import__("gpu"))
+if DISPATCHER_PROFILE == "ai":
+    # ── basicsr / torchvision compatibility shim ──────────────────
+    # basicsr 1.4.2 (pulled in by realesrgan) does:
+    #   from torchvision.transforms.functional_tensor import rgb_to_grayscale
+    # but torchvision >= 0.17 removed the functional_tensor submodule,
+    # merging everything into torchvision.transforms.functional.
+    # We install a shim module ONCE here so every script in this process
+    # benefits, rather than relying on each script to patch individually.
+    try:
+        import torchvision.transforms.functional_tensor  # noqa: F401
+    except (ImportError, ModuleNotFoundError):
+        try:
+            import types
+            import torchvision.transforms.functional as _F
+            import torchvision.transforms
 
-# Heavy ML libraries - import but don't fail if unavailable
-_try_import("rembg", lambda: __import__("rembg"))
+            _shim = types.ModuleType("torchvision.transforms.functional_tensor")
+            _shim.__getattr__ = lambda name: getattr(_F, name)
+            _shim.rgb_to_grayscale = _F.rgb_to_grayscale
+            sys.modules["torchvision.transforms.functional_tensor"] = _shim
+            torchvision.transforms.functional_tensor = _shim
+            print("[dispatcher] Installed torchvision.transforms.functional_tensor shim",
+                  file=sys.stderr, flush=True)
+        except (ImportError, AttributeError):
+            # torchvision not installed yet -- shim not needed until
+            # the upscale-enhance bundle is installed.
+            pass
+    except Exception:
+        # Catch-all so dispatcher startup is never blocked.
+        pass
 
-# Point rembg at the bundled model directory if it exists
-if os.path.isdir(MODELS_DIR):
-    os.environ.setdefault("U2NET_HOME", os.path.join(MODELS_DIR, "rembg"))
+    _try_import("PIL", lambda: __import__("PIL"))
+    _try_import("mediapipe", lambda: __import__("mediapipe"))
+    _try_import("numpy", lambda: __import__("numpy"))
+    _try_import("gpu", lambda: __import__("gpu"))
+
+    # Heavy ML libraries - import but don't fail if unavailable
+    _try_import("rembg", lambda: __import__("rembg"))
+
+    # Point rembg at the bundled model directory if it exists
+    if os.path.isdir(MODELS_DIR):
+        os.environ.setdefault("U2NET_HOME", os.path.join(MODELS_DIR, "rembg"))
 
 
 # ── Script handlers ─────────────────────────────────────────────────
