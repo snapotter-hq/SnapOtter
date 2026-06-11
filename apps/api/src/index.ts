@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
@@ -31,6 +32,7 @@ import {
 import { oidcRoutes } from "./plugins/oidc.js";
 import { registerStatic } from "./plugins/static.js";
 import { registerUpload } from "./plugins/upload.js";
+import { adminOpsRoutes } from "./routes/admin-ops.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { auditLogRoutes } from "./routes/audit-log.js";
@@ -171,7 +173,25 @@ ensureAiDirs();
 recoverInterruptedInstalls();
 
 const app = Fastify({
-  logger: { level: env.LOG_LEVEL },
+  logger: {
+    level: env.LOG_LEVEL,
+    transport: {
+      targets: [
+        { target: "pino/file", options: { destination: 1 } },
+        {
+          target: "pino-roll",
+          options: {
+            file: join(env.LOG_DIR, "snapotter"),
+            extension: ".log",
+            size: "10m",
+            limit: { count: 5 },
+            mkdir: true,
+          },
+        },
+      ],
+    },
+    redact: ["req.headers.authorization", "req.headers.cookie"],
+  },
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,
   trustProxy: env.TRUST_PROXY,
   routerOptions: { maxParamLength: 500 },
@@ -314,6 +334,9 @@ await auditLogRoutes(app);
 
 // Roles management routes
 await rolesRoutes(app);
+
+// Admin ops routes (runtime log level, Prometheus metrics)
+await adminOpsRoutes(app);
 
 // API docs (Scalar)
 await docsRoutes(app);

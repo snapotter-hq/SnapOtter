@@ -48,6 +48,7 @@ import {
 } from "../../apps/api/src/plugins/auth.js";
 import { oidcRoutes } from "../../apps/api/src/plugins/oidc.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
+import { adminOpsRoutes } from "../../apps/api/src/routes/admin-ops.js";
 import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
 import { apiKeyRoutes } from "../../apps/api/src/routes/api-keys.js";
 import { auditLogRoutes } from "../../apps/api/src/routes/audit-log.js";
@@ -172,6 +173,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // Roles management routes
   await rolesRoutes(app);
+
+  // Admin ops routes (runtime log level, Prometheus metrics)
+  await adminOpsRoutes(app);
 
   // Analytics routes
   await analyticsRoutes(app);

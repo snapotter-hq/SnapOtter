@@ -54,3 +54,20 @@ export async function queueCounts(): Promise<{
   }
   return { active, waiting, delayed };
 }
+
+/** Per-pool job counts (for Prometheus metrics). */
+export async function perPoolCounts(): Promise<
+  Record<string, { active: number; waiting: number }>
+> {
+  const result: Record<string, { active: number; waiting: number }> = {};
+  for (const pool of POOLS) {
+    const q = queues.get(pool);
+    if (!q) {
+      result[pool] = { active: 0, waiting: 0 };
+      continue;
+    }
+    const counts = await q.getJobCounts("active", "waiting");
+    result[pool] = { active: counts.active ?? 0, waiting: counts.waiting ?? 0 };
+  }
+  return result;
+}

@@ -29,6 +29,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { resolveConcurrency } from "../lib/env.js";
+import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
 import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
@@ -224,6 +225,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       })
       .where(eq(schema.jobs.id, jobId));
 
+    // Record Prometheus metrics
+    jobsTotal.inc({ pool: data.pool, status: "completed" });
+    jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
     // Emit terminal progress event with legacy result payload
     const legacyResult = buildLegacyResultPayload(jobResult, jobId);
     updateSingleFileProgress({
@@ -255,6 +260,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // emit a terminal SSE frame. The row stays "processing" and the
     // next attempt overwrites startedAt/attempts as usual.
     if (!willRetry) {
+      // Record Prometheus metrics on final attempt only
+      jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
+      jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
       await db
         .update(schema.jobs)
         .set({
