@@ -1,5 +1,6 @@
 import { APP_VERSION, CATEGORIES, SUPPORTED_LOCALES, TOOLS } from "@snapotter/shared";
 import {
+  BarChart3,
   Check,
   Copy,
   Eye,
@@ -40,6 +41,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { OtterLogo } from "../common/otter-logo";
 import { AiFeaturesSection } from "./ai-features-section";
+import { UsageSection } from "./usage-section";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -54,6 +56,7 @@ type Section =
   | "teams"
   | "roles"
   | "audit-log"
+  | "usage"
   | "api-keys"
   | "ai-features"
   | "tools"
@@ -105,6 +108,12 @@ function useNavItems() {
         id: "audit-log",
         label: t.settings.nav.auditLog,
         icon: FileText,
+        requiredPermission: "audit:read",
+      },
+      {
+        id: "usage",
+        label: t.settings.nav.usage,
+        icon: BarChart3,
         requiredPermission: "audit:read",
       },
       { id: "api-keys", label: t.settings.nav.apiKeys, icon: Key },
@@ -204,6 +213,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {section === "teams" && <TeamsSection />}
           {section === "roles" && <RolesSection />}
           {section === "audit-log" && <AuditLogSection />}
+          {section === "usage" && <UsageSection />}
           {section === "api-keys" && <ApiKeysSection />}
           {section === "ai-features" && <AiFeaturesSection />}
           {section === "tools" && <ToolsSection />}
@@ -274,6 +284,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {section === "teams" && <TeamsSection />}
           {section === "roles" && <RolesSection />}
           {section === "audit-log" && <AuditLogSection />}
+          {section === "usage" && <UsageSection />}
           {section === "api-keys" && <ApiKeysSection />}
           {section === "ai-features" && <AiFeaturesSection />}
           {section === "tools" && <ToolsSection />}
