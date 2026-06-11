@@ -111,7 +111,6 @@ export class ImageInputHandler implements InputHandler {
     return {
       buffer: fileBuffer,
       filename: name,
-      changed: fileBuffer !== raw || name !== originalFilename,
     };
   }
 }

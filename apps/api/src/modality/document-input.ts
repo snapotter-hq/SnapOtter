@@ -57,6 +57,6 @@ export class DocumentInputHandler implements InputHandler {
         throw new InputValidationError("File is not a valid Office/EPUB container");
       }
     }
-    return { buffer: raw, filename, changed: false };
+    return { buffer: raw, filename };
   }
 }

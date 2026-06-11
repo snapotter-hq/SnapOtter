@@ -16,7 +16,7 @@ describe.skipIf(!ffmpegAvailable())("MediaInputHandler (requires ffmpeg)", () =>
   it("accepts the mp4 fixture as video", async () => {
     const buf = await readFile(join(process.cwd(), "tests/fixtures/media/tiny.mp4"));
     const out = await new MediaInputHandler("video").prepare(buf, "tiny.mp4", { scratchDir });
-    expect(out.changed).toBe(false);
+    expect(out.buffer).toBe(buf);
   });
 
   it("rejects an audio-only file as video", async () => {
@@ -51,7 +51,7 @@ describe("DocumentInputHandler", () => {
   it.skipIf(!qpdfAvailable())("accepts the 3-page fixture and enforces page caps", async () => {
     const buf = await readFile(join(process.cwd(), "tests/fixtures/test-3page.pdf"));
     const out = await new DocumentInputHandler().prepare(buf, "test.pdf", { scratchDir });
-    expect(out.changed).toBe(false);
+    expect(out.buffer).toBe(buf);
     const { env } = await import("../../apps/api/src/config.js");
     const original = env.MAX_PDF_PAGES;
     (env as Record<string, unknown>).MAX_PDF_PAGES = 2;
@@ -67,6 +67,6 @@ describe("DocumentInputHandler", () => {
   it("accepts the docx fixture container", async () => {
     const buf = await readFile(join(process.cwd(), "tests/fixtures/documents/tiny.docx"));
     const out = await new DocumentInputHandler().prepare(buf, "tiny.docx", { scratchDir });
-    expect(out.changed).toBe(false);
+    expect(out.buffer).toBe(buf);
   });
 });

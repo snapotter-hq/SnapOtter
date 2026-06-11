@@ -55,7 +55,7 @@ export class MediaInputHandler implements InputHandler {
           `Bitrate ${info.bitrateKbps}kbps exceeds the maximum of ${env.MAX_VIDEO_BITRATE_KBPS}kbps`,
         );
       }
-      return { buffer: raw, filename, changed: false };
+      return { buffer: raw, filename };
     } finally {
       await rm(probeDir, { recursive: true, force: true }).catch(() => {});
     }

@@ -9,6 +9,7 @@ export class InputValidationError extends Error {
   details?: string;
   constructor(message: string, statusCode = 400, details?: string) {
     super(message);
+    this.name = "InputValidationError";
     this.statusCode = statusCode;
     if (details !== undefined) this.details = details;
   }
@@ -17,8 +18,6 @@ export class InputValidationError extends Error {
 export interface PreparedInput {
   buffer: Buffer;
   filename: string;
-  /** True when the bytes differ from what was uploaded (re-upload required). */
-  changed: boolean;
 }
 
 /**
