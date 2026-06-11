@@ -15,6 +15,9 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "watermark-text": { text: "Test" },
   "text-overlay": { text: "Test" },
   "passport-photo": { countryCode: "us" },
+  "trim-video": { startS: 0, endS: 5 },
+  "trim-audio": { startS: 0, endS: 5 },
+  "split-pdf": { mode: "range", range: "1" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {

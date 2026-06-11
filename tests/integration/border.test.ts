@@ -870,7 +870,7 @@ describe("Border", () => {
 
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/one image/i);
+    expect(result.error).toMatch(/too many files/i);
   });
 
   // ── Invalid settings JSON ────────────────────────────────────────

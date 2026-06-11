@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
@@ -262,6 +262,22 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
       await mkdir(scratchDir, { recursive: true });
       try {
+        // Reject files whose extension is not in the tool's acceptedInputs.
+        // Image and media modalities validate content via their input handlers
+        // (sharp decode, ffprobe); document/file modalities need an explicit
+        // extension gate because their handlers pass unrecognized types through.
+        const accepted = toolMeta?.acceptedInputs;
+        if (accepted?.length && (modality === "file" || modality === "document")) {
+          for (const upload of received) {
+            const ext = extname(upload.filename).toLowerCase();
+            if (!accepted.includes(ext)) {
+              return reply.status(415).send({
+                error: `Unsupported file type "${ext || "(none)"}" for this tool`,
+              });
+            }
+          }
+        }
+
         // Prepare all files through the modality input handler
         const inputRefs: string[] = [];
         for (let i = 0; i < received.length; i++) {
