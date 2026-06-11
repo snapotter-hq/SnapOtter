@@ -2,19 +2,25 @@
  * Integration tests for the BullMQ job spine.
  *
  * Tests the full enqueue -> worker -> result cycle and cooperative
- * cancellation. Requires the worker runtime (jobs/worker.ts) which
- * lands in Task 6.
- *
- * TODO(P2-T6): unskip when worker lands
+ * cancellation.
  */
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../apps/api/src/db/index.js";
-import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
+import {
+  requestCancel,
+  startCancelListener,
+  stopCancelListener,
+} from "../../apps/api/src/jobs/cancel.js";
 import { enqueueToolJob, waitForJob } from "../../apps/api/src/jobs/enqueue.js";
 import type { ToolJobData, ToolJobResult } from "../../apps/api/src/jobs/types.js";
-import { registerToolProcessFn } from "../../apps/api/src/routes/tool-factory.js";
+import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
+import { putObject } from "../../apps/api/src/lib/object-storage.js";
+import {
+  registerToolProcessFn,
+  type ToolProcessCtx,
+} from "../../apps/api/src/routes/tool-factory.js";
 import { buildTestApp, type TestApp } from "./test-server.js";
 
 // Register test-only tools for the spine tests
@@ -37,7 +43,7 @@ registerToolProcessFn({
     inputBuffer: Buffer,
     _settings: unknown,
     filename: string,
-    ctx?: { signal?: AbortSignal },
+    ctx?: ToolProcessCtx,
   ) => {
     // Simulate slow work that respects cancellation
     for (let i = 0; i < 50; i++) {
@@ -58,24 +64,31 @@ let testApp: TestApp;
 
 beforeAll(async () => {
   testApp = await buildTestApp();
+  await startCancelListener();
+  startWorkers();
 }, 30_000);
 
 afterAll(async () => {
+  await closeWorkers();
+  await stopCancelListener();
   await testApp.cleanup();
 }, 10_000);
 
-// TODO(P2-T6): unskip when worker lands
-describe.skip("Job spine", () => {
+describe("Job spine", () => {
   it("enqueue -> worker -> result round-trip (spine-echo)", async () => {
     const jobId = randomUUID();
     const inputBuffer = Buffer.from("test-image-data");
+
+    // Store input in object storage so the worker can retrieve it
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, inputBuffer);
 
     const data: ToolJobData = {
       jobId,
       toolId: "spine-echo",
       userId: null,
       pool: "image",
-      inputRefs: ["test-ref"],
+      inputRefs: [inputRef],
       filename: "test.png",
       settings: {},
       kind: "tool",
@@ -85,7 +98,8 @@ describe.skip("Job spine", () => {
 
     const result = await waitForJob("image", jobId, 10_000);
     expect(result).not.toBeNull();
-    expect(result!.filename).toBe("test.png");
+    // buildOutputName adds _spine-echo suffix since filename is unchanged
+    expect(result!.filename).toBe("test_spine-echo.png");
     expect(result!.outputRefs.length).toBeGreaterThan(0);
 
     // Verify durable DB row
@@ -104,13 +118,18 @@ describe.skip("Job spine", () => {
 
   it("cancel-active aborts a running job (spine-slow)", async () => {
     const jobId = randomUUID();
+    const inputBuffer = Buffer.from("test-image-data");
+
+    // Store input in object storage
+    const inputRef = `uploads/${jobId}/slow.png`;
+    await putObject(inputRef, inputBuffer);
 
     const data: ToolJobData = {
       jobId,
       toolId: "spine-slow",
       userId: null,
       pool: "image",
-      inputRefs: ["test-ref"],
+      inputRefs: [inputRef],
       filename: "slow.png",
       settings: {},
       kind: "tool",
@@ -118,19 +137,36 @@ describe.skip("Job spine", () => {
 
     await enqueueToolJob(data);
 
-    // Wait a bit for the job to start processing
-    await new Promise((r) => setTimeout(r, 300));
+    // Wait for the worker to pick up the job and start processing.
+    // Poll until the DB row shows "processing" (the worker sets this
+    // before entering the process function).
+    let started = false;
+    for (let i = 0; i < 30; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row?.status === "processing") {
+        started = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(started).toBe(true);
 
     // Request cancellation
     const canceled = await requestCancel(jobId);
     expect(canceled).toBe(true);
 
-    // Wait for the worker to finish aborting
-    await new Promise((r) => setTimeout(r, 1000));
+    // Wait for the worker to finish aborting: poll until the status
+    // moves to a terminal state.
+    let finalStatus = "processing";
+    for (let i = 0; i < 30; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalStatus = row.status;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
 
-    // Verify the job row is canceled
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-    expect(job).toBeDefined();
-    expect(job!.status).toBe("canceled");
+    expect(finalStatus).toBe("canceled");
   });
 });

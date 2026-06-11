@@ -13,6 +13,7 @@ import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents } from "./jobs/enqueue.js";
 import { closeQueues, queueCounts } from "./jobs/queues.js";
+import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { startCleanupCron } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
@@ -425,6 +426,9 @@ if (process.env.NODE_ENV === "production") {
 // Start workspace cleanup cron
 const cleanupCron = await startCleanupCron();
 
+// Start BullMQ worker pools (after route registration so the tool registry is full)
+startWorkers();
+
 // Start
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
@@ -506,8 +510,9 @@ async function shutdown(signal: string) {
     // analytics shutdown is best-effort
   }
 
-  // Close BullMQ resources before database
+  // Close BullMQ resources before database (workers first so no new jobs start)
   try {
+    await closeWorkers();
     await closeFlowProducer();
     await closeQueueEvents();
     await closeQueues();

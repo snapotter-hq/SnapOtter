@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import type { z } from "zod";
-import { db, schema } from "../db/index.js";
+import { autoSaveToLibrary, buildOutputName } from "../jobs/postprocess.js";
 import { trackEvent } from "../lib/analytics.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
@@ -22,6 +21,13 @@ import { getWorkerPool } from "../lib/worker-pool.js";
 import { createWorkspace } from "../lib/workspace.js";
 import { updateSingleFileProgress } from "./progress.js";
 
+/** Context passed to tool process functions for cooperative cancellation, scratch storage, and progress. */
+export interface ToolProcessCtx {
+  signal: AbortSignal;
+  scratchDir: string;
+  report: (percent: number, stage?: string) => void;
+}
+
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
   toolId: string;
@@ -32,6 +38,7 @@ export interface ToolRouteConfig<T> {
     inputBuffer: Buffer,
     settings: T,
     filename: string,
+    ctx?: ToolProcessCtx,
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
 }
 
@@ -43,6 +50,7 @@ export interface AnyToolRouteConfig {
     inputBuffer: Buffer,
     settings: unknown,
     filename: string,
+    ctx?: ToolProcessCtx,
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
 }
 
@@ -354,49 +362,13 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         reportProgress(75, "Saving...");
 
-        // Add a tool-specific suffix to the filename so the download
-        // doesn't silently overwrite the user's original file.
-        // Skip if the tool already changed the filename (e.g. convert, split).
-        if (result.filename === filename) {
-          const ext = extname(filename);
-          const base = ext ? filename.slice(0, -ext.length) : filename;
-          result.filename = `${base}_${config.toolId}${ext}`;
-        }
-
-        // Fix extension mismatch: when the output format differs from the
-        // original (e.g. SVG input -> PNG output), update the filename
-        // extension so the download endpoint serves the correct Content-Type.
-        const CONTENT_TYPE_TO_EXT: Record<string, string> = {
-          "image/jpeg": ".jpg",
-          "image/png": ".png",
-          "image/webp": ".webp",
-          "image/gif": ".gif",
-          "image/tiff": ".tiff",
-          "image/avif": ".avif",
-          "image/svg+xml": ".svg",
-          "image/bmp": ".bmp",
-          "image/heic": ".heic",
-          "image/heif": ".heif",
-          "image/jxl": ".jxl",
-          "image/x-icon": ".ico",
-          "image/vnd.adobe.photoshop": ".psd",
-          "image/x-exr": ".exr",
-          "image/vnd.radiance": ".hdr",
-          "image/x-targa": ".tga",
-          "image/jp2": ".jp2",
-          "image/qoi": ".qoi",
-          "application/postscript": ".eps",
-          "image/vnd.ms-dds": ".dds",
-          "image/x-dpx": ".dpx",
-          "image/fits": ".fits",
-        };
-        const expectedExt = CONTENT_TYPE_TO_EXT[result.contentType];
-        if (expectedExt) {
-          const currentExt = extname(result.filename).toLowerCase();
-          if (currentExt && currentExt !== expectedExt) {
-            result.filename = result.filename.slice(0, -currentExt.length) + expectedExt;
-          }
-        }
+        // Add a tool-specific suffix and fix extension mismatches
+        result.filename = buildOutputName(
+          result.filename,
+          filename,
+          config.toolId,
+          result.contentType,
+        );
 
         // Create workspace and save output
         const jobId = randomUUID();
@@ -453,50 +425,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         reportProgress(95, "Finishing...");
 
         // Auto-save to persistent file store when a fileId is provided
-        let savedFileId: string | undefined;
-        if (fileId) {
-          try {
-            const { saveFile } = await import("../lib/file-storage.js");
-            const [parent] = await db
-              .select()
-              .from(schema.userFiles)
-              .where(eq(schema.userFiles.id, fileId));
-            if (parent) {
-              const newVersion = parent.version + 1;
-              const parentChain: string[] = parent.toolChain ?? [];
-              const newToolChain = [...parentChain, config.toolId];
-              const storedName = await saveFile(result.buffer, result.filename);
-              // Get image dimensions from the processed output
-              let width: number | null = null;
-              let height: number | null = null;
-              try {
-                const meta = await sharp(result.buffer).metadata();
-                width = meta.width ?? null;
-                height = meta.height ?? null;
-              } catch {
-                // dimensions are non-critical
-              }
-              const newId = randomUUID();
-              await db.insert(schema.userFiles).values({
-                id: newId,
-                userId: parent.userId,
-                originalName: result.filename,
-                storedName,
-                mimeType: result.contentType,
-                size: result.buffer.length,
-                width,
-                height,
-                version: newVersion,
-                parentId: fileId,
-                toolChain: newToolChain,
-              });
-              savedFileId = newId;
-            }
-          } catch (saveErr) {
-            // Non-fatal — tool processing already succeeded
-            request.log.warn({ saveErr, fileId }, "Failed to auto-save processed file");
-          }
-        }
+        const savedFileId = await autoSaveToLibrary({
+          fileId: fileId ?? undefined,
+          userId: null,
+          buffer: result.buffer,
+          outName: result.filename,
+          contentType: result.contentType,
+          toolId: config.toolId,
+        });
 
         trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
           tool_id: config.toolId,
