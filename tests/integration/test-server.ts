@@ -93,6 +93,14 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // 3. Public API
 // ---------------------------------------------------------------------------
+
+/**
+ * Pre-ready hooks: test files can push registrars here before calling
+ * buildTestApp(). Each hook receives the Fastify instance and can register
+ * extra routes (createToolRoute, etc.) before app.ready() is called.
+ */
+export const preReadyHooks: Array<(app: ReturnType<typeof Fastify>) => void | Promise<void>> = [];
+
 export interface TestApp {
   app: ReturnType<typeof Fastify>;
   cleanup: () => Promise<void>;
@@ -257,6 +265,12 @@ export async function buildTestApp(): Promise<TestApp> {
       return reply.send({ canceled });
     },
   );
+
+  // Run pre-ready hooks (test files register extra routes here)
+  for (const hook of preReadyHooks) {
+    await hook(app);
+  }
+  preReadyHooks.length = 0;
 
   // Ensure Fastify is ready (all plugins loaded)
   await app.ready();

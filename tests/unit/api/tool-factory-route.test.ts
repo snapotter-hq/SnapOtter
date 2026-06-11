@@ -328,7 +328,7 @@ describe("createToolRoute", () => {
       expect(reply.status).toHaveBeenCalledWith(400);
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: expect.stringContaining("one image at a time"),
+          error: "Too many files (max 1)",
         }),
       );
     });

@@ -12,7 +12,7 @@ import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
-import { receiveUpload } from "../lib/upload-stream.js";
+import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { getAuthUser } from "../plugins/auth.js";
@@ -63,6 +63,12 @@ export type ToolProcessV2 = (ctx: ToolProcessCtxV2) => Promise<ToolProcessResult
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
   toolId: string;
+  /**
+   * How many file parts the route accepts (default 1). Inputs beyond the
+   * first are validated by the same modality handler and appended to
+   * inputRefs in arrival order.
+   */
+  maxInputs?: number;
   /** Zod schema that validates the settings JSON from the request. */
   settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
@@ -79,6 +85,7 @@ export interface ToolRouteConfig<T> {
 /** Type-erased config stored in the registry (settings type is widened to avoid variance issues). */
 export interface AnyToolRouteConfig {
   toolId: string;
+  maxInputs?: number;
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
     inputBuffer: Buffer,
@@ -171,12 +178,13 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const jobId = randomUUID();
+      const maxInputs = config.maxInputs ?? 1;
       let filename = "image";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
       let clientJobId: string | null = null;
       let fileCount = 0;
-      let inputKey: string | null = null;
+      const received: ReceivedUpload[] = [];
 
       // Parse multipart parts (file parts stream to object storage)
       try {
@@ -185,7 +193,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         for await (const part of parts) {
           if (part.type === "file") {
             fileCount++;
-            if (fileCount > 1) {
+            if (fileCount > maxInputs) {
               // Drain remaining parts to avoid hanging the connection
               for await (const _ of part.file) {
                 /* drain */
@@ -196,8 +204,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               maxBytes:
                 env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
             });
-            inputKey = upload.key;
-            filename = upload.filename;
+            received.push(upload);
+            if (fileCount === 1) {
+              filename = upload.filename;
+            }
           } else {
             // Field part
             if (part.fieldname === "settings") {
@@ -221,20 +231,16 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         });
       }
 
-      if (fileCount > 1) {
+      if (fileCount > maxInputs) {
         return reply.status(400).send({
-          error: `This endpoint processes one image at a time. Use /api/v1/tools/${config.toolId}/batch for multiple files.`,
+          error: `Too many files (max ${maxInputs})`,
         });
       }
 
-      // Require a file
-      if (!inputKey) {
+      // Require at least one file
+      if (received.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
       }
-
-      // Read back the uploaded file for validation/decode chain
-      let fileBuffer = await getObjectBuffer(inputKey);
-      const originalBuffer = fileBuffer;
 
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
@@ -256,20 +262,48 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
       await mkdir(scratchDir, { recursive: true });
       try {
-        // Modality-specific input validation and normalization
-        try {
-          const prepared = await inputHandlerFor(modality).prepare(fileBuffer, filename, {
-            scratchDir,
-          });
-          fileBuffer = prepared.buffer;
-          filename = prepared.filename;
-        } catch (err) {
-          if (err instanceof InputValidationError) {
-            const body: Record<string, string> = { error: err.message };
-            if (err.details) body.details = err.details;
-            return reply.status(err.statusCode).send(body);
+        // Prepare all files through the modality input handler
+        const inputRefs: string[] = [];
+        for (let i = 0; i < received.length; i++) {
+          const upload = received[i];
+          let fileBuffer = await getObjectBuffer(upload.key);
+          const originalBuffer = fileBuffer;
+          let fname = upload.filename;
+
+          try {
+            const prepared = await inputHandlerFor(modality).prepare(fileBuffer, fname, {
+              scratchDir,
+            });
+            fileBuffer = prepared.buffer;
+            fname = prepared.filename;
+          } catch (err) {
+            if (err instanceof InputValidationError) {
+              const body: Record<string, string> = { error: err.message };
+              if (err.details) body.details = err.details;
+              return reply.status(err.statusCode).send(body);
+            }
+            throw err;
           }
-          throw err;
+
+          // If decode/orient transformed the buffer or changed the filename,
+          // write the final version so the worker processes the correct data.
+          // Skip re-upload when the buffer is reference-identical to the
+          // originally streamed bytes and the filename hasn't changed.
+          const decodedKey = `uploads/${jobId}/${fname}`;
+          if (decodedKey !== upload.key) {
+            await putObject(decodedKey, fileBuffer);
+            inputRefs.push(decodedKey);
+          } else if (fileBuffer !== originalBuffer) {
+            await putObject(upload.key, fileBuffer);
+            inputRefs.push(upload.key);
+          } else {
+            inputRefs.push(upload.key);
+          }
+
+          // Primary file keeps the existing variable roles
+          if (i === 0) {
+            filename = fname;
+          }
         }
 
         reportProgress(15, "Preparing...");
@@ -310,19 +344,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           });
         }
 
-        // If decode/orient transformed the buffer or changed the filename,
-        // write the final version so the worker processes the correct data.
-        // Skip re-upload when the buffer is reference-identical to the
-        // originally streamed bytes and the filename hasn't changed.
-        const decodedName = filename;
-        const decodedKey = `uploads/${jobId}/${decodedName}`;
-        if (decodedKey !== inputKey) {
-          await putObject(decodedKey, fileBuffer);
-          inputKey = decodedKey;
-        } else if (fileBuffer !== originalBuffer) {
-          await putObject(inputKey, fileBuffer);
-        }
-
         const startTime = Date.now();
         const pool = resolveToolPool(config.toolId);
 
@@ -332,7 +353,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           toolId: config.toolId,
           userId: getAuthUser(request)?.id ?? null,
           pool,
-          inputRefs: [inputKey],
+          inputRefs,
           filename,
           settings,
           fileId: fileId ?? undefined,

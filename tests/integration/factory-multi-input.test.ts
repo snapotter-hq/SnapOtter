@@ -1,0 +1,149 @@
+/**
+ * Integration tests for multi-file upload support via the factory's
+ * maxInputs config. Registers a test tool with maxInputs: 3 that
+ * concatenates all inputs; verifies the HTTP multipart path through
+ * the factory (route registration, file collection, per-file prepare,
+ * inputRefs on the durable row, and the too-many-files rejection).
+ */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../apps/api/src/db/index.js";
+import { createToolRoute } from "../../apps/api/src/routes/tool-factory.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  loginAsAdmin,
+  preReadyHooks,
+  type TestApp,
+} from "./test-server.js";
+
+const PNG = readFileSync(join(__dirname, "..", "fixtures", "test-1x1.png"));
+
+// Minimal schema stand-in that satisfies the factory's safeParse call
+// without pulling in a zod dependency at the test root.
+const emptySchema = {
+  safeParse: (v: unknown) => ({ success: true as const, data: v }),
+  parse: (v: unknown) => v,
+} as never;
+
+// Register the test tool via a pre-ready hook so createToolRoute can
+// call app.post() before Fastify is ready (Fastify forbids late routes).
+preReadyHooks.push((app) => {
+  createToolRoute(app, {
+    toolId: "multi-concat",
+    maxInputs: 3,
+    settingsSchema: emptySchema,
+    process: async () => {
+      throw new Error("legacy path must not run");
+    },
+    processV2: async (ctx) => ({
+      buffer: Buffer.concat(ctx.inputs.map((i) => i.buffer)),
+      filename: "combined.bin",
+      contentType: "application/octet-stream",
+    }),
+  });
+});
+
+let testApp: TestApp;
+let adminToken: string;
+
+beforeAll(async () => {
+  testApp = await buildTestApp();
+  adminToken = await loginAsAdmin(testApp.app);
+}, 30_000);
+
+afterAll(async () => {
+  await testApp.cleanup();
+}, 10_000);
+
+describe("Factory multi-input (maxInputs)", () => {
+  it("accepts 3 files for a maxInputs:3 tool, concatenates, and records 3 inputRefs", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "c.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/multi-concat",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    expect(result.jobId).toBeDefined();
+
+    // Download and verify the output is the concatenation of three PNGs
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const expected = Buffer.concat([PNG, PNG, PNG]);
+    expect(dl.rawPayload.length).toBe(expected.length);
+    expect(dl.rawPayload.equals(expected)).toBe(true);
+
+    // Verify the durable DB row has 3 inputRefs
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, result.jobId));
+    expect(row).toBeDefined();
+    expect(row?.status).toBe("completed");
+    expect(row?.inputRefs).toBeDefined();
+    expect((row?.inputRefs as string[]).length).toBe(3);
+  }, 30_000);
+
+  it("rejects 2 files on a tool without maxInputs (default 1)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 100 }) },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/too many files/i);
+  });
+
+  it("rejects 4 files on a maxInputs:3 tool with the correct limit message", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "c.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "d.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/multi-concat",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toBe("Too many files (max 3)");
+  });
+});
