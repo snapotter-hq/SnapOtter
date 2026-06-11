@@ -21,7 +21,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
-import { updateSingleFileProgress } from "../routes/progress.js";
+import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
 import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
 import { hasAiJobHandler, runAiToolJob } from "./ai-handlers.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
@@ -242,11 +242,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       .where(eq(schema.jobs.id, jobId))
       .catch(() => {});
 
-    // Emit progress event for real failures only. For canceled jobs the
-    // progress persist would map "failed" -> status "failed", overwriting
-    // our authoritative "canceled" status. The SSE endpoint reads the DB
-    // row on reconnect and handles "canceled" as terminal.
-    if (!isCanceled) {
+    if (isCanceled) {
+      // Emit an ephemeral terminal event for live SSE clients. Uses
+      // publishEphemeral to set the terminal replay key without
+      // persisting to the DB row (which stays "canceled").
+      publishEphemeral({
+        jobId: progressJobId,
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: "Canceled",
+      });
+    } else {
       updateSingleFileProgress({
         jobId: progressJobId,
         phase: "failed",

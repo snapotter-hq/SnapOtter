@@ -200,6 +200,30 @@ export function updateSingleFileProgress(progress: Omit<SingleFileProgress, "typ
   publish(event);
 }
 
+/**
+ * Publish a progress event to Redis pub/sub and set the terminal replay
+ * key, but do NOT persist to the durable DB row. Used by the worker's
+ * cancel path so that live SSE clients receive a terminal frame while
+ * the authoritative DB row stays "canceled" (not overwritten to "failed").
+ */
+export function publishEphemeral(
+  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
+): void {
+  const json = JSON.stringify(payload);
+  const isTerminal =
+    payload.type === "single"
+      ? payload.phase === "complete" || payload.phase === "failed"
+      : payload.status === "completed" || payload.status === "failed";
+
+  const announce = isTerminal
+    ? sharedRedis()
+        .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
+        .catch(() => {})
+        .then(() => sharedRedis().publish(progressChannel(), json))
+    : sharedRedis().publish(progressChannel(), json);
+  void Promise.resolve(announce).catch(() => {});
+}
+
 // ── SSE subscriber (module-level, shared across all connections) ─
 
 type FrameCallback = (json: string) => void;

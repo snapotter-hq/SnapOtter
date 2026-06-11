@@ -13,8 +13,9 @@ import {
   startCancelListener,
   stopCancelListener,
 } from "../../apps/api/src/jobs/cancel.js";
+import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
 import { enqueueToolJob, waitForJob } from "../../apps/api/src/jobs/enqueue.js";
-import type { ToolJobData, ToolJobResult } from "../../apps/api/src/jobs/types.js";
+import { bullPrefix, type ToolJobData, type ToolJobResult } from "../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
 import { putObject } from "../../apps/api/src/lib/object-storage.js";
 import {
@@ -168,5 +169,16 @@ describe("Job spine", () => {
     }
 
     expect(finalStatus).toBe("canceled");
+
+    // Verify that a terminal SSE frame is retrievable after cancel.
+    // publishEphemeral should have written the terminal replay key
+    // so reconnecting SSE clients get the frame immediately.
+    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
+    const cached = await sharedRedis().get(terminalKeyName);
+    expect(cached).not.toBeNull();
+    const parsed = JSON.parse(cached!);
+    expect(parsed.phase).toBe("failed");
+    expect(parsed.error).toBe("Canceled");
+    expect(parsed.jobId).toBe(jobId);
   });
 });
