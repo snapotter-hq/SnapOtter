@@ -47,6 +47,10 @@ export const ja: TranslationKeys = {
     utilities: "ユーティリティ",
     layout: "レイアウトと構図",
     format: "フォーマットと変換",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AIツール",
   },
   modalities: {

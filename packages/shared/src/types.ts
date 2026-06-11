@@ -24,7 +24,11 @@ export type ToolCategory =
   | "watermark"
   | "utilities"
   | "layout"
-  | "format";
+  | "format"
+  | "video"
+  | "audio"
+  | "documents"
+  | "data";
 
 export interface CategoryInfo {
   id: ToolCategory;

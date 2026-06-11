@@ -428,7 +428,10 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["favicon", { Settings: FaviconSettings }],
   ["image-to-pdf", { Settings: ImageToPdfSettings }],
   ["optimize-for-web", { Settings: OptimizeForWebSettings }],
-  ["pdf-to-image", { Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview }],
+  [
+    "pdf-to-image",
+    { accept: ".pdf", Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview },
+  ],
 
   // Adjustments extra
   ["replace-color", { Settings: ReplaceColorSettings }],

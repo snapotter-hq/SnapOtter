@@ -18,14 +18,23 @@ describe("modality metadata", () => {
     expect(MODALITY_POOL.file).toBe("docs");
   });
 
-  it("every tool declares modality, acceptedInputs and executionHint", () => {
+  it("every tool declares a valid modality, acceptedInputs and executionHint", () => {
+    const validModalities = ["image", "video", "audio", "document", "file"];
     expect(TOOLS.length).toBeGreaterThanOrEqual(53);
     for (const tool of TOOLS) {
-      expect(tool.modality).toBe("image"); // phase 3: image only
+      expect(validModalities).toContain(tool.modality);
       expect(Array.isArray(tool.acceptedInputs)).toBe(true);
       expect(tool.acceptedInputs.length).toBeGreaterThan(0);
       expect(["fast", "long"]).toContain(tool.executionHint);
     }
+  });
+
+  it("pdf-to-image is a document-modality tool", () => {
+    const pdfToImage = TOOLS.find((t) => t.id === "pdf-to-image");
+    expect(pdfToImage).toBeDefined();
+    expect(pdfToImage!.modality).toBe("document");
+    expect(pdfToImage!.category).toBe("documents");
+    expect(pdfToImage!.acceptedInputs).toEqual([".pdf"]);
   });
 
   it("AI tools are hinted long (except pure-CV ones)", () => {

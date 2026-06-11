@@ -47,6 +47,10 @@ export const ptBR: TranslationKeys = {
     utilities: "Utilitarios",
     layout: "Layout e composicao",
     format: "Formato e conversao",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "Ferramentas de AI",
   },
   modalities: {

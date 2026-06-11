@@ -47,6 +47,10 @@ export const uk: TranslationKeys = {
     utilities: "Утиліти",
     layout: "Компонування та композиція",
     format: "Формат і конвертація",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI-інструменти",
   },
   modalities: {

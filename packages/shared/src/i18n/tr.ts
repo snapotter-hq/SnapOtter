@@ -47,6 +47,10 @@ export const tr: TranslationKeys = {
     utilities: "Yardımcı Araçlar",
     layout: "Düzen ve Kompozisyon",
     format: "Biçim ve Dönüştürme",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI Araçları",
   },
   modalities: {

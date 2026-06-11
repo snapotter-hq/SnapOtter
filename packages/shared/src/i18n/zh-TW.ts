@@ -47,6 +47,10 @@ export const zhTW: TranslationKeys = {
     utilities: "實用工具",
     layout: "版面與構圖",
     format: "格式與轉換",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI工具",
   },
   modalities: {

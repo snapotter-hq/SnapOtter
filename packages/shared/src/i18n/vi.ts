@@ -47,6 +47,10 @@ export const vi: TranslationKeys = {
     utilities: "Tiện ích",
     layout: "Bố cục & Kết hợp",
     format: "Định dạng & Chuyển đổi",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "Công cụ AI",
   },
   modalities: {

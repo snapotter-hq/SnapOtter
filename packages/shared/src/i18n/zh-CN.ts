@@ -47,6 +47,10 @@ export const zhCN: TranslationKeys = {
     utilities: "实用工具",
     layout: "布局与排版",
     format: "格式与转换",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI 工具",
   },
   modalities: {

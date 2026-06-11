@@ -80,7 +80,7 @@ describe("en translation completeness", () => {
     expect(en.features.progressMessages).toHaveLength(30);
   });
 
-  it("has 8 categories", () => {
-    expect(Object.keys(en.categories)).toHaveLength(8);
+  it("has 12 categories", () => {
+    expect(Object.keys(en.categories)).toHaveLength(12);
   });
 });

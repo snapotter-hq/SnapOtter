@@ -47,6 +47,10 @@ export const es: TranslationKeys = {
     utilities: "Utilidades",
     layout: "Diseno y composicion",
     format: "Formato y conversion",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "Herramientas de AI",
   },
   modalities: {

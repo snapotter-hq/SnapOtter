@@ -47,6 +47,10 @@ export const ko: TranslationKeys = {
     utilities: "유틸리티",
     layout: "레이아웃 및 구도",
     format: "포맷 및 변환",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI 도구",
   },
   modalities: {

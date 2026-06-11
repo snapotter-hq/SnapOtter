@@ -47,6 +47,10 @@ export const sv: TranslationKeys = {
     utilities: "Verktyg",
     layout: "Layout & Komposition",
     format: "Format & Konvertering",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI-verktyg",
   },
   modalities: {

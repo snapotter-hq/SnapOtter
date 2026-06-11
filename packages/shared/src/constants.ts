@@ -9,6 +9,10 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "utilities", name: "Utilities", icon: "Wrench", color: "#6366F1" },
   { id: "layout", name: "Layout & Composition", icon: "LayoutGrid", color: "#EC4899" },
   { id: "format", name: "Format & Conversion", icon: "FileType", color: "#14B8A6" },
+  { id: "video", name: "Video", icon: "Video", color: "#EF4444" },
+  { id: "audio", name: "Audio", icon: "AudioLines", color: "#10B981" },
+  { id: "documents", name: "PDF & Documents", icon: "FileText", color: "#8B5CF6" },
+  { id: "data", name: "Data Files", icon: "Table", color: "#F59E0B" },
   { id: "ai", name: "AI Tools", icon: "Sparkles", color: "#F59E0B" },
 ];
 
@@ -599,11 +603,11 @@ export const TOOLS: Tool[] = [
     id: "pdf-to-image",
     name: "PDF to Image",
     description: "Convert PDF pages to images",
-    category: "format",
+    category: "documents",
     icon: "BookImage",
     route: "/pdf-to-image",
-    modality: "image",
-    acceptedInputs: IMAGE_INPUTS,
+    modality: "document",
+    acceptedInputs: [".pdf"],
     executionHint: "fast",
   },
 ];

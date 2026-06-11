@@ -47,6 +47,10 @@ export const hi: TranslationKeys = {
     utilities: "सहायक टूल्स",
     layout: "लेआउट और कंपोज़िशन",
     format: "फॉर्मेट और कन्वर्शन",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI टूल्स",
   },
   modalities: {

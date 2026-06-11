@@ -45,6 +45,10 @@ export const en = {
     utilities: "Utilities",
     layout: "Layout & Composition",
     format: "Format & Conversion",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "AI Tools",
   },
   modalities: {

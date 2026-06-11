@@ -47,6 +47,10 @@ export const ar: TranslationKeys = {
     utilities: "الأدوات المساعدة",
     layout: "التخطيط والتكوين",
     format: "التنسيق والتحويل",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "أدوات AI",
   },
   modalities: {

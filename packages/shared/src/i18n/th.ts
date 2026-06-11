@@ -47,6 +47,10 @@ export const th: TranslationKeys = {
     utilities: "เครื่องมือเสริม",
     layout: "เค้าโครงและการจัดองค์ประกอบ",
     format: "รูปแบบและการแปลง",
+    video: "Video",
+    audio: "Audio",
+    documents: "PDF & Documents",
+    data: "Data Files",
     ai: "เครื่องมือ AI",
   },
   modalities: {
