@@ -149,7 +149,8 @@ function buildPipelineFlowTree(opts: {
     };
   }
 
-  // Finalize parent
+  // Finalize parent: runs on image pool (lightweight DB reads + one object copy;
+  // keeps the flow tree single-queue except batch parents; system pool is reserved for crons + batch manifest assembly)
   const tree: FlowJob = {
     name: "pipeline-finalize",
     queueName: queueName("image"),
@@ -247,7 +248,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
     if (needsCliDecode(validation.format)) {
       try {
-        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+        const fileExt = filename.split(".").pop()?.toLowerCase();
+        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
         const ext = filename.match(/\.[^.]+$/)?.[0];
         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
       } catch (err) {
@@ -786,7 +788,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       if (needsCliDecode(fileValidation.format)) {
         try {
-          processBuffer = await decodeToSharpCompat(processBuffer, fileValidation.format);
+          const fileExt = processFilename.split(".").pop()?.toLowerCase();
+          processBuffer = await decodeToSharpCompat(processBuffer, fileValidation.format, fileExt);
           const ext = processFilename.match(/\.[^.]+$/)?.[0];
           if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
         } catch {
@@ -1024,12 +1027,20 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     archive.pipe(reply.raw);
 
     // Append results from object storage in original upload order
-    for (const entry of successEntries) {
-      const stream = await getObjectStream(entry.outputRef!);
-      archive.append(stream, { name: entry.filename });
-    }
+    try {
+      for (const entry of successEntries) {
+        const stream = await getObjectStream(entry.outputRef!);
+        archive.append(stream, { name: entry.filename });
+      }
 
-    await archive.finalize();
+      await archive.finalize();
+    } catch (err) {
+      request.log.error({ err }, "Failed to stream ZIP entries during pipeline batch processing");
+      archive.abort();
+      if (!reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    }
   });
 
   app.log.info("Pipeline routes registered");

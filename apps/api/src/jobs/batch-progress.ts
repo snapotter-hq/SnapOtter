@@ -50,6 +50,7 @@ export async function recordChildOutcome(
   const completedFiles = doneCount + failedCount;
   const failedFiles = failedCount;
 
+  // SSE errors list is capped at 100 entries to bound frame size; failedFiles counter stays accurate
   const errors: Array<{ filename: string; error: string }> = (
     await r.lrange(`${base}:errors`, 0, 99)
   ).map((e) => JSON.parse(e));

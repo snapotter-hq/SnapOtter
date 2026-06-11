@@ -317,7 +317,11 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   // route; later steps read the previous step's output from the DB.
   if (data.stepIndex !== undefined && data.stepIndex > 0 && data.prevJobId) {
     const [prevRow] = await db
-      .select({ outputRefs: schema.jobs.outputRefs, status: schema.jobs.status })
+      .select({
+        outputRefs: schema.jobs.outputRefs,
+        status: schema.jobs.status,
+        error: schema.jobs.error,
+      })
       .from(schema.jobs)
       .where(eq(schema.jobs.id, data.prevJobId));
 
@@ -325,14 +329,7 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
       // Previous step failed -- propagate the error without processing.
       const prevError =
         prevRow?.status === "failed"
-          ? ((
-              (
-                await db
-                  .select({ error: schema.jobs.error })
-                  .from(schema.jobs)
-                  .where(eq(schema.jobs.id, data.prevJobId))
-              )[0]?.error as { message?: string } | null
-            )?.message ?? "Processing failed")
+          ? ((prevRow.error as { message?: string } | null)?.message ?? "Processing failed")
           : "Previous step has no output";
       await db
         .update(schema.jobs)

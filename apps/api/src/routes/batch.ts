@@ -30,6 +30,7 @@ import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectStream, putObject } from "../lib/object-storage.js";
+import { getAuthUser } from "../plugins/auth.js";
 import { updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
@@ -133,7 +134,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
       // ── Create job ID and initial progress ────────────────────────
       const parentId = clientJobId || randomUUID();
-      const userId = (request as unknown as { user?: { id: string } }).user?.id ?? null;
+      const userId = getAuthUser(request)?.id ?? null;
       const pool: Pool = hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId] ? "ai" : "image";
 
       // Insert the parent row BEFORE updateJobProgress, because the
@@ -199,7 +200,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
         if (!skipPreprocess && needsCliDecode(validation.format)) {
           try {
-            processBuffer = await decodeToSharpCompat(processBuffer, validation.format);
+            const fileExt = processFilename.split(".").pop()?.toLowerCase();
+            processBuffer = await decodeToSharpCompat(processBuffer, validation.format, fileExt);
           } catch {
             try {
               await sharp(processBuffer).metadata();
@@ -403,12 +405,20 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       archive.pipe(reply.raw);
 
       // Append results from object storage in original upload order
-      for (const entry of successEntries) {
-        const stream = await getObjectStream(entry.outputRef!);
-        archive.append(stream, { name: entry.filename });
-      }
+      try {
+        for (const entry of successEntries) {
+          const stream = await getObjectStream(entry.outputRef!);
+          archive.append(stream, { name: entry.filename });
+        }
 
-      await archive.finalize();
+        await archive.finalize();
+      } catch (err) {
+        request.log.error({ err }, "Failed to stream ZIP entries during batch processing");
+        archive.abort();
+        if (!reply.raw.writableEnded) {
+          reply.raw.end();
+        }
+      }
     },
   );
 }
