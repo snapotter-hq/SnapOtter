@@ -19,9 +19,9 @@ const TS = new Set([
 ]);
 // columns storing 0/1 booleans in 1.x
 const BOOL = new Set(["must_change_password", "analytics_enabled", "is_builtin"]);
-// per-table columns whose text-JSON becomes jsonb
+// per-table columns whose values must be cast to jsonb in the INSERT
 const JSONB: Record<string, Set<string>> = {
-  jobs: new Set(["input_files", "settings"]),
+  jobs: new Set(["settings", "input_refs", "output_refs", "progress", "error"]),
   pipelines: new Set(["steps"]),
   api_keys: new Set(["permissions"]),
   roles: new Set(["permissions"]),
@@ -45,6 +45,31 @@ const TABLE_ORDER = [
 function convertRow(table: string, row: SqliteRow): SqliteRow {
   const out: SqliteRow = {};
   for (const [col, raw] of Object.entries(row)) {
+    // Jobs table: remap removed 1.x columns to new spine columns
+    if (table === "jobs") {
+      if (col === "input_files") {
+        // 1.x refs are dead workspace paths; discard content, store empty array
+        out.input_refs = [];
+        continue;
+      }
+      if (col === "output_path") {
+        // Replaced by output_refs; 1.x paths are dead
+        out.output_refs = [];
+        continue;
+      }
+      if (col === "progress") {
+        // real 0-1 becomes jsonb {percent}
+        const p = typeof raw === "number" ? raw : 0;
+        out.progress = { percent: Math.round(p * 100) };
+        continue;
+      }
+      if (col === "error") {
+        // text becomes jsonb {message}
+        out.error = raw ? { message: String(raw) } : null;
+        continue;
+      }
+    }
+
     if (raw === null || raw === undefined) {
       out[col] = null;
     } else if (TS.has(col)) {

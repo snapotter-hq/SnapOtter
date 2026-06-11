@@ -1,15 +1,22 @@
 import {
+  bigint,
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
-  real,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
 
-export const jobStatus = pgEnum("job_status", ["queued", "processing", "completed", "failed"]);
+export const jobStatus = pgEnum("job_status", [
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+  "canceled",
+]);
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -60,20 +67,35 @@ export const settings = pgTable("settings", {
     .$defaultFn(() => new Date()),
 });
 
-export const jobs = pgTable("jobs", {
-  id: text("id").primaryKey(),
-  type: text("type").notNull(),
-  status: jobStatus("status").notNull().default("queued"),
-  progress: real("progress").notNull().default(0),
-  inputFiles: jsonb("input_files").$type<{ totalFiles: number } | unknown[]>().notNull(),
-  outputPath: text("output_path"),
-  settings: jsonb("settings").$type<Record<string, unknown>>(),
-  error: text("error"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-});
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    toolId: text("tool_id"),
+    pool: text("pool"),
+    type: text("type").notNull(),
+    status: jobStatus("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    progress: jsonb("progress").$type<{ percent: number; stage?: string }>(),
+    inputRefs: jsonb("input_refs").$type<string[]>(),
+    outputRefs: jsonb("output_refs").$type<string[]>(),
+    settings: jsonb("settings").$type<Record<string, unknown>>(),
+    error: jsonb("error").$type<{ message: string; details?: unknown }>(),
+    bytesIn: bigint("bytes_in", { mode: "number" }),
+    bytesOut: bigint("bytes_out", { mode: "number" }),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("jobs_created_at_idx").on(table.createdAt),
+    index("jobs_status_idx").on(table.status),
+  ],
+);
 
 export const apiKeys = pgTable("api_keys", {
   id: text("id").primaryKey(),

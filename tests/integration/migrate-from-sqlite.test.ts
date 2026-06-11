@@ -62,6 +62,9 @@ function buildFixtureSqlite(path: string): void {
     "INSERT INTO jobs (id, type, status, progress, input_files, created_at, completed_at) VALUES (?,?,?,?,?,?,?)",
   ).run("j1", "batch", "completed", 1, '["a.png"]', now, null);
   s.prepare(
+    "INSERT INTO jobs (id, type, status, progress, input_files, output_path, error, created_at) VALUES (?,?,?,?,?,?,?,?)",
+  ).run("j2", "single", "failed", 0.5, "[]", "/out/result.png", "Something broke", now);
+  s.prepare(
     "INSERT INTO audit_log (id, actor_username, action, details, created_at) VALUES (?,?,?,?,?)",
   ).run("al1", "alice", "login", null, now);
   s.prepare(
@@ -105,6 +108,18 @@ describe("migrate-from-sqlite", () => {
     expect(setting.value).toBe("not-json-value"); // settings.value stayed text, untouched
     const [job] = (await db.execute(sql`SELECT * FROM jobs WHERE id = 'j1'`)).rows;
     expect(job.completed_at).toBeNull(); // explicit NULL preserved
+    // 1.x progress (real 1.0) became jsonb {percent: 100}
+    expect(job.progress).toEqual({ percent: 100 });
+    // 1.x input_files became input_refs (empty array, dead paths discarded)
+    expect(job.input_refs).toEqual([]);
+    // 1.x error NULL preserved as null
+    expect(job.error).toBeNull();
+    // Verify j2: error text became jsonb, progress 0.5 became {percent: 50}, output_path became output_refs
+    const [job2] = (await db.execute(sql`SELECT * FROM jobs WHERE id = 'j2'`)).rows;
+    expect(job2.progress).toEqual({ percent: 50 });
+    expect(job2.error).toEqual({ message: "Something broke" });
+    expect(job2.input_refs).toEqual([]);
+    expect(job2.output_refs).toEqual([]);
     // audit_log with NULL details
     const alRows = (await db.execute(sql`SELECT * FROM audit_log WHERE id = 'al1'`)).rows;
     expect(alRows).toHaveLength(1);

@@ -74,8 +74,10 @@ function enqueuePersist(jobId: string, fn: () => Promise<void>): void {
 
 async function persistJobProgress(progress: JobProgress): Promise<void> {
   try {
-    const completionRatio =
-      progress.totalFiles > 0 ? progress.completedFiles / progress.totalFiles : 0;
+    const percent =
+      progress.totalFiles > 0
+        ? Math.round((progress.completedFiles / progress.totalFiles) * 100)
+        : 0;
     const [existing] = await db
       .select({ id: schema.jobs.id })
       .from(schema.jobs)
@@ -86,8 +88,8 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
         .update(schema.jobs)
         .set({
           status: progress.status,
-          progress: completionRatio,
-          error: progress.errors.length > 0 ? JSON.stringify(progress.errors) : null,
+          progress: { percent },
+          error: progress.errors.length > 0 ? { message: JSON.stringify(progress.errors) } : null,
           completedAt:
             progress.status === "completed" || progress.status === "failed" ? new Date() : null,
         })
@@ -97,9 +99,9 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
         id: progress.jobId,
         type: "batch",
         status: progress.status,
-        progress: completionRatio,
-        inputFiles: { totalFiles: progress.totalFiles },
-        error: progress.errors.length > 0 ? JSON.stringify(progress.errors) : null,
+        progress: { percent },
+        inputRefs: [],
+        error: progress.errors.length > 0 ? { message: JSON.stringify(progress.errors) } : null,
       });
     }
   } catch {
@@ -117,6 +119,8 @@ async function persistSingleFileProgress(
         : progress.phase === "failed"
           ? "failed"
           : "processing";
+    const progressJsonb: { percent: number; stage?: string } = { percent: progress.percent };
+    if (progress.stage) progressJsonb.stage = progress.stage;
     const [existing] = await db
       .select({ id: schema.jobs.id })
       .from(schema.jobs)
@@ -127,8 +131,8 @@ async function persistSingleFileProgress(
         .update(schema.jobs)
         .set({
           status,
-          progress: progress.percent / 100,
-          error: progress.error ?? null,
+          progress: progressJsonb,
+          error: progress.error ? { message: progress.error } : null,
           completedAt: status === "completed" || status === "failed" ? new Date() : null,
         })
         .where(eq(schema.jobs.id, progress.jobId));
@@ -137,9 +141,9 @@ async function persistSingleFileProgress(
         id: progress.jobId,
         type: "single",
         status,
-        progress: progress.percent / 100,
-        inputFiles: [],
-        error: progress.error ?? null,
+        progress: progressJsonb,
+        inputRefs: [],
+        error: progress.error ? { message: progress.error } : null,
       });
     }
   } catch {
@@ -157,7 +161,7 @@ export async function recoverStaleJobs(): Promise<void> {
       .update(schema.jobs)
       .set({
         status: "failed",
-        error: "Server restarted while job was in progress",
+        error: { message: "Server restarted while job was in progress" },
         completedAt: new Date(),
       })
       .where(eq(schema.jobs.status, "processing"));
@@ -165,7 +169,7 @@ export async function recoverStaleJobs(): Promise<void> {
       .update(schema.jobs)
       .set({
         status: "failed",
-        error: "Server restarted while job was queued",
+        error: { message: "Server restarted while job was queued" },
         completedAt: new Date(),
       })
       .where(eq(schema.jobs.status, "queued"));

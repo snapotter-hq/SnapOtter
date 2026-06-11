@@ -146,7 +146,7 @@ describe("Batch progress tracking", () => {
 
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
-    expect(job?.progress).toBe(1); // 100% complete
+    expect((job?.progress as { percent: number })?.percent).toBe(100);
     expect(job?.completedAt).not.toBeNull();
   });
 
@@ -221,7 +221,8 @@ describe("Batch progress tracking", () => {
     expect(job?.status).toBe("completed");
     // Should have error info for the failed file
     if (job?.error) {
-      const errors = JSON.parse(job?.error);
+      const errorObj = job.error as { message: string };
+      const errors = JSON.parse(errorObj.message);
       expect(errors.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -320,9 +321,11 @@ describe("Job DB record structure", () => {
     expect(job).toBeDefined();
     expect(job?.id).toBe(clientJobId);
     expect(job?.type).toBe("batch");
-    expect(typeof job?.progress).toBe("number");
-    expect(job?.progress).toBeGreaterThanOrEqual(0);
-    expect(job?.progress).toBeLessThanOrEqual(1);
+    const progressObj = job?.progress as { percent: number } | null;
+    expect(progressObj).not.toBeNull();
+    expect(typeof progressObj?.percent).toBe("number");
+    expect(progressObj?.percent).toBeGreaterThanOrEqual(0);
+    expect(progressObj?.percent).toBeLessThanOrEqual(100);
   });
 });
 
@@ -414,7 +417,7 @@ describe("updateJobProgress direct calls", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("processing");
-    expect(job?.progress).toBeCloseTo(0.4, 1); // 2/5
+    expect((job?.progress as { percent: number })?.percent).toBe(40); // 2/5
     expect(job?.type).toBe("batch");
   });
 
@@ -446,7 +449,7 @@ describe("updateJobProgress direct calls", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
-    expect(job?.progress).toBe(1);
+    expect((job?.progress as { percent: number })?.percent).toBe(100);
     expect(job?.completedAt).not.toBeNull();
   });
 
@@ -470,7 +473,8 @@ describe("updateJobProgress direct calls", () => {
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
     expect(job?.error).not.toBeNull();
-    const errors = JSON.parse(job?.error ?? "[]");
+    const errorObj = job?.error as { message: string };
+    const errors = JSON.parse(errorObj.message);
     expect(errors).toHaveLength(2);
   });
 
@@ -489,7 +493,7 @@ describe("updateJobProgress direct calls", () => {
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
-    expect(job?.progress).toBe(0);
+    expect((job?.progress as { percent: number })?.percent).toBe(0);
   });
 });
 
@@ -509,7 +513,9 @@ describe("updateSingleFileProgress direct calls", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("processing");
-    expect(job?.progress).toBeCloseTo(0.5, 1);
+    const p = job?.progress as { percent: number; stage?: string };
+    expect(p?.percent).toBe(50);
+    expect(p?.stage).toBe("encoding");
     expect(job?.type).toBe("single");
   });
 
@@ -526,7 +532,7 @@ describe("updateSingleFileProgress direct calls", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
-    expect(job?.progress).toBe(1);
+    expect((job?.progress as { percent: number })?.percent).toBe(100);
     // completedAt is only set on UPDATE path (not INSERT for new jobs)
     expect(job?.type).toBe("single");
   });
@@ -545,7 +551,7 @@ describe("updateSingleFileProgress direct calls", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
-    expect(job?.error).toBe("Processing timeout");
+    expect((job?.error as { message: string })?.message).toBe("Processing timeout");
     expect(job?.type).toBe("single");
   });
 
@@ -598,7 +604,7 @@ describe("updateSingleFileProgress direct calls", () => {
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
     expect(job?.completedAt).not.toBeNull();
-    expect(job?.error).toBe("Timeout error");
+    expect((job?.error as { message: string })?.message).toBe("Timeout error");
   });
 
   it("updates existing single-file job progress", async () => {
@@ -624,7 +630,7 @@ describe("updateSingleFileProgress direct calls", () => {
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
-    expect(job?.progress).toBeCloseTo(0.75, 1);
+    expect((job?.progress as { percent: number })?.percent).toBe(75);
   });
 });
 
@@ -638,8 +644,8 @@ describe("recoverStaleJobs", () => {
       id: jobId,
       type: "batch",
       status: "processing",
-      progress: 0.5,
-      inputFiles: "[]",
+      progress: { percent: 50 },
+      inputRefs: [],
     });
 
     await recoverStaleJobs();
@@ -647,7 +653,7 @@ describe("recoverStaleJobs", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
-    expect(job?.error).toContain("Server restarted");
+    expect((job?.error as { message: string })?.message).toContain("Server restarted");
     expect(job?.completedAt).not.toBeNull();
   });
 
@@ -658,8 +664,8 @@ describe("recoverStaleJobs", () => {
       id: jobId,
       type: "batch",
       status: "queued",
-      progress: 0,
-      inputFiles: "[]",
+      progress: { percent: 0 },
+      inputRefs: [],
     });
 
     await recoverStaleJobs();
@@ -667,7 +673,7 @@ describe("recoverStaleJobs", () => {
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
-    expect(job?.error).toContain("Server restarted");
+    expect((job?.error as { message: string })?.message).toContain("Server restarted");
   });
 
   it("does not modify completed jobs", async () => {
@@ -677,8 +683,8 @@ describe("recoverStaleJobs", () => {
       id: jobId,
       type: "batch",
       status: "completed",
-      progress: 1,
-      inputFiles: "[]",
+      progress: { percent: 100 },
+      inputRefs: [],
       completedAt: new Date(),
     });
 
@@ -696,9 +702,9 @@ describe("recoverStaleJobs", () => {
       id: jobId,
       type: "batch",
       status: "failed",
-      progress: 0,
-      inputFiles: "[]",
-      error: "Original error",
+      progress: { percent: 0 },
+      inputRefs: [],
+      error: { message: "Original error" },
       completedAt: new Date(),
     });
 
@@ -706,6 +712,6 @@ describe("recoverStaleJobs", () => {
 
     const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     expect(job).toBeDefined();
-    expect(job?.error).toBe("Original error");
+    expect((job?.error as { message: string })?.message).toBe("Original error");
   });
 });
