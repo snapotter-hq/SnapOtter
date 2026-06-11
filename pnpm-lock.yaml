@@ -146,6 +146,9 @@ importers:
       '@snapotter/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@snapotter/doc-engine':
+        specifier: workspace:*
+        version: link:../../packages/doc-engine
       '@snapotter/enterprise':
         specifier: workspace:*
         version: link:../../packages/enterprise
@@ -484,6 +487,19 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/doc-engine:
+    dependencies:
+      '@snapotter/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(terser@5.47.1)(tsx@4.22.4)(yaml@2.8.3)
 
   packages/enterprise:
     dependencies:
