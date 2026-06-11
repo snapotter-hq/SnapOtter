@@ -97,6 +97,7 @@ export function buildSupportBundle(): Readable {
   const archive = archiver("zip", { zlib: { level: 6 } });
 
   archive.pipe(passthrough);
+  archive.on("error", (err) => passthrough.destroy(err));
 
   // Kick off the async assembly without blocking the return.
   // Errors are forwarded to the passthrough so the HTTP layer sees them.

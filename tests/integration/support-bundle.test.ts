@@ -88,6 +88,7 @@ describe("GET /api/v1/admin/support-bundle", () => {
     const failedJobs = JSON.parse(failedBuf.toString("utf-8"));
     expect(Array.isArray(failedJobs)).toBe(true);
     expect(failedJobs.length).toBeGreaterThan(0);
+    expect(failedJobs[0]).toMatchObject({ toolId: "resize", pool: "image" });
 
     // db-counts.json must exist and parse
     expect(entryNames).toContain("db-counts.json");
