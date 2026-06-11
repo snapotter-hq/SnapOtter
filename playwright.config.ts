@@ -121,6 +121,8 @@ export default defineConfig({
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
         DATABASE_URL: e2eDatabaseUrl,
+        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+        BULLMQ_PREFIX: e2eDbName,
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
         DATA_DIR: path.join(__dirname, "test-results", ".e2e-data"),

@@ -13,11 +13,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // above are vitest-only and do not trigger config.ts).
 process.env.JOB_TIMEOUT_FAST_S = "1";
 
-// Isolate this fork's BullMQ queues so parallel forks (e.g. job-spine)
-// don't steal our jobs. Per-fork Redis isolation arrives in a later task;
-// until then, a unique prefix prevents cross-contamination.
-process.env.BULLMQ_PREFIX = `snapotter-timeout-${process.pid}`;
-
 // Dynamic imports so config.ts picks up the 1-second timeout.
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../apps/api/src/db/index.js");

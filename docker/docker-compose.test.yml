@@ -17,9 +17,10 @@ services:
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
       - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
-      # Tells tests/global-setup.ts to use this server instead of spawning a
-      # testcontainer (no docker daemon inside the test container).
+      # Tells tests/global-setup.ts to use these servers instead of spawning
+      # testcontainers (no docker daemon inside the test container).
       - TEST_DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
+      - TEST_REDIS_URL=redis://redis:6379
       - REDIS_URL=redis://redis:6379
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100

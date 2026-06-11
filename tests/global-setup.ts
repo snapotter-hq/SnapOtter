@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
 
 // pg and drizzle-orm live in the api workspace's node_modules. Global-setup
 // files run outside Vite's transform pipeline, so vitest resolve.alias does
@@ -15,6 +16,7 @@ const { migrate } = apiRequire(
 ) as typeof import("drizzle-orm/node-postgres/migrator");
 
 let container: StartedPostgreSqlContainer | undefined;
+let redisContainer: StartedRedisContainer | undefined;
 
 export async function setup(): Promise<void> {
   // Base server: testcontainer by default, or an existing server via
@@ -43,8 +45,18 @@ export async function setup(): Promise<void> {
   } finally {
     await pool.end();
   }
+
+  // Redis server: testcontainer by default, or an existing server via
+  // TEST_REDIS_URL (e.g. inside Docker where testcontainers cannot spawn).
+  if (process.env.TEST_REDIS_URL) {
+    process.env.TEST_REDIS_BASE_URL = process.env.TEST_REDIS_URL;
+  } else {
+    redisContainer = await new RedisContainer("redis:8-alpine").start();
+    process.env.TEST_REDIS_BASE_URL = redisContainer.getConnectionUrl();
+  }
 }
 
 export async function teardown(): Promise<void> {
+  await redisContainer?.stop();
   await container?.stop();
 }

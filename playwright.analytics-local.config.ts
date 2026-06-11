@@ -58,6 +58,8 @@ export default defineConfig({
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "true",
         DATABASE_URL: e2eDatabaseUrl,
+        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+        BULLMQ_PREFIX: e2eDbName,
         PORT: String(TEST_API_PORT),
       },
       timeout: 30_000,
