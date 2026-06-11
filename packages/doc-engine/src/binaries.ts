@@ -31,3 +31,6 @@ export function qpdfAvailable(): boolean {
 export function sofficeAvailable(): boolean {
   return resolveSoffice() !== null;
 }
+export function gsAvailable(): boolean {
+  return resolveGs() !== null;
+}
