@@ -19,11 +19,13 @@ import { registerCompress } from "./compress.js";
 import { registerCompressVideo } from "./compress-video.js";
 import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConvert } from "./convert.js";
+import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
 import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
 import { registerEraseObject } from "./erase-object.js";
+import { registerExtractAudio } from "./extract-audio.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerGifTools } from "./gif-tools.js";
@@ -54,6 +56,7 @@ import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
 import { registerTextOverlay } from "./text-overlay.js";
 import { registerTransparencyFixer } from "./transparency-fixer.js";
+import { registerTrimAudio } from "./trim-audio.js";
 import { registerTrimVideo } from "./trim-video.js";
 import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
@@ -150,6 +153,11 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "trim-video", register: registerTrimVideo },
     { id: "mute-video", register: registerMuteVideo },
     { id: "video-to-gif", register: registerVideoToGif },
+
+    // Audio
+    { id: "convert-audio", register: registerConvertAudio },
+    { id: "trim-audio", register: registerTrimAudio },
+    { id: "extract-audio", register: registerExtractAudio },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

@@ -1,4 +1,4 @@
-import { IMAGE_INPUTS, VIDEO_INPUTS } from "./modality.js";
+import { AUDIO_INPUTS, IMAGE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -665,6 +665,40 @@ export const TOOLS: Tool[] = [
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
     executionHint: "long",
+  },
+  // Audio
+  {
+    id: "convert-audio",
+    name: "Convert Audio",
+    description: "Convert audio between MP3, WAV, OGG, and more",
+    category: "audio",
+    icon: "AudioLines",
+    route: "/convert-audio",
+    modality: "audio",
+    acceptedInputs: AUDIO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "trim-audio",
+    name: "Trim Audio",
+    description: "Cut a section out of an audio file",
+    category: "audio",
+    icon: "Scissors",
+    route: "/trim-audio",
+    modality: "audio",
+    acceptedInputs: AUDIO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "extract-audio",
+    name: "Extract Audio",
+    description: "Pull the audio track out of a video",
+    category: "audio",
+    icon: "FileAudio",
+    route: "/extract-audio",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
   },
 ];
 

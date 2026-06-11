@@ -29,9 +29,11 @@ function run(args) {
   }
 }
 
-// 1s 64x64 silent mp4 (h264 baseline, tiny)
+// 1s 64x64 mp4 with video + audio (h264 + aac; needed by extract-audio + mute-video)
 run(["-f", "lavfi", "-i", "testsrc=duration=1:size=64x64:rate=8",
+  "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
   "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+  "-c:a", "aac", "-b:a", "32k", "-shortest",
   join(mediaDir, "tiny.mp4")]);
 // 1s sine mp3
 run(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "libmp3lame", "-b:a", "32k",

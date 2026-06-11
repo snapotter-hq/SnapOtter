@@ -286,6 +286,18 @@ export const es: TranslationKeys = {
       name: "Video to GIF",
       description: "Turn a video clip into an animated GIF",
     },
+    "convert-audio": {
+      name: "Convert Audio",
+      description: "Convert audio between MP3, WAV, OGG, and more",
+    },
+    "trim-audio": {
+      name: "Trim Audio",
+      description: "Cut a section out of an audio file",
+    },
+    "extract-audio": {
+      name: "Extract Audio",
+      description: "Pull the audio track out of a video",
+    },
     pipeline: {
       name: "Constructor de Pipeline",
       description: "Encadena multiples herramientas en un flujo de trabajo",
@@ -1292,6 +1304,26 @@ export const es: TranslationKeys = {
       submit: "Create GIF",
       submitBatch: "Create GIFs ({count} files)",
       progressLabel: "Creating GIF",
+    },
+    "convert-audio": {
+      format: "Output format",
+      bitrate: "Bitrate (kbps)",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "trim-audio": {
+      start: "Start (seconds)",
+      end: "End (seconds)",
+      submit: "Trim",
+      submitBatch: "Trim ({count} files)",
+      progressLabel: "Trimming",
+    },
+    "extract-audio": {
+      format: "Output format",
+      submit: "Extract",
+      submitBatch: "Extract ({count} files)",
+      progressLabel: "Extracting",
     },
   },
   urlImport: {

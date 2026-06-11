@@ -15,6 +15,23 @@ export function videoContentType(ext: string): string {
   return EXT_VIDEO_CONTENT_TYPES[ext.toLowerCase()] || "video/mp4";
 }
 
+const EXT_AUDIO_CONTENT_TYPES: Record<string, string> = {
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+  ".flac": "audio/flac",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".opus": "audio/opus",
+  ".wma": "audio/x-ms-wma",
+  ".aiff": "audio/aiff",
+};
+
+/** Content type for a preserved-container audio output; mpeg fallback. */
+export function audioContentType(ext: string): string {
+  return EXT_AUDIO_CONTENT_TYPES[ext.toLowerCase()] || "audio/mpeg";
+}
+
 export interface MediaRunResult {
   outPath: string;
   durationS: number | null;
