@@ -1,7 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
@@ -13,8 +10,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 const targetSizeSchema = z.object({
   value: z.number().positive(),
@@ -272,8 +269,6 @@ export function registerImageToPdf(app: FastifyInstance) {
       }
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputDir = join(workspacePath, "output");
       const originalSize = files.reduce((s, f) => s + f.buffer.length, 0);
 
       if (settings.collate) {
@@ -284,7 +279,7 @@ export function registerImageToPdf(app: FastifyInstance) {
         }
 
         const filename = "images.pdf";
-        await writeFile(join(outputDir, filename), pdfBuffer);
+        await putObject(`outputs/${jobId}/${filename}`, pdfBuffer);
 
         return reply.send({
           jobId,
@@ -297,30 +292,33 @@ export function registerImageToPdf(app: FastifyInstance) {
       }
 
       let totalProcessedSize = 0;
-      const pdfFilenames: string[] = [];
+      const pdfEntries = new Map<string, Buffer>();
 
       for (let i = 0; i < imageBuffers.length; i++) {
         const pdfBuffer = await buildPdf([imageBuffers[i]]);
         const baseName = files[i].filename.replace(/\.[^.]+$/, "");
         const pdfName = `${baseName}.pdf`;
-        await writeFile(join(outputDir, pdfName), pdfBuffer);
-        pdfFilenames.push(pdfName);
+        await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
+        pdfEntries.set(pdfName, pdfBuffer);
         totalProcessedSize += pdfBuffer.length;
       }
 
+      // Build ZIP in memory
       const zipFilename = "images.zip";
-      const zipPath = join(outputDir, zipFilename);
-      await new Promise<void>((resolve, reject) => {
-        const output = createWriteStream(zipPath);
-        const archive = archiver("zip", { zlib: { level: 5 } });
-        output.on("close", resolve);
+      const archive = archiver("zip", { zlib: { level: 5 } });
+      const zipChunks: Buffer[] = [];
+      archive.on("data", (chunk: Buffer) => zipChunks.push(chunk));
+      const zipDone = new Promise<void>((resolve, reject) => {
+        archive.on("end", resolve);
         archive.on("error", reject);
-        archive.pipe(output);
-        for (const name of pdfFilenames) {
-          archive.file(join(outputDir, name), { name });
-        }
-        archive.finalize();
       });
+      for (const [name, buf] of pdfEntries) {
+        archive.append(buf, { name });
+      }
+      await archive.finalize();
+      await zipDone;
+      const zipBuffer = Buffer.concat(zipChunks);
+      await putObject(`outputs/${jobId}/${zipFilename}`, zipBuffer);
 
       return reply.send({
         jobId,

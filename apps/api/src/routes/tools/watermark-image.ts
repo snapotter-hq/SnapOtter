@@ -226,16 +226,11 @@ export function registerWatermarkImage(app: FastifyInstance) {
         .composite([{ input: wmBuffer, top, left }])
         .toBuffer();
 
-      // Use tool-factory's workspace pattern
       const { randomUUID } = await import("node:crypto");
-      const { writeFile } = await import("node:fs/promises");
-      const { join } = await import("node:path");
-      const { createWorkspace } = await import("../../lib/workspace.js");
+      const { putObject } = await import("../../lib/object-storage.js");
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, result);
+      await putObject(`outputs/${jobId}/${filename}`, result);
 
       return reply.send({
         jobId,

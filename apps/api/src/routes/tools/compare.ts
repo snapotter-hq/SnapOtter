@@ -1,14 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 /**
  * Compare two images: compute a pixel-level diff and similarity score.
@@ -179,10 +177,8 @@ export function registerCompare(app: FastifyInstance) {
         .toBuffer();
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
       const diffFilename = "diff.png";
-      const outputPath = join(workspacePath, "output", diffFilename);
-      await writeFile(outputPath, diffBuffer);
+      await putObject(`outputs/${jobId}/${diffFilename}`, diffBuffer);
 
       return reply.send({
         jobId,

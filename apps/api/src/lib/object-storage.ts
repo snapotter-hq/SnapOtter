@@ -1,5 +1,5 @@
-import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readdir, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream, existsSync } from "node:fs";
+import { mkdir, readdir, rm, stat, statfs, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -63,6 +63,43 @@ async function getS3(): Promise<S3StorageModule> {
   return s3Mod;
 }
 
+// ── Capacity guard (local backend only) ──────────────────────────
+// Thresholds copied from the former workspace.ts checkWorkspaceCapacity.
+// The scan-and-delete cleanup is removed; the TTL sweeper now owns that.
+
+/** Minimum free space (GB) below which writes are rejected with 503. */
+export const CAPACITY_CRITICAL_GB = 0.5;
+
+/**
+ * Pure threshold check exported for unit testing.
+ * Returns true when freeBytes is below the critical threshold.
+ */
+export function isBelowCapacity(freeBytes: number): boolean {
+  return freeBytes / 1024 ** 3 < CAPACITY_CRITICAL_GB;
+}
+
+/**
+ * Asserts that the local storage volume has enough free space.
+ * Called by putObject / putObjectStream for the local backend only.
+ * S3 backend skips this check entirely.
+ */
+export async function assertLocalCapacity(): Promise<void> {
+  const root = env.WORKSPACE_PATH;
+  if (!existsSync(root)) return;
+  let fsStats: Awaited<ReturnType<typeof statfs>>;
+  try {
+    fsStats = await statfs(root);
+  } catch {
+    return; // statfs unavailable (e.g. some CI envs) -- allow the write
+  }
+  const freeBytes = fsStats.bavail * fsStats.bsize;
+  if (isBelowCapacity(freeBytes)) {
+    const error = new Error("Insufficient disk space for processing");
+    (error as Error & { statusCode: number }).statusCode = 503;
+    throw error;
+  }
+}
+
 export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
   if (useS3()) {
@@ -70,6 +107,7 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
     await s3.putGenericObject(key, data);
     return;
   }
+  await assertLocalCapacity();
   const p = localPath(key);
   await mkdir(dirname(p), { recursive: true });
   await writeFile(p, data);
@@ -96,6 +134,7 @@ export async function putObjectStream(
     await s3.putGenericObjectStream(key, counter(source));
     return written;
   }
+  await assertLocalCapacity();
   const p = localPath(key);
   await mkdir(dirname(p), { recursive: true });
   try {

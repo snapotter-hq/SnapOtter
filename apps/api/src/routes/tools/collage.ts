@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -11,8 +9,8 @@ import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 // ── Template definitions (mirrors the frontend) ─────────────────────
 // We only need the grid proportions and cell definitions here.
@@ -694,10 +692,8 @@ export function registerCollage(app: FastifyInstance) {
       const finalBuffer = outputExt === "jxl" ? await encodeJxl(result, settings.quality) : result;
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
       const filename = `collage.${outputExt}`;
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, finalBuffer);
+      await putObject(`outputs/${jobId}/${filename}`, finalBuffer);
 
       return reply.send({
         jobId,

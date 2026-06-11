@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -12,8 +10,8 @@ import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 const settingsSchema = z.object({
   direction: z.enum(["horizontal", "vertical", "grid"]).default("horizontal"),
@@ -289,10 +287,8 @@ export function registerStitch(app: FastifyInstance) {
       }
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
       const filename = `stitch.${settings.format}`;
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, result);
+      await putObject(`outputs/${jobId}/${filename}`, result);
 
       return reply.send({
         jobId,

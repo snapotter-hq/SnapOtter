@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { vectorize as vtrace } from "@neplex/vectorizer";
 import type { FastifyInstance } from "fastify";
 import potrace from "potrace";
@@ -12,8 +10,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -189,9 +187,7 @@ export function registerVectorize(app: FastifyInstance) {
       const result = await vectorizeBuffer(fileBuffer, settings, filename);
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", result.filename);
-      await writeFile(outputPath, result.buffer);
+      await putObject(`outputs/${jobId}/${result.filename}`, result.buffer);
 
       return reply.send({
         jobId,

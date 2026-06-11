@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -267,23 +269,22 @@ export function registerTransparencyFixer(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: TOOL_ID,
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const resultBuffer = await processTransparencyFix(orientedBuffer, s, scratchDir);
 
-      const resultBuffer = await processTransparencyFix(
-        orientedBuffer,
-        s,
-        join(workspacePath, "output"),
-      );
-
-      const outputExt = s.outputFormat === "webp" ? "webp" : "png";
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
-      const contentType = outputExt === "webp" ? "image/webp" : "image/png";
-      return { buffer: resultBuffer, filename: outputFilename, contentType };
+        const outputExt = s.outputFormat === "webp" ? "webp" : "png";
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
+        const contentType = outputExt === "webp" ? "image/webp" : "image/png";
+        return { buffer: resultBuffer, filename: outputFilename, contentType };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

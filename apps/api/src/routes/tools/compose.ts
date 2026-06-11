@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -10,8 +8,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 async function decodeBuffer(inputBuffer: Buffer, filename: string): Promise<Buffer> {
   const validation = await validateImageBuffer(inputBuffer, filename);
@@ -150,9 +148,7 @@ export function registerCompose(app: FastifyInstance) {
         .toBuffer();
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, result);
+      await putObject(`outputs/${jobId}/${filename}`, result);
 
       return reply.send({
         jobId,

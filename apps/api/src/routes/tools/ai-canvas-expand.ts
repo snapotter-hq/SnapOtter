@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { outpaint } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -256,7 +258,7 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "ai-canvas-expand",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as Settings;
 
       const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -270,24 +272,27 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
       }
 
       const orientedBuffer = await autoOrient(buf);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const resultBuffer = await outpaint(
+          orientedBuffer,
+          {
+            extendTop: s.extendTop,
+            extendRight: s.extendRight,
+            extendBottom: s.extendBottom,
+            extendLeft: s.extendLeft,
+            tier: s.tier,
+          },
+          scratchDir,
+        );
 
-      const resultBuffer = await outpaint(
-        orientedBuffer,
-        {
-          extendTop: s.extendTop,
-          extendRight: s.extendRight,
-          extendBottom: s.extendBottom,
-          extendLeft: s.extendLeft,
-          tier: s.tier,
-        },
-        join(workspacePath, "output"),
-      );
-
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_extended.png`;
-      return { buffer: resultBuffer, filename: outputFilename, contentType: "image/png" };
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_extended.png`;
+        return { buffer: resultBuffer, filename: outputFilename, contentType: "image/png" };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

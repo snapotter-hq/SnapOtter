@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -11,8 +9,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 const settingsSchema = z.object({
   tryHarder: z.boolean().default(true),
@@ -233,25 +231,22 @@ export function registerBarcodeRead(app: FastifyInstance) {
 
       // --- Generate annotated image ---
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
 
       // Save original input
-      const inputPath = join(workspacePath, "input", filename);
-      await writeFile(inputPath, fileBuffer);
+      await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
       // Build SVG overlay with bounding boxes
       const overlaySvg = buildOverlaySvg(width, height, barcodes);
 
       const stem = filename.replace(/\.[^.]+$/, "");
       const outputFilename = `annotated-${stem}.png`;
-      const outputPath = join(workspacePath, "output", outputFilename);
 
       const annotatedBuffer = await sharp(fileBuffer)
         .composite([{ input: Buffer.from(overlaySvg), top: 0, left: 0 }])
         .png()
         .toBuffer();
 
-      await writeFile(outputPath, annotatedBuffer);
+      await putObject(`outputs/${jobId}/${outputFilename}`, annotatedBuffer);
 
       const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
 

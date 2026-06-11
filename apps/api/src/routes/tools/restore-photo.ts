@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { restorePhoto } from "@snapotter/ai";
 import { getBundleForTool } from "@snapotter/shared";
@@ -207,35 +209,39 @@ export function registerRestorePhoto(app: FastifyInstance) {
       colorize: z.boolean().default(false),
       colorizeStrength: z.number().min(0).max(100).default(85),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await restorePhoto(orientedBuffer, join(workspacePath, "output"), {
-        scratchRemoval: s.scratchRemoval,
-        faceEnhancement: s.faceEnhancement,
-        fidelity: s.fidelity,
-        denoise: s.denoise,
-        denoiseStrength: s.denoiseStrength,
-        colorize: s.colorize,
-        colorizeStrength: s.colorizeStrength,
-      });
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      let outputBuffer = result.buffer;
-      if (outputFormat.format !== "png") {
-        outputBuffer = await sharp(result.buffer)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await restorePhoto(orientedBuffer, scratchDir, {
+          scratchRemoval: s.scratchRemoval,
+          faceEnhancement: s.faceEnhancement,
+          fidelity: s.fidelity,
+          denoise: s.denoise,
+          denoiseStrength: s.denoiseStrength,
+          colorize: s.colorize,
+          colorizeStrength: s.colorizeStrength,
+        });
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        let outputBuffer = result.buffer;
+        if (outputFormat.format !== "png") {
+          outputBuffer = await sharp(result.buffer)
+            .toFormat(outputFormat.format, { quality: outputFormat.quality })
+            .toBuffer();
+        }
+        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
+        return {
+          buffer: outputBuffer,
+          filename: outputFilename,
+          contentType: outputFormat.contentType,
+        };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
-      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
-      return {
-        buffer: outputBuffer,
-        filename: outputFilename,
-        contentType: outputFormat.contentType,
-      };
     },
   });
 }

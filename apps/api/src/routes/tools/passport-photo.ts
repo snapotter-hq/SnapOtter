@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
 import {
@@ -18,7 +19,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace, getWorkspacePath } from "../../lib/workspace.js";
+import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -203,11 +204,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
         );
 
         const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
+        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
+        await mkdir(scratchDir, { recursive: true });
 
-        // Save original to workspace for generate phase
-        const inputPath = join(workspacePath, "input", filename);
-        await writeFile(inputPath, fileBuffer);
+        // Save original to object storage for generate phase
+        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
         // Progress callback
         const jobIdForProgress = clientJobId;
@@ -253,16 +254,21 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        const bgRemovedBuffer = await removeBackground(
-          fileBuffer,
-          join(workspacePath, "output"),
-          { model: "birefnet-portrait" },
-          bgProgress,
-        );
+        let bgRemovedBuffer: Buffer;
+        try {
+          bgRemovedBuffer = await removeBackground(
+            fileBuffer,
+            scratchDir,
+            { model: "birefnet-portrait" },
+            bgProgress,
+          );
+        } finally {
+          await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
 
-        // Save bg-removed image to workspace
+        // Save bg-removed image to object storage for generate phase
         const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
-        await writeFile(join(workspacePath, "output", bgRemovedFilename), bgRemovedBuffer);
+        await putObject(`outputs/${jobId}/${bgRemovedFilename}`, bgRemovedBuffer);
 
         // Create a smaller preview for fast transfer (max 800px wide)
         const meta = await sharp(bgRemovedBuffer).metadata();
@@ -383,10 +389,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
       };
 
       try {
-        const workspacePath = getWorkspacePath(jobId);
         const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
 
-        const bgRemovedBuffer = await readFile(join(workspacePath, "output", bgRemovedFilename));
+        const bgRemovedBuffer = await getObjectBuffer(`outputs/${jobId}/${bgRemovedFilename}`);
 
         // Use actual bg-removed image dimensions for crop (may differ from
         // the original image dimensions reported by the analyze endpoint).
@@ -494,8 +499,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         // Save output
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_passport.jpg`;
-        const outputPath = join(workspacePath, "output", outputFilename);
-        await writeFile(outputPath, cropped);
+        await putObject(`outputs/${jobId}/${outputFilename}`, cropped);
 
         const response: Record<string, unknown> = {
           jobId,
@@ -526,7 +530,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
           if (printBuffer) {
             const printFilename = `${filename.replace(/\.[^.]+$/, "")}_passport_print_${printLayout}.jpg`;
-            await writeFile(join(workspacePath, "output", printFilename), printBuffer);
+            await putObject(`outputs/${jobId}/${printFilename}`, printBuffer);
             response.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
           }
         }
@@ -555,7 +559,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "passport-photo",
     settingsSchema: pipelineSettingsSchema,
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof pipelineSettingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
 
@@ -572,16 +576,18 @@ export function registerPassportPhoto(app: FastifyInstance) {
       const imgH = landmarksResult.imageHeight;
 
       // Step 2: Remove background
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
 
-      const bgRemovedBuffer = await removeBackground(
-        orientedBuffer,
-        join(workspacePath, "output"),
-        {
+      let bgRemovedBuffer: Buffer;
+      try {
+        bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
           model: "birefnet-portrait",
-        },
-      );
+        });
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
 
       // Step 3: Look up spec and compute crop
       const countrySpec = PASSPORT_SPECS.find((sp) => sp.code === s.countryCode);

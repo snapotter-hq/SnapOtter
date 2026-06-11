@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seamCarve } from "@snapotter/ai";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,7 +11,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
+import { putObject } from "../../lib/object-storage.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -127,35 +128,38 @@ export function registerContentAwareResize(app: FastifyInstance) {
         fileBuffer = await autoOrient(fileBuffer);
 
         const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
+        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
+        await mkdir(scratchDir, { recursive: true });
 
-        // Save input
-        const inputPath = join(workspacePath, "input", filename);
-        await writeFile(inputPath, fileBuffer);
+        try {
+          // Save input to object storage
+          await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
-        // Process with caire
-        const result = await seamCarve(fileBuffer, join(workspacePath, "output"), {
-          width: settings.width,
-          height: settings.height,
-          protectFaces: settings.protectFaces,
-          blurRadius: settings.blurRadius,
-          sobelThreshold: settings.sobelThreshold,
-          square: settings.square,
-        });
+          // Process with caire
+          const result = await seamCarve(fileBuffer, scratchDir, {
+            width: settings.width,
+            height: settings.height,
+            protectFaces: settings.protectFaces,
+            blurRadius: settings.blurRadius,
+            sobelThreshold: settings.sobelThreshold,
+            square: settings.square,
+          });
 
-        // Save output
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
-        const outputPath = join(workspacePath, "output", outputFilename);
-        await writeFile(outputPath, result.buffer);
+          // Save output to object storage
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
+          await putObject(`outputs/${jobId}/${outputFilename}`, result.buffer);
 
-        return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
-          originalSize: fileBuffer.length,
-          processedSize: result.buffer.length,
-          width: result.width,
-          height: result.height,
-        });
+          return reply.send({
+            jobId,
+            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+            originalSize: fileBuffer.length,
+            processedSize: result.buffer.length,
+            width: result.width,
+            height: result.height,
+          });
+        } finally {
+          await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
       } catch (err) {
         request.log.error({ err, toolId: "content-aware-resize" }, "Content-aware resize failed");
         return reply.status(422).send({
@@ -170,7 +174,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "content-aware-resize",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as Settings;
       // Decode HEIC/HEIF for pipeline/batch mode
       const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -184,18 +188,23 @@ export function registerContentAwareResize(app: FastifyInstance) {
         buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
       }
       const orientedBuffer = await autoOrient(buf);
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const result = await seamCarve(orientedBuffer, join(workspacePath, "output"), {
-        width: s.width,
-        height: s.height,
-        protectFaces: s.protectFaces,
-        blurRadius: s.blurRadius,
-        sobelThreshold: s.sobelThreshold,
-        square: s.square,
-      });
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
-      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await seamCarve(orientedBuffer, scratchDir, {
+          width: s.width,
+          height: s.height,
+          protectFaces: s.protectFaces,
+          blurRadius: s.blurRadius,
+          sobelThreshold: s.sobelThreshold,
+          square: s.square,
+        });
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_seam.png`;
+        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

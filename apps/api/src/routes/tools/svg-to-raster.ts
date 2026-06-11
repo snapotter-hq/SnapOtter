@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -13,8 +11,8 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { updateJobProgress } from "../progress.js";
 
 const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
@@ -422,9 +420,7 @@ export function registerSvgToRaster(app: FastifyInstance) {
         ext,
       } = await convertSvg(fileBuffer, filename, settings);
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", outFilename);
-      await writeFile(outputPath, buffer);
+      await putObject(`outputs/${jobId}/${outFilename}`, buffer);
 
       let previewUrl: string | undefined;
       if (NON_PREVIEWABLE.has(ext)) {
@@ -435,8 +431,7 @@ export function registerSvgToRaster(app: FastifyInstance) {
             .resize(1200, 1200, { fit: "inside" })
             .webp({ quality: 80 })
             .toBuffer();
-          const previewPath = join(workspacePath, "output", "preview.webp");
-          await writeFile(previewPath, previewBuffer);
+          await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
           previewUrl = `/api/v1/download/${jobId}/preview.webp`;
         } catch {
           // Non-fatal - frontend shows success card fallback

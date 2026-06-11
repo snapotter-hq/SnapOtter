@@ -750,99 +750,33 @@ describe("isRawExtension", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Workspace
+// 2. Object storage capacity guard (replaces former workspace tests)
 // ---------------------------------------------------------------------------
 
-describe("workspace", () => {
-  // Use a real temp directory to avoid polluting the project
-  let TEST_WORKSPACE: string;
-
-  beforeEach(async () => {
-    TEST_WORKSPACE = join(tmpdir(), `SnapOtter-test-workspace-${randomUUID()}`);
-    await mkdir(TEST_WORKSPACE, { recursive: true });
-
-    // Point the env mock's WORKSPACE_PATH at our temp dir
-    const configMod = await import("../../../apps/api/src/config.js");
-    configMod.env.WORKSPACE_PATH = TEST_WORKSPACE;
-  });
-
-  afterEach(async () => {
-    // Clean up the temp dir
-    await rm(TEST_WORKSPACE, { recursive: true, force: true });
-  });
-
-  it("createWorkspace creates input and output subdirectories", async () => {
-    const { createWorkspace } = await import("../../../apps/api/src/lib/workspace.js");
-    const jobId = randomUUID();
-    const root = await createWorkspace(jobId);
-
-    expect(root).toBe(join(TEST_WORKSPACE, jobId));
-    expect(existsSync(join(root, "input"))).toBe(true);
-    expect(existsSync(join(root, "output"))).toBe(true);
-  });
-
-  it("createWorkspace returns the workspace root path", async () => {
-    const { createWorkspace } = await import("../../../apps/api/src/lib/workspace.js");
-    const jobId = "my-test-job-123";
-    const root = await createWorkspace(jobId);
-    expect(root).toBe(join(TEST_WORKSPACE, jobId));
-  });
-
-  it("getWorkspacePath returns correct path without creating dirs", async () => {
-    const { getWorkspacePath } = await import("../../../apps/api/src/lib/workspace.js");
-    const jobId = "path-check-id";
-    const result = getWorkspacePath(jobId);
-    expect(result).toBe(join(TEST_WORKSPACE, jobId));
-    // Should NOT have created the directory
-    expect(existsSync(join(TEST_WORKSPACE, jobId))).toBe(false);
-  });
-
-  it("cleanupWorkspace removes the entire workspace directory", async () => {
-    const { createWorkspace, cleanupWorkspace } = await import(
-      "../../../apps/api/src/lib/workspace.js"
+describe("assertLocalCapacity / isBelowCapacity", () => {
+  it("isBelowCapacity returns true when free space is below 0.5 GB", async () => {
+    const { isBelowCapacity, CAPACITY_CRITICAL_GB } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
     );
-    const jobId = randomUUID();
-    const root = await createWorkspace(jobId);
-
-    // Verify it exists
-    expect(existsSync(root)).toBe(true);
-
-    await cleanupWorkspace(jobId);
-
-    // Verify it is gone
-    expect(existsSync(root)).toBe(false);
+    expect(CAPACITY_CRITICAL_GB).toBe(0.5);
+    // 0.4 GB free should be below threshold
+    expect(isBelowCapacity(0.4 * 1024 ** 3)).toBe(true);
+    // 0.0 bytes free
+    expect(isBelowCapacity(0)).toBe(true);
   });
 
-  it("cleanupWorkspace on a non-existent directory does not throw", async () => {
-    const { cleanupWorkspace } = await import("../../../apps/api/src/lib/workspace.js");
-    // This job was never created
-    await expect(cleanupWorkspace(`does-not-exist-${randomUUID()}`)).resolves.toBeUndefined();
+  it("isBelowCapacity returns false when free space is above 0.5 GB", async () => {
+    const { isBelowCapacity } = await import("../../../apps/api/src/lib/object-storage.js");
+    // 1 GB free
+    expect(isBelowCapacity(1 * 1024 ** 3)).toBe(false);
+    // Exactly at threshold (0.5 GB) should be false (not strictly less)
+    expect(isBelowCapacity(0.5 * 1024 ** 3)).toBe(false);
   });
 
-  it("createWorkspace is idempotent (calling twice does not throw)", async () => {
-    const { createWorkspace } = await import("../../../apps/api/src/lib/workspace.js");
-    const jobId = randomUUID();
-    await createWorkspace(jobId);
-    await expect(createWorkspace(jobId)).resolves.toBeDefined();
-  });
-
-  it("createWorkspace with empty string job ID still creates a directory", async () => {
-    const { createWorkspace } = await import("../../../apps/api/src/lib/workspace.js");
-    // Empty string is technically allowed by mkdir, it just uses WORKSPACE_PATH as the root
-    const root = await createWorkspace("");
-    expect(existsSync(root)).toBe(true);
-  });
-
-  it("workspace directories are nested under the configured WORKSPACE_PATH", async () => {
-    const { createWorkspace, getWorkspacePath } = await import(
-      "../../../apps/api/src/lib/workspace.js"
-    );
-    const jobId = randomUUID();
-    const wsPath = getWorkspacePath(jobId);
-    const root = await createWorkspace(jobId);
-
-    expect(wsPath).toBe(root);
-    expect(root.startsWith(TEST_WORKSPACE)).toBe(true);
+  it("isBelowCapacity boundary: just below 0.5 GB is true", async () => {
+    const { isBelowCapacity } = await import("../../../apps/api/src/lib/object-storage.js");
+    // One byte below 0.5 GB
+    expect(isBelowCapacity(0.5 * 1024 ** 3 - 1)).toBe(true);
   });
 });
 

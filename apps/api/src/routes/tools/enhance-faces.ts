@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { enhanceFaces } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -173,7 +175,7 @@ export function registerEnhanceFaces(app: FastifyInstance) {
       onlyCenterFace: z.boolean().default(false),
       sensitivity: z.number().min(0).max(1).default(0.5),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as {
         model?: "auto" | "gfpgan" | "codeformer";
         strength?: number;
@@ -181,17 +183,21 @@ export function registerEnhanceFaces(app: FastifyInstance) {
         sensitivity?: number;
       };
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await enhanceFaces(orientedBuffer, join(workspacePath, "output"), {
-        model: s.model ?? "auto",
-        strength: s.strength ?? 0.8,
-        onlyCenterFace: s.onlyCenterFace ?? false,
-        sensitivity: s.sensitivity ?? 0.5,
-      });
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
-      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await enhanceFaces(orientedBuffer, scratchDir, {
+          model: s.model ?? "auto",
+          strength: s.strength ?? 0.8,
+          onlyCenterFace: s.onlyCenterFace ?? false,
+          sensitivity: s.sensitivity ?? 0.5,
+        });
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
+        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

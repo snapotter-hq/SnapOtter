@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../../lib/auto-orient.js";
@@ -23,8 +21,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
@@ -308,9 +306,7 @@ export function registerBeautify(app: FastifyInstance) {
       const outFilename = resolveOutputFilename(filename, settings);
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", outFilename);
-      await writeFile(outputPath, outputBuf);
+      await putObject(`outputs/${jobId}/${outFilename}`, outputBuf);
 
       return reply.send({
         jobId,

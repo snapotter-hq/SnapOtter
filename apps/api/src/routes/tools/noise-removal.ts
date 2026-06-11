@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { noiseRemoval } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -186,34 +188,38 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       format: z.enum(["original", "png", "jpeg", "webp", "avif", "jxl"]).default("original"),
       quality: z.union([z.number(), z.string()]).transform(Number).default(90),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await noiseRemoval(orientedBuffer, join(workspacePath, "output"), {
-        tier: s.tier,
-        strength: s.strength,
-        detailPreservation: s.detailPreservation,
-        colorNoise: s.colorNoise,
-        format: s.format,
-        quality: s.quality,
-      });
-      const ext = result.format === "jpeg" ? "jpg" : result.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
-      const CONTENT_TYPES: Record<string, string> = {
-        png: "image/png",
-        jpeg: "image/jpeg",
-        jpg: "image/jpeg",
-        webp: "image/webp",
-        avif: "image/avif",
-      };
-      return {
-        buffer: result.buffer,
-        filename: outputFilename,
-        contentType: CONTENT_TYPES[result.format] || "image/png",
-      };
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await noiseRemoval(orientedBuffer, scratchDir, {
+          tier: s.tier,
+          strength: s.strength,
+          detailPreservation: s.detailPreservation,
+          colorNoise: s.colorNoise,
+          format: s.format,
+          quality: s.quality,
+        });
+        const ext = result.format === "jpeg" ? "jpg" : result.format;
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
+        const CONTENT_TYPES: Record<string, string> = {
+          png: "image/png",
+          jpeg: "image/jpeg",
+          jpg: "image/jpeg",
+          webp: "image/webp",
+          avif: "image/avif",
+        };
+        return {
+          buffer: result.buffer,
+          filename: outputFilename,
+          contentType: CONTENT_TYPES[result.format] || "image/png",
+        };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

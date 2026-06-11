@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { upscale } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -231,27 +233,31 @@ export function registerUpscale(app: FastifyInstance) {
     settingsSchema: z.object({
       scale: z.union([z.number(), z.string()]).transform(Number).default(2),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const scale = Number((settings as { scale?: number }).scale) || 2;
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await upscale(orientedBuffer, join(workspacePath, "output"), { scale });
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      let outputBuffer = result.buffer;
-      if (outputFormat.format !== "png") {
-        outputBuffer = await sharp(result.buffer)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await upscale(orientedBuffer, scratchDir, { scale });
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        let outputBuffer = result.buffer;
+        if (outputFormat.format !== "png") {
+          outputBuffer = await sharp(result.buffer)
+            .toFormat(outputFormat.format, { quality: outputFormat.quality })
+            .toBuffer();
+        }
+        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
+        return {
+          buffer: outputBuffer,
+          filename: outputFilename,
+          contentType: outputFormat.contentType,
+        };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
-      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
-      return {
-        buffer: outputBuffer,
-        filename: outputFilename,
-        contentType: outputFormat.contentType,
-      };
     },
   });
 }

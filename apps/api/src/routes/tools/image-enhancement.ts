@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { noiseRemoval } from "@snapotter/ai";
 import { analyzeImage, applyCorrections } from "@snapotter/image-engine";
@@ -12,7 +13,6 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -82,12 +82,10 @@ async function processImageEnhancement(
   }
 
   if (settings.deepEnhance && isToolInstalled("noise-removal")) {
+    const scratchDir = join(tmpdir(), "snapotter-scratch", randomUUID());
     try {
-      const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputDir = join(workspacePath, "output");
-      await mkdir(outputDir, { recursive: true });
-      const result = await noiseRemoval(buffer, outputDir, {
+      await mkdir(scratchDir, { recursive: true });
+      const result = await noiseRemoval(buffer, scratchDir, {
         tier: "quality",
         strength: 35,
         detailPreservation: 70,
@@ -96,6 +94,8 @@ async function processImageEnhancement(
       buffer = result.buffer;
     } catch {
       // SCUNet unavailable -- fall back to Sharp-only result
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 

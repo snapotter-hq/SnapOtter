@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { readImageDimensions } from "../lib/exiftool.js";
@@ -8,9 +7,8 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { getObjectSize, getObjectStream } from "../lib/object-storage.js";
+import { getObjectSize, getObjectStream, putObject } from "../lib/object-storage.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
-import { createWorkspace } from "../lib/workspace.js";
 
 /**
  * Guard against path traversal in URL params.
@@ -31,8 +29,6 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const inputDir = join(workspacePath, "input");
 
       const uploadedFiles: Array<{
         name: string;
@@ -67,12 +63,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
         const safeBuffer = isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
 
-        // Sanitize filename
+        // Sanitize filename (canonical; do NOT re-sanitize downstream)
         const safeName = sanitizeFilename(part.filename ?? "upload");
 
-        // Write to workspace input directory
-        const filePath = join(inputDir, safeName);
-        await writeFile(filePath, safeBuffer);
+        // Write to object storage uploads prefix
+        await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
 
         uploadedFiles.push({
           name: safeName,

@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
-import { createWorkspace } from "../../lib/workspace.js";
+import { putObject } from "../../lib/object-storage.js";
 
 const settingsSchema = z.object({
   text: z.string().min(1).max(2000),
@@ -57,10 +55,8 @@ export function registerQrGenerate(app: FastifyInstance) {
       });
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
       const filename = "qrcode.png";
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, buffer);
+      await putObject(`outputs/${jobId}/${filename}`, buffer);
 
       return reply.send({
         jobId,

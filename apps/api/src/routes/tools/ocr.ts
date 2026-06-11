@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { extractText } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -10,7 +13,6 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { updateSingleFileProgress } from "../progress.js";
 
 const settingsSchema = z.object({
@@ -79,6 +81,7 @@ export function registerOcr(app: FastifyInstance) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
 
+    let scratchDir = "";
     try {
       // Decode HEIC/HEIF input via system decoder
       if (validation.format === "heif") {
@@ -123,7 +126,8 @@ export function registerOcr(app: FastifyInstance) {
         "Starting OCR",
       );
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
+      scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
+      await mkdir(scratchDir, { recursive: true });
 
       const jobIdForProgress = clientJobId;
       const onProgress = jobIdForProgress
@@ -152,7 +156,7 @@ export function registerOcr(app: FastifyInstance) {
         try {
           const result = await extractText(
             fileBuffer,
-            workspacePath,
+            scratchDir,
             {
               quality: tier,
               language: settings.language,
@@ -225,6 +229,8 @@ export function registerOcr(app: FastifyInstance) {
         error: "OCR failed",
         details: err instanceof Error ? err.message : "Unknown error",
       });
+    } finally {
+      if (scratchDir) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
     }
   });
 }

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { blurFaces } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -178,7 +180,7 @@ export function registerBlurFaces(app: FastifyInstance) {
       blurRadius: z.number().min(1).max(100).default(30),
       sensitivity: z.number().min(0).max(1).default(0.5),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as { blurRadius?: number; sensitivity?: number };
       let decoded = inputBuffer;
       const validation = await validateImageBuffer(decoded, filename);
@@ -193,27 +195,31 @@ export function registerBlurFaces(app: FastifyInstance) {
         }
       }
       const orientedBuffer = await autoOrient(decoded);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await blurFaces(orientedBuffer, join(workspacePath, "output"), {
-        blurRadius: s.blurRadius ?? 30,
-        sensitivity: s.sensitivity ?? 0.5,
-      });
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      let outputBuffer = result.buffer;
-      if (outputFormat.format !== "png") {
-        outputBuffer = await sharp(result.buffer)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await blurFaces(orientedBuffer, scratchDir, {
+          blurRadius: s.blurRadius ?? 30,
+          sensitivity: s.sensitivity ?? 0.5,
+        });
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        let outputBuffer = result.buffer;
+        if (outputFormat.format !== "png") {
+          outputBuffer = await sharp(result.buffer)
+            .toFormat(outputFormat.format, { quality: outputFormat.quality })
+            .toBuffer();
+        }
+        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
+        return {
+          buffer: outputBuffer,
+          filename: outputFilename,
+          contentType: outputFormat.contentType,
+        };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
-      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
-      return {
-        buffer: outputBuffer,
-        filename: outputFilename,
-        contentType: outputFormat.contentType,
-      };
     },
   });
 }

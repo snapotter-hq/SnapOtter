@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeRedEye } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -175,7 +177,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
       format: z.string().optional(),
       quality: z.number().min(1).max(100).default(90),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as {
         sensitivity?: number;
         strength?: number;
@@ -195,17 +197,21 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
         }
       }
       const orientedBuffer = await autoOrient(decoded);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await removeRedEye(orientedBuffer, join(workspacePath, "output"), {
-        sensitivity: s.sensitivity ?? 50,
-        strength: s.strength ?? 70,
-        format: s.format,
-        quality: s.quality ?? 90,
-      });
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await removeRedEye(orientedBuffer, scratchDir, {
+          sensitivity: s.sensitivity ?? 50,
+          strength: s.strength ?? 70,
+          format: s.format,
+          quality: s.quality ?? 90,
+        });
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
+        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

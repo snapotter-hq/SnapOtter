@@ -5,18 +5,18 @@
  *
  * Accepts a JSON body with { urls: string[] } (1-50 URLs).
  * Fetches each URL server-side with SSRF protection, validates as an image,
- * saves to a workspace, generates a preview for non-browser formats, and
+ * saves to object storage, generates a preview for non-browser formats, and
  * returns results with download URLs.
  */
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
   MAX_URL_FETCH_SIZE,
@@ -24,7 +24,6 @@ import {
   safeFetch,
   URL_FETCH_CONCURRENCY,
 } from "../lib/ssrf.js";
-import { createWorkspace } from "../lib/workspace.js";
 
 /** Formats browsers can display natively (no preview needed). */
 const BROWSER_PREVIEWABLE = new Set([
@@ -151,8 +150,6 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
 
       const { urls } = parsed.data;
       const jobId = randomUUID();
-      const workspace = await createWorkspace(jobId);
-      const outputDir = join(workspace, "output");
 
       const queue = new PQueue({ concurrency: URL_FETCH_CONCURRENCY });
 
@@ -166,7 +163,7 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
       await Promise.all(
         urls.map((url, index) =>
           queue.add(async () => {
-            resultSlots[index] = await fetchSingleUrl(url, jobId, outputDir, usedFilenames);
+            resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames);
           }),
         ),
       );
@@ -179,7 +176,6 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
 async function fetchSingleUrl(
   url: string,
   jobId: string,
-  outputDir: string,
   usedFilenames: Set<string>,
 ): Promise<FetchResult> {
   try {
@@ -246,8 +242,8 @@ async function fetchSingleUrl(
       return { success: false, url, error: validation.reason };
     }
 
-    // Save to output directory
-    await writeFile(join(outputDir, filename), buffer);
+    // Save to object storage uploads prefix (raw fetched files)
+    await putObject(`uploads/${jobId}/${filename}`, buffer);
 
     const contentType = FORMAT_TO_MIME[validation.format] ?? "application/octet-stream";
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
@@ -258,7 +254,7 @@ async function fetchSingleUrl(
       try {
         const previewBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
-        await writeFile(join(outputDir, previewFilename), previewBuffer);
+        await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
         previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
       } catch {
         // Preview generation failed -- non-fatal, skip preview

@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -14,7 +12,7 @@ import {
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
+import { putObject } from "../../lib/object-storage.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -177,11 +175,9 @@ export function registerEditMetadata(app: FastifyInstance) {
       // Determine content type from validated format
       const contentType = MIME_BY_FORMAT[validation.format] ?? "image/jpeg";
 
-      // Create workspace and save output
+      // Save output to object storage
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", filename);
-      await writeFile(outputPath, outputBuffer);
+      await putObject(`outputs/${jobId}/${filename}`, outputBuffer);
 
       // Generate preview for non-browser-previewable formats (HEIF, TIFF)
       let previewUrl: string | undefined;
@@ -192,8 +188,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             previewInput = await decodeHeic(outputBuffer);
           }
           const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-          const previewPath = join(workspacePath, "output", "preview.webp");
-          await writeFile(previewPath, previewBuffer);
+          await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
           previewUrl = `/api/v1/download/${jobId}/preview.webp`;
         } catch {
           // Non-fatal - frontend shows fallback

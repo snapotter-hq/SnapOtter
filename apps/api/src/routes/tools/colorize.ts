@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { colorize } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -179,17 +181,21 @@ export function registerColorize(app: FastifyInstance) {
       intensity: z.number().min(0).max(1).default(1.0),
       model: z.enum(["auto", "ddcolor", "opencv"]).default("auto"),
     }),
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
-      const result = await colorize(orientedBuffer, join(workspacePath, "output"), {
-        intensity: (settings as { intensity?: number }).intensity ?? 1.0,
-        model: (settings as { model?: string }).model ?? "auto",
-      });
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_colorized.png`;
-      return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const result = await colorize(orientedBuffer, scratchDir, {
+          intensity: (settings as { intensity?: number }).intensity ?? 1.0,
+          model: (settings as { model?: string }).model ?? "auto",
+        });
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_colorized.png`;
+        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

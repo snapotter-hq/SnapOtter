@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -11,8 +10,8 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
+import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-import { createWorkspace } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 // ---------------------------------------------------------------------------
@@ -331,9 +330,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
       const output = await processMeme(imageBuffer, settings, filename, templateTextBoxes);
 
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputPath = join(workspacePath, "output", output.filename);
-      await writeFile(outputPath, output.buffer);
+      await putObject(`outputs/${jobId}/${output.filename}`, output.buffer);
 
       return reply.send({
         jobId,

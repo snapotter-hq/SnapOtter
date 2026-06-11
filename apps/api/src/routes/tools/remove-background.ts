@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
@@ -21,7 +22,6 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
-import { getWorkspacePath } from "../../lib/workspace.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -285,15 +285,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         const { jobId, filename } = settings;
 
-        const workspacePath = getWorkspacePath(jobId);
-
         const baseName = filename.replace(/\.[^.]+$/, "");
-        const maskPath = join(workspacePath, "output", `${baseName}_mask.png`);
-        const originalPath = join(workspacePath, "output", `${baseName}_original.png`);
+        const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
+        const originalKey = `outputs/${jobId}/${baseName}_original.png`;
 
         const [maskBuffer, originalBuffer] = await Promise.all([
-          readFile(maskPath),
-          readFile(originalPath),
+          getObjectBuffer(maskKey),
+          getObjectBuffer(originalKey),
         ]);
 
         // Decode HEIC/HEIF background image if needed
@@ -325,9 +323,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         // Save the final output
         const outputFilename = `${baseName}_nobg.${fmt}`;
-        const outputPath = join(workspacePath, "output", outputFilename);
-        const { writeFile } = await import("node:fs/promises");
-        await writeFile(outputPath, resultBuffer);
+        await putObject(`outputs/${jobId}/${outputFilename}`, resultBuffer);
 
         return reply.send({
           jobId,
@@ -348,39 +344,42 @@ export function registerRemoveBackground(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "remove-background",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
+    process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
-      const jobId = randomUUID();
-      const { createWorkspace } = await import("../../lib/workspace.js");
-      const workspacePath = await createWorkspace(jobId);
+      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+      const needsCleanup = !ctx?.scratchDir;
+      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+      try {
+        const transparentResult = await removeBackground(orientedBuffer, scratchDir, {
+          model: s.model,
+          edgeRefine: s.edgeRefine,
+          decontaminate: s.decontaminate,
+        });
 
-      const transparentResult = await removeBackground(
-        orientedBuffer,
-        join(workspacePath, "output"),
-        { model: s.model, edgeRefine: s.edgeRefine, decontaminate: s.decontaminate },
-      );
+        const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
+        const resultBuffer = await applyEffects(transparentResult, orientedBuffer, {
+          backgroundType: s.backgroundType,
+          backgroundColor: s.backgroundColor,
+          gradientColor1: s.gradientColor1,
+          gradientColor2: s.gradientColor2,
+          gradientAngle: s.gradientAngle,
+          blurEnabled: s.blurEnabled,
+          blurIntensity: s.blurIntensity,
+          shadowEnabled: s.shadowEnabled,
+          shadowOpacity: s.shadowOpacity,
+          outputFormat: fmt,
+        });
 
-      const fmt = (s.outputFormat ?? "png") as BgOutputFormat;
-      const resultBuffer = await applyEffects(transparentResult, orientedBuffer, {
-        backgroundType: s.backgroundType,
-        backgroundColor: s.backgroundColor,
-        gradientColor1: s.gradientColor1,
-        gradientColor2: s.gradientColor2,
-        gradientAngle: s.gradientAngle,
-        blurEnabled: s.blurEnabled,
-        blurIntensity: s.blurIntensity,
-        shadowEnabled: s.shadowEnabled,
-        shadowOpacity: s.shadowOpacity,
-        outputFormat: fmt,
-      });
-
-      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`;
-      return {
-        buffer: resultBuffer,
-        filename: outputFilename,
-        contentType: BG_FORMAT_CONTENT_TYPES[fmt],
-      };
+        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.${fmt}`;
+        return {
+          buffer: resultBuffer,
+          filename: outputFilename,
+          contentType: BG_FORMAT_CONTENT_TYPES[fmt],
+        };
+      } finally {
+        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
     },
   });
 }

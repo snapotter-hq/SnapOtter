@@ -1,7 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
@@ -11,7 +8,7 @@ import { env } from "../../config.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
-import { createWorkspace } from "../../lib/workspace.js";
+import { putObject } from "../../lib/object-storage.js";
 
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -329,9 +326,8 @@ export function registerPdfToImage(app: FastifyInstance) {
 
       const ext = FORMAT_EXT[settings.format] ?? ".png";
       const jobId = randomUUID();
-      const workspacePath = await createWorkspace(jobId);
-      const outputDir = join(workspacePath, "output");
       const pages: Array<{ page: number; downloadUrl: string; size: number }> = [];
+      const pageBuffers = new Map<string, Buffer>();
 
       for (const pageNum of selectedPages) {
         const pngBytes = renderPage(doc, pageNum - 1, settings.dpi);
@@ -342,8 +338,8 @@ export function registerPdfToImage(app: FastifyInstance) {
           settings.colorMode,
         );
         const filename = `page-${pageNum}${ext}`;
-        const filePath = join(outputDir, filename);
-        await writeFile(filePath, imageBuffer);
+        await putObject(`outputs/${jobId}/${filename}`, imageBuffer);
+        pageBuffers.set(filename, imageBuffer);
         pages.push({
           page: pageNum,
           downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
@@ -354,23 +350,10 @@ export function registerPdfToImage(app: FastifyInstance) {
       doc.destroy();
       doc = null;
 
-      // Generate ZIP
+      // Generate ZIP in memory
       const zipFilename = "pdf-pages.zip";
-      const zipPath = join(outputDir, zipFilename);
-      await new Promise<void>((resolve, reject) => {
-        const output = createWriteStream(zipPath);
-        const archive = archiver("zip", { zlib: { level: 5 } });
-        output.on("close", resolve);
-        archive.on("error", reject);
-        archive.pipe(output);
-        for (const p of pages) {
-          const fname = `page-${p.page}${ext}`;
-          archive.file(join(outputDir, fname), { name: fname });
-        }
-        archive.finalize();
-      });
-
-      const zipStat = await stat(zipPath);
+      const zipBuffer = await buildZipFromBuffers(pageBuffers);
+      await putObject(`outputs/${jobId}/${zipFilename}`, zipBuffer);
 
       return reply.send({
         jobId,
@@ -379,7 +362,7 @@ export function registerPdfToImage(app: FastifyInstance) {
         format: settings.format,
         pages,
         zipUrl: `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`,
-        zipSize: zipStat.size,
+        zipSize: zipBuffer.length,
       });
     } catch (err) {
       doc?.destroy();
@@ -389,4 +372,21 @@ export function registerPdfToImage(app: FastifyInstance) {
       });
     }
   });
+}
+
+/** Build a ZIP archive in memory from name-to-buffer entries. */
+async function buildZipFromBuffers(entries: Map<string, Buffer>): Promise<Buffer> {
+  const archive = archiver("zip", { zlib: { level: 5 } });
+  const chunks: Buffer[] = [];
+  archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<void>((resolve, reject) => {
+    archive.on("end", resolve);
+    archive.on("error", reject);
+  });
+  for (const [name, buffer] of entries) {
+    archive.append(buffer, { name });
+  }
+  await archive.finalize();
+  await done;
+  return Buffer.concat(chunks);
 }

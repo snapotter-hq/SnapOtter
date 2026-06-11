@@ -1,12 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { captureHtml, capturePage, isBrowserAvailable } from "../../lib/browser-service.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { putObject } from "../../lib/object-storage.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
-import { createWorkspace } from "../../lib/workspace.js";
 
 const DEVICE_PRESETS = {
   desktop: { width: 1280, height: 720, isMobile: false },
@@ -95,10 +93,9 @@ export function registerHtmlToImage(app: FastifyInstance) {
           : await capturePage(settings.url!, captureOpts);
 
         const jobId = randomUUID();
-        const workspacePath = await createWorkspace(jobId);
         const ext = settings.format;
         const filename = `screenshot.${ext}`;
-        await writeFile(join(workspacePath, "output", filename), buffer);
+        await putObject(`outputs/${jobId}/${filename}`, buffer);
 
         return reply.send({
           jobId,
