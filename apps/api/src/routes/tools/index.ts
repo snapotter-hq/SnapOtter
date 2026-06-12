@@ -10,6 +10,7 @@ import { registerBlurFaces } from "./blur-faces.js";
 import { registerBookletPdf } from "./booklet-pdf.js";
 import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
+import { registerChangeFps } from "./change-fps.js";
 import { registerCollage } from "./collage.js";
 import { registerColorBlindness } from "./color-blindness.js";
 import { registerColorPalette } from "./color-palette.js";
@@ -25,6 +26,7 @@ import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
 import { registerCropPdf } from "./crop-pdf.js";
+import { registerCropVideo } from "./crop-video.js";
 import { registerCsvExcel } from "./csv-excel.js";
 import { registerCsvJson } from "./csv-json.js";
 import { registerEditMetadata } from "./edit-metadata.js";
@@ -70,9 +72,11 @@ import { registerRemovePages } from "./remove-pages.js";
 import { registerRepairPdf } from "./repair-pdf.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
+import { registerResizeVideo } from "./resize-video.js";
 import { registerRestorePhoto } from "./restore-photo.js";
 import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
+import { registerRotateVideo } from "./rotate-video.js";
 import { registerSharpening } from "./sharpening.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
@@ -88,6 +92,7 @@ import { registerTrimVideo } from "./trim-video.js";
 import { registerUnlockPdf } from "./unlock-pdf.js";
 import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
+import { registerVideoColor } from "./video-color.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
@@ -178,10 +183,15 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "color-blindness", register: registerColorBlindness },
 
     // Video
-    { id: "convert-video", register: registerConvertVideo },
+    { id: "change-fps", register: registerChangeFps },
     { id: "compress-video", register: registerCompressVideo },
-    { id: "trim-video", register: registerTrimVideo },
+    { id: "convert-video", register: registerConvertVideo },
+    { id: "crop-video", register: registerCropVideo },
     { id: "mute-video", register: registerMuteVideo },
+    { id: "resize-video", register: registerResizeVideo },
+    { id: "rotate-video", register: registerRotateVideo },
+    { id: "trim-video", register: registerTrimVideo },
+    { id: "video-color", register: registerVideoColor },
     { id: "video-to-gif", register: registerVideoToGif },
 
     // Audio
