@@ -34,9 +34,12 @@ export function registerEpubConvert(app: FastifyInstance) {
       ctx.report(10, "Converting");
 
       if (format === "pdf") {
-        // Two-step chain: epub -> self-contained HTML -> PDF via WeasyPrint
+        // Two-step chain: epub -> standalone HTML -> PDF via WeasyPrint.
+        // Resource embedding MUST stay OFF: pandoc --self-contained / --embed-resources
+        // would fetch remote refs server-side (SSRF). The weasyprint bridge pre-scan
+        // enforces remote-ref rejection so the PDF path fails safely on remote content.
         const intermediateHtml = join(ctx.scratchDir, "book.html");
-        await runPandoc(inPath, intermediateHtml, { selfContained: true });
+        await runPandoc(inPath, intermediateHtml, { extraArgs: ["--standalone"] });
         const outPath = join(ctx.scratchDir, `${base}.pdf`);
         await htmlToPdfPy(intermediateHtml, outPath, "html");
         ctx.report(90, "Done");
@@ -49,7 +52,7 @@ export function registerEpubConvert(app: FastifyInstance) {
 
       // Direct pandoc conversion for docx, html, md
       const outPath = join(ctx.scratchDir, `${base}.${format}`);
-      await runPandoc(inPath, outPath, format === "html" ? { selfContained: true } : {});
+      await runPandoc(inPath, outPath, format === "html" ? { extraArgs: ["--standalone"] } : {});
       ctx.report(90, "Done");
 
       return {
