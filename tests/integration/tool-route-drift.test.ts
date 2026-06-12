@@ -15,6 +15,7 @@ import { buildTestApp, loginAsAdmin, type TestApp } from "./test-server.js";
  *    URLs (consolidated into adjust-colors).
  */
 const REGISTRY_EXEMPT = new Set([
+  "barcode-generate",
   "barcode-read",
   "bulk-rename",
   "collage",

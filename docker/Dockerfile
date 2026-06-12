@@ -238,11 +238,11 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
        fi \
     && rm -rf /var/lib/apt/lists/*
 
-# Allow ImageMagick to use Ghostscript delegate for EPS decode (read-only).
-# Modern Debian blocks EPS/PS by default. We only grant read rights.
+# Allow ImageMagick to use Ghostscript delegate for EPS (read for decode,
+# write for the convert tool's EPS output). PS/PDF/XPS stay read-only.
 RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1) && \
     if [ -n "$POLICY_FILE" ]; then \
-      sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read" pattern="EPS"/' "$POLICY_FILE" && \
+      sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read|write" pattern="EPS"/' "$POLICY_FILE" && \
       sed -i 's/<policy domain="coder" rights="none" pattern="PS"/<policy domain="coder" rights="read" pattern="PS"/' "$POLICY_FILE" && \
       sed -i 's/<policy domain="coder" rights="none" pattern="PDF"/<policy domain="coder" rights="read" pattern="PDF"/' "$POLICY_FILE" && \
       sed -i 's/<policy domain="coder" rights="none" pattern="XPS"/<policy domain="coder" rights="read" pattern="XPS"/' "$POLICY_FILE"; \
