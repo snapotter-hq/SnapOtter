@@ -12,6 +12,7 @@ import { registerBlurPad } from "./blur-pad.js";
 import { registerBookletPdf } from "./booklet-pdf.js";
 import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
+import { registerBurnSubtitles } from "./burn-subtitles.js";
 import { registerChangeFps } from "./change-fps.js";
 import { registerCollage } from "./collage.js";
 import { registerColorBlindness } from "./color-blindness.js";
@@ -32,10 +33,12 @@ import { registerCropVideo } from "./crop-video.js";
 import { registerCsvExcel } from "./csv-excel.js";
 import { registerCsvJson } from "./csv-json.js";
 import { registerEditMetadata } from "./edit-metadata.js";
+import { registerEmbedSubtitles } from "./embed-subtitles.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
 import { registerEraseObject } from "./erase-object.js";
 import { registerExtractAudio } from "./extract-audio.js";
 import { registerExtractPages } from "./extract-pages.js";
+import { registerExtractSubtitles } from "./extract-subtitles.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerFlattenPdf } from "./flatten-pdf.js";
@@ -47,6 +50,7 @@ import { registerHtmlToPdf } from "./html-to-pdf.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
 import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
+import { registerImagesToVideo } from "./images-to-video.js";
 import { registerInfo } from "./info.js";
 import { registerJsonXml } from "./json-xml.js";
 import { registerLinearizePdf } from "./linearize-pdf.js";
@@ -101,6 +105,7 @@ import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
 import { registerVideoColor } from "./video-color.js";
 import { registerVideoLoudnorm } from "./video-loudnorm.js";
+import { registerVideoMetadata } from "./video-metadata.js";
 import { registerVideoSpeed } from "./video-speed.js";
 import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
@@ -197,11 +202,15 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     // Video
     { id: "aspect-pad", register: registerAspectPad },
     { id: "blur-pad", register: registerBlurPad },
+    { id: "burn-subtitles", register: registerBurnSubtitles },
     { id: "change-fps", register: registerChangeFps },
     { id: "compress-video", register: registerCompressVideo },
     { id: "convert-video", register: registerConvertVideo },
     { id: "crop-video", register: registerCropVideo },
+    { id: "embed-subtitles", register: registerEmbedSubtitles },
+    { id: "extract-subtitles", register: registerExtractSubtitles },
     { id: "gif-to-video", register: registerGifToVideo },
+    { id: "images-to-video", register: registerImagesToVideo },
     { id: "merge-videos", register: registerMergeVideos },
     { id: "mute-video", register: registerMuteVideo },
     { id: "replace-audio", register: registerReplaceAudio },
@@ -212,6 +221,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "trim-video", register: registerTrimVideo },
     { id: "video-color", register: registerVideoColor },
     { id: "video-loudnorm", register: registerVideoLoudnorm },
+    { id: "video-metadata", register: registerVideoMetadata },
     { id: "video-speed", register: registerVideoSpeed },
     { id: "video-to-frames", register: registerVideoToFrames },
     { id: "video-to-gif", register: registerVideoToGif },

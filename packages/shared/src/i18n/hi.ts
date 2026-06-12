@@ -361,6 +361,26 @@ export const hi: TranslationKeys = {
       name: "Replace Audio",
       description: "Swap the audio track of a video with another file",
     },
+    "burn-subtitles": {
+      name: "Burn Subtitles",
+      description: "Permanently render subtitles onto video frames",
+    },
+    "embed-subtitles": {
+      name: "Embed Subtitles",
+      description: "Mux a subtitle track into the video container",
+    },
+    "extract-subtitles": {
+      name: "Extract Subtitles",
+      description: "Pull the subtitle track out of a video as an SRT file",
+    },
+    "images-to-video": {
+      name: "Images to Video",
+      description: "Turn a set of images into a slideshow video",
+    },
+    "video-metadata": {
+      name: "Clean Video Metadata",
+      description: "Strip metadata from a video and report what was found",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1630,6 +1650,39 @@ export const hi: TranslationKeys = {
       submit: "Replace Audio",
       submitBatch: "Replace Audio ({count} files)",
       progressLabel: "Replacing audio",
+    },
+    "burn-subtitles": {
+      fontSize: "Font size",
+      hint: "Upload a video and a subtitle file (.srt or .vtt)",
+      submit: "Burn Subtitles",
+      submitBatch: "Burn Subtitles ({count} files)",
+      progressLabel: "Burning subtitles",
+    },
+    "embed-subtitles": {
+      language: "Language code",
+      languageHint: "Three-letter ISO 639-2 code, e.g. eng, spa, fra",
+      submit: "Embed Subtitles",
+      submitBatch: "Embed Subtitles ({count} files)",
+      progressLabel: "Embedding subtitles",
+    },
+    "extract-subtitles": {
+      submit: "Extract Subtitles",
+      submitBatch: "Extract Subtitles ({count} files)",
+      progressLabel: "Extracting subtitles",
+    },
+    "images-to-video": {
+      secondsPerImage: "Seconds per image",
+      resolution: "Resolution",
+      fps: "Frames per second",
+      submit: "Create Video",
+      submitBatch: "Create Video ({count} files)",
+      progressLabel: "Creating slideshow",
+    },
+    "video-metadata": {
+      hint: "Metadata report appears in the result",
+      submit: "Strip Metadata",
+      submitBatch: "Strip Metadata ({count} files)",
+      progressLabel: "Stripping metadata",
     },
     "convert-audio": {
       format: "Output format",

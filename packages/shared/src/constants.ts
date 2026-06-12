@@ -1,4 +1,4 @@
-import { AUDIO_INPUTS, IMAGE_INPUTS, VIDEO_INPUTS } from "./modality.js";
+import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -851,6 +851,61 @@ export const TOOLS: Tool[] = [
     route: "/replace-audio",
     modality: "video",
     acceptedInputs: [...VIDEO_INPUTS, ...AUDIO_INPUTS],
+    executionHint: "fast",
+  },
+  {
+    id: "burn-subtitles",
+    name: "Burn Subtitles",
+    description: "Permanently render subtitles onto video frames",
+    category: "video",
+    icon: "Captions",
+    route: "/burn-subtitles",
+    modality: "video",
+    acceptedInputs: [...VIDEO_INPUTS, ...SUBTITLE_INPUTS],
+    executionHint: "long",
+  },
+  {
+    id: "embed-subtitles",
+    name: "Embed Subtitles",
+    description: "Mux a subtitle track into the video container",
+    category: "video",
+    icon: "MessageSquareText",
+    route: "/embed-subtitles",
+    modality: "video",
+    acceptedInputs: [...VIDEO_INPUTS, ...SUBTITLE_INPUTS],
+    executionHint: "fast",
+  },
+  {
+    id: "extract-subtitles",
+    name: "Extract Subtitles",
+    description: "Pull the subtitle track out of a video as an SRT file",
+    category: "video",
+    icon: "FileText",
+    route: "/extract-subtitles",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "images-to-video",
+    name: "Images to Video",
+    description: "Turn a set of images into a slideshow video",
+    category: "video",
+    icon: "GalleryThumbnails",
+    route: "/images-to-video",
+    modality: "video",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "video-metadata",
+    name: "Clean Video Metadata",
+    description: "Strip metadata from a video and report what was found",
+    category: "video",
+    icon: "Tags",
+    route: "/video-metadata",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
     executionHint: "fast",
   },
   // Audio
