@@ -15,6 +15,7 @@ import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
+import { MediaInputHandler, type MediaInputKind } from "../modality/media-input.js";
 import { getAuthUser } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
 
@@ -69,6 +70,12 @@ export interface ToolRouteConfig<T> {
    * inputRefs in arrival order.
    */
   maxInputs?: number;
+  /**
+   * Per-position input kind overrides for mixed-input tools (e.g. video +
+   * subtitle). Input i validates with kind inputKinds[Math.min(i, len-1)].
+   * When absent, the tool's modality drives a single handler as before.
+   */
+  inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   /** Zod schema that validates the settings JSON from the request. */
   settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
@@ -100,6 +107,7 @@ export interface ToolRouteConfig<T> {
 export interface AnyToolRouteConfig {
   toolId: string;
   maxInputs?: number;
+  inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
     inputBuffer: Buffer,
@@ -294,6 +302,23 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
 
+        // Build per-position input handlers: when inputKinds is present,
+        // each position gets a MediaInputHandler for its kind; otherwise
+        // the tool's modality drives a single shared handler as before.
+        const kindHandlers: Map<MediaInputKind, MediaInputHandler> = new Map();
+        function handlerForPosition(idx: number) {
+          if (config.inputKinds) {
+            const kind = config.inputKinds[Math.min(idx, config.inputKinds.length - 1)];
+            let h = kindHandlers.get(kind);
+            if (!h) {
+              h = new MediaInputHandler(kind);
+              kindHandlers.set(kind, h);
+            }
+            return h;
+          }
+          return inputHandlerFor(modality);
+        }
+
         // Prepare all files through the modality input handler
         const inputRefs: string[] = [];
         for (let i = 0; i < received.length; i++) {
@@ -303,7 +328,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           let fname = upload.filename;
 
           try {
-            const prepared = await inputHandlerFor(modality).prepare(fileBuffer, fname, {
+            const prepared = await handlerForPosition(i).prepare(fileBuffer, fname, {
               scratchDir,
               lenient: config.skipStructuralValidation,
             });

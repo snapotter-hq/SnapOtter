@@ -97,6 +97,7 @@ export const AUDIO_INPUTS = [
   ".amr",
   ".ac3",
 ];
+export const SUBTITLE_INPUTS = [".srt", ".vtt", ".ass"] as const;
 export const DOCUMENT_INPUTS = [
   ".pdf",
   ".docx",
