@@ -53,11 +53,23 @@ describe.skipIf(!ffmpegAvailable())("watermark-video (requires ffmpeg)", () => {
     expect(info.streams.some((s) => s.type === "video")).toBe(true);
   }, 60_000);
 
-  it("handles special characters in text via textfile bypass", async () => {
-    const res = await runTool({ text: "a:b'c\\d,e" });
+  it("handles special characters and literal percent sequences in text", async () => {
+    const res = await runTool({ text: "a:b'c\\d,e %{pts} %{bad}" });
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
     expect(envelope.downloadUrl).toBeDefined();
+
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: envelope.downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "wm-special-"));
+    const probeFile = join(tmpDir, "watermarked.mp4");
+    writeFileSync(probeFile, dl.rawPayload);
+    const info = await probeMedia(probeFile);
+    expect(info.streams.some((s) => s.type === "video")).toBe(true);
   }, 60_000);
 
   it("rejects empty text with 400", async () => {

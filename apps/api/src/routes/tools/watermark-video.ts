@@ -53,7 +53,8 @@ export function registerWatermarkVideo(app: FastifyInstance) {
 
       const color = `${settings.color.replace("#", "0x")}@${settings.opacity.toFixed(2)}`;
 
-      const vf = `drawtext=fontfile=${font.file}:textfile=${textFile}:fontsize=${settings.fontSize}:fontcolor=${color}:${POS[settings.position]}`;
+      // expansion=none: user text is literal; %{...} sequences must not expand
+      const vf = `drawtext=fontfile=${font.file}:textfile=${textFile}:fontsize=${settings.fontSize}:fontcolor=${color}:${POS[settings.position]}:expansion=none`;
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => [
         "-i",
