@@ -404,6 +404,52 @@ describe("Pipeline save rejects password tools", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE EXECUTE REJECTS PASSWORD TOOLS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline execute rejects password tools", () => {
+  it("rejects executing a pipeline containing protect-pdf", async () => {
+    const res = await executePipeline(PNG_200x150, "test.png", {
+      steps: [
+        { toolId: "resize", settings: { width: 100 } },
+        { toolId: "protect-pdf", settings: { userPassword: "test" } },
+      ],
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/password/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE BATCH REJECTS PASSWORD TOOLS
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline batch rejects password tools", () => {
+  it("rejects a batch pipeline containing unlock-pdf", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "unlock-pdf", settings: { password: "test" } }],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/password/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DELETE PIPELINE EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Delete pipeline edge cases", () => {
