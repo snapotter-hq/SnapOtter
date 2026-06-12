@@ -5,7 +5,7 @@
  * Adding a new tool means adding one entry here instead of editing a 750-line file.
  */
 
-import { AUDIO_INPUTS, VIDEO_INPUTS } from "@snapotter/shared";
+import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "@snapotter/shared";
 import type React from "react";
 import { lazy } from "react";
 import type { Crop } from "react-image-crop";
@@ -429,6 +429,56 @@ const StabilizeVideoSettings = lazy(() =>
     default: m.StabilizeVideoSettings,
   })),
 );
+const GifToVideoSettings = lazy(() =>
+  import("@/components/tools/gif-to-video-settings").then((m) => ({
+    default: m.GifToVideoSettings,
+  })),
+);
+const VideoToWebpSettings = lazy(() =>
+  import("@/components/tools/video-to-webp-settings").then((m) => ({
+    default: m.VideoToWebpSettings,
+  })),
+);
+const VideoToFramesSettings = lazy(() =>
+  import("@/components/tools/video-to-frames-settings").then((m) => ({
+    default: m.VideoToFramesSettings,
+  })),
+);
+const MergeVideosSettings = lazy(() =>
+  import("@/components/tools/merge-videos-settings").then((m) => ({
+    default: m.MergeVideosSettings,
+  })),
+);
+const ReplaceAudioSettings = lazy(() =>
+  import("@/components/tools/replace-audio-settings").then((m) => ({
+    default: m.ReplaceAudioSettings,
+  })),
+);
+const BurnSubtitlesSettings = lazy(() =>
+  import("@/components/tools/burn-subtitles-settings").then((m) => ({
+    default: m.BurnSubtitlesSettings,
+  })),
+);
+const EmbedSubtitlesSettings = lazy(() =>
+  import("@/components/tools/embed-subtitles-settings").then((m) => ({
+    default: m.EmbedSubtitlesSettings,
+  })),
+);
+const ExtractSubtitlesSettings = lazy(() =>
+  import("@/components/tools/extract-subtitles-settings").then((m) => ({
+    default: m.ExtractSubtitlesSettings,
+  })),
+);
+const ImagesToVideoSettings = lazy(() =>
+  import("@/components/tools/images-to-video-settings").then((m) => ({
+    default: m.ImagesToVideoSettings,
+  })),
+);
+const VideoMetadataSettings = lazy(() =>
+  import("@/components/tools/video-metadata-settings").then((m) => ({
+    default: m.VideoMetadataSettings,
+  })),
+);
 const ConvertAudioSettings = lazy(() =>
   import("@/components/tools/convert-audio-settings").then((m) => ({
     default: m.ConvertAudioSettings,
@@ -725,6 +775,34 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["blur-pad", { accept: VIDEO_INPUTS.join(","), Settings: BlurPadSettings }],
   ["watermark-video", { accept: VIDEO_INPUTS.join(","), Settings: WatermarkVideoSettings }],
   ["stabilize-video", { accept: VIDEO_INPUTS.join(","), Settings: StabilizeVideoSettings }],
+  ["gif-to-video", { accept: ".gif", Settings: GifToVideoSettings }],
+  ["video-to-webp", { accept: VIDEO_INPUTS.join(","), Settings: VideoToWebpSettings }],
+  ["video-to-frames", { accept: VIDEO_INPUTS.join(","), Settings: VideoToFramesSettings }],
+  ["merge-videos", { accept: VIDEO_INPUTS.join(","), Settings: MergeVideosSettings }],
+  [
+    "replace-audio",
+    {
+      accept: `${VIDEO_INPUTS.join(",")},${AUDIO_INPUTS.join(",")}`,
+      Settings: ReplaceAudioSettings,
+    },
+  ],
+  [
+    "burn-subtitles",
+    {
+      accept: `${VIDEO_INPUTS.join(",")},${SUBTITLE_INPUTS.join(",")}`,
+      Settings: BurnSubtitlesSettings,
+    },
+  ],
+  [
+    "embed-subtitles",
+    {
+      accept: `${VIDEO_INPUTS.join(",")},${SUBTITLE_INPUTS.join(",")}`,
+      Settings: EmbedSubtitlesSettings,
+    },
+  ],
+  ["extract-subtitles", { accept: VIDEO_INPUTS.join(","), Settings: ExtractSubtitlesSettings }],
+  ["images-to-video", { accept: IMAGE_INPUTS.join(","), Settings: ImagesToVideoSettings }],
+  ["video-metadata", { accept: VIDEO_INPUTS.join(","), Settings: VideoMetadataSettings }],
 
   // Audio tools
   ["convert-audio", { accept: AUDIO_INPUTS.join(","), Settings: ConvertAudioSettings }],
