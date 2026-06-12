@@ -444,6 +444,18 @@ export const it: TranslationKeys = {
       name: "Split Audio",
       description: "Split audio by time, equal parts, or silence detection",
     },
+    "ringtone-maker": {
+      name: "Ringtone Maker",
+      description: "Create a ringtone clip from any audio file",
+    },
+    "waveform-image": {
+      name: "Waveform Image",
+      description: "Generate a waveform visualization as a PNG image",
+    },
+    "audio-metadata": {
+      name: "Audio Metadata",
+      description: "View, edit, or strip audio tags (ID3)",
+    },
     "merge-pdf": {
       name: "Merge PDFs",
       description: "Combine multiple PDFs into one",
@@ -1842,6 +1854,31 @@ export const it: TranslationKeys = {
       submit: "Split Audio",
       submitBatch: "Split Audio ({count} files)",
       progressLabel: "Splitting audio",
+    },
+    "ringtone-maker": {
+      "start-s": "Start time (seconds)",
+      "duration-s": "Duration (seconds)",
+      "max-hint": "Maximum 30 seconds",
+      submit: "Create Ringtone",
+      submitBatch: "Create Ringtone ({count} files)",
+      progressLabel: "Creating ringtone",
+    },
+    "waveform-image": {
+      width: "Width (px)",
+      height: "Height (px)",
+      color: "Waveform color",
+      submit: "Generate Waveform",
+      submitBatch: "Generate Waveform ({count} files)",
+      progressLabel: "Generating waveform",
+    },
+    "audio-metadata": {
+      strip: "Strip all metadata",
+      title: "Title",
+      artist: "Artist",
+      album: "Album",
+      submit: "Apply Metadata",
+      submitBatch: "Apply Metadata ({count} files)",
+      progressLabel: "Applying metadata",
     },
     "merge-pdf": {
       addFiles: "Add PDFs to merge",

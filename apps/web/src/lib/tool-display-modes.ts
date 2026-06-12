@@ -133,6 +133,9 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "reverse-audio": "media-player",
   "silence-removal": "media-player",
   "split-audio": "no-comparison",
+  "ringtone-maker": "media-player",
+  "waveform-image": "no-comparison",
+  "audio-metadata": "no-comparison",
   "trim-audio": "media-player",
   "volume-adjust": "media-player",
 

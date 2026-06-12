@@ -6,6 +6,7 @@ import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerAspectPad } from "./aspect-pad.js";
 import { registerAudioChannels } from "./audio-channels.js";
+import { registerAudioMetadata } from "./audio-metadata.js";
 import { registerAudioSpeed } from "./audio-speed.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
@@ -92,6 +93,7 @@ import { registerResizeVideo } from "./resize-video.js";
 import { registerRestorePhoto } from "./restore-photo.js";
 import { registerReverseAudio } from "./reverse-audio.js";
 import { registerReverseVideo } from "./reverse-video.js";
+import { registerRingtoneMaker } from "./ringtone-maker.js";
 import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerRotateVideo } from "./rotate-video.js";
@@ -125,6 +127,7 @@ import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
 import { registerWatermarkText } from "./watermark-text.js";
 import { registerWatermarkVideo } from "./watermark-video.js";
+import { registerWaveformImage } from "./waveform-image.js";
 import { registerWordToPdf } from "./word-to-pdf.js";
 
 /**
@@ -241,6 +244,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
 
     // Audio
     { id: "audio-channels", register: registerAudioChannels },
+    { id: "audio-metadata", register: registerAudioMetadata },
     { id: "audio-speed", register: registerAudioSpeed },
     { id: "convert-audio", register: registerConvertAudio },
     { id: "extract-audio", register: registerExtractAudio },
@@ -250,10 +254,12 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "normalize-audio", register: registerNormalizeAudio },
     { id: "pitch-shift", register: registerPitchShift },
     { id: "reverse-audio", register: registerReverseAudio },
+    { id: "ringtone-maker", register: registerRingtoneMaker },
     { id: "silence-removal", register: registerSilenceRemoval },
     { id: "split-audio", register: registerSplitAudio },
     { id: "trim-audio", register: registerTrimAudio },
     { id: "volume-adjust", register: registerVolumeAdjust },
+    { id: "waveform-image", register: registerWaveformImage },
 
     // PDF & Documents
     { id: "merge-pdf", register: registerMergePdf },
