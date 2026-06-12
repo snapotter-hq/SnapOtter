@@ -776,6 +776,17 @@ export const TOOLS: Tool[] = [
     acceptedInputs: VIDEO_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "watermark-video",
+    name: "Watermark Video",
+    description: "Burn a text watermark onto video frames",
+    category: "video",
+    icon: "Stamp",
+    route: "/watermark-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
   // Audio
   {
     id: "convert-audio",

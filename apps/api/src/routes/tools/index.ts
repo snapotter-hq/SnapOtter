@@ -102,6 +102,7 @@ import { registerVideoToGif } from "./video-to-gif.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
 import { registerWatermarkText } from "./watermark-text.js";
+import { registerWatermarkVideo } from "./watermark-video.js";
 import { registerWordToPdf } from "./word-to-pdf.js";
 
 /**
@@ -203,6 +204,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "video-loudnorm", register: registerVideoLoudnorm },
     { id: "video-speed", register: registerVideoSpeed },
     { id: "video-to-gif", register: registerVideoToGif },
+    { id: "watermark-video", register: registerWatermarkVideo },
 
     // Audio
     { id: "convert-audio", register: registerConvertAudio },

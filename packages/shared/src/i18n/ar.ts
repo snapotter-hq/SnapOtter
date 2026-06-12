@@ -336,6 +336,10 @@ export const ar: TranslationKeys = {
       name: "Blur Pad",
       description: "Fill bars with a blurred copy of the video",
     },
+    "watermark-video": {
+      name: "Watermark Video",
+      description: "Burn a text watermark onto video frames",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1548,6 +1552,17 @@ export const ar: TranslationKeys = {
       submit: "Pad",
       submitBatch: "Pad ({count} files)",
       progressLabel: "Padding",
+    },
+    "watermark-video": {
+      text: "Watermark text",
+      position: "Position",
+      fontSize: "Font size",
+      opacity: "Opacity",
+      color: "Color",
+      colorHint: "Hex color, e.g. #ffffff",
+      submit: "Watermark",
+      submitBatch: "Watermark ({count} files)",
+      progressLabel: "Watermarking",
     },
     "convert-audio": {
       format: "Output format",
