@@ -123,6 +123,13 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "linearize-pdf": "no-comparison",
   "grayscale-pdf": "document",
   "pdfa-convert": "no-comparison",
+  "flatten-pdf": "document",
+  "redact-pdf": "document",
+  "pdf-to-text": "no-comparison",
+  "pdf-to-word": "no-comparison",
+  "pdf-metadata": "no-comparison",
+  "html-to-pdf": "document",
+  "markdown-to-pdf": "document",
 
   // Data tools
   "csv-excel": "no-comparison",

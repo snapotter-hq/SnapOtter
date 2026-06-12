@@ -484,6 +484,56 @@ const PdfPageNumbersSettings = lazy(() =>
     default: m.PdfPageNumbersSettings,
   })),
 );
+const LinearizePdfSettings = lazy(() =>
+  import("@/components/tools/linearize-pdf-settings").then((m) => ({
+    default: m.LinearizePdfSettings,
+  })),
+);
+const GrayscalePdfSettings = lazy(() =>
+  import("@/components/tools/grayscale-pdf-settings").then((m) => ({
+    default: m.GrayscalePdfSettings,
+  })),
+);
+const PdfaConvertSettings = lazy(() =>
+  import("@/components/tools/pdfa-convert-settings").then((m) => ({
+    default: m.PdfaConvertSettings,
+  })),
+);
+const FlattenPdfSettings = lazy(() =>
+  import("@/components/tools/flatten-pdf-settings").then((m) => ({
+    default: m.FlattenPdfSettings,
+  })),
+);
+const RedactPdfSettings = lazy(() =>
+  import("@/components/tools/redact-pdf-settings").then((m) => ({
+    default: m.RedactPdfSettings,
+  })),
+);
+const PdfToTextSettings = lazy(() =>
+  import("@/components/tools/pdf-to-text-settings").then((m) => ({
+    default: m.PdfToTextSettings,
+  })),
+);
+const PdfToWordSettings = lazy(() =>
+  import("@/components/tools/pdf-to-word-settings").then((m) => ({
+    default: m.PdfToWordSettings,
+  })),
+);
+const PdfMetadataSettings = lazy(() =>
+  import("@/components/tools/pdf-metadata-settings").then((m) => ({
+    default: m.PdfMetadataSettings,
+  })),
+);
+const HtmlToPdfSettings = lazy(() =>
+  import("@/components/tools/html-to-pdf-settings").then((m) => ({
+    default: m.HtmlToPdfSettings,
+  })),
+);
+const MarkdownToPdfSettings = lazy(() =>
+  import("@/components/tools/markdown-to-pdf-settings").then((m) => ({
+    default: m.MarkdownToPdfSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -628,6 +678,18 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["booklet-pdf", { accept: ".pdf", Settings: BookletPdfSettings }],
   ["watermark-pdf", { accept: ".pdf", Settings: WatermarkPdfSettings }],
   ["pdf-page-numbers", { accept: ".pdf", Settings: PdfPageNumbersSettings }],
+
+  // PDF convert and optimize tools
+  ["linearize-pdf", { accept: ".pdf", Settings: LinearizePdfSettings }],
+  ["grayscale-pdf", { accept: ".pdf", Settings: GrayscalePdfSettings }],
+  ["pdfa-convert", { accept: ".pdf", Settings: PdfaConvertSettings }],
+  ["flatten-pdf", { accept: ".pdf", Settings: FlattenPdfSettings }],
+  ["redact-pdf", { accept: ".pdf", Settings: RedactPdfSettings }],
+  ["pdf-to-text", { accept: ".pdf", Settings: PdfToTextSettings }],
+  ["pdf-to-word", { accept: ".pdf", Settings: PdfToWordSettings }],
+  ["pdf-metadata", { accept: ".pdf", Settings: PdfMetadataSettings }],
+  ["html-to-pdf", { accept: ".html,.htm", Settings: HtmlToPdfSettings }],
+  ["markdown-to-pdf", { accept: ".md,.markdown", Settings: MarkdownToPdfSettings }],
 
   // Data tools
   ["csv-excel", { accept: ".csv,.xlsx", Settings: CsvExcelSettings }],

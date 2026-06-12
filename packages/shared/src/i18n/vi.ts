@@ -1607,6 +1607,7 @@ export const vi: TranslationKeys = {
       progressLabel: "Extracting",
     },
     "pdf-to-word": {
+      hint: "Best for text-based PDFs; scanned pages need OCR",
       submit: "Convert to Word",
       submitBatch: "Convert to Word ({count} files)",
       progressLabel: "Converting",
@@ -1619,6 +1620,18 @@ export const vi: TranslationKeys = {
       submit: "Set Metadata",
       submitBatch: "Set Metadata ({count} files)",
       progressLabel: "Setting metadata",
+    },
+    "html-to-pdf": {
+      hint: "Remote resources are disabled for privacy.",
+      submit: "Convert to PDF",
+      submitBatch: "Convert to PDF ({count} files)",
+      progressLabel: "Converting",
+    },
+    "markdown-to-pdf": {
+      hint: "Remote resources are disabled for privacy.",
+      submit: "Convert to PDF",
+      submitBatch: "Convert to PDF ({count} files)",
+      progressLabel: "Converting",
     },
     "csv-excel": {
       sheet: "Worksheet number",
