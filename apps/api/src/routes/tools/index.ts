@@ -39,6 +39,7 @@ import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEmbedSubtitles } from "./embed-subtitles.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
 import { registerEraseObject } from "./erase-object.js";
+import { registerExcelToPdf } from "./excel-to-pdf.js";
 import { registerExtractAudio } from "./extract-audio.js";
 import { registerExtractPages } from "./extract-pages.js";
 import { registerExtractSubtitles } from "./extract-subtitles.js";
@@ -79,6 +80,7 @@ import { registerPdfToText } from "./pdf-to-text.js";
 import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
 import { registerPitchShift } from "./pitch-shift.js";
+import { registerPowerpointToPdf } from "./powerpoint-to-pdf.js";
 import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
@@ -262,6 +264,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "waveform-image", register: registerWaveformImage },
 
     // PDF & Documents
+    { id: "excel-to-pdf", register: registerExcelToPdf },
     { id: "merge-pdf", register: registerMergePdf },
     { id: "split-pdf", register: registerSplitPdf },
     { id: "compress-pdf", register: registerCompressPdf },
@@ -286,6 +289,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "pdf-to-text", register: registerPdfToText },
     { id: "pdf-to-word", register: registerPdfToWord },
     { id: "pdf-metadata", register: registerPdfMetadata },
+    { id: "powerpoint-to-pdf", register: registerPowerpointToPdf },
     { id: "html-to-pdf", register: registerHtmlToPdf },
     { id: "markdown-to-pdf", register: registerMarkdownToPdf },
 

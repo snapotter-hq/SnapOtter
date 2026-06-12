@@ -471,6 +471,10 @@ export const sv: TranslationKeys = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "excel-to-pdf": {
+      name: "Excel to PDF",
+      description: "Convert spreadsheets to PDF. Wide sheets may paginate across multiple pages.",
+    },
     "word-to-pdf": {
       name: "Word to PDF",
       description: "Convert Word documents to PDF",
@@ -550,6 +554,10 @@ export const sv: TranslationKeys = {
     "pdf-metadata": {
       name: "PDF Metadata",
       description: "Read and write PDF document metadata",
+    },
+    "powerpoint-to-pdf": {
+      name: "PowerPoint to PDF",
+      description: "Convert presentations to PDF",
     },
     "html-to-pdf": {
       name: "HTML to PDF",
@@ -1914,6 +1922,16 @@ export const sv: TranslationKeys = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "excel-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "powerpoint-to-pdf": {
+      submit: "Convert to PDF",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
     "word-to-pdf": {
       submit: "Convert to PDF",

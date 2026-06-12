@@ -140,6 +140,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "waveform-image": "no-comparison",
 
   // PDF & Document tools
+  "excel-to-pdf": "document",
   "merge-pdf": "document",
   "split-pdf": "no-comparison",
   "compress-pdf": "document",
@@ -164,6 +165,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "pdf-to-text": "no-comparison",
   "pdf-to-word": "no-comparison",
   "pdf-metadata": "no-comparison",
+  "powerpoint-to-pdf": "document",
   "html-to-pdf": "document",
   "markdown-to-pdf": "document",
 
