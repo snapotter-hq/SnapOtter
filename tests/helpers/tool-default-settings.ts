@@ -29,6 +29,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "rotate-video": { transform: "cw90" },
   "resize-video": { preset: "720p" },
   "watermark-video": { text: "CONFIDENTIAL" },
+  "audio-channels": { mode: "mono-to-stereo" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {

@@ -5,6 +5,8 @@ import { db, schema } from "../../db/index.js";
 import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerAspectPad } from "./aspect-pad.js";
+import { registerAudioChannels } from "./audio-channels.js";
+import { registerAudioSpeed } from "./audio-speed.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurFaces } from "./blur-faces.js";
@@ -60,6 +62,7 @@ import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMuteVideo } from "./mute-video.js";
+import { registerNoiseReduction } from "./noise-reduction.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerNormalizeAudio } from "./normalize-audio.js";
 import { registerNupPdf } from "./nup-pdf.js";
@@ -73,6 +76,7 @@ import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerPdfToText } from "./pdf-to-text.js";
 import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
+import { registerPitchShift } from "./pitch-shift.js";
 import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
@@ -91,6 +95,7 @@ import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerRotateVideo } from "./rotate-video.js";
 import { registerSharpening } from "./sharpening.js";
+import { registerSilenceRemoval } from "./silence-removal.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
 import { registerSplitCsv } from "./split-csv.js";
@@ -233,11 +238,16 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "watermark-video", register: registerWatermarkVideo },
 
     // Audio
+    { id: "audio-channels", register: registerAudioChannels },
+    { id: "audio-speed", register: registerAudioSpeed },
     { id: "convert-audio", register: registerConvertAudio },
     { id: "extract-audio", register: registerExtractAudio },
     { id: "fade-audio", register: registerFadeAudio },
+    { id: "noise-reduction", register: registerNoiseReduction },
     { id: "normalize-audio", register: registerNormalizeAudio },
+    { id: "pitch-shift", register: registerPitchShift },
     { id: "reverse-audio", register: registerReverseAudio },
+    { id: "silence-removal", register: registerSilenceRemoval },
     { id: "trim-audio", register: registerTrimAudio },
     { id: "volume-adjust", register: registerVolumeAdjust },
 

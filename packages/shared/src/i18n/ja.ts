@@ -380,6 +380,26 @@ export const ja: TranslationKeys = {
       name: "Reverse Audio",
       description: "Play audio backwards",
     },
+    "audio-speed": {
+      name: "Audio Speed",
+      description: "Speed up or slow down audio playback",
+    },
+    "pitch-shift": {
+      name: "Pitch Shift",
+      description: "Raise or lower pitch by semitones without changing speed",
+    },
+    "audio-channels": {
+      name: "Audio Channels",
+      description: "Convert between mono, stereo, or swap left and right channels",
+    },
+    "silence-removal": {
+      name: "Silence Removal",
+      description: "Strip silent sections from audio",
+    },
+    "noise-reduction": {
+      name: "Noise Reduction",
+      description: "Reduce background noise with FFT-based denoising",
+    },
     "merge-pdf": {
       name: "Merge PDFs",
       description: "Combine multiple PDFs into one",
@@ -1712,6 +1732,43 @@ export const ja: TranslationKeys = {
       submit: "Reverse",
       submitBatch: "Reverse ({count} files)",
       progressLabel: "Reversing",
+    },
+    "audio-speed": {
+      factor: "Speed factor",
+      submit: "Change Speed",
+      submitBatch: "Change Speed ({count} files)",
+      progressLabel: "Changing speed",
+    },
+    "pitch-shift": {
+      semitones: "Semitones",
+      submit: "Shift Pitch",
+      submitBatch: "Shift Pitch ({count} files)",
+      progressLabel: "Shifting pitch",
+    },
+    "audio-channels": {
+      mode: "Channel mode",
+      "stereo-to-mono": "Stereo to mono",
+      "mono-to-stereo": "Mono to stereo",
+      swap: "Swap left/right",
+      submit: "Convert Channels",
+      submitBatch: "Convert Channels ({count} files)",
+      progressLabel: "Converting channels",
+    },
+    "silence-removal": {
+      "threshold-db": "Silence threshold (dB)",
+      "min-silence-s": "Minimum silence duration (seconds)",
+      submit: "Remove Silence",
+      submitBatch: "Remove Silence ({count} files)",
+      progressLabel: "Removing silence",
+    },
+    "noise-reduction": {
+      strength: "Strength",
+      light: "Light",
+      medium: "Medium",
+      strong: "Strong",
+      submit: "Reduce Noise",
+      submitBatch: "Reduce Noise ({count} files)",
+      progressLabel: "Reducing noise",
     },
     "merge-pdf": {
       addFiles: "Add PDFs to merge",
