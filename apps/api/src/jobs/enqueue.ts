@@ -62,6 +62,9 @@ export async function closeFlowProducer(): Promise<void> {
 export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData, ToolJobResult>> {
   // Insert the durable DB row first (crash-safe: row exists even if
   // Redis add fails and the job is retried on next boot).
+  // When dbSettings is provided, persist the redacted version instead of
+  // the real settings (which may contain secrets like passwords). The
+  // worker reads settings from BullMQ job data, never the DB row.
   await db.insert(schema.jobs).values({
     id: data.jobId,
     userId: data.userId,
@@ -70,7 +73,7 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     type: data.kind,
     status: "queued",
     inputRefs: data.inputRefs,
-    settings: data.settings as Record<string, unknown>,
+    settings: (data.dbSettings ?? data.settings) as Record<string, unknown>,
   });
 
   const queue = getQueue(data.pool);

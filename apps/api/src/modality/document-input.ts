@@ -22,7 +22,7 @@ export class DocumentInputHandler implements InputHandler {
   async prepare(
     raw: Buffer,
     filename: string,
-    opts: { scratchDir: string },
+    opts: { scratchDir: string; lenient?: boolean },
   ): Promise<PreparedInput> {
     if (raw.length === 0) throw new InputValidationError("Empty file");
     const lower = filename.toLowerCase();
@@ -30,7 +30,9 @@ export class DocumentInputHandler implements InputHandler {
       if (raw.subarray(0, 5).toString() !== "%PDF-") {
         throw new InputValidationError("File does not start with a PDF header");
       }
-      if (qpdfAvailable()) {
+      // When lenient, skip qpdfCheck + page-cap (repair-pdf's input is
+      // intentionally damaged). The %PDF- header check above still runs.
+      if (!opts.lenient && qpdfAvailable()) {
         const dir = join(opts.scratchDir, `qpdf-${randomUUID()}`);
         await mkdir(dir, { recursive: true });
         const p = join(dir, "input.pdf");

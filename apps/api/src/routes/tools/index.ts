@@ -33,12 +33,14 @@ import { registerExtractPages } from "./extract-pages.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerGifTools } from "./gif-tools.js";
+import { registerGrayscalePdf } from "./grayscale-pdf.js";
 import { registerHtmlToImage } from "./html-to-image.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
 import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerJsonXml } from "./json-xml.js";
+import { registerLinearizePdf } from "./linearize-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -48,10 +50,13 @@ import { registerOptimizeForWeb } from "./optimize-for-web.js";
 import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
+import { registerPdfaConvert } from "./pdfa-convert.js";
+import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
 import { registerRemoveBackground } from "./remove-background.js";
 import { registerRemovePages } from "./remove-pages.js";
+import { registerRepairPdf } from "./repair-pdf.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
 import { registerRestorePhoto } from "./restore-photo.js";
@@ -69,6 +74,7 @@ import { registerTextOverlay } from "./text-overlay.js";
 import { registerTransparencyFixer } from "./transparency-fixer.js";
 import { registerTrimAudio } from "./trim-audio.js";
 import { registerTrimVideo } from "./trim-video.js";
+import { registerUnlockPdf } from "./unlock-pdf.js";
 import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
 import { registerVideoToGif } from "./video-to-gif.js";
@@ -180,6 +186,12 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "extract-pages", register: registerExtractPages },
     { id: "remove-pages", register: registerRemovePages },
     { id: "organize-pdf", register: registerOrganizePdf },
+    { id: "protect-pdf", register: registerProtectPdf },
+    { id: "unlock-pdf", register: registerUnlockPdf },
+    { id: "repair-pdf", register: registerRepairPdf },
+    { id: "linearize-pdf", register: registerLinearizePdf },
+    { id: "grayscale-pdf", register: registerGrayscalePdf },
+    { id: "pdfa-convert", register: registerPdfaConvert },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },

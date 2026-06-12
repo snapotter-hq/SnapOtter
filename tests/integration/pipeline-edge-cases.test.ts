@@ -358,6 +358,52 @@ describe("Save pipeline edge cases", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PASSWORD TOOL PIPELINE SAVE REJECTION
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline save rejects password tools", () => {
+  it("rejects saving a pipeline containing protect-pdf", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/save",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: {
+        name: "protect-pipeline",
+        steps: [
+          { toolId: "resize", settings: { width: 100 } },
+          { toolId: "protect-pdf", settings: { userPassword: "test" } },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/password/i);
+  });
+
+  it("rejects saving a pipeline containing unlock-pdf", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/save",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: {
+        name: "unlock-pipeline",
+        steps: [{ toolId: "unlock-pdf", settings: { password: "test" } }],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toMatch(/password/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DELETE PIPELINE EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Delete pipeline edge cases", () => {

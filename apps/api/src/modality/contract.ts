@@ -26,5 +26,17 @@ export interface PreparedInput {
  * enqueueing; handlers own format logic only.
  */
 export interface InputHandler {
-  prepare(raw: Buffer, filename: string, opts: { scratchDir: string }): Promise<PreparedInput>;
+  prepare(
+    raw: Buffer,
+    filename: string,
+    opts: {
+      scratchDir: string;
+      /**
+       * When true, skip structural validation (qpdfCheck, page caps) but
+       * keep header-magic checks. Used by tools that intentionally accept
+       * damaged inputs (e.g. repair-pdf).
+       */
+      lenient?: boolean;
+    },
+  ): Promise<PreparedInput>;
 }

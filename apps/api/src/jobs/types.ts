@@ -25,6 +25,12 @@ export interface ToolJobData {
   inputRefs: string[];
   filename: string;
   settings: unknown;
+  /**
+   * When set, persisted to the DB row instead of settings. Use to strip
+   * secrets the worker needs but should not persist (the worker reads
+   * settings from BullMQ job data, never the DB row).
+   */
+  dbSettings?: Record<string, unknown>;
   fileId?: string;
   clientJobId?: string;
   kind:

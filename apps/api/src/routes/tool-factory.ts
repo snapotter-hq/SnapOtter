@@ -80,6 +80,20 @@ export interface ToolRouteConfig<T> {
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
   /** Optional v2 process function. When set, the worker calls this instead of the legacy process. */
   processV2?: ToolProcessV2;
+  /**
+   * When set, the factory passes `{ scratchDir, lenient: true }` to the
+   * input handler's prepare(). DocumentInputHandler skips qpdfCheck and
+   * page-cap when lenient, keeping only the %PDF- header check. Set on
+   * tools that intentionally accept damaged inputs (e.g. repair-pdf).
+   */
+  skipStructuralValidation?: boolean;
+  /**
+   * When set, produces a redacted copy of settings for the durable DB
+   * row. Passwords and other secrets are replaced so they do not persist
+   * in the jobs table (retention keeps rows for days). The BullMQ job
+   * data keeps the real settings; the worker reads from job data.
+   */
+  redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
 }
 
 /** Type-erased config stored in the registry (settings type is widened to avoid variance issues). */
@@ -94,6 +108,8 @@ export interface AnyToolRouteConfig {
     ctx?: ToolProcessCtx,
   ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
   processV2?: ToolProcessV2;
+  skipStructuralValidation?: boolean;
+  redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
 }
 
 // ── Legacy adapter ────────────────────────────────────────────
@@ -289,6 +305,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           try {
             const prepared = await inputHandlerFor(modality).prepare(fileBuffer, fname, {
               scratchDir,
+              lenient: config.skipStructuralValidation,
             });
             fileBuffer = prepared.buffer;
             fname = prepared.filename;
@@ -366,6 +383,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const pool = resolveToolPool(config.toolId);
 
         // Enqueue for the BullMQ worker
+        const dbSettings = config.redactSettingsForAudit
+          ? config.redactSettingsForAudit(settings)
+          : undefined;
         await enqueueToolJob({
           jobId,
           toolId: config.toolId,
@@ -374,6 +394,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           inputRefs,
           filename,
           settings,
+          dbSettings,
           fileId: fileId ?? undefined,
           clientJobId: clientJobId ?? undefined,
           kind: "tool",

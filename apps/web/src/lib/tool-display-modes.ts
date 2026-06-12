@@ -112,6 +112,12 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "extract-pages": "document",
   "remove-pages": "document",
   "organize-pdf": "document",
+  "protect-pdf": "no-comparison",
+  "unlock-pdf": "document",
+  "repair-pdf": "document",
+  "linearize-pdf": "no-comparison",
+  "grayscale-pdf": "document",
+  "pdfa-convert": "no-comparison",
 
   // Data tools
   "csv-excel": "no-comparison",

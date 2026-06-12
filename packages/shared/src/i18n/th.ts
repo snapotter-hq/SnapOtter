@@ -338,6 +338,30 @@ export const th: TranslationKeys = {
       name: "Organize PDF",
       description: "Reorder pages with an explicit page order",
     },
+    "protect-pdf": {
+      name: "Protect PDF",
+      description: "Add password protection (AES-256 encryption)",
+    },
+    "unlock-pdf": {
+      name: "Unlock PDF",
+      description: "Remove password protection from a PDF",
+    },
+    "repair-pdf": {
+      name: "Repair PDF",
+      description: "Attempt to repair a damaged or corrupted PDF",
+    },
+    "linearize-pdf": {
+      name: "Web-Optimize PDF",
+      description: "Linearize a PDF for fast web viewing",
+    },
+    "grayscale-pdf": {
+      name: "Grayscale PDF",
+      description: "Convert all colors to grayscale",
+    },
+    "pdfa-convert": {
+      name: "PDF/A Convert",
+      description: "Convert to archival PDF/A-2",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",
@@ -1426,6 +1450,40 @@ export const th: TranslationKeys = {
       submit: "Reorder",
       submitBatch: "Reorder ({count} files)",
       progressLabel: "Reordering",
+    },
+    "protect-pdf": {
+      userPassword: "User password",
+      ownerPassword: "Owner password (optional)",
+      ownerPasswordHint: "Defaults to user password if empty",
+      submit: "Protect",
+      submitBatch: "Protect ({count} files)",
+      progressLabel: "Encrypting",
+    },
+    "unlock-pdf": {
+      password: "Password",
+      submit: "Unlock",
+      submitBatch: "Unlock ({count} files)",
+      progressLabel: "Decrypting",
+    },
+    "repair-pdf": {
+      submit: "Repair",
+      submitBatch: "Repair ({count} files)",
+      progressLabel: "Repairing",
+    },
+    "linearize-pdf": {
+      submit: "Optimize",
+      submitBatch: "Optimize ({count} files)",
+      progressLabel: "Linearizing",
+    },
+    "grayscale-pdf": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "pdfa-convert": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
     "csv-excel": {
       sheet: "Worksheet number",

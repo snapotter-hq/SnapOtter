@@ -481,8 +481,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
     const { name, description, steps } = result.data;
 
+    // Tools that require a password cannot be saved in pipelines because
+    // the step settings are persisted indefinitely in the pipelines.steps
+    // jsonb column. Reject them at save time with a clear message.
+    const PASSWORD_TOOLS = new Set(["protect-pdf", "unlock-pdf"]);
+
     // Validate all tool IDs exist
     for (let i = 0; i < steps.length; i++) {
+      if (PASSWORD_TOOLS.has(steps[i].toolId)) {
+        return reply.status(400).send({
+          error: `This tool cannot be used in saved pipelines because it requires a password`,
+        });
+      }
       const toolConfig = getToolConfig(steps[i].toolId);
       if (!toolConfig) {
         return reply.status(400).send({

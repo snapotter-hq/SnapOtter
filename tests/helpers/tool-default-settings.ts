@@ -21,6 +21,8 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "extract-pages": { range: "1" },
   "remove-pages": { pages: "2" },
   "organize-pdf": { order: "1-z" },
+  "protect-pdf": { userPassword: "test123" },
+  "unlock-pdf": { password: "test123" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {
