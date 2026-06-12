@@ -429,6 +429,61 @@ const SplitCsvSettings = lazy(() =>
     default: m.SplitCsvSettings,
   })),
 );
+const ExtractPagesSettings = lazy(() =>
+  import("@/components/tools/extract-pages-settings").then((m) => ({
+    default: m.ExtractPagesSettings,
+  })),
+);
+const RemovePagesSettings = lazy(() =>
+  import("@/components/tools/remove-pages-settings").then((m) => ({
+    default: m.RemovePagesSettings,
+  })),
+);
+const OrganizePdfSettings = lazy(() =>
+  import("@/components/tools/organize-pdf-settings").then((m) => ({
+    default: m.OrganizePdfSettings,
+  })),
+);
+const ProtectPdfSettings = lazy(() =>
+  import("@/components/tools/protect-pdf-settings").then((m) => ({
+    default: m.ProtectPdfSettings,
+  })),
+);
+const UnlockPdfSettings = lazy(() =>
+  import("@/components/tools/unlock-pdf-settings").then((m) => ({
+    default: m.UnlockPdfSettings,
+  })),
+);
+const RepairPdfSettings = lazy(() =>
+  import("@/components/tools/repair-pdf-settings").then((m) => ({
+    default: m.RepairPdfSettings,
+  })),
+);
+const CropPdfSettings = lazy(() =>
+  import("@/components/tools/crop-pdf-settings").then((m) => ({
+    default: m.CropPdfSettings,
+  })),
+);
+const NupPdfSettings = lazy(() =>
+  import("@/components/tools/nup-pdf-settings").then((m) => ({
+    default: m.NupPdfSettings,
+  })),
+);
+const BookletPdfSettings = lazy(() =>
+  import("@/components/tools/booklet-pdf-settings").then((m) => ({
+    default: m.BookletPdfSettings,
+  })),
+);
+const WatermarkPdfSettings = lazy(() =>
+  import("@/components/tools/watermark-pdf-settings").then((m) => ({
+    default: m.WatermarkPdfSettings,
+  })),
+);
+const PdfPageNumbersSettings = lazy(() =>
+  import("@/components/tools/pdf-page-numbers-settings").then((m) => ({
+    default: m.PdfPageNumbersSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -560,6 +615,19 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["compress-pdf", { accept: ".pdf", Settings: CompressPdfSettings }],
   ["rotate-pdf", { accept: ".pdf", Settings: RotatePdfSettings }],
   ["word-to-pdf", { accept: ".docx,.doc,.odt,.rtf,.txt", Settings: WordToPdfSettings }],
+
+  // PDF depth tools (organize, secure, pdfcpu, layout)
+  ["extract-pages", { accept: ".pdf", Settings: ExtractPagesSettings }],
+  ["remove-pages", { accept: ".pdf", Settings: RemovePagesSettings }],
+  ["organize-pdf", { accept: ".pdf", Settings: OrganizePdfSettings }],
+  ["protect-pdf", { accept: ".pdf", Settings: ProtectPdfSettings }],
+  ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],
+  ["repair-pdf", { accept: ".pdf", Settings: RepairPdfSettings }],
+  ["crop-pdf", { accept: ".pdf", Settings: CropPdfSettings }],
+  ["nup-pdf", { accept: ".pdf", Settings: NupPdfSettings }],
+  ["booklet-pdf", { accept: ".pdf", Settings: BookletPdfSettings }],
+  ["watermark-pdf", { accept: ".pdf", Settings: WatermarkPdfSettings }],
+  ["pdf-page-numbers", { accept: ".pdf", Settings: PdfPageNumbersSettings }],
 
   // Data tools
   ["csv-excel", { accept: ".csv,.xlsx", Settings: CsvExcelSettings }],
