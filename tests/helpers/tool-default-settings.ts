@@ -24,6 +24,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "protect-pdf": { userPassword: "test123" },
   "unlock-pdf": { password: "test123" },
   "watermark-pdf": { text: "CONFIDENTIAL" },
+  "redact-pdf": { terms: ["test"] },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {

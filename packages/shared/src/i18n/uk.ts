@@ -389,6 +389,26 @@ export const uk: TranslationKeys = {
       name: "PDF Page Numbers",
       description: "Add page numbers to every page",
     },
+    "flatten-pdf": {
+      name: "Flatten PDF",
+      description: "Bake forms and annotations into page content",
+    },
+    "redact-pdf": {
+      name: "Redact PDF",
+      description: "Permanently remove text occurrences (verified true redaction)",
+    },
+    "pdf-to-text": {
+      name: "PDF to Text",
+      description: "Extract plain text from a PDF",
+    },
+    "pdf-to-word": {
+      name: "PDF to Word",
+      description: "Best for text-based PDFs; scanned pages need OCR",
+    },
+    "pdf-metadata": {
+      name: "PDF Metadata",
+      description: "Read and write PDF document metadata",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",
@@ -1559,6 +1579,38 @@ export const uk: TranslationKeys = {
       submit: "Add Numbers",
       submitBatch: "Add Numbers ({count} files)",
       progressLabel: "Numbering",
+    },
+    "flatten-pdf": {
+      submit: "Flatten",
+      submitBatch: "Flatten ({count} files)",
+      progressLabel: "Flattening",
+    },
+    "redact-pdf": {
+      terms: "Terms to redact",
+      termsHint: "One term per line (max 50)",
+      caseSensitive: "Case sensitive",
+      submit: "Redact",
+      submitBatch: "Redact ({count} files)",
+      progressLabel: "Redacting",
+    },
+    "pdf-to-text": {
+      submit: "Extract Text",
+      submitBatch: "Extract Text ({count} files)",
+      progressLabel: "Extracting",
+    },
+    "pdf-to-word": {
+      submit: "Convert to Word",
+      submitBatch: "Convert to Word ({count} files)",
+      progressLabel: "Converting",
+    },
+    "pdf-metadata": {
+      title: "Title",
+      author: "Author",
+      subject: "Subject",
+      keywords: "Keywords",
+      submit: "Set Metadata",
+      submitBatch: "Set Metadata ({count} files)",
+      progressLabel: "Setting metadata",
     },
     "csv-excel": {
       sheet: "Worksheet number",

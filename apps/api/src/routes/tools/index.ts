@@ -34,6 +34,7 @@ import { registerExtractAudio } from "./extract-audio.js";
 import { registerExtractPages } from "./extract-pages.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
+import { registerFlattenPdf } from "./flatten-pdf.js";
 import { registerGifTools } from "./gif-tools.js";
 import { registerGrayscalePdf } from "./grayscale-pdf.js";
 import { registerHtmlToImage } from "./html-to-image.js";
@@ -52,12 +53,16 @@ import { registerOcr } from "./ocr.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
 import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
+import { registerPdfMetadata } from "./pdf-metadata.js";
 import { registerPdfPageNumbers } from "./pdf-page-numbers.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
+import { registerPdfToText } from "./pdf-to-text.js";
+import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
 import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
+import { registerRedactPdf } from "./redact-pdf.js";
 import { registerRemoveBackground } from "./remove-background.js";
 import { registerRemovePages } from "./remove-pages.js";
 import { registerRepairPdf } from "./repair-pdf.js";
@@ -202,6 +207,11 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "booklet-pdf", register: registerBookletPdf },
     { id: "watermark-pdf", register: registerWatermarkPdf },
     { id: "pdf-page-numbers", register: registerPdfPageNumbers },
+    { id: "flatten-pdf", register: registerFlattenPdf },
+    { id: "redact-pdf", register: registerRedactPdf },
+    { id: "pdf-to-text", register: registerPdfToText },
+    { id: "pdf-to-word", register: registerPdfToWord },
+    { id: "pdf-metadata", register: registerPdfMetadata },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },

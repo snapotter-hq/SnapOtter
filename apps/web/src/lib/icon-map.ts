@@ -39,6 +39,7 @@ import {
   Info,
   Laugh,
   Layers,
+  Layers2,
   LayoutGrid,
   ListOrdered,
   Lock,
@@ -65,6 +66,7 @@ import {
   Stamp,
   Star,
   Table,
+  Tags,
   TextCursorInput,
   Type,
   Undo2,
@@ -155,4 +157,6 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Wrench,
   Zap,
   ZoomIn,
+  Layers2,
+  Tags,
 };
