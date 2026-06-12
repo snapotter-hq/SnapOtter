@@ -321,6 +321,18 @@ export const ru: TranslationKeys = {
       name: "Video Color",
       description: "Adjust brightness, contrast, saturation, and gamma",
     },
+    "video-speed": {
+      name: "Video Speed",
+      description: "Speed up or slow down a video",
+    },
+    "reverse-video": {
+      name: "Reverse Video",
+      description: "Play a video clip backwards",
+    },
+    "video-loudnorm": {
+      name: "Normalize Audio",
+      description: "Normalize video audio volume to broadcast standard",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1503,6 +1515,25 @@ export const ru: TranslationKeys = {
       submit: "Apply",
       submitBatch: "Apply ({count} files)",
       progressLabel: "Adjusting color",
+    },
+    "video-speed": {
+      factor: "Speed factor",
+      keepPitch: "Keep original pitch",
+      submit: "Change speed",
+      submitBatch: "Change speed ({count} files)",
+      progressLabel: "Changing speed",
+    },
+    "reverse-video": {
+      hint: "Limited to clips up to 5 minutes",
+      submit: "Reverse",
+      submitBatch: "Reverse ({count} files)",
+      progressLabel: "Reversing",
+    },
+    "video-loudnorm": {
+      hint: "Normalizes audio to EBU R128 broadcast standard",
+      submit: "Normalize",
+      submitBatch: "Normalize ({count} files)",
+      progressLabel: "Normalizing",
     },
     "convert-audio": {
       format: "Output format",
