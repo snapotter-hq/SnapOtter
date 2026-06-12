@@ -7,6 +7,7 @@ export interface MediaStreamInfo {
   width?: number;
   height?: number;
   sampleRate?: number;
+  channels?: number;
 }
 
 export interface MediaInfo {
@@ -14,6 +15,7 @@ export interface MediaInfo {
   durationS: number | null;
   bitrateKbps: number | null;
   streams: MediaStreamInfo[];
+  tags?: Record<string, string>;
 }
 
 export interface ProbeOptions {
@@ -70,17 +72,28 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     });
   });
   const parsed = JSON.parse(stdout) as {
-    format?: { format_name?: string; duration?: string; bit_rate?: string };
+    format?: {
+      format_name?: string;
+      duration?: string;
+      bit_rate?: string;
+      tags?: Record<string, unknown>;
+    };
     streams?: Array<{
       codec_type?: string;
       codec_name?: string;
       width?: number;
       height?: number;
       sample_rate?: string;
+      channels?: number;
     }>;
   };
   const duration = parsed.format?.duration ? Number(parsed.format.duration) : null;
   const bitRate = parsed.format?.bit_rate ? Number(parsed.format.bit_rate) : null;
+  const rawTags = (parsed.format?.tags ?? {}) as Record<string, unknown>;
+  const tags: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rawTags)) {
+    if (typeof v === "string" && v.length > 0) tags[k.toLowerCase()] = v;
+  }
   return {
     container: parsed.format?.format_name ?? "unknown",
     durationS: Number.isFinite(duration as number) ? (duration as number) : null,
@@ -93,7 +106,9 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
         width: s.width,
         height: s.height,
         sampleRate: Number.isFinite(sr) && (sr as number) > 0 ? sr : undefined,
+        channels: typeof s.channels === "number" && s.channels > 0 ? s.channels : undefined,
       } as MediaStreamInfo;
     }),
+    tags: Object.keys(tags).length > 0 ? tags : undefined,
   };
 }

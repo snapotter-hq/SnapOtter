@@ -13,12 +13,14 @@ const STDERR_RING_MAX = 16 * 1024;
 /**
  * Runs ffmpeg with `-progress pipe:1` appended, parsing progress blocks from
  * stdout. Rejects with the tail of stderr on non-zero exit, timeout or abort.
- * Output must go to a FILE path in args (no stdout piping of media data).
+ * Resolves with the captured stderr tail (filters like silencedetect report
+ * there). Output must go to a FILE path in args (no stdout piping of media
+ * data).
  */
-export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Promise<void> {
+export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Promise<string> {
   const bin = resolveFfmpeg();
   if (!bin) throw new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)");
-  await new Promise<void>((resolvePromise, reject) => {
+  return new Promise<string>((resolvePromise, reject) => {
     const child = spawn(bin, ["-hide_banner", "-nostdin", "-y", ...args, "-progress", "pipe:1"], {
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -73,7 +75,7 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       if (settled) return;
       settled = true;
       cleanup();
-      if (code === 0) resolvePromise();
+      if (code === 0) resolvePromise(stderrTail);
       else reject(new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail.slice(-2000)}`));
     });
   });

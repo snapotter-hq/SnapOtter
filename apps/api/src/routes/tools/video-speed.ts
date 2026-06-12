@@ -2,25 +2,18 @@ import { extname, join } from "node:path";
 import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
+import {
+  buildAtempoChain,
+  runFfmpegWithProgress,
+  stageMediaInputs,
+  videoContentType,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   factor: z.number().min(0.25).max(4).default(2),
   keepPitch: z.boolean().default(true),
 });
-
-/** atempo only accepts 0.5..100; chain factors of 0.5 until in range. */
-export function buildAtempoChain(factor: number): string {
-  const parts: string[] = [];
-  let f = factor;
-  while (f < 0.5) {
-    parts.push("atempo=0.5");
-    f /= 0.5;
-  }
-  parts.push(`atempo=${f}`);
-  return parts.join(",");
-}
 
 export function registerVideoSpeed(app: FastifyInstance) {
   createToolRoute(app, {

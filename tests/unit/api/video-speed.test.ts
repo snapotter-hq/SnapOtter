@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAtempoChain } from "../../../apps/api/src/routes/tools/video-speed.js";
+import { buildAtempoChain } from "../../../apps/api/src/lib/media-tool.js";
 
 describe("buildAtempoChain", () => {
   it("returns a single atempo for factor >= 0.5", () => {

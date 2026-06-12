@@ -32,6 +32,55 @@ export function audioContentType(ext: string): string {
   return EXT_AUDIO_CONTENT_TYPES[ext.toLowerCase()] || "audio/mpeg";
 }
 
+/** atempo only accepts 0.5..100; chain factors of 0.5 until in range. */
+export function buildAtempoChain(factor: number): string {
+  const parts: string[] = [];
+  let f = factor;
+  while (f < 0.5) {
+    parts.push("atempo=0.5");
+    f /= 0.5;
+  }
+  parts.push(`atempo=${f}`);
+  return parts.join(",");
+}
+
+export interface AudioOutput {
+  ext: string;
+  contentType: string;
+  encodeArgs: string[];
+}
+
+const AUDIO_OUTPUTS: Record<string, AudioOutput> = {
+  ".mp3": {
+    ext: ".mp3",
+    contentType: "audio/mpeg",
+    encodeArgs: ["-c:a", "libmp3lame", "-b:a", "192k"],
+  },
+  ".wav": { ext: ".wav", contentType: "audio/wav", encodeArgs: ["-c:a", "pcm_s16le"] },
+  ".ogg": {
+    ext: ".ogg",
+    contentType: "audio/ogg",
+    encodeArgs: ["-c:a", "libvorbis", "-b:a", "192k"],
+  },
+  ".opus": {
+    ext: ".opus",
+    contentType: "audio/opus",
+    encodeArgs: ["-c:a", "libopus", "-b:a", "128k"],
+  },
+  ".flac": { ext: ".flac", contentType: "audio/flac", encodeArgs: ["-c:a", "flac"] },
+  ".m4a": { ext: ".m4a", contentType: "audio/mp4", encodeArgs: ["-c:a", "aac", "-b:a", "192k"] },
+  ".aac": { ext: ".m4a", contentType: "audio/mp4", encodeArgs: ["-c:a", "aac", "-b:a", "192k"] },
+  ".aiff": { ext: ".aiff", contentType: "audio/aiff", encodeArgs: ["-c:a", "pcm_s16be"] },
+};
+
+/**
+ * Encoder selection for filtered (re-encoded) audio outputs, keyed by the
+ * SOURCE extension. Decode-only sources (wma/amr/ape/...) fall back to mp3.
+ */
+export function audioOutputFor(srcExt: string): AudioOutput {
+  return AUDIO_OUTPUTS[srcExt.toLowerCase()] ?? AUDIO_OUTPUTS[".mp3"];
+}
+
 export interface MediaRunResult {
   outPath: string;
   durationS: number | null;
@@ -57,9 +106,9 @@ export async function runFfmpegWithProgress(
   args: string[],
   durationS: number | null,
   opts: { timeoutMs?: number } = {},
-): Promise<void> {
+): Promise<string> {
   ctx.report(5, "Preparing");
-  await runFfmpeg(args, {
+  return runFfmpeg(args, {
     signal: ctx.signal,
     timeoutMs: opts.timeoutMs ?? 30 * 60_000,
     onProgress: (p) => {
