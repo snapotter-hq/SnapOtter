@@ -785,6 +785,63 @@ const ExtractZipSettings = lazy(() =>
   })),
 );
 
+// Wave 5a: Image gap-fill tools
+const BarcodeGenerateSettings = lazy(() =>
+  import("@/components/tools/barcode-generate-settings").then((m) => ({
+    default: m.BarcodeGenerateSettings,
+  })),
+);
+const ChartMakerSettings = lazy(() =>
+  import("@/components/tools/chart-maker-settings").then((m) => ({
+    default: m.ChartMakerSettings,
+  })),
+);
+const CircleCropSettings = lazy(() =>
+  import("@/components/tools/circle-crop-settings").then((m) => ({
+    default: m.CircleCropSettings,
+  })),
+);
+const DuotoneSettings = lazy(() =>
+  import("@/components/tools/duotone-settings").then((m) => ({
+    default: m.DuotoneSettings,
+  })),
+);
+const GifWebpSettings = lazy(() =>
+  import("@/components/tools/gif-webp-settings").then((m) => ({
+    default: m.GifWebpSettings,
+  })),
+);
+const HistogramSettings = lazy(() =>
+  import("@/components/tools/histogram-settings").then((m) => ({
+    default: m.HistogramSettings,
+  })),
+);
+const ImagePadSettings = lazy(() =>
+  import("@/components/tools/image-pad-settings").then((m) => ({
+    default: m.ImagePadSettings,
+  })),
+);
+const LqipPlaceholderSettings = lazy(() =>
+  import("@/components/tools/lqip-placeholder-settings").then((m) => ({
+    default: m.LqipPlaceholderSettings,
+  })),
+);
+const PixelateSettings = lazy(() =>
+  import("@/components/tools/pixelate-settings").then((m) => ({
+    default: m.PixelateSettings,
+  })),
+);
+const SpriteSheetSettings = lazy(() =>
+  import("@/components/tools/sprite-sheet-settings").then((m) => ({
+    default: m.SpriteSheetSettings,
+  })),
+);
+const VignetteSettings = lazy(() =>
+  import("@/components/tools/vignette-settings").then((m) => ({
+    default: m.VignetteSettings,
+  })),
+);
+
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
 
@@ -851,6 +908,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["qr-generate", { Settings: QrGenerateSettings, ResultsPanel: QrGeneratePreview }],
   ["html-to-image", { Settings: HtmlToImageSettings, ResultsPanel: HtmlToImageResults }],
   ["barcode-read", { Settings: BarcodeReadSettings }],
+  ["barcode-generate", { Settings: BarcodeGenerateSettings }],
   ["image-to-base64", { Settings: ImageToBase64Settings, ResultsPanel: ImageToBase64Results }],
 
   // Layout & Composition
@@ -859,6 +917,17 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["split", { Settings: SplitSettings, ResultsPanel: SplitCanvas }],
   ["border", { livePreview: true, Settings: BorderSettings as never }],
   ["beautify", { livePreview: true, Settings: BeautifySettings as never }],
+  ["circle-crop", { livePreview: true, Settings: CircleCropSettings }],
+  ["duotone", { livePreview: true, Settings: DuotoneSettings }],
+  ["image-pad", { livePreview: true, Settings: ImagePadSettings }],
+  ["pixelate", { livePreview: true, Settings: PixelateSettings }],
+  ["sprite-sheet", { Settings: SpriteSheetSettings }],
+  ["vignette", { livePreview: true, Settings: VignetteSettings }],
+
+  // Image utilities (wave 5a)
+  ["gif-webp", { livePreview: true, accept: ".gif,.webp", Settings: GifWebpSettings }],
+  ["histogram", { Settings: HistogramSettings }],
+  ["lqip-placeholder", { Settings: LqipPlaceholderSettings }],
 
   // Format & Conversion
   ["svg-to-raster", { accept: ".svg,.svgz", Settings: SvgToRasterSettings }],
@@ -1007,6 +1076,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["markdown-to-pdf", { accept: ".md,.markdown", Settings: MarkdownToPdfSettings }],
 
   // Data tools
+  ["chart-maker", { accept: ".csv,.json", Settings: ChartMakerSettings }],
   ["csv-excel", { accept: ".csv,.tsv,.xlsx", Settings: CsvExcelSettings }],
   ["csv-json", { accept: ".csv,.tsv,.json", Settings: CsvJsonSettings }],
   ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],

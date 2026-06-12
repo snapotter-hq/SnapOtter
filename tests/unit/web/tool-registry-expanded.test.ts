@@ -169,6 +169,41 @@ vi.mock("@/components/tools/split-csv-settings", () => ({
   SplitCsvSettings: () => null,
 }));
 
+// Wave 5a: Image gap-fill tools
+vi.mock("@/components/tools/barcode-generate-settings", () => ({
+  BarcodeGenerateSettings: () => null,
+}));
+vi.mock("@/components/tools/chart-maker-settings", () => ({
+  ChartMakerSettings: () => null,
+}));
+vi.mock("@/components/tools/circle-crop-settings", () => ({
+  CircleCropSettings: () => null,
+}));
+vi.mock("@/components/tools/duotone-settings", () => ({
+  DuotoneSettings: () => null,
+}));
+vi.mock("@/components/tools/gif-webp-settings", () => ({
+  GifWebpSettings: () => null,
+}));
+vi.mock("@/components/tools/histogram-settings", () => ({
+  HistogramSettings: () => null,
+}));
+vi.mock("@/components/tools/image-pad-settings", () => ({
+  ImagePadSettings: () => null,
+}));
+vi.mock("@/components/tools/lqip-placeholder-settings", () => ({
+  LqipPlaceholderSettings: () => null,
+}));
+vi.mock("@/components/tools/pixelate-settings", () => ({
+  PixelateSettings: () => null,
+}));
+vi.mock("@/components/tools/sprite-sheet-settings", () => ({
+  SpriteSheetSettings: () => null,
+}));
+vi.mock("@/components/tools/vignette-settings", () => ({
+  VignetteSettings: () => null,
+}));
+
 import { TOOLS } from "@snapotter/shared";
 import type { DisplayMode, ToolRegistryEntry } from "@/lib/tool-registry";
 import { getToolRegistryEntry, toolRegistry } from "@/lib/tool-registry";

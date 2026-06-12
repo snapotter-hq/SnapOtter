@@ -67,6 +67,7 @@ interface QrState {
   // Logo
   logoFile: File | null;
   logoDataUrl: string | null;
+  logoError: string | null;
   logoSize: number;
   logoMargin: number;
   hideBackgroundDots: boolean;
@@ -150,6 +151,7 @@ const DEFAULTS = {
   useCustomCornerColors: false,
   logoFile: null as File | null,
   logoDataUrl: null as string | null,
+  logoError: null as string | null,
   logoSize: 0.4,
   logoMargin: 5,
   hideBackgroundDots: true,
@@ -184,11 +186,22 @@ export const useQrStore = create<QrState>((set) => ({
   setUseCustomCornerColors: (v) => set({ useCustomCornerColors: v }),
   setLogoFile: (f) => {
     if (!f) {
-      set({ logoFile: null, logoDataUrl: null });
+      set({ logoFile: null, logoDataUrl: null, logoError: null });
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => set({ logoFile: f, logoDataUrl: reader.result as string });
+    reader.onload = () => {
+      const dataUri = reader.result as string;
+      if (dataUri.length > 700000) {
+        set({
+          logoFile: null,
+          logoDataUrl: null,
+          logoError: "Logo image is too large (max ~500 KB). Please use a smaller image.",
+        });
+        return;
+      }
+      set({ logoFile: f, logoDataUrl: dataUri, logoError: null });
+    };
     reader.readAsDataURL(f);
   },
   setLogoSize: (v) => set({ logoSize: v }),

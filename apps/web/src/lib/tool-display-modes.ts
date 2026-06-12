@@ -214,4 +214,5 @@ export const MULTI_FILE_TOOLS: ReadonlySet<string> = new Set([
   "burn-subtitles",
   "embed-subtitles",
   "images-to-video",
+  "sprite-sheet",
 ]);

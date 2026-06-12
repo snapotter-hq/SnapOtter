@@ -212,6 +212,41 @@ vi.mock("@/components/tools/split-csv-settings", () => ({
   SplitCsvSettings: () => null,
 }));
 
+// Wave 5a: Image gap-fill tools
+vi.mock("@/components/tools/barcode-generate-settings", () => ({
+  BarcodeGenerateSettings: () => null,
+}));
+vi.mock("@/components/tools/chart-maker-settings", () => ({
+  ChartMakerSettings: () => null,
+}));
+vi.mock("@/components/tools/circle-crop-settings", () => ({
+  CircleCropSettings: () => null,
+}));
+vi.mock("@/components/tools/duotone-settings", () => ({
+  DuotoneSettings: () => null,
+}));
+vi.mock("@/components/tools/gif-webp-settings", () => ({
+  GifWebpSettings: () => null,
+}));
+vi.mock("@/components/tools/histogram-settings", () => ({
+  HistogramSettings: () => null,
+}));
+vi.mock("@/components/tools/image-pad-settings", () => ({
+  ImagePadSettings: () => null,
+}));
+vi.mock("@/components/tools/lqip-placeholder-settings", () => ({
+  LqipPlaceholderSettings: () => null,
+}));
+vi.mock("@/components/tools/pixelate-settings", () => ({
+  PixelateSettings: () => null,
+}));
+vi.mock("@/components/tools/sprite-sheet-settings", () => ({
+  SpriteSheetSettings: () => null,
+}));
+vi.mock("@/components/tools/vignette-settings", () => ({
+  VignetteSettings: () => null,
+}));
+
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
@@ -340,7 +375,7 @@ describe("toolRegistry", () => {
   });
 
   it("tools with no-dropzone display mode have a ResultsPanel", () => {
-    const selfContainedTools = new Set(["meme-generator"]);
+    const selfContainedTools = new Set(["meme-generator", "barcode-generate"]);
     for (const [toolId, entry] of toolRegistry) {
       if (entry.displayMode === "no-dropzone" && !selfContainedTools.has(toolId)) {
         expect(entry.ResultsPanel, `missing ResultsPanel for ${toolId}`).toBeDefined();
