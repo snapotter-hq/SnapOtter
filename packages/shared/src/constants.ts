@@ -965,6 +965,29 @@ export const TOOLS: Tool[] = [
     acceptedInputs: [".pdf"],
     executionHint: "fast",
   },
+  {
+    id: "html-to-pdf",
+    name: "HTML to PDF",
+    description: "Convert an HTML file to PDF. Remote resources are disabled for privacy.",
+    category: "documents",
+    icon: "FileCode",
+    route: "/html-to-pdf",
+    modality: "document",
+    acceptedInputs: [".html", ".htm"],
+    executionHint: "long",
+  },
+  {
+    id: "markdown-to-pdf",
+    name: "Markdown to PDF",
+    description:
+      "Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.",
+    category: "documents",
+    icon: "FileCode2",
+    route: "/markdown-to-pdf",
+    modality: "document",
+    acceptedInputs: [".md", ".markdown"],
+    executionHint: "long",
+  },
   // Data Files
   {
     id: "csv-excel",

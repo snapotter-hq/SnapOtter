@@ -407,6 +407,15 @@ export const ptBR: TranslationKeys = {
       name: "PDF Metadata",
       description: "Read and write PDF document metadata",
     },
+    "html-to-pdf": {
+      name: "HTML to PDF",
+      description: "Convert an HTML file to PDF. Remote resources are disabled for privacy.",
+    },
+    "markdown-to-pdf": {
+      name: "Markdown to PDF",
+      description:
+        "Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",

@@ -38,12 +38,14 @@ import { registerFlattenPdf } from "./flatten-pdf.js";
 import { registerGifTools } from "./gif-tools.js";
 import { registerGrayscalePdf } from "./grayscale-pdf.js";
 import { registerHtmlToImage } from "./html-to-image.js";
+import { registerHtmlToPdf } from "./html-to-pdf.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
 import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerInfo } from "./info.js";
 import { registerJsonXml } from "./json-xml.js";
 import { registerLinearizePdf } from "./linearize-pdf.js";
+import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -212,6 +214,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "pdf-to-text", register: registerPdfToText },
     { id: "pdf-to-word", register: registerPdfToWord },
     { id: "pdf-metadata", register: registerPdfMetadata },
+    { id: "html-to-pdf", register: registerHtmlToPdf },
+    { id: "markdown-to-pdf", register: registerMarkdownToPdf },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },
