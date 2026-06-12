@@ -126,11 +126,13 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "convert-audio": "media-player",
   "extract-audio": "media-player",
   "fade-audio": "media-player",
+  "merge-audio": "media-player",
   "noise-reduction": "media-player",
   "normalize-audio": "media-player",
   "pitch-shift": "media-player",
   "reverse-audio": "media-player",
   "silence-removal": "media-player",
+  "split-audio": "no-comparison",
   "trim-audio": "media-player",
   "volume-adjust": "media-player",
 

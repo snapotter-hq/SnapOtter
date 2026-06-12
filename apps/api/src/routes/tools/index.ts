@@ -59,6 +59,7 @@ import { registerJsonXml } from "./json-xml.js";
 import { registerLinearizePdf } from "./linearize-pdf.js";
 import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
+import { registerMergeAudio } from "./merge-audio.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -98,6 +99,7 @@ import { registerSharpening } from "./sharpening.js";
 import { registerSilenceRemoval } from "./silence-removal.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
+import { registerSplitAudio } from "./split-audio.js";
 import { registerSplitCsv } from "./split-csv.js";
 import { registerSplitPdf } from "./split-pdf.js";
 import { registerStabilizeVideo } from "./stabilize-video.js";
@@ -243,11 +245,13 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "convert-audio", register: registerConvertAudio },
     { id: "extract-audio", register: registerExtractAudio },
     { id: "fade-audio", register: registerFadeAudio },
+    { id: "merge-audio", register: registerMergeAudio },
     { id: "noise-reduction", register: registerNoiseReduction },
     { id: "normalize-audio", register: registerNormalizeAudio },
     { id: "pitch-shift", register: registerPitchShift },
     { id: "reverse-audio", register: registerReverseAudio },
     { id: "silence-removal", register: registerSilenceRemoval },
+    { id: "split-audio", register: registerSplitAudio },
     { id: "trim-audio", register: registerTrimAudio },
     { id: "volume-adjust", register: registerVolumeAdjust },
 

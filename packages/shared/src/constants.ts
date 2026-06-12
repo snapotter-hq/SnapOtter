@@ -1041,6 +1041,28 @@ export const TOOLS: Tool[] = [
     acceptedInputs: AUDIO_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "merge-audio",
+    name: "Merge Audio",
+    description: "Combine multiple audio files into one",
+    category: "audio",
+    icon: "Combine",
+    route: "/merge-audio",
+    modality: "audio",
+    acceptedInputs: AUDIO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "split-audio",
+    name: "Split Audio",
+    description: "Split audio by time, equal parts, or silence detection",
+    category: "audio",
+    icon: "Scissors",
+    route: "/split-audio",
+    modality: "audio",
+    acceptedInputs: AUDIO_INPUTS,
+    executionHint: "fast",
+  },
   // PDF & Documents
   {
     id: "merge-pdf",
