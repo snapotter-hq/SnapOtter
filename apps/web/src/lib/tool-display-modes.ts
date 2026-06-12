@@ -181,6 +181,11 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "csv-json": "no-comparison",
   "json-xml": "no-comparison",
   "split-csv": "no-comparison",
+  "merge-csvs": "no-comparison",
+  "yaml-json": "no-comparison",
+  "xml-to-csv": "no-comparison",
+  "create-zip": "no-comparison",
+  "extract-zip": "no-comparison",
 };
 
 /**
@@ -188,7 +193,9 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
  * Consumed by use-tool-processor; backend routes declare maxInputs.
  */
 export const MULTI_FILE_TOOLS: ReadonlySet<string> = new Set([
+  "create-zip",
   "merge-audio",
+  "merge-csvs",
   "merge-pdf",
   "merge-videos",
   "replace-audio",

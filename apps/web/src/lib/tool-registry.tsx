@@ -714,6 +714,76 @@ const MarkdownToPdfSettings = lazy(() =>
     default: m.MarkdownToPdfSettings,
   })),
 );
+const ExcelToPdfSettings = lazy(() =>
+  import("@/components/tools/excel-to-pdf-settings").then((m) => ({
+    default: m.ExcelToPdfSettings,
+  })),
+);
+const PowerpointToPdfSettings = lazy(() =>
+  import("@/components/tools/powerpoint-to-pdf-settings").then((m) => ({
+    default: m.PowerpointToPdfSettings,
+  })),
+);
+const ConvertDocumentSettings = lazy(() =>
+  import("@/components/tools/convert-document-settings").then((m) => ({
+    default: m.ConvertDocumentSettings,
+  })),
+);
+const ConvertSpreadsheetSettings = lazy(() =>
+  import("@/components/tools/convert-spreadsheet-settings").then((m) => ({
+    default: m.ConvertSpreadsheetSettings,
+  })),
+);
+const ConvertPresentationSettings = lazy(() =>
+  import("@/components/tools/convert-presentation-settings").then((m) => ({
+    default: m.ConvertPresentationSettings,
+  })),
+);
+const MarkdownToHtmlSettings = lazy(() =>
+  import("@/components/tools/markdown-to-html-settings").then((m) => ({
+    default: m.MarkdownToHtmlSettings,
+  })),
+);
+const MarkdownToDocxSettings = lazy(() =>
+  import("@/components/tools/markdown-to-docx-settings").then((m) => ({
+    default: m.MarkdownToDocxSettings,
+  })),
+);
+const EpubConvertSettings = lazy(() =>
+  import("@/components/tools/epub-convert-settings").then((m) => ({
+    default: m.EpubConvertSettings,
+  })),
+);
+const ToEpubSettings = lazy(() =>
+  import("@/components/tools/to-epub-settings").then((m) => ({
+    default: m.ToEpubSettings,
+  })),
+);
+const MergeCsvsSettings = lazy(() =>
+  import("@/components/tools/merge-csvs-settings").then((m) => ({
+    default: m.MergeCsvsSettings,
+  })),
+);
+const YamlJsonSettings = lazy(() =>
+  import("@/components/tools/yaml-json-settings").then((m) => ({
+    default: m.YamlJsonSettings,
+  })),
+);
+const XmlToCsvSettings = lazy(() =>
+  import("@/components/tools/xml-to-csv-settings").then((m) => ({
+    default: m.XmlToCsvSettings,
+  })),
+);
+const CreateZipSettings = lazy(() =>
+  import("@/components/tools/create-zip-settings").then((m) => ({
+    default: m.CreateZipSettings,
+  })),
+);
+const ExtractZipSettings = lazy(() =>
+  import("@/components/tools/extract-zip-settings").then((m) => ({
+    default: m.ExtractZipSettings,
+  })),
+);
 
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
@@ -901,6 +971,15 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["compress-pdf", { accept: ".pdf", Settings: CompressPdfSettings }],
   ["rotate-pdf", { accept: ".pdf", Settings: RotatePdfSettings }],
   ["word-to-pdf", { accept: ".docx,.doc,.odt,.rtf,.txt", Settings: WordToPdfSettings }],
+  ["excel-to-pdf", { accept: ".xlsx,.xls,.ods,.csv", Settings: ExcelToPdfSettings }],
+  ["powerpoint-to-pdf", { accept: ".pptx,.ppt,.odp", Settings: PowerpointToPdfSettings }],
+  ["convert-document", { accept: ".docx,.doc,.odt,.rtf,.txt", Settings: ConvertDocumentSettings }],
+  ["convert-spreadsheet", { accept: ".xlsx,.xls,.ods,.csv", Settings: ConvertSpreadsheetSettings }],
+  ["convert-presentation", { accept: ".pptx,.ppt,.odp", Settings: ConvertPresentationSettings }],
+  ["markdown-to-html", { accept: ".md,.markdown", Settings: MarkdownToHtmlSettings }],
+  ["markdown-to-docx", { accept: ".md,.markdown", Settings: MarkdownToDocxSettings }],
+  ["epub-convert", { accept: ".epub", Settings: EpubConvertSettings }],
+  ["to-epub", { accept: ".docx,.md,.html,.txt", Settings: ToEpubSettings }],
 
   // PDF depth tools (organize, secure, pdfcpu, layout)
   ["extract-pages", { accept: ".pdf", Settings: ExtractPagesSettings }],
@@ -932,6 +1011,11 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["csv-json", { accept: ".csv,.json", Settings: CsvJsonSettings }],
   ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],
   ["split-csv", { accept: ".csv", Settings: SplitCsvSettings }],
+  ["merge-csvs", { accept: ".csv,.tsv", Settings: MergeCsvsSettings }],
+  ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
+  ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
+  ["create-zip", { Settings: CreateZipSettings }],
+  ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];
 
 export const toolRegistry = new Map<string, ToolRegistryEntry>(
