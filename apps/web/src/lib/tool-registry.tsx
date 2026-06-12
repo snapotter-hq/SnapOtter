@@ -494,6 +494,76 @@ const ExtractAudioSettings = lazy(() =>
     default: m.ExtractAudioSettings,
   })),
 );
+const AudioChannelsSettings = lazy(() =>
+  import("@/components/tools/audio-channels-settings").then((m) => ({
+    default: m.AudioChannelsSettings,
+  })),
+);
+const AudioMetadataSettings = lazy(() =>
+  import("@/components/tools/audio-metadata-settings").then((m) => ({
+    default: m.AudioMetadataSettings,
+  })),
+);
+const AudioSpeedSettings = lazy(() =>
+  import("@/components/tools/audio-speed-settings").then((m) => ({
+    default: m.AudioSpeedSettings,
+  })),
+);
+const FadeAudioSettings = lazy(() =>
+  import("@/components/tools/fade-audio-settings").then((m) => ({
+    default: m.FadeAudioSettings,
+  })),
+);
+const MergeAudioSettings = lazy(() =>
+  import("@/components/tools/merge-audio-settings").then((m) => ({
+    default: m.MergeAudioSettings,
+  })),
+);
+const NoiseReductionSettings = lazy(() =>
+  import("@/components/tools/noise-reduction-settings").then((m) => ({
+    default: m.NoiseReductionSettings,
+  })),
+);
+const NormalizeAudioSettings = lazy(() =>
+  import("@/components/tools/normalize-audio-settings").then((m) => ({
+    default: m.NormalizeAudioSettings,
+  })),
+);
+const PitchShiftSettings = lazy(() =>
+  import("@/components/tools/pitch-shift-settings").then((m) => ({
+    default: m.PitchShiftSettings,
+  })),
+);
+const ReverseAudioSettings = lazy(() =>
+  import("@/components/tools/reverse-audio-settings").then((m) => ({
+    default: m.ReverseAudioSettings,
+  })),
+);
+const RingtoneMakerSettings = lazy(() =>
+  import("@/components/tools/ringtone-maker-settings").then((m) => ({
+    default: m.RingtoneMakerSettings,
+  })),
+);
+const SilenceRemovalSettings = lazy(() =>
+  import("@/components/tools/silence-removal-settings").then((m) => ({
+    default: m.SilenceRemovalSettings,
+  })),
+);
+const SplitAudioSettings = lazy(() =>
+  import("@/components/tools/split-audio-settings").then((m) => ({
+    default: m.SplitAudioSettings,
+  })),
+);
+const VolumeAdjustSettings = lazy(() =>
+  import("@/components/tools/volume-adjust-settings").then((m) => ({
+    default: m.VolumeAdjustSettings,
+  })),
+);
+const WaveformImageSettings = lazy(() =>
+  import("@/components/tools/waveform-image-settings").then((m) => ({
+    default: m.WaveformImageSettings,
+  })),
+);
 const MergePdfSettings = lazy(() =>
   import("@/components/tools/merge-pdf-settings").then((m) => ({
     default: m.MergePdfSettings,
@@ -808,6 +878,22 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["convert-audio", { accept: AUDIO_INPUTS.join(","), Settings: ConvertAudioSettings }],
   ["trim-audio", { accept: AUDIO_INPUTS.join(","), Settings: TrimAudioSettings }],
   ["extract-audio", { accept: VIDEO_INPUTS.join(","), Settings: ExtractAudioSettings }],
+
+  // Audio depth tools
+  ["audio-channels", { accept: AUDIO_INPUTS.join(","), Settings: AudioChannelsSettings }],
+  ["audio-metadata", { accept: AUDIO_INPUTS.join(","), Settings: AudioMetadataSettings }],
+  ["audio-speed", { accept: AUDIO_INPUTS.join(","), Settings: AudioSpeedSettings }],
+  ["fade-audio", { accept: AUDIO_INPUTS.join(","), Settings: FadeAudioSettings }],
+  ["merge-audio", { accept: AUDIO_INPUTS.join(","), Settings: MergeAudioSettings }],
+  ["noise-reduction", { accept: AUDIO_INPUTS.join(","), Settings: NoiseReductionSettings }],
+  ["normalize-audio", { accept: AUDIO_INPUTS.join(","), Settings: NormalizeAudioSettings }],
+  ["pitch-shift", { accept: AUDIO_INPUTS.join(","), Settings: PitchShiftSettings }],
+  ["reverse-audio", { accept: AUDIO_INPUTS.join(","), Settings: ReverseAudioSettings }],
+  ["ringtone-maker", { accept: AUDIO_INPUTS.join(","), Settings: RingtoneMakerSettings }],
+  ["silence-removal", { accept: AUDIO_INPUTS.join(","), Settings: SilenceRemovalSettings }],
+  ["split-audio", { accept: AUDIO_INPUTS.join(","), Settings: SplitAudioSettings }],
+  ["volume-adjust", { accept: AUDIO_INPUTS.join(","), Settings: VolumeAdjustSettings }],
+  ["waveform-image", { accept: AUDIO_INPUTS.join(","), Settings: WaveformImageSettings }],
 
   // PDF & Document tools
   ["merge-pdf", { accept: ".pdf", Settings: MergePdfSettings }],

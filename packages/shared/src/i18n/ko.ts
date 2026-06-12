@@ -1722,6 +1722,7 @@ export const ko: TranslationKeys = {
       progressLabel: "Adjusting volume",
     },
     "normalize-audio": {
+      hint: "EBU R128 loudness normalization",
       submit: "Normalize",
       submitBatch: "Normalize ({count} files)",
       progressLabel: "Normalizing",
@@ -1746,6 +1747,7 @@ export const ko: TranslationKeys = {
     },
     "pitch-shift": {
       semitones: "Semitones",
+      hint: "0 semitones is not allowed",
       submit: "Shift Pitch",
       submitBatch: "Shift Pitch ({count} files)",
       progressLabel: "Shifting pitch",
