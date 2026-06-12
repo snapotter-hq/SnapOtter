@@ -22,6 +22,7 @@ export {
   qpdfLinearize,
   qpdfMerge,
   qpdfPagesSpec,
+  qpdfPagesSpecUnchecked,
   qpdfRepair,
   qpdfRotate,
   qpdfSplitRanges,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePageSpec } from "../../../apps/api/src/lib/page-spec.js";
+import { compressPageRuns, parsePageSpec } from "../../../apps/api/src/lib/page-spec.js";
 
 describe("parsePageSpec", () => {
   it("resolves a single page", () => {
@@ -93,5 +93,59 @@ describe("parsePageSpec", () => {
       if (!removeSet.has(i)) keep.push(i);
     }
     expect(keep.length).toBe(0);
+  });
+
+  // Reviewer edge-decision tests
+  it("reversed range '3-1' normalizes to {1,2,3}", () => {
+    expect(parsePageSpec("3-1", 3)).toEqual(new Set([1, 2, 3]));
+  });
+
+  it("'z-1' of 3 resolves to all pages", () => {
+    expect(parsePageSpec("z-1", 3)).toEqual(new Set([1, 2, 3]));
+  });
+
+  it("'r2-r1' of 5 resolves to {4,5}", () => {
+    expect(parsePageSpec("r2-r1", 5)).toEqual(new Set([4, 5]));
+  });
+
+  it("'1-r1' of 5 resolves to all pages", () => {
+    expect(parsePageSpec("1-r1", 5)).toEqual(new Set([1, 2, 3, 4, 5]));
+  });
+
+  it("'1,1' deduplicates to {1}", () => {
+    expect(parsePageSpec("1,1", 3)).toEqual(new Set([1]));
+  });
+});
+
+describe("compressPageRuns", () => {
+  it("collapses a full consecutive run: [2..80] -> '2-80'", () => {
+    const pages = Array.from({ length: 79 }, (_, i) => i + 2);
+    expect(compressPageRuns(pages)).toBe("2-80");
+  });
+
+  it("leaves non-consecutive pages as singles: [1,3,5,7] -> '1,3,5,7'", () => {
+    expect(compressPageRuns([1, 3, 5, 7])).toBe("1,3,5,7");
+  });
+
+  it("mixes runs and singles: [1,2,4,5,6,9] -> '1-2,4-6,9'", () => {
+    expect(compressPageRuns([1, 2, 4, 5, 6, 9])).toBe("1-2,4-6,9");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(compressPageRuns([])).toBe("");
+  });
+
+  it("handles a single page: [3] -> '3'", () => {
+    expect(compressPageRuns([3])).toBe("3");
+  });
+
+  it("pathological alternation (odd pages 1..399) produces ~800 chars", () => {
+    // 200 odd pages, none consecutive, so compression cannot help
+    const pages = Array.from({ length: 200 }, (_, i) => i * 2 + 1);
+    const result = compressPageRuns(pages);
+    // Each singleton is up to 3 digits + comma -> no runs to collapse
+    expect(result).toBe(pages.join(","));
+    // This exceeds 200 chars, confirming the need for qpdfPagesSpecUnchecked
+    expect(result.length).toBeGreaterThan(200);
   });
 });

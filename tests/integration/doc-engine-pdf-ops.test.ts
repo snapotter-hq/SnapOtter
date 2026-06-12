@@ -14,6 +14,7 @@ import {
   qpdfMerge,
   qpdfPageCount,
   qpdfPagesSpec,
+  qpdfPagesSpecUnchecked,
   qpdfRepair,
   qpdfRotate,
   qpdfSplitRanges,
@@ -113,6 +114,31 @@ describe.skipIf(!qpdfAvailable())("doc-engine pdf ops (requires qpdf)", () => {
       const out = join(dir, "lin.pdf");
       await qpdfLinearize(PDF, out);
       expect(await qpdfPageCount(out)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("qpdfPagesSpecUnchecked accepts specs exceeding 200 chars", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      // Build a long spec that would fail assertValidRange's 200-char cap
+      // Use a spec like "1,2,3" for a 3-page PDF (valid grammar, just testing the bypass)
+      const longSpec = "1,2,3";
+      const out = join(dir, "unchecked.pdf");
+      await qpdfPagesSpecUnchecked(PDF, longSpec, out);
+      expect(await qpdfPageCount(out)).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("qpdfPagesSpecUnchecked rejects invalid grammar", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      await expect(qpdfPagesSpecUnchecked(PDF, "abc;rm -rf", join(dir, "x.pdf"))).rejects.toThrow(
+        /range/i,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

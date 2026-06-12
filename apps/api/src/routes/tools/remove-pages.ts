@@ -1,9 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qpdfPageCount, qpdfPagesSpec } from "@snapotter/doc-engine";
+import { qpdfPageCount, qpdfPagesSpecUnchecked } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { parsePageSpec } from "../../lib/page-spec.js";
+import { compressPageRuns, parsePageSpec } from "../../lib/page-spec.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const rangeField = z
@@ -45,10 +45,10 @@ export function registerRemovePages(app: FastifyInstance) {
         throw new Error("Cannot remove every page from the document");
       }
 
-      const keepSpec = keepPages.join(",");
+      const keepSpec = compressPageRuns(keepPages);
       const outPath = join(ctx.scratchDir, `${base}_removed.pdf`);
       ctx.report(30, "Removing pages");
-      await qpdfPagesSpec(inPath, keepSpec, outPath);
+      await qpdfPagesSpecUnchecked(inPath, keepSpec, outPath);
       ctx.report(90, "Done");
 
       return {

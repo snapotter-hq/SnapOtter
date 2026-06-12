@@ -37,6 +37,41 @@ export function parsePageSpec(spec: string, total: number): Set<number> {
   return result;
 }
 
+/**
+ * Collapse a sorted-ascending array of page numbers into the most compact
+ * qpdf range string by merging consecutive runs into N-M parts.
+ *
+ * Examples:
+ *   [2,3,4,...,80] -> "2-80"
+ *   [1,3,5,7]      -> "1,3,5,7"
+ *   [1,2,4,5,6,9]  -> "1-2,4-6,9"
+ *   []              -> ""
+ *   [3]             -> "3"
+ *
+ * The input MUST be sorted ascending with no duplicates (as produced by
+ * iterating 1..total and filtering).
+ */
+export function compressPageRuns(pages: number[]): string {
+  if (pages.length === 0) return "";
+
+  const parts: string[] = [];
+  let runStart = pages[0];
+  let runEnd = pages[0];
+
+  for (let i = 1; i < pages.length; i++) {
+    if (pages[i] === runEnd + 1) {
+      runEnd = pages[i];
+    } else {
+      parts.push(runStart === runEnd ? `${runStart}` : `${runStart}-${runEnd}`);
+      runStart = pages[i];
+      runEnd = pages[i];
+    }
+  }
+
+  parts.push(runStart === runEnd ? `${runStart}` : `${runStart}-${runEnd}`);
+  return parts.join(",");
+}
+
 function resolveToken(token: string, total: number): number {
   const t = token.trim().toLowerCase();
   let page: number;

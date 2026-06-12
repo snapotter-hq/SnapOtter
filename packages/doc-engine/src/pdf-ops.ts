@@ -87,6 +87,27 @@ export async function qpdfPagesSpec(
   await runQpdf([inputPath, "--pages", ".", spec, "--", outPath], 60_000);
 }
 
+/**
+ * Internal variant of qpdfPagesSpec that validates the grammar (charset) but
+ * NOT the 200-character length cap. Use ONLY for specs built programmatically
+ * from validated integers (e.g. keepPages derived from parsePageSpec output),
+ * never for raw user input.
+ *
+ * Trust boundary: the caller guarantees every number in the spec originated
+ * from parsePageSpec (which validates bounds against the real page count).
+ * We still verify the characters are safe for the qpdf CLI.
+ */
+export async function qpdfPagesSpecUnchecked(
+  inputPath: string,
+  spec: string,
+  outPath: string,
+): Promise<void> {
+  if (!RANGE_RE.test(spec)) {
+    throw new Error(`Invalid page range: ${spec.slice(0, 50)}`);
+  }
+  await runQpdf([inputPath, "--pages", ".", spec, "--", outPath], 60_000);
+}
+
 export async function qpdfLinearize(inputPath: string, outPath: string): Promise<void> {
   await runQpdf(["--linearize", inputPath, outPath], 60_000);
 }
