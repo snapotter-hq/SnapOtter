@@ -68,6 +68,7 @@ import { registerMarkdownToHtml } from "./markdown-to-html.js";
 import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergeAudio } from "./merge-audio.js";
+import { registerMergeCsvs } from "./merge-csvs.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -138,6 +139,8 @@ import { registerWatermarkText } from "./watermark-text.js";
 import { registerWatermarkVideo } from "./watermark-video.js";
 import { registerWaveformImage } from "./waveform-image.js";
 import { registerWordToPdf } from "./word-to-pdf.js";
+import { registerXmlToCsv } from "./xml-to-csv.js";
+import { registerYamlJson } from "./yaml-json.js";
 
 /**
  * Registry that imports and registers all tool routes.
@@ -311,7 +314,10 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "csv-excel", register: registerCsvExcel },
     { id: "csv-json", register: registerCsvJson },
     { id: "json-xml", register: registerJsonXml },
+    { id: "merge-csvs", register: registerMergeCsvs },
     { id: "split-csv", register: registerSplitCsv },
+    { id: "xml-to-csv", register: registerXmlToCsv },
+    { id: "yaml-json", register: registerYamlJson },
 
     // AI Tools
     { id: "remove-background", register: registerRemoveBackground },

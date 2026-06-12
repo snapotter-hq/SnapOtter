@@ -567,6 +567,18 @@ export const zhCN: TranslationKeys = {
       name: "Split CSV",
       description: "Split a CSV into smaller files by row count",
     },
+    "merge-csvs": {
+      name: "Merge CSVs",
+      description: "Combine multiple CSV or TSV files with matching columns into one",
+    },
+    "yaml-json": {
+      name: "YAML / JSON",
+      description: "Convert between YAML and JSON, both directions",
+    },
+    "xml-to-csv": {
+      name: "XML to CSV",
+      description: "Extract repeating elements from XML into a CSV table",
+    },
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
     processing: { canceled: "Processing canceled" },
     mediaPlayer: {
@@ -2107,6 +2119,21 @@ export const zhCN: TranslationKeys = {
       submit: "Split",
       submitBatch: "Split ({count} files)",
       progressLabel: "Splitting",
+    },
+    "merge-csvs": {
+      submit: "Merge",
+      submitBatch: "Merge ({count} files)",
+      progressLabel: "Merging",
+    },
+    "yaml-json": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "xml-to-csv": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
   },
   urlImport: {
