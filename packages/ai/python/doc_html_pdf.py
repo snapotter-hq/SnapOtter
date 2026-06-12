@@ -1,14 +1,33 @@
-"""HTML or Markdown to PDF via WeasyPrint. Remote resource fetching is
-REJECTED (no-phone-home posture): only data: URIs resolve; any http(s)/file
-reference fails the conversion with a clear error.
-Args: {"path": in, "out": o, "mode": "html"|"markdown"}. Prints {"ok": true}.
-
-WeasyPrint SSRF contract (verified against 69.0): the url_fetcher's ValueError
-is caught internally by WeasyPrint and the offending resource is omitted from
-output. No outbound HTTP request is made. The conversion succeeds with remote
-resources missing, which is the desired no-phone-home behavior."""
+"""HTML or Markdown to PDF via WeasyPrint (no-phone-home posture).
+Remote references (src/href/action/url()) are REJECTED before conversion
+with a clear error listing up to 5 offending URLs. The url_fetcher remains
+as a defense-in-depth backstop: it blocks any reference that slips past
+the scan, raising ValueError so WeasyPrint omits the resource with zero
+outbound requests.
+Args: {"path": in, "out": o, "mode": "html"|"markdown"}. Prints {"ok": true}."""
 import json
+import re
 import sys
+
+_REMOTE_REF_RE = re.compile(
+    r'(?:src|href|action)\s*=\s*["\']?\s*(https?://[^\s"\'>\)]{1,200})',
+    re.IGNORECASE,
+)
+_REMOTE_CSS_URL_RE = re.compile(
+    r'url\s*\(\s*["\']?\s*(https?://[^\s"\'>\)]{1,200})',
+    re.IGNORECASE,
+)
+
+
+def _find_remote_refs(source):
+    """Return up to 5 remote URLs found in HTML/CSS source."""
+    refs = []
+    for pattern in (_REMOTE_REF_RE, _REMOTE_CSS_URL_RE):
+        for m in pattern.finditer(source):
+            refs.append(m.group(1)[:120])
+            if len(refs) >= 5:
+                return refs
+    return refs
 
 
 def main():
@@ -45,6 +64,10 @@ def main():
                 "code,pre{background:#f4f4f4;}table,td,th{border:1px solid #999;border-collapse:collapse;padding:4px;}</style>"
                 f"</head><body>{body}</body></html>"
             )
+        remote_refs = _find_remote_refs(source)
+        if remote_refs:
+            print(json.dumps({"error": f"remote resources are disabled: {', '.join(remote_refs)}"}))
+            sys.exit(1)
         HTML(string=source, url_fetcher=no_remote_fetcher, base_url=None).write_pdf(out)
         print(json.dumps({"ok": True}))
     except SystemExit:
