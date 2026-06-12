@@ -10,10 +10,13 @@ import sharp from "sharp";
 import { z } from "zod";
 import {
   encodeBmp,
+  encodeEps,
   encodeIco,
   encodeJp2,
   encodeJxl,
+  encodePpm,
   encodeQoi,
+  encodeTga,
 } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
 import { isSvgBuffer } from "../../lib/svg-sanitize.js";
@@ -56,15 +59,23 @@ const FORMAT_CONTENT_TYPES: Record<string, string> = {
   jp2: "image/jp2",
   qoi: "image/x-qoi",
   psd: "image/vnd.adobe.photoshop",
+  ppm: "image/x-portable-pixmap",
+  eps: "application/postscript",
+  tga: "image/x-tga",
 };
 
 const CLI_ENCODERS: Record<string, (buf: Buffer, quality?: number) => Promise<Buffer>> = {
   bmp: encodeBmp,
+  eps: encodeEps,
   ico: encodeIco,
   jp2: encodeJp2,
   jxl: encodeJxl,
+  ppm: encodePpm,
   qoi: encodeQoi,
+  tga: encodeTga,
 };
+
+const ANIMATABLE_FORMATS = new Set(["gif", "webp"]);
 
 const settingsSchema = z.object({
   format: z.enum([
@@ -82,6 +93,9 @@ const settingsSchema = z.object({
     "jp2",
     "qoi",
     "psd",
+    "ppm",
+    "eps",
+    "tga",
   ]),
   quality: z.number().min(1).max(100).optional(),
 });
@@ -105,7 +119,14 @@ export function registerConvert(app: FastifyInstance) {
         };
       }
 
-      const sharpOpts = isSvgBuffer(inputBuffer) ? { density: 300 } : undefined;
+      const inputExt = extname(filename).toLowerCase().replace(".", "");
+      const sharpOpts: import("sharp").SharpOptions = isSvgBuffer(inputBuffer)
+        ? { density: 300 }
+        : {};
+      // Preserve animation frames when both input and output are animatable formats
+      if (ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)) {
+        sharpOpts.animated = true;
+      }
       const image = sharp(inputBuffer, sharpOpts);
 
       let buffer: Buffer;

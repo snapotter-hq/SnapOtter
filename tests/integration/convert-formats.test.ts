@@ -6,7 +6,9 @@
  * Also tests SVG-to-raster via the dedicated endpoint.
  */
 
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -30,11 +32,26 @@ const OUTPUT_FORMATS = [
   "jp2",
   "qoi",
   "psd",
+  "ppm",
+  "eps",
+  "tga",
 ] as const;
 
 // Formats whose CLI encoder (cjxl, heif-enc, opj_compress, magick) may not
 // be installed in every dev/CI environment. Allow graceful 422 for these.
-const CLI_ENCODED_FORMATS = new Set(["heic", "heif", "jxl", "bmp", "ico", "jp2", "qoi", "psd"]);
+const CLI_ENCODED_FORMATS = new Set([
+  "heic",
+  "heif",
+  "jxl",
+  "bmp",
+  "ico",
+  "jp2",
+  "qoi",
+  "psd",
+  "ppm",
+  "eps",
+  "tga",
+]);
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -295,7 +312,7 @@ describe("SVG via dedicated svg-to-raster endpoint", () => {
     expect(highBody.processedSize).toBeGreaterThan(lowBody.processedSize);
   });
 
-  // Non-browser formats should include a previewUrl
+  // Non-browser formats should include a previewUrl (moved below animated tests)
   it("returns previewUrl for non-browser format (tiff)", async () => {
     const input = inputs.svg;
     const { body: payload, contentType } = createMultipartPayload([
@@ -325,5 +342,88 @@ describe("SVG via dedicated svg-to-raster endpoint", () => {
     const body = JSON.parse(res.body);
     expect(body.previewUrl).toBeDefined();
     expect(body.previewUrl).toContain("preview.webp");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Animated format preservation via /api/v1/tools/convert
+// ---------------------------------------------------------------------------
+describe("Animated format preservation", () => {
+  it("preserves animation when converting animated GIF to WebP", async () => {
+    const animatedGif = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "animated.gif",
+        contentType: "image/gif",
+        content: animatedGif,
+      },
+      { name: "settings", content: JSON.stringify({ format: "webp" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/convert",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.downloadUrl).toContain(".webp");
+
+    // Download the output and verify it has multiple frames
+    const dl = await app.inject({
+      method: "GET",
+      url: body.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const tmpPath = join(tmpdir(), `animated-check-${randomUUID()}.webp`);
+    writeFileSync(tmpPath, dl.rawPayload);
+    const meta = await sharp(tmpPath, { animated: true }).metadata();
+    expect(meta.pages).toBeGreaterThan(1);
+  });
+
+  it("converts animated GIF to PNG as single frame without error", async () => {
+    const animatedGif = readFileSync(join(FIXTURES, "animated.gif"));
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "animated.gif",
+        contentType: "image/gif",
+        content: animatedGif,
+      },
+      { name: "settings", content: JSON.stringify({ format: "png" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/convert",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.downloadUrl).toContain(".png");
+
+    // Download and verify single frame
+    const dl = await app.inject({
+      method: "GET",
+      url: body.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const meta = await sharp(dl.rawPayload).metadata();
+    expect(meta.pages ?? 1).toBe(1);
   });
 });

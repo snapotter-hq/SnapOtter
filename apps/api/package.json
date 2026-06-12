@@ -30,6 +30,7 @@
     "archiver": "^7.0.1",
     "better-sqlite3": "^11.7.0",
     "bullmq": "^5.78.0",
+    "bwip-js": "^4.11.1",
     "dotenv": "^16.4.0",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",

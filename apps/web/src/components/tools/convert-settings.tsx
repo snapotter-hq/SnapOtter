@@ -20,6 +20,9 @@ const OUTPUT_FORMATS = [
   "ico",
   "jp2",
   "qoi",
+  "ppm",
+  "eps",
+  "tga",
 ] as const;
 const LOSSY_FORMATS = ["jpg", "jpeg", "webp", "avif", "heic", "heif", "jxl", "jp2"];
 
@@ -37,6 +40,9 @@ const FORMAT_LABELS: Record<string, string> = {
   ico: "ICO",
   jp2: "JP2",
   qoi: "QOI",
+  ppm: "PPM",
+  eps: "EPS",
+  tga: "TGA",
 };
 
 export interface ConvertControlsProps {

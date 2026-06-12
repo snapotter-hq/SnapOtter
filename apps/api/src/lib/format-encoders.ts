@@ -104,6 +104,60 @@ export async function encodeQoi(inputBuffer: Buffer): Promise<Buffer> {
   return Buffer.from(encoded);
 }
 
+export async function encodePpm(inputBuffer: Buffer): Promise<Buffer> {
+  const cmd = await findMagickCmd();
+  const id = randomUUID();
+  const inputPath = join(tmpdir(), `ppm-enc-in-${id}.png`);
+  const outputPath = join(tmpdir(), `ppm-enc-out-${id}.ppm`);
+  try {
+    const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+    await writeFile(inputPath, pngBuffer);
+    await execFileAsync(cmd, magickArgs(cmd, [inputPath, `ppm:${outputPath}`]), {
+      timeout: 60_000,
+    });
+    return await readFile(outputPath);
+  } finally {
+    await rm(inputPath, { force: true }).catch(() => {});
+    await rm(outputPath, { force: true }).catch(() => {});
+  }
+}
+
+export async function encodeEps(inputBuffer: Buffer): Promise<Buffer> {
+  const cmd = await findMagickCmd();
+  const id = randomUUID();
+  const inputPath = join(tmpdir(), `eps-enc-in-${id}.png`);
+  const outputPath = join(tmpdir(), `eps-enc-out-${id}.eps`);
+  try {
+    const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+    await writeFile(inputPath, pngBuffer);
+    await execFileAsync(cmd, magickArgs(cmd, [inputPath, `eps:${outputPath}`]), {
+      timeout: 60_000,
+    });
+    return await readFile(outputPath);
+  } finally {
+    await rm(inputPath, { force: true }).catch(() => {});
+    await rm(outputPath, { force: true }).catch(() => {});
+  }
+}
+
+export async function encodeTga(inputBuffer: Buffer): Promise<Buffer> {
+  const cmd = await findMagickCmd();
+  const id = randomUUID();
+  const inputPath = join(tmpdir(), `tga-enc-in-${id}.png`);
+  const outputPath = join(tmpdir(), `tga-enc-out-${id}.tga`);
+  try {
+    const pngBuffer = await sharp(inputBuffer).png().toBuffer();
+    await writeFile(inputPath, pngBuffer);
+    await execFileAsync(cmd, magickArgs(cmd, [inputPath, `tga:${outputPath}`]), {
+      timeout: 60_000,
+    });
+    return await readFile(outputPath);
+  } finally {
+    await rm(inputPath, { force: true }).catch(() => {});
+    await rm(outputPath, { force: true }).catch(() => {});
+  }
+}
+
 export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<Buffer> {
   const id = randomUUID();
   const inputPath = join(tmpdir(), `jxl-enc-in-${id}.png`);

@@ -170,6 +170,9 @@ importers:
       bullmq:
         specifier: ^5.78.0
         version: 5.78.0
+      bwip-js:
+        specifier: ^4.11.1
+        version: 4.11.1
       dotenv:
         specifier: ^16.4.0
         version: 16.6.1
@@ -3921,6 +3924,10 @@ packages:
     peerDependenciesMeta:
       redis:
         optional: true
+
+  bwip-js@4.11.1:
+    resolution: {integrity: sha512-9KCjsJF/VSETOS6jPgNxd6X9yCHTbqcm2zccDceX7bOmxDDjQ92V9S+iFf+UD5+hijUZDw7SFsYT7vL2rW7qcQ==}
+    hasBin: true
 
   byline@5.0.0:
     resolution: {integrity: sha512-s6webAy+R4SR8XVuJWt2V2rGvhnrhxN+9S15GNuTK3wKPOXFF6RNc+8ug2XhH+2s4f+uudG4kUVYmYOQWL2g0Q==}
@@ -11090,6 +11097,8 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+
+  bwip-js@4.11.1: {}
 
   byline@5.0.0: {}
 

@@ -131,9 +131,14 @@ describe("tool x format matrix (generated)", () => {
             !NON_RASTER_OUTPUT.has(outType.split(";")[0]) && outType.startsWith("image/");
           const sharpDecodable =
             isRaster &&
-            !["image/heic", "image/heif", "image/x-icon", "image/qoi"].includes(
-              outType.split(";")[0],
-            );
+            ![
+              "image/heic",
+              "image/heif",
+              "image/x-icon",
+              "image/qoi",
+              "image/x-portable-pixmap",
+              "image/x-tga",
+            ].includes(outType.split(";")[0]);
           if (sharpDecodable) {
             // The processed output must actually decode; a corrupt "success" is a bug.
             const meta = await sharp(dl.rawPayload).metadata();
