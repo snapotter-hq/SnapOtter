@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Anchor,
   AppWindow,
   Archive,
   AudioLines,
@@ -90,6 +91,7 @@ import {
 // Only the icons actually used by tool definitions in @snapotter/shared constants.
 // Avoids `import * as icons from "lucide-react"` which pulls the entire 1000+ icon library.
 export const ICON_MAP: Record<string, LucideIcon> = {
+  Anchor,
   AppWindow,
   Archive,
   AudioLines,

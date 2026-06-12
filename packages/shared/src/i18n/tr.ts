@@ -346,6 +346,10 @@ export const tr: TranslationKeys = {
       name: "Watermark Video",
       description: "Burn a text watermark onto video frames",
     },
+    "stabilize-video": {
+      name: "Stabilize Video",
+      description: "Reduce camera shake with two-pass stabilization",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1574,6 +1578,13 @@ export const tr: TranslationKeys = {
       submit: "Watermark",
       submitBatch: "Watermark ({count} files)",
       progressLabel: "Watermarking",
+    },
+    "stabilize-video": {
+      smoothing: "Smoothing",
+      hint: "Runs two passes and takes longer than most tools",
+      submit: "Stabilize",
+      submitBatch: "Stabilize ({count} files)",
+      progressLabel: "Stabilizing",
     },
     "convert-audio": {
       format: "Output format",

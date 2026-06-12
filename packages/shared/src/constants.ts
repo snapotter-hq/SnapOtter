@@ -787,6 +787,17 @@ export const TOOLS: Tool[] = [
     acceptedInputs: VIDEO_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "stabilize-video",
+    name: "Stabilize Video",
+    description: "Reduce camera shake with two-pass stabilization",
+    category: "video",
+    icon: "Anchor",
+    route: "/stabilize-video",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "long",
+  },
   // Audio
   {
     id: "convert-audio",

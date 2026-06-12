@@ -85,6 +85,7 @@ import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
 import { registerSplitCsv } from "./split-csv.js";
 import { registerSplitPdf } from "./split-pdf.js";
+import { registerStabilizeVideo } from "./stabilize-video.js";
 import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
@@ -199,6 +200,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "resize-video", register: registerResizeVideo },
     { id: "reverse-video", register: registerReverseVideo },
     { id: "rotate-video", register: registerRotateVideo },
+    { id: "stabilize-video", register: registerStabilizeVideo },
     { id: "trim-video", register: registerTrimVideo },
     { id: "video-color", register: registerVideoColor },
     { id: "video-loudnorm", register: registerVideoLoudnorm },
