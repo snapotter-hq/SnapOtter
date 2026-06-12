@@ -831,6 +831,28 @@ export const TOOLS: Tool[] = [
     acceptedInputs: VIDEO_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "merge-videos",
+    name: "Merge Videos",
+    description: "Join multiple video clips into one file",
+    category: "video",
+    icon: "Combine",
+    route: "/merge-videos",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "long",
+  },
+  {
+    id: "replace-audio",
+    name: "Replace Audio",
+    description: "Swap the audio track of a video with another file",
+    category: "video",
+    icon: "MicVocal",
+    route: "/replace-audio",
+    modality: "video",
+    acceptedInputs: [...VIDEO_INPUTS, ...AUDIO_INPUTS],
+    executionHint: "fast",
+  },
   // Audio
   {
     id: "convert-audio",

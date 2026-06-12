@@ -53,6 +53,7 @@ import { registerLinearizePdf } from "./linearize-pdf.js";
 import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
+import { registerMergeVideos } from "./merge-videos.js";
 import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerNupPdf } from "./nup-pdf.js";
@@ -73,6 +74,7 @@ import { registerRedactPdf } from "./redact-pdf.js";
 import { registerRemoveBackground } from "./remove-background.js";
 import { registerRemovePages } from "./remove-pages.js";
 import { registerRepairPdf } from "./repair-pdf.js";
+import { registerReplaceAudio } from "./replace-audio.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
 import { registerResizeVideo } from "./resize-video.js";
@@ -200,6 +202,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "convert-video", register: registerConvertVideo },
     { id: "crop-video", register: registerCropVideo },
     { id: "gif-to-video", register: registerGifToVideo },
+    { id: "merge-videos", register: registerMergeVideos },
     { id: "mute-video", register: registerMuteVideo },
     { id: "resize-video", register: registerResizeVideo },
     { id: "reverse-video", register: registerReverseVideo },
@@ -210,6 +213,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "video-loudnorm", register: registerVideoLoudnorm },
     { id: "video-speed", register: registerVideoSpeed },
     { id: "video-to-frames", register: registerVideoToFrames },
+    { id: "replace-audio", register: registerReplaceAudio },
     { id: "video-to-gif", register: registerVideoToGif },
     { id: "video-to-webp", register: registerVideoToWebp },
     { id: "watermark-video", register: registerWatermarkVideo },

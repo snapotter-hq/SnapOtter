@@ -362,6 +362,14 @@ export const tr: TranslationKeys = {
       name: "Video to Frames",
       description: "Extract frames from a video as a ZIP of images",
     },
+    "merge-videos": {
+      name: "Merge Videos",
+      description: "Join multiple video clips into one file",
+    },
+    "replace-audio": {
+      name: "Replace Audio",
+      description: "Swap the audio track of a video with another file",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1625,6 +1633,18 @@ export const tr: TranslationKeys = {
       submit: "Extract Frames",
       submitBatch: "Extract Frames ({count} files)",
       progressLabel: "Extracting frames",
+    },
+    "merge-videos": {
+      hint: "Files are joined in upload order",
+      submit: "Merge",
+      submitBatch: "Merge ({count} files)",
+      progressLabel: "Merging",
+    },
+    "replace-audio": {
+      hint: "Upload the video first, then the audio",
+      submit: "Replace Audio",
+      submitBatch: "Replace Audio ({count} files)",
+      progressLabel: "Replacing audio",
     },
     "convert-audio": {
       format: "Output format",
