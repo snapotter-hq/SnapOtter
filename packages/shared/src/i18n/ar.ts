@@ -258,6 +258,26 @@ export const ar: TranslationKeys = {
       name: "تجميل لقطة الشاشة",
       description: "إضافة خلفيات متدرجة وإطارات أجهزة وظلال وأحجام وسائل التواصل للقطات الشاشة",
     },
+    "circle-crop": {
+      name: "Circle Crop",
+      description: "Crop image to a centered circle with transparent corners",
+    },
+    duotone: {
+      name: "Duotone",
+      description: "Apply a two-color duotone effect with custom shadow and highlight colors",
+    },
+    "image-pad": {
+      name: "Image Pad",
+      description: "Pad image to a target aspect ratio with a solid color background",
+    },
+    pixelate: {
+      name: "Pixelate",
+      description: "Apply a pixelation effect to the full image or a specific region",
+    },
+    vignette: {
+      name: "Vignette",
+      description: "Add a vignette effect with adjustable strength and color",
+    },
     "svg-to-raster": {
       name: "SVG إلى صورة نقطية",
       description:
@@ -1504,6 +1524,38 @@ export const ar: TranslationKeys = {
       submit: "تجميل",
       submitBatch: "تجميل ({count} ملف)",
       progressLabel: "جاري تجميل لقطة الشاشة",
+    },
+    "circle-crop": {
+      submit: "Circle Crop",
+      submitBatch: "Circle Crop ({count} files)",
+      progressLabel: "Cropping to circle",
+    },
+    duotone: {
+      shadow: "Shadow Color",
+      highlight: "Highlight Color",
+      submit: "Apply Duotone",
+      submitBatch: "Apply Duotone ({count} files)",
+      progressLabel: "Applying duotone",
+    },
+    "image-pad": {
+      target: "Target Ratio",
+      color: "Background Color",
+      submit: "Pad Image",
+      submitBatch: "Pad Image ({count} files)",
+      progressLabel: "Padding image",
+    },
+    pixelate: {
+      blockSize: "Block Size",
+      submit: "Pixelate",
+      submitBatch: "Pixelate ({count} files)",
+      progressLabel: "Pixelating",
+    },
+    vignette: {
+      strength: "Strength",
+      color: "Vignette Color",
+      submit: "Apply Vignette",
+      submitBatch: "Apply Vignette ({count} files)",
+      progressLabel: "Applying vignette",
     },
     "svg-to-raster": {
       outputFormat: "صيغة الإخراج",

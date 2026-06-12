@@ -215,6 +215,26 @@ export const zhCN: TranslationKeys = {
       name: "截图美化",
       description: "为截图添加渐变背景、设备外框、阴影和社交媒体尺寸",
     },
+    "circle-crop": {
+      name: "Circle Crop",
+      description: "Crop image to a centered circle with transparent corners",
+    },
+    duotone: {
+      name: "Duotone",
+      description: "Apply a two-color duotone effect with custom shadow and highlight colors",
+    },
+    "image-pad": {
+      name: "Image Pad",
+      description: "Pad image to a target aspect ratio with a solid color background",
+    },
+    pixelate: {
+      name: "Pixelate",
+      description: "Apply a pixelation effect to the full image or a specific region",
+    },
+    vignette: {
+      name: "Vignette",
+      description: "Add a vignette effect with adjustable strength and color",
+    },
     "svg-to-raster": {
       name: "SVG 转位图",
       description: "将 SVG 转换为 PNG、JPEG、WebP、AVIF、TIFF、GIF 或 HEIF，支持自定义缩放和 DPI",
@@ -1447,6 +1467,38 @@ export const zhCN: TranslationKeys = {
       submit: "美化",
       submitBatch: "美化（{count} 个文件）",
       progressLabel: "正在美化截图",
+    },
+    "circle-crop": {
+      submit: "Circle Crop",
+      submitBatch: "Circle Crop ({count} files)",
+      progressLabel: "Cropping to circle",
+    },
+    duotone: {
+      shadow: "Shadow Color",
+      highlight: "Highlight Color",
+      submit: "Apply Duotone",
+      submitBatch: "Apply Duotone ({count} files)",
+      progressLabel: "Applying duotone",
+    },
+    "image-pad": {
+      target: "Target Ratio",
+      color: "Background Color",
+      submit: "Pad Image",
+      submitBatch: "Pad Image ({count} files)",
+      progressLabel: "Padding image",
+    },
+    pixelate: {
+      blockSize: "Block Size",
+      submit: "Pixelate",
+      submitBatch: "Pixelate ({count} files)",
+      progressLabel: "Pixelating",
+    },
+    vignette: {
+      strength: "Strength",
+      color: "Vignette Color",
+      submit: "Apply Vignette",
+      submitBatch: "Apply Vignette ({count} files)",
+      progressLabel: "Applying vignette",
     },
     "svg-to-raster": {
       outputFormat: "输出格式",

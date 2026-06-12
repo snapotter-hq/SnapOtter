@@ -56,6 +56,11 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   split: "interactive-split",
   border: "live-preview",
   beautify: "live-preview",
+  "circle-crop": "live-preview",
+  duotone: "live-preview",
+  "image-pad": "live-preview",
+  pixelate: "live-preview",
+  vignette: "live-preview",
 
   // Format & conversion
   "svg-to-raster": "before-after",

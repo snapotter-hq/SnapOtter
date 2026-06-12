@@ -17,6 +17,7 @@ import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
 import { registerBurnSubtitles } from "./burn-subtitles.js";
 import { registerChangeFps } from "./change-fps.js";
+import { registerCircleCrop } from "./circle-crop.js";
 import { registerCollage } from "./collage.js";
 import { registerColorBlindness } from "./color-blindness.js";
 import { registerColorPalette } from "./color-palette.js";
@@ -39,6 +40,7 @@ import { registerCropPdf } from "./crop-pdf.js";
 import { registerCropVideo } from "./crop-video.js";
 import { registerCsvExcel } from "./csv-excel.js";
 import { registerCsvJson } from "./csv-json.js";
+import { registerDuotone } from "./duotone.js";
 import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEmbedSubtitles } from "./embed-subtitles.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
@@ -59,6 +61,7 @@ import { registerGrayscalePdf } from "./grayscale-pdf.js";
 import { registerHtmlToImage } from "./html-to-image.js";
 import { registerHtmlToPdf } from "./html-to-pdf.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
+import { registerImagePad } from "./image-pad.js";
 import { registerImageToBase64 } from "./image-to-base64.js";
 import { registerImageToPdf } from "./image-to-pdf.js";
 import { registerImagesToVideo } from "./images-to-video.js";
@@ -89,6 +92,7 @@ import { registerPdfToText } from "./pdf-to-text.js";
 import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
 import { registerPitchShift } from "./pitch-shift.js";
+import { registerPixelate } from "./pixelate.js";
 import { registerPowerpointToPdf } from "./powerpoint-to-pdf.js";
 import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
@@ -134,6 +138,7 @@ import { registerVideoSpeed } from "./video-speed.js";
 import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerVideoToWebp } from "./video-to-webp.js";
+import { registerVignette } from "./vignette.js";
 import { registerVolumeAdjust } from "./volume-adjust.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
@@ -210,6 +215,11 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "split", register: registerSplit },
     { id: "border", register: registerBorder },
     { id: "beautify", register: registerBeautify },
+    { id: "circle-crop", register: registerCircleCrop },
+    { id: "duotone", register: registerDuotone },
+    { id: "image-pad", register: registerImagePad },
+    { id: "pixelate", register: registerPixelate },
+    { id: "vignette", register: registerVignette },
 
     // Format & Conversion
     { id: "svg-to-raster", register: registerSvgToRaster },
