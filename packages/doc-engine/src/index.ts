@@ -35,5 +35,14 @@ export {
   pdfcpuTextStamp,
   type TextStampOptions,
 } from "./pdfcpu.js";
-export { pdfPageCountPy } from "./python-docs.js";
+export {
+  htmlToPdfPy,
+  pdfFlattenPy,
+  pdfMetadataGetPy,
+  pdfMetadataSetPy,
+  pdfPageCountPy,
+  pdfRedactPy,
+  pdfTextPy,
+  pdfToWordPy,
+} from "./python-docs.js";
 export { qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";

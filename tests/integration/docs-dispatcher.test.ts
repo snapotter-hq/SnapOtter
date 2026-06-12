@@ -1,8 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDocsDispatcher, runDocsScript, shutdownDocsDispatcher } from "@snapotter/ai";
-import { pdfPageCountPy } from "@snapotter/doc-engine";
+import {
+  pdfMetadataGetPy,
+  pdfMetadataSetPy,
+  pdfPageCountPy,
+  pdfTextPy,
+} from "@snapotter/doc-engine";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
@@ -27,25 +33,30 @@ function resolvePython(): string | null {
   return null;
 }
 
-function pythonHasPikepdf(pythonBin: string): boolean {
-  const res = spawnSync(pythonBin, ["-c", "import pikepdf"], { encoding: "utf8" });
+/** Check whether a Python module is importable by the resolved interpreter. */
+function pythonWith(mod: string): boolean {
+  if (!pythonBin) return false;
+  const res = spawnSync(pythonBin, ["-c", `import ${mod}`], { encoding: "utf8" });
   return res.status === 0;
 }
 
 const pythonBin = resolvePython();
 const hasPython = pythonBin !== null;
-const hasPikepdf = hasPython && pythonHasPikepdf(pythonBin!);
+const hasPikepdf = hasPython && pythonWith("pikepdf");
+const hasFitz = hasPython && pythonWith("fitz");
 
 // Ensure the bridge uses a reachable Python; set PYTHON_VENV_PATH before
 // any import triggers a dispatcher spawn.
 if (hasPython && !existsSync(join(process.cwd(), ".venv", "bin", "python3"))) {
-  const parts = pythonBin!.split("/");
+  const parts = (pythonBin ?? "").split("/");
   process.env.PYTHON_VENV_PATH = parts.slice(0, -2).join("/");
 }
 
 if (!hasPython) console.log("[docs-dispatcher] SKIP: no python3 found (venv or system)");
 if (hasPython && !hasPikepdf)
   console.log("[docs-dispatcher] pikepdf not available; pikepdf tests will skip");
+if (hasPython && !hasFitz)
+  console.log("[docs-dispatcher] fitz (PyMuPDF) not available; fitz tests will skip");
 
 afterAll(async () => {
   await shutdownDocsDispatcher();
@@ -70,5 +81,32 @@ describe.skipIf(!hasPikepdf)("docs dispatcher pikepdf (requires python + pikepdf
   it("counts pdf pages through the docs profile", async () => {
     const pages = await pdfPageCountPy(join(process.cwd(), "tests/fixtures/test-3page.pdf"));
     expect(pages).toBe(3);
+  });
+
+  it("metadata get/set roundtrip", async () => {
+    const pdf = join(process.cwd(), "tests/fixtures/test-3page.pdf");
+    const dir = mkdtempSync(join(tmpdir(), "meta-"));
+    try {
+      const out = join(dir, "meta.pdf");
+      await pdfMetadataSetPy(pdf, out, { Title: "Wave2" });
+      const meta = await pdfMetadataGetPy(out);
+      expect(meta.Title).toBe("Wave2");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe.skipIf(!hasFitz)("docs dispatcher fitz (requires python + PyMuPDF)", () => {
+  it("extracts text with chars > 0", async () => {
+    const pdf = join(process.cwd(), "tests/fixtures/test-3page.pdf");
+    const dir = mkdtempSync(join(tmpdir(), "text-"));
+    try {
+      const out = join(dir, "text.txt");
+      const result = await pdfTextPy(pdf, out);
+      expect(result.chars).toBeGreaterThan(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

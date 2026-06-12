@@ -63,6 +63,12 @@ DISPATCHER_PROFILE = os.environ.get("DISPATCHER_PROFILE", "ai")
 DOCS_SCRIPTS = {
     "doc_pagecount",
     "doc_health",
+    "doc_flatten",
+    "doc_redact",
+    "doc_text",
+    "doc_to_word",
+    "doc_metadata",
+    "doc_html_pdf",
 }
 
 if DISPATCHER_PROFILE == "docs":
