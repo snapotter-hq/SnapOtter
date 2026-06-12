@@ -57,7 +57,9 @@ import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerFlattenPdf } from "./flatten-pdf.js";
 import { registerGifToVideo } from "./gif-to-video.js";
 import { registerGifTools } from "./gif-tools.js";
+import { registerGifWebp } from "./gif-webp.js";
 import { registerGrayscalePdf } from "./grayscale-pdf.js";
+import { registerHistogram } from "./histogram.js";
 import { registerHtmlToImage } from "./html-to-image.js";
 import { registerHtmlToPdf } from "./html-to-pdf.js";
 import { registerImageEnhancement } from "./image-enhancement.js";
@@ -68,6 +70,7 @@ import { registerImagesToVideo } from "./images-to-video.js";
 import { registerInfo } from "./info.js";
 import { registerJsonXml } from "./json-xml.js";
 import { registerLinearizePdf } from "./linearize-pdf.js";
+import { registerLqipPlaceholder } from "./lqip-placeholder.js";
 import { registerMarkdownToDocx } from "./markdown-to-docx.js";
 import { registerMarkdownToHtml } from "./markdown-to-html.js";
 import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
@@ -119,6 +122,7 @@ import { registerSplit } from "./split.js";
 import { registerSplitAudio } from "./split-audio.js";
 import { registerSplitCsv } from "./split-csv.js";
 import { registerSplitPdf } from "./split-pdf.js";
+import { registerSpriteSheet } from "./sprite-sheet.js";
 import { registerStabilizeVideo } from "./stabilize-video.js";
 import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
@@ -217,14 +221,18 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "beautify", register: registerBeautify },
     { id: "circle-crop", register: registerCircleCrop },
     { id: "duotone", register: registerDuotone },
+    { id: "histogram", register: registerHistogram },
     { id: "image-pad", register: registerImagePad },
+    { id: "lqip-placeholder", register: registerLqipPlaceholder },
     { id: "pixelate", register: registerPixelate },
+    { id: "sprite-sheet", register: registerSpriteSheet },
     { id: "vignette", register: registerVignette },
 
     // Format & Conversion
     { id: "svg-to-raster", register: registerSvgToRaster },
     { id: "vectorize", register: registerVectorize },
     { id: "gif-tools", register: registerGifTools },
+    { id: "gif-webp", register: registerGifWebp },
     { id: "pdf-to-image", register: registerPdfToImage },
 
     // Optimization extras

@@ -283,6 +283,22 @@ export const ru: TranslationKeys = {
       name: "Vignette",
       description: "Add a vignette effect with adjustable strength and color",
     },
+    "gif-webp": {
+      name: "GIF/WebP Converter",
+      description: "Convert animated GIF to WebP and vice versa, preserving all frames",
+    },
+    histogram: {
+      name: "Histogram",
+      description: "Generate an RGB histogram chart from an image",
+    },
+    "lqip-placeholder": {
+      name: "LQIP Placeholder",
+      description: "Generate a tiny low-quality image placeholder with base64 data URI",
+    },
+    "sprite-sheet": {
+      name: "Sprite Sheet",
+      description: "Combine multiple images into a single sprite sheet grid",
+    },
     "svg-to-raster": {
       name: "SVG в растр",
       description:
@@ -1565,6 +1581,31 @@ export const ru: TranslationKeys = {
       submit: "Apply Vignette",
       submitBatch: "Apply Vignette ({count} files)",
       progressLabel: "Applying vignette",
+    },
+    "gif-webp": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting animation",
+    },
+    histogram: {
+      submit: "Generate Histogram",
+      submitBatch: "Generate Histogram ({count} files)",
+      progressLabel: "Generating histogram",
+    },
+    "lqip-placeholder": {
+      width: "Width",
+      blur: "Blur",
+      submit: "Generate Placeholder",
+      submitBatch: "Generate Placeholder ({count} files)",
+      progressLabel: "Generating placeholder",
+    },
+    "sprite-sheet": {
+      columns: "Columns",
+      padding: "Padding",
+      background: "Background Color",
+      submit: "Create Sprite Sheet",
+      submitBatch: "Create Sprite Sheet",
+      progressLabel: "Creating sprite sheet",
     },
     "svg-to-raster": {
       outputFormat: "Формат вывода",
