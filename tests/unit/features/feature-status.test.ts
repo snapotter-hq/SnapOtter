@@ -446,7 +446,7 @@ describe("Composite state - getFeatureStates", () => {
     for (const state of states) {
       expect(state.status).toBe("not_installed");
     }
-    expect(states.length).toBe(6);
+    expect(states.length).toBe(7);
   });
 
   it("installed bundle with valid models returns installed with version", () => {

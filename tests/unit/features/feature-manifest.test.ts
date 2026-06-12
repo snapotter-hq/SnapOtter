@@ -37,14 +37,15 @@ describe("Feature manifest structure", () => {
     expect(manifest.basePackages).toBeInstanceOf(Array);
   });
 
-  it("all 6 bundles are defined", () => {
-    expect(Object.keys(bundles)).toHaveLength(6);
+  it("all 7 bundles are defined", () => {
+    expect(Object.keys(bundles)).toHaveLength(7);
     expect(bundles["background-removal"]).toBeDefined();
     expect(bundles["face-detection"]).toBeDefined();
     expect(bundles["object-eraser-colorize"]).toBeDefined();
     expect(bundles["upscale-enhance"]).toBeDefined();
     expect(bundles["photo-restoration"]).toBeDefined();
     expect(bundles.ocr).toBeDefined();
+    expect(bundles.transcription).toBeDefined();
   });
 
   it("every bundle has required fields", () => {

@@ -26,7 +26,13 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     name: "Background Removal",
     description: "Remove image backgrounds with AI",
     estimatedSize: "4-5 GB",
-    enablesTools: ["remove-background", "passport-photo", "transparency-fixer"],
+    enablesTools: [
+      "remove-background",
+      "passport-photo",
+      "transparency-fixer",
+      "background-replace",
+      "blur-background",
+    ],
   },
   "face-detection": {
     id: "face-detection",
@@ -61,7 +67,14 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     name: "OCR",
     description: "Extract text from images",
     estimatedSize: "3-4 GB",
-    enablesTools: ["ocr"],
+    enablesTools: ["ocr", "ocr-pdf"],
+  },
+  transcription: {
+    id: "transcription",
+    name: "Transcription",
+    description: "Speech to text for audio and video (subtitles)",
+    estimatedSize: "~600 MB",
+    enablesTools: ["transcribe-audio", "auto-subtitles"],
   },
 };
 

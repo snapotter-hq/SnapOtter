@@ -40,11 +40,13 @@ ALLOWED_SCRIPTS = {
     "install_feature",
     "noise_removal",
     "ocr",
+    "ocr_pdf",
     "ocr_preprocess",
     "outpaint",
     "red_eye_removal",
     "remove_bg",
     "restore",
+    "transcribe",
     "upscale",
 }
 
@@ -90,6 +92,8 @@ TOOL_BUNDLE_MAP = {
     "noise_removal": "upscale-enhance",
     "restore": "photo-restoration",
     "ocr": "ocr",
+    "ocr_pdf": "ocr",
+    "transcribe": "transcription",
 }
 
 

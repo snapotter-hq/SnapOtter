@@ -27,14 +27,15 @@ describe("Feature bundles", () => {
     expect(tools).not.toContain("upscale");
   });
 
-  it("all 6 bundles are defined", () => {
-    expect(Object.keys(FEATURE_BUNDLES)).toHaveLength(6);
+  it("all 7 bundles are defined", () => {
+    expect(Object.keys(FEATURE_BUNDLES)).toHaveLength(7);
     expect(FEATURE_BUNDLES["background-removal"]).toBeDefined();
     expect(FEATURE_BUNDLES["face-detection"]).toBeDefined();
     expect(FEATURE_BUNDLES["object-eraser-colorize"]).toBeDefined();
     expect(FEATURE_BUNDLES["upscale-enhance"]).toBeDefined();
     expect(FEATURE_BUNDLES["photo-restoration"]).toBeDefined();
     expect(FEATURE_BUNDLES.ocr).toBeDefined();
+    expect(FEATURE_BUNDLES.transcription).toBeDefined();
   });
 
   it("TOOL_BUNDLE_MAP covers all sidecar tools", () => {
