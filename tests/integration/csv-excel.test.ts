@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 const CSV = readFileSync(join(__dirname, "..", "fixtures", "data", "tiny.csv"));
+const TSV = readFileSync(join(__dirname, "..", "fixtures", "data", "tiny.tsv"));
 const XLSX_FIXTURE = readFileSync(join(__dirname, "..", "fixtures", "documents", "tiny.xlsx"));
 
 let testApp: TestApp;
@@ -59,6 +60,23 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     expect(sst).toBeDefined();
     const sstXml = sst?.getData().toString("utf8") ?? "";
     expect(sstXml).toContain("name");
+  }, 30_000);
+
+  it("converts TSV to XLSX with PK magic", async () => {
+    const res = await runTool("tiny.tsv", TSV);
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: envelope.downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    // XLSX files start with PK zip magic
+    expect(dl.rawPayload[0]).toBe(0x50);
+    expect(dl.rawPayload[1]).toBe(0x4b);
   }, 30_000);
 
   it("converts XLSX to CSV containing the fixture content", async () => {

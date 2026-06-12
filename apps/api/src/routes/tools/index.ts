@@ -33,6 +33,7 @@ import { registerConvertDocument } from "./convert-document.js";
 import { registerConvertPresentation } from "./convert-presentation.js";
 import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
 import { registerConvertVideo } from "./convert-video.js";
+import { registerCreateZip } from "./create-zip.js";
 import { registerCrop } from "./crop.js";
 import { registerCropPdf } from "./crop-pdf.js";
 import { registerCropVideo } from "./crop-video.js";
@@ -47,6 +48,7 @@ import { registerExcelToPdf } from "./excel-to-pdf.js";
 import { registerExtractAudio } from "./extract-audio.js";
 import { registerExtractPages } from "./extract-pages.js";
 import { registerExtractSubtitles } from "./extract-subtitles.js";
+import { registerExtractZip } from "./extract-zip.js";
 import { registerFadeAudio } from "./fade-audio.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
@@ -311,8 +313,10 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "to-epub", register: registerToEpub },
 
     // Data Files
+    { id: "create-zip", register: registerCreateZip },
     { id: "csv-excel", register: registerCsvExcel },
     { id: "csv-json", register: registerCsvJson },
+    { id: "extract-zip", register: registerExtractZip },
     { id: "json-xml", register: registerJsonXml },
     { id: "merge-csvs", register: registerMergeCsvs },
     { id: "split-csv", register: registerSplitCsv },

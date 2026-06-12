@@ -24,7 +24,11 @@ describe("modality metadata", () => {
     for (const tool of TOOLS) {
       expect(validModalities).toContain(tool.modality);
       expect(Array.isArray(tool.acceptedInputs)).toBe(true);
-      expect(tool.acceptedInputs.length).toBeGreaterThan(0);
+      // Empty acceptedInputs is valid for file-modality tools that accept any file
+      // (e.g. create-zip); the factory 415 gate skips when the list is empty.
+      if (tool.modality !== "file" || tool.acceptedInputs.length > 0) {
+        expect(tool.acceptedInputs.length).toBeGreaterThan(0);
+      }
       expect(["fast", "long"]).toContain(tool.executionHint);
     }
   });

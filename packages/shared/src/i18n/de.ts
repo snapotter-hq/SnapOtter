@@ -629,6 +629,15 @@ export const de: TranslationKeys = {
       name: "XML to CSV",
       description: "Extract repeating elements from XML into a CSV table",
     },
+    "create-zip": {
+      name: "Create ZIP",
+      description: "Bundle multiple files into a single ZIP archive",
+    },
+    "extract-zip": {
+      name: "Extract ZIP",
+      description:
+        "Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly.",
+    },
     pipeline: {
       name: "Pipeline-Builder",
       description: "Mehrere Werkzeuge zu einem Workflow verketten",
@@ -2204,6 +2213,16 @@ export const de: TranslationKeys = {
       submit: "Convert",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
+    },
+    "create-zip": {
+      submit: "Create ZIP",
+      submitBatch: "Create ZIP ({count} files)",
+      progressLabel: "Zipping",
+    },
+    "extract-zip": {
+      submit: "Extract",
+      submitBatch: "Extract ({count} files)",
+      progressLabel: "Extracting",
     },
   },
   urlImport: {

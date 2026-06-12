@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 const CSV = readFileSync(join(__dirname, "..", "fixtures", "data", "tiny.csv"));
+const TSV = readFileSync(join(__dirname, "..", "fixtures", "data", "tiny.tsv"));
 const JSON_FIXTURE = readFileSync(join(__dirname, "..", "fixtures", "data", "tiny.json"));
 
 let testApp: TestApp;
@@ -66,6 +67,26 @@ describe("csv-json (pure JS, no skipIf)", () => {
     const csvText = dl.payload;
     expect(csvText).toContain("name,age");
     expect(csvText).toContain("Ada");
+  }, 30_000);
+
+  it("converts TSV to JSON with the correct keys", async () => {
+    const res = await runTool("tiny.tsv", TSV, { pretty: true });
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: envelope.downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const data = JSON.parse(dl.payload);
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBe(2);
+    const first = data[0] as Record<string, string>;
+    expect(first.id).toBe("1");
+    expect(first.name).toBe("alpha");
   }, 30_000);
 
   it("rejects non-array JSON input for JSON-to-CSV", async () => {

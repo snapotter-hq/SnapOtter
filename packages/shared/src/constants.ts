@@ -1495,7 +1495,7 @@ export const TOOLS: Tool[] = [
     icon: "Table",
     route: "/csv-excel",
     modality: "file",
-    acceptedInputs: [".csv", ".xlsx"],
+    acceptedInputs: [".csv", ".tsv", ".xlsx"],
     executionHint: "fast",
   },
   {
@@ -1506,7 +1506,7 @@ export const TOOLS: Tool[] = [
     icon: "Braces",
     route: "/csv-json",
     modality: "file",
-    acceptedInputs: [".csv", ".json"],
+    acceptedInputs: [".csv", ".tsv", ".json"],
     executionHint: "fast",
   },
   {
@@ -1528,7 +1528,7 @@ export const TOOLS: Tool[] = [
     icon: "Split",
     route: "/split-csv",
     modality: "file",
-    acceptedInputs: [".csv"],
+    acceptedInputs: [".csv", ".tsv"],
     executionHint: "fast",
   },
   {
@@ -1562,6 +1562,30 @@ export const TOOLS: Tool[] = [
     route: "/xml-to-csv",
     modality: "file",
     acceptedInputs: [".xml"],
+    executionHint: "fast",
+  },
+  // Archives
+  {
+    id: "create-zip",
+    name: "Create ZIP",
+    description: "Bundle multiple files into a single ZIP archive",
+    category: "data",
+    icon: "FolderArchive",
+    route: "/create-zip",
+    modality: "file",
+    acceptedInputs: [],
+    executionHint: "fast",
+  },
+  {
+    id: "extract-zip",
+    name: "Extract ZIP",
+    description:
+      "Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly.",
+    category: "data",
+    icon: "FolderOpen",
+    route: "/extract-zip",
+    modality: "file",
+    acceptedInputs: [".zip"],
     executionHint: "fast",
   },
 ];
