@@ -27,6 +27,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "redact-pdf": { terms: ["test"] },
   "crop-video": { width: 32, height: 32 },
   "rotate-video": { transform: "cw90" },
+  "resize-video": { preset: "720p" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {
