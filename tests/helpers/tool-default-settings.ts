@@ -31,6 +31,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "watermark-video": { text: "CONFIDENTIAL" },
   "audio-channels": { mode: "mono-to-stereo" },
   "convert-document": { format: "odt" },
+  "epub-convert": { format: "html" },
   "convert-presentation": { format: "odp" },
   "convert-spreadsheet": { format: "ods" },
 };

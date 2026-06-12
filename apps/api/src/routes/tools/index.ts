@@ -41,6 +41,7 @@ import { registerCsvJson } from "./csv-json.js";
 import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEmbedSubtitles } from "./embed-subtitles.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
+import { registerEpubConvert } from "./epub-convert.js";
 import { registerEraseObject } from "./erase-object.js";
 import { registerExcelToPdf } from "./excel-to-pdf.js";
 import { registerExtractAudio } from "./extract-audio.js";
@@ -116,6 +117,7 @@ import { registerStitch } from "./stitch.js";
 import { registerStripMetadata } from "./strip-metadata.js";
 import { registerSvgToRaster } from "./svg-to-raster.js";
 import { registerTextOverlay } from "./text-overlay.js";
+import { registerToEpub } from "./to-epub.js";
 import { registerTransparencyFixer } from "./transparency-fixer.js";
 import { registerTrimAudio } from "./trim-audio.js";
 import { registerTrimVideo } from "./trim-video.js";
@@ -272,6 +274,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "convert-document", register: registerConvertDocument },
     { id: "convert-presentation", register: registerConvertPresentation },
     { id: "convert-spreadsheet", register: registerConvertSpreadsheet },
+    { id: "epub-convert", register: registerEpubConvert },
     { id: "excel-to-pdf", register: registerExcelToPdf },
     { id: "merge-pdf", register: registerMergePdf },
     { id: "split-pdf", register: registerSplitPdf },
@@ -302,6 +305,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "markdown-to-docx", register: registerMarkdownToDocx },
     { id: "markdown-to-html", register: registerMarkdownToHtml },
     { id: "markdown-to-pdf", register: registerMarkdownToPdf },
+    { id: "to-epub", register: registerToEpub },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },

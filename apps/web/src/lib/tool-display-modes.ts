@@ -173,6 +173,8 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "markdown-to-docx": "no-comparison",
   "markdown-to-html": "no-comparison",
   "markdown-to-pdf": "document",
+  "epub-convert": "no-comparison",
+  "to-epub": "no-comparison",
 
   // Data tools
   "csv-excel": "no-comparison",

@@ -1463,6 +1463,29 @@ export const TOOLS: Tool[] = [
     acceptedInputs: [".md", ".markdown"],
     executionHint: "long",
   },
+  {
+    id: "epub-convert",
+    name: "Convert EPUB",
+    description:
+      "Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.",
+    category: "documents",
+    icon: "BookOpen",
+    route: "/epub-convert",
+    modality: "document",
+    acceptedInputs: [".epub"],
+    executionHint: "long",
+  },
+  {
+    id: "to-epub",
+    name: "Convert to EPUB",
+    description: "Convert Word, Markdown, HTML, or plain text files to EPUB",
+    category: "documents",
+    icon: "Book",
+    route: "/to-epub",
+    modality: "document",
+    acceptedInputs: [".docx", ".md", ".html", ".txt"],
+    executionHint: "long",
+  },
   // Data Files
   {
     id: "csv-excel",

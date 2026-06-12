@@ -542,6 +542,15 @@ export const ko: TranslationKeys = {
       description:
         "Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.",
     },
+    "epub-convert": {
+      name: "Convert EPUB",
+      description:
+        "Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.",
+    },
+    "to-epub": {
+      name: "Convert to EPUB",
+      description: "Convert Word, Markdown, HTML, or plain text files to EPUB",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",
@@ -2068,6 +2077,18 @@ export const ko: TranslationKeys = {
       hint: "Remote resources are disabled for privacy.",
       submit: "Convert to PDF",
       submitBatch: "Convert to PDF ({count} files)",
+      progressLabel: "Converting",
+    },
+    "epub-convert": {
+      format: "Output format",
+      hint: "Remote resources inside the book are not fetched.",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "to-epub": {
+      submit: "Convert to EPUB",
+      submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
     },
     "csv-excel": {
