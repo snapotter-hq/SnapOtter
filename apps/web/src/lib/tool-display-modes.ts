@@ -122,8 +122,12 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
 
   // Audio tools
   "convert-audio": "media-player",
-  "trim-audio": "media-player",
   "extract-audio": "media-player",
+  "fade-audio": "media-player",
+  "normalize-audio": "media-player",
+  "reverse-audio": "media-player",
+  "trim-audio": "media-player",
+  "volume-adjust": "media-player",
 
   // PDF & Document tools
   "merge-pdf": "document",

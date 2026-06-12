@@ -356,6 +356,22 @@ export const en = {
       name: "Extract Audio",
       description: "Pull the audio track out of a video",
     },
+    "volume-adjust": {
+      name: "Volume Adjust",
+      description: "Increase or decrease audio volume by a fixed gain",
+    },
+    "normalize-audio": {
+      name: "Normalize Audio",
+      description: "Even out loudness to broadcast standard levels",
+    },
+    "fade-audio": {
+      name: "Fade Audio",
+      description: "Add fade-in and fade-out effects to audio",
+    },
+    "reverse-audio": {
+      name: "Reverse Audio",
+      description: "Play audio backwards",
+    },
     "merge-pdf": {
       name: "Merge PDFs",
       description: "Combine multiple PDFs into one",
@@ -1665,6 +1681,29 @@ export const en = {
       submit: "Extract",
       submitBatch: "Extract ({count} files)",
       progressLabel: "Extracting",
+    },
+    "volume-adjust": {
+      "gain-db": "Gain (dB)",
+      submit: "Adjust Volume",
+      submitBatch: "Adjust Volume ({count} files)",
+      progressLabel: "Adjusting volume",
+    },
+    "normalize-audio": {
+      submit: "Normalize",
+      submitBatch: "Normalize ({count} files)",
+      progressLabel: "Normalizing",
+    },
+    "fade-audio": {
+      "fade-in-s": "Fade in (seconds)",
+      "fade-out-s": "Fade out (seconds)",
+      submit: "Apply Fade",
+      submitBatch: "Apply Fade ({count} files)",
+      progressLabel: "Applying fade",
+    },
+    "reverse-audio": {
+      submit: "Reverse",
+      submitBatch: "Reverse ({count} files)",
+      progressLabel: "Reversing",
     },
     "merge-pdf": {
       addFiles: "Add PDFs to merge",

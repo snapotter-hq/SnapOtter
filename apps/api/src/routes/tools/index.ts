@@ -39,6 +39,7 @@ import { registerEraseObject } from "./erase-object.js";
 import { registerExtractAudio } from "./extract-audio.js";
 import { registerExtractPages } from "./extract-pages.js";
 import { registerExtractSubtitles } from "./extract-subtitles.js";
+import { registerFadeAudio } from "./fade-audio.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerFlattenPdf } from "./flatten-pdf.js";
@@ -60,6 +61,7 @@ import { registerMergePdf } from "./merge-pdf.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
+import { registerNormalizeAudio } from "./normalize-audio.js";
 import { registerNupPdf } from "./nup-pdf.js";
 import { registerOcr } from "./ocr.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
@@ -83,6 +85,7 @@ import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
 import { registerResizeVideo } from "./resize-video.js";
 import { registerRestorePhoto } from "./restore-photo.js";
+import { registerReverseAudio } from "./reverse-audio.js";
 import { registerReverseVideo } from "./reverse-video.js";
 import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
@@ -110,6 +113,7 @@ import { registerVideoSpeed } from "./video-speed.js";
 import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerVideoToWebp } from "./video-to-webp.js";
+import { registerVolumeAdjust } from "./volume-adjust.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
 import { registerWatermarkText } from "./watermark-text.js";
@@ -230,8 +234,12 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
 
     // Audio
     { id: "convert-audio", register: registerConvertAudio },
-    { id: "trim-audio", register: registerTrimAudio },
     { id: "extract-audio", register: registerExtractAudio },
+    { id: "fade-audio", register: registerFadeAudio },
+    { id: "normalize-audio", register: registerNormalizeAudio },
+    { id: "reverse-audio", register: registerReverseAudio },
+    { id: "trim-audio", register: registerTrimAudio },
+    { id: "volume-adjust", register: registerVolumeAdjust },
 
     // PDF & Documents
     { id: "merge-pdf", register: registerMergePdf },
