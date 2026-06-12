@@ -425,6 +425,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               originalSize: result.originalSize,
               processedSize: result.processedSize,
               savedFileId: result.savedFileId,
+              ...result.resultPayload,
             });
           }
           return reply.status(202).send({ jobId: clientJobId || jobId, async: true });

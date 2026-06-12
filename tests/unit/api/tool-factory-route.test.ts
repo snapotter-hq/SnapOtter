@@ -436,6 +436,58 @@ describe("createToolRoute", () => {
       );
     });
 
+    it("spreads resultPayload fields at top level in sync 200 envelope", async () => {
+      vi.mocked(waitForJob).mockResolvedValueOnce({
+        outputRefs: ["outputs/mock-job/result.pdf"],
+        filename: "result.pdf",
+        contentType: "application/pdf",
+        originalSize: 5000,
+        processedSize: 4800,
+        resultPayload: { found: 3 },
+      });
+      const app = createMockApp();
+      const id = uniqueId();
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[`/api/v1/tools/${id}`];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("pdf-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+
+      const sent = vi.mocked(reply.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(sent.found).toBe(3);
+      expect(sent.originalSize).toBe(5000);
+      expect(sent.processedSize).toBe(4800);
+      expect(sent.downloadUrl).toContain("/api/v1/download/");
+      // resultPayload must NOT appear as a nested key
+      expect(sent.resultPayload).toBeUndefined();
+    });
+
+    it("omits resultPayload fields when processV2 returns no resultPayload", async () => {
+      // Default mock already returns no resultPayload
+      const app = createMockApp();
+      const id = uniqueId();
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[`/api/v1/tools/${id}`];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+
+      const sent = vi.mocked(reply.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // No extra keys from resultPayload should be present
+      const keys = Object.keys(sent);
+      expect(keys).not.toContain("found");
+      expect(keys).not.toContain("metadata");
+      expect(keys).not.toContain("resultPayload");
+    });
+
     it("returns 202 when waitForJob returns null (sync window expired)", async () => {
       vi.mocked(waitForJob).mockResolvedValueOnce(null);
       const app = createMockApp();
