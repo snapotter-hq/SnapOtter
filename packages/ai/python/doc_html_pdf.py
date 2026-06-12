@@ -10,11 +10,11 @@ import re
 import sys
 
 _REMOTE_REF_RE = re.compile(
-    r'(?:src|href|action)\s*=\s*["\']?\s*(https?://[^\s"\'>\)]{1,200})',
+    r'(?:src|href|action)\s*=\s*["\']?\s*(https?:/{1,2}[^\s"\'>\)]{1,200})',
     re.IGNORECASE,
 )
 _REMOTE_CSS_URL_RE = re.compile(
-    r'url\s*\(\s*["\']?\s*(https?://[^\s"\'>\)]{1,200})',
+    r'url\s*\(\s*["\']?\s*(https?:/{1,2}[^\s"\'>\)]{1,200})',
     re.IGNORECASE,
 )
 
