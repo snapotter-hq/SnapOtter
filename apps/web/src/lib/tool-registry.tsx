@@ -1007,10 +1007,10 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["markdown-to-pdf", { accept: ".md,.markdown", Settings: MarkdownToPdfSettings }],
 
   // Data tools
-  ["csv-excel", { accept: ".csv,.xlsx", Settings: CsvExcelSettings }],
-  ["csv-json", { accept: ".csv,.json", Settings: CsvJsonSettings }],
+  ["csv-excel", { accept: ".csv,.tsv,.xlsx", Settings: CsvExcelSettings }],
+  ["csv-json", { accept: ".csv,.tsv,.json", Settings: CsvJsonSettings }],
   ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],
-  ["split-csv", { accept: ".csv", Settings: SplitCsvSettings }],
+  ["split-csv", { accept: ".csv,.tsv", Settings: SplitCsvSettings }],
   ["merge-csvs", { accept: ".csv,.tsv", Settings: MergeCsvsSettings }],
   ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
