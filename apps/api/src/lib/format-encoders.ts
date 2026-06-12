@@ -158,6 +158,28 @@ export async function encodeTga(inputBuffer: Buffer): Promise<Buffer> {
   }
 }
 
+export async function encodeMultiIco(pngPaths: string[], outputPath: string): Promise<void> {
+  const cmd = await findMagickCmd();
+  const args =
+    cmd === "magick" ? [...pngPaths, `ico:${outputPath}`] : [...pngPaths, `ico:${outputPath}`];
+  await execFileAsync(cmd, cmd === "magick" ? ["convert", ...args] : args, {
+    timeout: 60_000,
+  });
+}
+
+/**
+ * Check whether ImageMagick is available on this system.
+ * Returns true if magick or convert can be found; false otherwise.
+ */
+export async function hasMagick(): Promise<boolean> {
+  try {
+    await findMagickCmd();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<Buffer> {
   const id = randomUUID();
   const inputPath = join(tmpdir(), `jxl-enc-in-${id}.png`);

@@ -272,6 +272,14 @@ export const en = {
       name: "Image to Base64",
       description: "Convert images to base64 strings for embedding in HTML, CSS, and more",
     },
+    "barcode-generate": {
+      name: "Barcode Generator",
+      description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
+    },
+    "chart-maker": {
+      name: "Chart Maker",
+      description: "Create bar, line, or pie charts from CSV or JSON data",
+    },
     "convert-video": {
       name: "Convert Video",
       description: "Convert videos between MP4, MOV, and WebM",
@@ -1636,6 +1644,23 @@ export const en = {
       copyDataUri: "Copy Data URI",
       copyImgTag: "Copy <img> Tag",
       copyCssUrl: "Copy CSS url()",
+    },
+    "barcode-generate": {
+      text: "Text",
+      type: "Barcode Type",
+      scale: "Scale",
+      includeText: "Include Text",
+      submit: "Generate Barcode",
+      download: "Download Barcode",
+    },
+    "chart-maker": {
+      kind: "Chart Type",
+      title: "Title",
+      width: "Width",
+      height: "Height",
+      submit: "Create Chart",
+      submitBatch: "Create Chart ({count} files)",
+      progressLabel: "Creating chart",
     },
     "enhance-faces-standalone": {
       model: "Model",

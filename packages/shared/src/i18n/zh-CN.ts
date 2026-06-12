@@ -267,6 +267,14 @@ export const zhCN: TranslationKeys = {
       name: "图片转 Base64",
       description: "将图片转换为 Base64 字符串，可嵌入 HTML、CSS 等",
     },
+    "barcode-generate": {
+      name: "Barcode Generator",
+      description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
+    },
+    "chart-maker": {
+      name: "Chart Maker",
+      description: "Create bar, line, or pie charts from CSV or JSON data",
+    },
     "convert-video": {
       name: "Convert Video",
       description: "Convert videos between MP4, MOV, and WebM",
@@ -1621,6 +1629,23 @@ export const zhCN: TranslationKeys = {
       copyDataUri: "复制 Data URI",
       copyImgTag: "复制 <img> 标签",
       copyCssUrl: "复制 CSS url()",
+    },
+    "barcode-generate": {
+      text: "Text",
+      type: "Barcode Type",
+      scale: "Scale",
+      includeText: "Include Text",
+      submit: "Generate Barcode",
+      download: "Download Barcode",
+    },
+    "chart-maker": {
+      kind: "Chart Type",
+      title: "Title",
+      width: "Width",
+      height: "Height",
+      submit: "Create Chart",
+      submitBatch: "Create Chart ({count} files)",
+      progressLabel: "Creating chart",
     },
     "enhance-faces-standalone": {
       model: "模型",

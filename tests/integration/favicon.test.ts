@@ -6,12 +6,30 @@
  * response via reply.hijack().
  */
 
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import AdmZip from "adm-zip";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
+
+/** Check if ImageMagick is available on this system. */
+function checkMagickAvailable(): boolean {
+  try {
+    execFileSync("magick", ["--version"], { timeout: 5_000, stdio: "ignore" });
+    return true;
+  } catch {
+    try {
+      execFileSync("convert", ["--version"], { timeout: 5_000, stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+const HAS_MAGICK = checkMagickAvailable();
 
 const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
@@ -573,12 +591,8 @@ describe("favicon", () => {
     const zip = new AdmZip(Buffer.from(res.rawPayload));
     const icoEntry = zip.getEntry("favicon.ico");
     expect(icoEntry).toBeDefined();
-    const icoData = icoEntry?.getData();
+    const icoData = icoEntry!.getData();
     expect(icoData.length).toBeGreaterThan(0);
-    // ICO is generated as PNG which starts with PNG magic bytes
-    const meta = await sharp(icoData).metadata();
-    expect(meta.width).toBe(32);
-    expect(meta.height).toBe(32);
   });
 
   // ── Three images produce three subfolders ────────────────────────
@@ -674,7 +688,7 @@ describe("favicon", () => {
 
   // ── Verify ICO dimensions ───────────────────────────────────────
 
-  it("favicon.ico has correct 32x32 dimensions", async () => {
+  it("favicon.ico has correct dimensions", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
     ]);
@@ -690,10 +704,20 @@ describe("favicon", () => {
     const zip = new AdmZip(Buffer.from(res.rawPayload));
     const icoEntry = zip.getEntry("favicon.ico");
     expect(icoEntry).toBeDefined();
-    const meta = await sharp(icoEntry?.getData()).metadata();
-    expect(meta.width).toBe(32);
-    expect(meta.height).toBe(32);
-    expect(meta.format).toBe("png");
+    const icoData = icoEntry!.getData();
+    expect(icoData.length).toBeGreaterThan(0);
+
+    if (HAS_MAGICK) {
+      // Real ICO header
+      expect(icoData[0]).toBe(0x00);
+      expect(icoData[2]).toBe(0x01);
+    } else {
+      // Fallback: PNG wrapped as .ico
+      const meta = await sharp(icoData).metadata();
+      expect(meta.width).toBe(32);
+      expect(meta.height).toBe(32);
+      expect(meta.format).toBe("png");
+    }
   });
 
   // ── Apple touch icon is 180x180 ─────────────────────────────────
@@ -830,9 +854,46 @@ describe("favicon", () => {
     }
   });
 
+  // ── Multi-size ICO (magick-gated) ──────────────────────────────
+
+  it("favicon.ico is a real multi-size ICO when magick is available", async () => {
+    if (!HAS_MAGICK) {
+      // Skip the ICO header assertion when magick is unavailable;
+      // the fallback produces a PNG-renamed-as-ICO which is still functional.
+      return;
+    }
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const icoEntry = zip.getEntry("favicon.ico");
+    expect(icoEntry).toBeDefined();
+    const icoData = icoEntry!.getData();
+
+    // Real ICO header: bytes 0-1 = 0x0000 (reserved), bytes 2-3 = 0x0100 (type 1 = ICO)
+    expect(icoData[0]).toBe(0x00);
+    expect(icoData[1]).toBe(0x00);
+    expect(icoData[2]).toBe(0x01);
+    expect(icoData[3]).toBe(0x00);
+
+    // Image count at offset 4-5 (little-endian); should be >= 4 (16/32/48/256)
+    const imageCount = icoData[4] | (icoData[5] << 8);
+    expect(imageCount).toBeGreaterThanOrEqual(4);
+  });
+
   // ── ICO output has valid content ────────────────────────────────
 
-  it("ICO output can be read by Sharp and is 32x32", async () => {
+  it("ICO output has valid content", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
     ]);
@@ -849,13 +910,19 @@ describe("favicon", () => {
     const icoEntry = zip.getEntry("favicon.ico");
     expect(icoEntry).toBeDefined();
 
-    const icoData = icoEntry?.getData();
+    const icoData = icoEntry!.getData();
     expect(icoData.length).toBeGreaterThan(0);
 
-    // The ICO is actually a PNG wrapped, so Sharp can read it
-    const meta = await sharp(icoData).metadata();
-    expect(meta.width).toBe(32);
-    expect(meta.height).toBe(32);
+    if (HAS_MAGICK) {
+      // Real ICO: header check
+      expect(icoData[0]).toBe(0x00);
+      expect(icoData[2]).toBe(0x01);
+    } else {
+      // Fallback: PNG wrapped, so Sharp can read it
+      const meta = await sharp(icoData).metadata();
+      expect(meta.width).toBe(32);
+      expect(meta.height).toBe(32);
+    }
   });
 
   // ── Favicon from stress-large.jpg verifies 512x512 is square ───

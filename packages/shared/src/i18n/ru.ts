@@ -317,6 +317,14 @@ export const ru: TranslationKeys = {
       name: "Изображение в Base64",
       description: "Конвертация изображений в строки Base64 для встраивания в HTML, CSS и другое",
     },
+    "barcode-generate": {
+      name: "Barcode Generator",
+      description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
+    },
+    "chart-maker": {
+      name: "Chart Maker",
+      description: "Create bar, line, or pie charts from CSV or JSON data",
+    },
     "convert-video": {
       name: "Convert Video",
       description: "Convert videos between MP4, MOV, and WebM",
@@ -1687,6 +1695,23 @@ export const ru: TranslationKeys = {
       copyDataUri: "Копировать Data URI",
       copyImgTag: "Копировать <img>",
       copyCssUrl: "Копировать CSS url()",
+    },
+    "barcode-generate": {
+      text: "Text",
+      type: "Barcode Type",
+      scale: "Scale",
+      includeText: "Include Text",
+      submit: "Generate Barcode",
+      download: "Download Barcode",
+    },
+    "chart-maker": {
+      kind: "Chart Type",
+      title: "Title",
+      width: "Width",
+      height: "Height",
+      submit: "Create Chart",
+      submitBatch: "Create Chart ({count} files)",
+      progressLabel: "Creating chart",
     },
     "enhance-faces-standalone": {
       model: "Модель",

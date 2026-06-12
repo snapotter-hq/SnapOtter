@@ -48,6 +48,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "qr-generate": "no-dropzone",
   "html-to-image": "no-dropzone",
   "barcode-read": "before-after",
+  "barcode-generate": "no-dropzone",
   "image-to-base64": "custom-results",
 
   // Layout & composition
@@ -187,6 +188,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "to-epub": "no-comparison",
 
   // Data tools
+  "chart-maker": "no-comparison",
   "csv-excel": "no-comparison",
   "csv-json": "no-comparison",
   "json-xml": "no-comparison",

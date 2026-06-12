@@ -1224,6 +1224,97 @@ describe("QR Generate", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
+  // ── Logo embed ────────────────────────────────────────────────
+
+  it("logo embed produces different output from no-logo render", async () => {
+    // Generate a small red PNG as a logo data URI
+    const logoPng = await sharp({
+      create: { width: 20, height: 20, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const logoDataUri = `data:image/png;base64,${logoPng.toString("base64")}`;
+
+    const resNoLogo = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "logo test",
+        size: 400,
+      },
+    });
+    expect(resNoLogo.statusCode).toBe(200);
+
+    const resWithLogo = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "logo test",
+        size: 400,
+        logoDataUri,
+      },
+    });
+    expect(resWithLogo.statusCode).toBe(200);
+
+    const noLogoResult = JSON.parse(resNoLogo.body);
+    const withLogoResult = JSON.parse(resWithLogo.body);
+
+    // Download both and verify output bytes differ
+    const dlNoLogo = await app.inject({ method: "GET", url: noLogoResult.downloadUrl });
+    const dlWithLogo = await app.inject({ method: "GET", url: withLogoResult.downloadUrl });
+
+    expect(dlNoLogo.rawPayload.equals(dlWithLogo.rawPayload)).toBe(false);
+
+    // Verify the logo version is still valid PNG
+    const meta = await sharp(dlWithLogo.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.width).toBe(400);
+  });
+
+  it("rejects invalid logo base64 data", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "bad logo test",
+        logoDataUri: "data:image/png;base64,dGhpcyBpcyBub3QgYSByZWFsIGltYWdl",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid logo/i);
+  });
+
+  it("rejects malformed logo data URI format", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "bad uri format",
+        logoDataUri: "not-a-data-uri",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   // ── Output is always square ──────────────────────────────────
 
   it("output image is always square regardless of content", async () => {

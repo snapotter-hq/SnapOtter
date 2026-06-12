@@ -508,6 +508,17 @@ export const TOOLS: Tool[] = [
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "barcode-generate",
+    name: "Barcode Generator",
+    description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
+    category: "utilities",
+    icon: "Barcode",
+    route: "/barcode-generate",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
+  },
   // Layout & Composition
   {
     id: "collage",
@@ -1586,6 +1597,17 @@ export const TOOLS: Tool[] = [
     executionHint: "long",
   },
   // Data Files
+  {
+    id: "chart-maker",
+    name: "Chart Maker",
+    description: "Create bar, line, or pie charts from CSV or JSON data",
+    category: "data",
+    icon: "BarChart3",
+    route: "/chart-maker",
+    modality: "file",
+    acceptedInputs: [".csv", ".json"],
+    executionHint: "fast",
+  },
   {
     id: "csv-excel",
     name: "CSV to Excel",

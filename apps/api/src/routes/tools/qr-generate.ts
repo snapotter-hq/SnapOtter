@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import QRCode from "qrcode";
+import sharp from "sharp";
 import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -17,6 +18,11 @@ const settingsSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .default("#FFFFFF"),
+  logoDataUri: z
+    .string()
+    .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/)
+    .max(700000)
+    .optional(),
 });
 
 /**
@@ -43,9 +49,13 @@ export function registerQrGenerate(app: FastifyInstance) {
     const settings = result.data;
 
     try {
-      const buffer = await QRCode.toBuffer(settings.text, {
+      // When a logo is present, force max error correction so the QR
+      // remains scannable despite the logo occluding the center.
+      const ecLevel = settings.logoDataUri ? "H" : settings.errorCorrection;
+
+      let buffer = await QRCode.toBuffer(settings.text, {
         width: settings.size,
-        errorCorrectionLevel: settings.errorCorrection,
+        errorCorrectionLevel: ecLevel,
         color: {
           dark: settings.foreground,
           light: settings.background,
@@ -53,6 +63,34 @@ export function registerQrGenerate(app: FastifyInstance) {
         type: "png",
         margin: 2,
       });
+
+      if (settings.logoDataUri) {
+        // Decode the data-URI base64 payload into a buffer
+        const base64Part = settings.logoDataUri.split(",")[1];
+        let logoBuffer: Buffer;
+        try {
+          logoBuffer = Buffer.from(base64Part, "base64");
+          // Validate that sharp can decode it
+          await sharp(logoBuffer).metadata();
+        } catch {
+          return reply.status(400).send({ error: "Invalid logo image" });
+        }
+
+        // Resize logo to 22% of QR size and composite centered
+        const logoSize = Math.round(settings.size * 0.22);
+        const resizedLogo = await sharp(logoBuffer)
+          .resize(logoSize, logoSize, {
+            fit: "contain",
+            background: { r: 255, g: 255, b: 255, alpha: 0 },
+          })
+          .png()
+          .toBuffer();
+
+        buffer = await sharp(buffer)
+          .composite([{ input: resizedLogo, gravity: "centre" }])
+          .png()
+          .toBuffer();
+      }
 
       const jobId = randomUUID();
       const filename = "qrcode.png";

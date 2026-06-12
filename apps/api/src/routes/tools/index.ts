@@ -8,6 +8,7 @@ import { registerAspectPad } from "./aspect-pad.js";
 import { registerAudioChannels } from "./audio-channels.js";
 import { registerAudioMetadata } from "./audio-metadata.js";
 import { registerAudioSpeed } from "./audio-speed.js";
+import { registerBarcodeGenerate } from "./barcode-generate.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurFaces } from "./blur-faces.js";
@@ -17,6 +18,7 @@ import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
 import { registerBurnSubtitles } from "./burn-subtitles.js";
 import { registerChangeFps } from "./change-fps.js";
+import { registerChartMaker } from "./chart-maker.js";
 import { registerCircleCrop } from "./circle-crop.js";
 import { registerCollage } from "./collage.js";
 import { registerColorBlindness } from "./color-blindness.js";
@@ -210,6 +212,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "color-palette", register: registerColorPalette },
     { id: "qr-generate", register: registerQrGenerate },
     { id: "html-to-image", register: registerHtmlToImage },
+    { id: "barcode-generate", register: registerBarcodeGenerate },
     { id: "barcode-read", register: registerBarcodeRead },
     { id: "image-to-base64", register: registerImageToBase64 },
 
@@ -331,6 +334,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "to-epub", register: registerToEpub },
 
     // Data Files
+    { id: "chart-maker", register: registerChartMaker },
     { id: "create-zip", register: registerCreateZip },
     { id: "csv-excel", register: registerCsvExcel },
     { id: "csv-json", register: registerCsvJson },

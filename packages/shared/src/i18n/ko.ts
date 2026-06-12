@@ -267,6 +267,14 @@ export const ko: TranslationKeys = {
       name: "이미지를 Base64로",
       description: "이미지를 Base64 문자열로 변환하여 HTML, CSS 등에 임베드",
     },
+    "barcode-generate": {
+      name: "Barcode Generator",
+      description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
+    },
+    "chart-maker": {
+      name: "Chart Maker",
+      description: "Create bar, line, or pie charts from CSV or JSON data",
+    },
     "convert-video": {
       name: "Convert Video",
       description: "Convert videos between MP4, MOV, and WebM",
@@ -1629,6 +1637,23 @@ export const ko: TranslationKeys = {
       copyDataUri: "Data URI 복사",
       copyImgTag: "<img> 태그 복사",
       copyCssUrl: "CSS url() 복사",
+    },
+    "barcode-generate": {
+      text: "Text",
+      type: "Barcode Type",
+      scale: "Scale",
+      includeText: "Include Text",
+      submit: "Generate Barcode",
+      download: "Download Barcode",
+    },
+    "chart-maker": {
+      kind: "Chart Type",
+      title: "Title",
+      width: "Width",
+      height: "Height",
+      submit: "Create Chart",
+      submitBatch: "Create Chart ({count} files)",
+      progressLabel: "Creating chart",
     },
     "enhance-faces-standalone": {
       model: "모델",

@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -9,6 +12,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
@@ -172,8 +176,36 @@ export function registerFavicon(app: FastifyInstance) {
           archive.append(buffer, { name: `${prefix}${icon.name}` });
         }
 
-        const ico32 = await sharp(file.buffer).resize(32, 32, { fit: "cover" }).png().toBuffer();
-        archive.append(ico32, { name: `${prefix}favicon.ico` });
+        // Generate a true multi-size ICO (16/32/48/256) via ImageMagick
+        // when available; fall back to a single 32px PNG renamed .ico otherwise.
+        const magickReady = await hasMagick();
+        if (magickReady) {
+          const icoId = randomUUID();
+          const icoSizes = [16, 32, 48, 256];
+          const icoPaths: string[] = [];
+          const icoOutPath = join(tmpdir(), `favicon-${icoId}.ico`);
+          try {
+            for (const sz of icoSizes) {
+              const pngPath = join(tmpdir(), `favicon-${icoId}-${sz}.png`);
+              const buf = await sharp(file.buffer)
+                .resize(sz, sz, { fit: "cover" })
+                .png()
+                .toBuffer();
+              await writeFile(pngPath, buf);
+              icoPaths.push(pngPath);
+            }
+            await encodeMultiIco(icoPaths, icoOutPath);
+            const icoData = await readFile(icoOutPath);
+            archive.append(icoData, { name: `${prefix}favicon.ico` });
+          } finally {
+            for (const p of [...icoPaths, icoOutPath]) {
+              await rm(p, { force: true }).catch(() => {});
+            }
+          }
+        } else {
+          const ico32 = await sharp(file.buffer).resize(32, 32, { fit: "cover" }).png().toBuffer();
+          archive.append(ico32, { name: `${prefix}favicon.ico` });
+        }
 
         const manifest = {
           name: stem,
