@@ -14,7 +14,8 @@ export {
   gsPdfaConvert,
   type PdfCompressionPreset,
 } from "./ghostscript.js";
-export { type ConvertOptions, convertDocument } from "./libreoffice.js";
+export { type ConvertOptions, convertDocument, parseConvertTarget } from "./libreoffice.js";
+export { type PandocOptions, pandocAvailable, runPandoc } from "./pandoc.js";
 export {
   assertValidRange,
   qpdfDecrypt,

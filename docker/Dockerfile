@@ -212,12 +212,13 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
-    # Document engine: qpdf + LibreOffice headless + WeasyPrint runtime deps
-    # calibre deferred (ebook wave)
+    # Document engine: qpdf + LibreOffice headless + pandoc + WeasyPrint runtime deps
+    # calibre deferred (5.2 GB ruling; pandoc covers epub/markdown families)
+    pandoc \
     qpdf \
     libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
     fonts-dejavu-core \
-    libreoffice-writer libreoffice-calc \
+    libreoffice-calc libreoffice-impress libreoffice-writer \
     gcc g++ \
     libgl1 libglib2.0-0 libgles2 \
     libegl1 libwayland-egl1 libwayland-client0 libwayland-cursor0 \
