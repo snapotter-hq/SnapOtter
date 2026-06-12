@@ -23,6 +23,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "organize-pdf": { order: "1-z" },
   "protect-pdf": { userPassword: "test123" },
   "unlock-pdf": { password: "test123" },
+  "watermark-pdf": { text: "CONFIDENTIAL" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {

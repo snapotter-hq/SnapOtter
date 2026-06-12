@@ -7,6 +7,7 @@ import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurFaces } from "./blur-faces.js";
+import { registerBookletPdf } from "./booklet-pdf.js";
 import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
 import { registerCollage } from "./collage.js";
@@ -23,6 +24,7 @@ import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
+import { registerCropPdf } from "./crop-pdf.js";
 import { registerCsvExcel } from "./csv-excel.js";
 import { registerCsvJson } from "./csv-json.js";
 import { registerEditMetadata } from "./edit-metadata.js";
@@ -45,10 +47,12 @@ import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
+import { registerNupPdf } from "./nup-pdf.js";
 import { registerOcr } from "./ocr.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
 import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
+import { registerPdfPageNumbers } from "./pdf-page-numbers.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
 import { registerProtectPdf } from "./protect-pdf.js";
@@ -79,6 +83,7 @@ import { registerUpscale } from "./upscale.js";
 import { registerVectorize } from "./vectorize.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerWatermarkImage } from "./watermark-image.js";
+import { registerWatermarkPdf } from "./watermark-pdf.js";
 import { registerWatermarkText } from "./watermark-text.js";
 import { registerWordToPdf } from "./word-to-pdf.js";
 
@@ -192,6 +197,11 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "linearize-pdf", register: registerLinearizePdf },
     { id: "grayscale-pdf", register: registerGrayscalePdf },
     { id: "pdfa-convert", register: registerPdfaConvert },
+    { id: "crop-pdf", register: registerCropPdf },
+    { id: "nup-pdf", register: registerNupPdf },
+    { id: "booklet-pdf", register: registerBookletPdf },
+    { id: "watermark-pdf", register: registerWatermarkPdf },
+    { id: "pdf-page-numbers", register: registerPdfPageNumbers },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },

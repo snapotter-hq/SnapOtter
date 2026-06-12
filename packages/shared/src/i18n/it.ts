@@ -368,6 +368,26 @@ export const it: TranslationKeys = {
       name: "PDF/A Convert",
       description: "Convert to archival PDF/A-2",
     },
+    "crop-pdf": {
+      name: "Crop PDF",
+      description: "Crop all pages with a uniform margin",
+    },
+    "nup-pdf": {
+      name: "N-up PDF",
+      description: "Arrange multiple pages per sheet",
+    },
+    "booklet-pdf": {
+      name: "Booklet PDF",
+      description: "Arrange pages for folding into a booklet",
+    },
+    "watermark-pdf": {
+      name: "Watermark PDF",
+      description: "Add a text watermark to every page",
+    },
+    "pdf-page-numbers": {
+      name: "PDF Page Numbers",
+      description: "Add page numbers to every page",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",
@@ -1502,6 +1522,41 @@ export const it: TranslationKeys = {
       submit: "Convert",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
+    },
+    "crop-pdf": {
+      margin: "Margin (points)",
+      submit: "Crop",
+      submitBatch: "Crop ({count} files)",
+      progressLabel: "Cropping",
+    },
+    "nup-pdf": {
+      perSheet: "Pages per sheet",
+      submit: "Arrange",
+      submitBatch: "Arrange ({count} files)",
+      progressLabel: "Arranging",
+    },
+    "booklet-pdf": {
+      perSheet: "Pages per sheet",
+      submit: "Create Booklet",
+      submitBatch: "Create Booklet ({count} files)",
+      progressLabel: "Creating booklet",
+    },
+    "watermark-pdf": {
+      text: "Watermark text",
+      position: "Position",
+      fontSize: "Font size",
+      opacity: "Opacity",
+      rotation: "Rotation",
+      submit: "Watermark",
+      submitBatch: "Watermark ({count} files)",
+      progressLabel: "Watermarking",
+    },
+    "pdf-page-numbers": {
+      position: "Position",
+      fontSize: "Font size",
+      submit: "Add Numbers",
+      submitBatch: "Add Numbers ({count} files)",
+      progressLabel: "Numbering",
     },
     "csv-excel": {
       sheet: "Worksheet number",
