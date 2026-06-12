@@ -43,11 +43,13 @@ export function registerVideoSpeed(app: FastifyInstance) {
       let args: string[];
 
       if (hasAudio) {
+        const audioStream = info.streams.find((s) => s.type === "audio");
+        const sr = audioStream?.sampleRate ?? 48000;
         let audioChain: string;
         if (settings.keepPitch) {
           audioChain = buildAtempoChain(settings.factor);
         } else {
-          audioChain = `asetrate=48000*${settings.factor},aresample=48000`;
+          audioChain = `asetrate=${sr}*${settings.factor},aresample=${sr}`;
         }
 
         args = [

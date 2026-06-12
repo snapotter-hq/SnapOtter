@@ -6,6 +6,7 @@ export interface MediaStreamInfo {
   codec: string;
   width?: number;
   height?: number;
+  sampleRate?: number;
 }
 
 export interface MediaInfo {
@@ -70,7 +71,13 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
   });
   const parsed = JSON.parse(stdout) as {
     format?: { format_name?: string; duration?: string; bit_rate?: string };
-    streams?: Array<{ codec_type?: string; codec_name?: string; width?: number; height?: number }>;
+    streams?: Array<{
+      codec_type?: string;
+      codec_name?: string;
+      width?: number;
+      height?: number;
+      sample_rate?: string;
+    }>;
   };
   const duration = parsed.format?.duration ? Number(parsed.format.duration) : null;
   const bitRate = parsed.format?.bit_rate ? Number(parsed.format.bit_rate) : null;
@@ -78,11 +85,15 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     container: parsed.format?.format_name ?? "unknown",
     durationS: Number.isFinite(duration as number) ? (duration as number) : null,
     bitrateKbps: Number.isFinite(bitRate as number) ? Math.round((bitRate as number) / 1000) : null,
-    streams: (parsed.streams ?? []).map((s) => ({
-      type: s.codec_type === "video" ? "video" : s.codec_type === "audio" ? "audio" : "other",
-      codec: s.codec_name ?? "unknown",
-      width: s.width,
-      height: s.height,
-    })),
+    streams: (parsed.streams ?? []).map((s) => {
+      const sr = s.sample_rate ? Number(s.sample_rate) : undefined;
+      return {
+        type: s.codec_type === "video" ? "video" : s.codec_type === "audio" ? "audio" : "other",
+        codec: s.codec_name ?? "unknown",
+        width: s.width,
+        height: s.height,
+        sampleRate: Number.isFinite(sr) && (sr as number) > 0 ? sr : undefined,
+      } as MediaStreamInfo;
+    }),
   };
 }

@@ -15,12 +15,17 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
 
-  // Probe source duration for comparison
+  // Probe source duration and verify sampleRate for comparison
   const tmpDir = mkdtempSync(join(tmpdir(), "speed-src-"));
   const srcFile = join(tmpDir, "tiny.mp4");
   writeFileSync(srcFile, MP4);
   const info = await probeMedia(srcFile);
   sourceDurationS = info.durationS ?? 1;
+  const audioStream = info.streams.find((s) => s.type === "audio");
+  if (audioStream) {
+    // Verify sampleRate is populated correctly from ffprobe
+    expect(audioStream.sampleRate).toBe(44100);
+  }
 }, 30_000);
 
 afterAll(async () => {
@@ -53,6 +58,28 @@ describe.skipIf(!ffmpegAvailable())("video-speed (requires ffmpeg)", () => {
 
     const tmpDir = mkdtempSync(join(tmpdir(), "speed-test-"));
     const probeFile = join(tmpDir, "speed.mp4");
+    writeFileSync(probeFile, dl.rawPayload);
+    const info = await probeMedia(probeFile);
+    expect(info.durationS).not.toBeNull();
+
+    const expected = sourceDurationS / 2;
+    const tolerance = expected * 0.25;
+    expect(info.durationS as number).toBeGreaterThan(expected - tolerance);
+    expect(info.durationS as number).toBeLessThan(expected + tolerance);
+  }, 60_000);
+
+  it("speeds up by factor 2 with keepPitch=false and halves duration", async () => {
+    const res = await runTool({ factor: 2, keepPitch: false });
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBeGreaterThan(100);
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "speed-nopitch-"));
+    const probeFile = join(tmpDir, "speed-nopitch.mp4");
     writeFileSync(probeFile, dl.rawPayload);
     const info = await probeMedia(probeFile);
     expect(info.durationS).not.toBeNull();
