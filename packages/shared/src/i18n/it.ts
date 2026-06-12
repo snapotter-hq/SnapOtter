@@ -332,6 +332,18 @@ export const it: TranslationKeys = {
       name: "Word to PDF",
       description: "Convert Word documents to PDF",
     },
+    "extract-pages": {
+      name: "Extract Pages",
+      description: "Pull selected pages into a new PDF",
+    },
+    "remove-pages": {
+      name: "Remove Pages",
+      description: "Delete specific pages from a PDF",
+    },
+    "organize-pdf": {
+      name: "Organize PDF",
+      description: "Reorder pages with an explicit page order",
+    },
     "csv-excel": {
       name: "CSV to Excel",
       description: "Convert between CSV and Excel (XLSX), both directions",
@@ -1411,6 +1423,27 @@ export const it: TranslationKeys = {
       submit: "Convert to PDF",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
+    },
+    "extract-pages": {
+      range: "Page range",
+      rangeHint: "e.g. 1-3, 5, 7-z",
+      submit: "Extract",
+      submitBatch: "Extract ({count} files)",
+      progressLabel: "Extracting",
+    },
+    "remove-pages": {
+      pages: "Pages to remove",
+      pagesHint: "e.g. 2, 4-6, z (last page)",
+      submit: "Remove",
+      submitBatch: "Remove ({count} files)",
+      progressLabel: "Removing",
+    },
+    "organize-pdf": {
+      order: "Page order",
+      orderHint: "e.g. 3,1,2 or 1-z (identity)",
+      submit: "Reorder",
+      submitBatch: "Reorder ({count} files)",
+      progressLabel: "Reordering",
     },
     "csv-excel": {
       sheet: "Worksheet number",

@@ -109,6 +109,9 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "compress-pdf": "document",
   "rotate-pdf": "document",
   "word-to-pdf": "document",
+  "extract-pages": "document",
+  "remove-pages": "document",
+  "organize-pdf": "document",
 
   // Data tools
   "csv-excel": "no-comparison",

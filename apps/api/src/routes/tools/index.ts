@@ -29,6 +29,7 @@ import { registerEditMetadata } from "./edit-metadata.js";
 import { registerEnhanceFaces } from "./enhance-faces.js";
 import { registerEraseObject } from "./erase-object.js";
 import { registerExtractAudio } from "./extract-audio.js";
+import { registerExtractPages } from "./extract-pages.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerGifTools } from "./gif-tools.js";
@@ -44,11 +45,13 @@ import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerOcr } from "./ocr.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
+import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
 import { registerRemoveBackground } from "./remove-background.js";
+import { registerRemovePages } from "./remove-pages.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
 import { registerRestorePhoto } from "./restore-photo.js";
@@ -174,6 +177,9 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "compress-pdf", register: registerCompressPdf },
     { id: "rotate-pdf", register: registerRotatePdf },
     { id: "word-to-pdf", register: registerWordToPdf },
+    { id: "extract-pages", register: registerExtractPages },
+    { id: "remove-pages", register: registerRemovePages },
+    { id: "organize-pdf", register: registerOrganizePdf },
 
     // Data Files
     { id: "csv-excel", register: registerCsvExcel },
