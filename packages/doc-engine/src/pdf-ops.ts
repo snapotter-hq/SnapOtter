@@ -40,6 +40,14 @@ export async function qpdfRotate(
   await runQpdf([`--rotate=+${angle}:${range}`, inputPath, outPath], 60_000);
 }
 
+/*
+ * Security note: passwords are passed as argv elements to spawn() (no shell).
+ * They are visible in /proc/<pid>/cmdline for the ~1s process lifetime. This
+ * is acceptable for the single-tenant container threat model. If multi-tenant
+ * isolation is ever needed, switch to qpdf's --password-file or @argfile
+ * syntax with a 0600 temp file in the scratch dir, deleted in a finally block.
+ */
+
 /** AES-256 encrypt with user + owner passwords (qpdf --encrypt user owner 256 --). */
 export async function qpdfEncrypt(
   inputPath: string,

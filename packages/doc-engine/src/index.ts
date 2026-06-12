@@ -26,5 +26,14 @@ export {
   qpdfRotate,
   qpdfSplitRanges,
 } from "./pdf-ops.js";
+export {
+  type BookletValue,
+  type NupValue,
+  pdfcpuBooklet,
+  pdfcpuCropMargin,
+  pdfcpuNup,
+  pdfcpuTextStamp,
+  type TextStampOptions,
+} from "./pdfcpu.js";
 export { pdfPageCountPy } from "./python-docs.js";
 export { qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";
