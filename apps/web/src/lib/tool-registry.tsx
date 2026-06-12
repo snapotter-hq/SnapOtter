@@ -369,6 +369,66 @@ const VideoToGifSettings = lazy(() =>
     default: m.VideoToGifSettings,
   })),
 );
+const ResizeVideoSettings = lazy(() =>
+  import("@/components/tools/resize-video-settings").then((m) => ({
+    default: m.ResizeVideoSettings,
+  })),
+);
+const CropVideoSettings = lazy(() =>
+  import("@/components/tools/crop-video-settings").then((m) => ({
+    default: m.CropVideoSettings,
+  })),
+);
+const RotateVideoSettings = lazy(() =>
+  import("@/components/tools/rotate-video-settings").then((m) => ({
+    default: m.RotateVideoSettings,
+  })),
+);
+const ChangeFpsSettings = lazy(() =>
+  import("@/components/tools/change-fps-settings").then((m) => ({
+    default: m.ChangeFpsSettings,
+  })),
+);
+const VideoColorSettings = lazy(() =>
+  import("@/components/tools/video-color-settings").then((m) => ({
+    default: m.VideoColorSettings,
+  })),
+);
+const VideoSpeedSettings = lazy(() =>
+  import("@/components/tools/video-speed-settings").then((m) => ({
+    default: m.VideoSpeedSettings,
+  })),
+);
+const ReverseVideoSettings = lazy(() =>
+  import("@/components/tools/reverse-video-settings").then((m) => ({
+    default: m.ReverseVideoSettings,
+  })),
+);
+const VideoLoudnormSettings = lazy(() =>
+  import("@/components/tools/video-loudnorm-settings").then((m) => ({
+    default: m.VideoLoudnormSettings,
+  })),
+);
+const AspectPadSettings = lazy(() =>
+  import("@/components/tools/aspect-pad-settings").then((m) => ({
+    default: m.AspectPadSettings,
+  })),
+);
+const BlurPadSettings = lazy(() =>
+  import("@/components/tools/blur-pad-settings").then((m) => ({
+    default: m.BlurPadSettings,
+  })),
+);
+const WatermarkVideoSettings = lazy(() =>
+  import("@/components/tools/watermark-video-settings").then((m) => ({
+    default: m.WatermarkVideoSettings,
+  })),
+);
+const StabilizeVideoSettings = lazy(() =>
+  import("@/components/tools/stabilize-video-settings").then((m) => ({
+    default: m.StabilizeVideoSettings,
+  })),
+);
 const ConvertAudioSettings = lazy(() =>
   import("@/components/tools/convert-audio-settings").then((m) => ({
     default: m.ConvertAudioSettings,
@@ -653,6 +713,18 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["trim-video", { accept: VIDEO_INPUTS.join(","), Settings: TrimVideoSettings }],
   ["mute-video", { accept: VIDEO_INPUTS.join(","), Settings: MuteVideoSettings }],
   ["video-to-gif", { accept: VIDEO_INPUTS.join(","), Settings: VideoToGifSettings }],
+  ["resize-video", { accept: VIDEO_INPUTS.join(","), Settings: ResizeVideoSettings }],
+  ["crop-video", { accept: VIDEO_INPUTS.join(","), Settings: CropVideoSettings }],
+  ["rotate-video", { accept: VIDEO_INPUTS.join(","), Settings: RotateVideoSettings }],
+  ["change-fps", { accept: VIDEO_INPUTS.join(","), Settings: ChangeFpsSettings }],
+  ["video-color", { accept: VIDEO_INPUTS.join(","), Settings: VideoColorSettings }],
+  ["video-speed", { accept: VIDEO_INPUTS.join(","), Settings: VideoSpeedSettings }],
+  ["reverse-video", { accept: VIDEO_INPUTS.join(","), Settings: ReverseVideoSettings }],
+  ["video-loudnorm", { accept: VIDEO_INPUTS.join(","), Settings: VideoLoudnormSettings }],
+  ["aspect-pad", { accept: VIDEO_INPUTS.join(","), Settings: AspectPadSettings }],
+  ["blur-pad", { accept: VIDEO_INPUTS.join(","), Settings: BlurPadSettings }],
+  ["watermark-video", { accept: VIDEO_INPUTS.join(","), Settings: WatermarkVideoSettings }],
+  ["stabilize-video", { accept: VIDEO_INPUTS.join(","), Settings: StabilizeVideoSettings }],
 
   // Audio tools
   ["convert-audio", { accept: AUDIO_INPUTS.join(","), Settings: ConvertAudioSettings }],

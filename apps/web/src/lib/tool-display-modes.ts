@@ -97,6 +97,18 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "trim-video": "media-player",
   "mute-video": "media-player",
   "video-to-gif": "side-by-side",
+  "resize-video": "media-player",
+  "crop-video": "media-player",
+  "rotate-video": "media-player",
+  "change-fps": "media-player",
+  "video-color": "media-player",
+  "video-speed": "media-player",
+  "reverse-video": "media-player",
+  "video-loudnorm": "media-player",
+  "aspect-pad": "media-player",
+  "blur-pad": "media-player",
+  "watermark-video": "media-player",
+  "stabilize-video": "media-player",
 
   // Audio tools
   "convert-audio": "media-player",
