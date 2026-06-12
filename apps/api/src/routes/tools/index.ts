@@ -29,6 +29,9 @@ import { registerCompressVideo } from "./compress-video.js";
 import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
+import { registerConvertDocument } from "./convert-document.js";
+import { registerConvertPresentation } from "./convert-presentation.js";
+import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCrop } from "./crop.js";
 import { registerCropPdf } from "./crop-pdf.js";
@@ -264,6 +267,9 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "waveform-image", register: registerWaveformImage },
 
     // PDF & Documents
+    { id: "convert-document", register: registerConvertDocument },
+    { id: "convert-presentation", register: registerConvertPresentation },
+    { id: "convert-spreadsheet", register: registerConvertSpreadsheet },
     { id: "excel-to-pdf", register: registerExcelToPdf },
     { id: "merge-pdf", register: registerMergePdf },
     { id: "split-pdf", register: registerSplitPdf },

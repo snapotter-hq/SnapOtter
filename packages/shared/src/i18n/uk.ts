@@ -473,6 +473,19 @@ export const uk: TranslationKeys = {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
     },
+    "convert-document": {
+      name: "Convert Document",
+      description: "Convert between Word, OpenDocument, RTF, and plain text formats",
+    },
+    "convert-presentation": {
+      name: "Convert Presentation",
+      description: "Convert between PowerPoint and OpenDocument presentation formats",
+    },
+    "convert-spreadsheet": {
+      name: "Convert Spreadsheet",
+      description:
+        "Convert between Excel, OpenDocument, and CSV formats. Multi-sheet workbooks export the first sheet to CSV.",
+    },
     "excel-to-pdf": {
       name: "Excel to PDF",
       description: "Convert spreadsheets to PDF. Wide sheets may paginate across multiple pages.",
@@ -1925,6 +1938,25 @@ export const uk: TranslationKeys = {
       submit: "Rotate",
       submitBatch: "Rotate ({count} files)",
       progressLabel: "Rotating",
+    },
+    "convert-document": {
+      format: "Output format",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "convert-presentation": {
+      format: "Output format",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "convert-spreadsheet": {
+      format: "Output format",
+      hint: "Multi-sheet workbooks export the first sheet to CSV.",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
     },
     "excel-to-pdf": {
       submit: "Convert to PDF",
