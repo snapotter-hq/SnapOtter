@@ -39,6 +39,7 @@ import { registerExtractPages } from "./extract-pages.js";
 import { registerFavicon } from "./favicon.js";
 import { registerFindDuplicates } from "./find-duplicates.js";
 import { registerFlattenPdf } from "./flatten-pdf.js";
+import { registerGifToVideo } from "./gif-to-video.js";
 import { registerGifTools } from "./gif-tools.js";
 import { registerGrayscalePdf } from "./grayscale-pdf.js";
 import { registerHtmlToImage } from "./html-to-image.js";
@@ -99,7 +100,9 @@ import { registerVectorize } from "./vectorize.js";
 import { registerVideoColor } from "./video-color.js";
 import { registerVideoLoudnorm } from "./video-loudnorm.js";
 import { registerVideoSpeed } from "./video-speed.js";
+import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
+import { registerVideoToWebp } from "./video-to-webp.js";
 import { registerWatermarkImage } from "./watermark-image.js";
 import { registerWatermarkPdf } from "./watermark-pdf.js";
 import { registerWatermarkText } from "./watermark-text.js";
@@ -196,6 +199,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "compress-video", register: registerCompressVideo },
     { id: "convert-video", register: registerConvertVideo },
     { id: "crop-video", register: registerCropVideo },
+    { id: "gif-to-video", register: registerGifToVideo },
     { id: "mute-video", register: registerMuteVideo },
     { id: "resize-video", register: registerResizeVideo },
     { id: "reverse-video", register: registerReverseVideo },
@@ -205,7 +209,9 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "video-color", register: registerVideoColor },
     { id: "video-loudnorm", register: registerVideoLoudnorm },
     { id: "video-speed", register: registerVideoSpeed },
+    { id: "video-to-frames", register: registerVideoToFrames },
     { id: "video-to-gif", register: registerVideoToGif },
+    { id: "video-to-webp", register: registerVideoToWebp },
     { id: "watermark-video", register: registerWatermarkVideo },
 
     // Audio

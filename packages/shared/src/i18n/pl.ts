@@ -350,6 +350,18 @@ export const pl: TranslationKeys = {
       name: "Stabilize Video",
       description: "Reduce camera shake with two-pass stabilization",
     },
+    "gif-to-video": {
+      name: "GIF to Video",
+      description: "Convert an animated GIF into an MP4 or WebM video",
+    },
+    "video-to-webp": {
+      name: "Video to WebP",
+      description: "Convert a video clip into an animated WebP image",
+    },
+    "video-to-frames": {
+      name: "Video to Frames",
+      description: "Extract frames from a video as a ZIP of images",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1585,6 +1597,34 @@ export const pl: TranslationKeys = {
       submit: "Stabilize",
       submitBatch: "Stabilize ({count} files)",
       progressLabel: "Stabilizing",
+    },
+    "gif-to-video": {
+      format: "Output format",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "video-to-webp": {
+      fps: "Frames per second",
+      width: "Width (px)",
+      quality: "Quality",
+      loop: "Loop animation",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "video-to-frames": {
+      mode: "Extraction mode",
+      modeAll: "All frames",
+      modeNth: "Every Nth frame",
+      modeTimestamps: "Specific timestamps",
+      n: "Take every Nth frame",
+      timestamps: "Timestamps (seconds)",
+      timestampsHint: "Comma-separated, e.g. 0.5, 2, 4.5",
+      format: "Image format",
+      submit: "Extract Frames",
+      submitBatch: "Extract Frames ({count} files)",
+      progressLabel: "Extracting frames",
     },
     "convert-audio": {
       format: "Output format",

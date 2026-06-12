@@ -1,0 +1,63 @@
+import { resolveEncoder } from "@snapotter/media-engine";
+import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { runMediaTool } from "../../lib/media-tool.js";
+import { createToolRoute } from "../tool-factory.js";
+
+const settingsSchema = z.object({
+  format: z.enum(["mp4", "webm"]).default("mp4"),
+});
+
+export function registerGifToVideo(app: FastifyInstance) {
+  createToolRoute(app, {
+    toolId: "gif-to-video",
+    settingsSchema,
+    process: async () => {
+      throw new Error("gif-to-video is v2-only");
+    },
+    processV2: async (ctx) => {
+      const settings = settingsSchema.parse(ctx.settings);
+      const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
+      const outName = `${base}.${settings.format}`;
+      const contentType = settings.format === "mp4" ? "video/mp4" : "video/webm";
+
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+        if (settings.format === "webm") {
+          return [
+            "-i",
+            inPath,
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            "-c:v",
+            resolveEncoder("vp9"),
+            "-b:v",
+            "0",
+            "-crf",
+            "32",
+            "-an",
+            out,
+          ];
+        }
+        return [
+          "-i",
+          inPath,
+          "-vf",
+          "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+          "-c:v",
+          resolveEncoder("h264"),
+          "-crf",
+          "20",
+          "-preset",
+          "medium",
+          "-pix_fmt",
+          "yuv420p",
+          "-movflags",
+          "+faststart",
+          "-an",
+          out,
+        ];
+      });
+      return { scratchPath: outPath, filename: outName, contentType };
+    },
+  });
+}
