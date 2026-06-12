@@ -1429,6 +1429,29 @@ export const TOOLS: Tool[] = [
     executionHint: "long",
   },
   {
+    id: "markdown-to-docx",
+    name: "Markdown to Word",
+    description: "Convert a Markdown file to a Word document (DOCX)",
+    category: "documents",
+    icon: "FileType",
+    route: "/markdown-to-docx",
+    modality: "document",
+    acceptedInputs: [".md", ".markdown"],
+    executionHint: "fast",
+  },
+  {
+    id: "markdown-to-html",
+    name: "Markdown to HTML",
+    description:
+      "Convert a Markdown file to a standalone HTML page. Remote images in the source are left as-is in the output.",
+    category: "documents",
+    icon: "FileCode",
+    route: "/markdown-to-html",
+    modality: "document",
+    acceptedInputs: [".md", ".markdown"],
+    executionHint: "fast",
+  },
+  {
     id: "markdown-to-pdf",
     name: "Markdown to PDF",
     description:

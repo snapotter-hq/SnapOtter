@@ -62,6 +62,8 @@ import { registerImagesToVideo } from "./images-to-video.js";
 import { registerInfo } from "./info.js";
 import { registerJsonXml } from "./json-xml.js";
 import { registerLinearizePdf } from "./linearize-pdf.js";
+import { registerMarkdownToDocx } from "./markdown-to-docx.js";
+import { registerMarkdownToHtml } from "./markdown-to-html.js";
 import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
 import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergeAudio } from "./merge-audio.js";
@@ -297,6 +299,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "pdf-metadata", register: registerPdfMetadata },
     { id: "powerpoint-to-pdf", register: registerPowerpointToPdf },
     { id: "html-to-pdf", register: registerHtmlToPdf },
+    { id: "markdown-to-docx", register: registerMarkdownToDocx },
+    { id: "markdown-to-html", register: registerMarkdownToHtml },
     { id: "markdown-to-pdf", register: registerMarkdownToPdf },
 
     // Data Files

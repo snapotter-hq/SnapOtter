@@ -570,6 +570,15 @@ export const hi: TranslationKeys = {
       name: "HTML to PDF",
       description: "Convert an HTML file to PDF. Remote resources are disabled for privacy.",
     },
+    "markdown-to-docx": {
+      name: "Markdown to Word",
+      description: "Convert a Markdown file to a Word document (DOCX)",
+    },
+    "markdown-to-html": {
+      name: "Markdown to HTML",
+      description:
+        "Convert a Markdown file to a standalone HTML page. Remote images in the source are left as-is in the output.",
+    },
     "markdown-to-pdf": {
       name: "Markdown to PDF",
       description:
@@ -2087,6 +2096,17 @@ export const hi: TranslationKeys = {
       hint: "Remote resources are disabled for privacy.",
       submit: "Convert to PDF",
       submitBatch: "Convert to PDF ({count} files)",
+      progressLabel: "Converting",
+    },
+    "markdown-to-docx": {
+      submit: "Convert to DOCX",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "markdown-to-html": {
+      hint: "Remote images in the source are left as-is in the output.",
+      submit: "Convert to HTML",
+      submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
     },
     "markdown-to-pdf": {

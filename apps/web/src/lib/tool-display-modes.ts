@@ -170,6 +170,8 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "pdf-metadata": "no-comparison",
   "powerpoint-to-pdf": "document",
   "html-to-pdf": "document",
+  "markdown-to-docx": "no-comparison",
+  "markdown-to-html": "no-comparison",
   "markdown-to-pdf": "document",
 
   // Data tools
