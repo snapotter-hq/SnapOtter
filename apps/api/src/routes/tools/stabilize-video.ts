@@ -30,10 +30,13 @@ export function registerStabilizeVideo(app: FastifyInstance) {
 
       // Pass 1: motion analysis (no progress mapping; stdout carries -progress pipe:1)
       ctx.report(5, "Analyzing");
-      await runFfmpeg(["-i", inPath, "-vf", `vidstabdetect=result=${trf}`, "-f", "null", nullOut], {
-        signal: ctx.signal,
-        timeoutMs: 30 * 60_000,
-      });
+      await runFfmpeg(
+        ["-i", inPath, "-an", "-vf", `vidstabdetect=result=${trf}`, "-f", "null", nullOut],
+        {
+          signal: ctx.signal,
+          timeoutMs: 30 * 60_000,
+        },
+      );
 
       // Pass 2: stabilization with re-encode
       ctx.report(50, "Stabilizing");
