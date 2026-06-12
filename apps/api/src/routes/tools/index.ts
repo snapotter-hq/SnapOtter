@@ -4,9 +4,11 @@ import type { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";
 import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
+import { registerAspectPad } from "./aspect-pad.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurFaces } from "./blur-faces.js";
+import { registerBlurPad } from "./blur-pad.js";
 import { registerBookletPdf } from "./booklet-pdf.js";
 import { registerBorder } from "./border.js";
 import { registerBulkRename } from "./bulk-rename.js";
@@ -186,6 +188,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "color-blindness", register: registerColorBlindness },
 
     // Video
+    { id: "aspect-pad", register: registerAspectPad },
+    { id: "blur-pad", register: registerBlurPad },
     { id: "change-fps", register: registerChangeFps },
     { id: "compress-video", register: registerCompressVideo },
     { id: "convert-video", register: registerConvertVideo },

@@ -754,6 +754,28 @@ export const TOOLS: Tool[] = [
     acceptedInputs: VIDEO_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "aspect-pad",
+    name: "Aspect Pad",
+    description: "Add solid-color bars to fit a target aspect ratio",
+    category: "video",
+    icon: "RectangleHorizontal",
+    route: "/aspect-pad",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
+  {
+    id: "blur-pad",
+    name: "Blur Pad",
+    description: "Fill bars with a blurred copy of the video",
+    category: "video",
+    icon: "GalleryHorizontalEnd",
+    route: "/blur-pad",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    executionHint: "fast",
+  },
   // Audio
   {
     id: "convert-audio",

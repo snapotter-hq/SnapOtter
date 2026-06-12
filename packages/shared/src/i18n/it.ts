@@ -332,6 +332,14 @@ export const it: TranslationKeys = {
       name: "Normalize Audio",
       description: "Normalize video audio volume to broadcast standard",
     },
+    "aspect-pad": {
+      name: "Aspect Pad",
+      description: "Add solid-color bars to fit a target aspect ratio",
+    },
+    "blur-pad": {
+      name: "Blur Pad",
+      description: "Fill bars with a blurred copy of the video",
+    },
     "convert-audio": {
       name: "Convert Audio",
       description: "Convert audio between MP3, WAV, OGG, and more",
@@ -1532,6 +1540,21 @@ export const it: TranslationKeys = {
       submit: "Normalize",
       submitBatch: "Normalize ({count} files)",
       progressLabel: "Normalizing",
+    },
+    "aspect-pad": {
+      target: "Target ratio",
+      color: "Background color",
+      colorHint: "Hex color, e.g. #000000",
+      submit: "Pad",
+      submitBatch: "Pad ({count} files)",
+      progressLabel: "Padding",
+    },
+    "blur-pad": {
+      target: "Target ratio",
+      blur: "Blur strength",
+      submit: "Pad",
+      submitBatch: "Pad ({count} files)",
+      progressLabel: "Padding",
     },
     "convert-audio": {
       format: "Output format",
