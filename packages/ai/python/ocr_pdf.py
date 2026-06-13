@@ -96,7 +96,7 @@ def main():
         # Parse page specification
         page_indices, parse_error = parse_page_spec(pages_spec, total_pages)
         if parse_error:
-            print(json.dumps({"error": f"Invalid page range: {parse_error}"}))
+            print(json.dumps({"error": parse_error}))
             sys.exit(1)
 
         if len(page_indices) > MAX_PAGES:
