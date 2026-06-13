@@ -187,6 +187,14 @@ export const sv: TranslationKeys = {
       description:
         "Skapa myndighetsgodkanda pass-, visum- och ID-foton med automatisk ansiktsdetektion",
     },
+    "transcribe-audio": {
+      name: "Transkribera ljud",
+      description: "Omvandla tal till text med AI-driven transkription",
+    },
+    "auto-subtitles": {
+      name: "Automatiska undertexter",
+      description: "Generera undertextfiler fran videoers ljudspar",
+    },
     "transparency-fixer": {
       name: "PNG-transparensfix",
       description: "Fixa falska transparenta PNGs med ett klick",
@@ -1293,6 +1301,23 @@ export const sv: TranslationKeys = {
       dragToAdjust: "Dra for att justera",
       scrollToZoom: "Scrolla for att zooma",
       photoGenerated: "Foto genererat. Ladda ner fran vanstra panelen.",
+    },
+    "transcribe-audio": {
+      language: "Sprak",
+      autoDetect: "Automatisk identifiering",
+      outputFormat: "Utdataformat",
+      plainText: "Ren text",
+      submit: "Transkribera",
+      submitBatch: "Transkribera ({count} filer)",
+      progressLabel: "Transkriberar ljud",
+    },
+    "auto-subtitles": {
+      language: "Sprak",
+      autoDetect: "Automatisk identifiering",
+      format: "Undertextformat",
+      submit: "Generera undertexter",
+      submitBatch: "Generera undertexter ({count} filer)",
+      progressLabel: "Genererar undertexter",
     },
     "transparency-fixer": {
       description: "Ladda upp en PNG med falsk transparent bakgrund sa fixar vi det med ett klick.",

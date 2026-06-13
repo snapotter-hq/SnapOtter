@@ -160,6 +160,14 @@ export const zhTW: TranslationKeys = {
       name: "證件照",
       description: "自動偵測臉部並產生符合政府規範的護照、簽證和證件照",
     },
+    "transcribe-audio": {
+      name: "音訊轉文字",
+      description: "使用AI轉錄將語音轉換為文字",
+    },
+    "auto-subtitles": {
+      name: "自動字幕",
+      description: "從影片音軌產生字幕檔案",
+    },
     "transparency-fixer": {
       name: "PNG透明修復",
       description: "一鍵修復偽透明PNG影像",
@@ -1228,6 +1236,23 @@ export const zhTW: TranslationKeys = {
       dragToAdjust: "拖曳調整位置",
       scrollToZoom: "捲動縮放",
       photoGenerated: "照片已產生。在左側面板下載。",
+    },
+    "transcribe-audio": {
+      language: "語言",
+      autoDetect: "自動偵測",
+      outputFormat: "輸出格式",
+      plainText: "純文字",
+      submit: "轉錄",
+      submitBatch: "轉錄 ({count} 個檔案)",
+      progressLabel: "正在轉錄音訊",
+    },
+    "auto-subtitles": {
+      language: "語言",
+      autoDetect: "自動偵測",
+      format: "字幕格式",
+      submit: "產生字幕",
+      submitBatch: "產生字幕 ({count} 個檔案)",
+      progressLabel: "正在產生字幕",
     },
     "transparency-fixer": {
       description: "上傳帶有偽透明背景的PNG，我們將一鍵修復。",

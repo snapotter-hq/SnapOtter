@@ -160,6 +160,14 @@ export const ko: TranslationKeys = {
       name: "증명사진",
       description: "얼굴 자동 감지로 정부 규격에 맞는 여권, 비자, 신분증 사진 생성",
     },
+    "transcribe-audio": {
+      name: "오디오 전사",
+      description: "AI 기반 전사로 음성을 텍스트로 변환",
+    },
+    "auto-subtitles": {
+      name: "자동 자막",
+      description: "비디오 오디오 트랙에서 자막 파일 생성",
+    },
     "transparency-fixer": {
       name: "PNG 투명도 수정",
       description: "가짜 투명 PNG를 원클릭으로 수정",
@@ -1238,6 +1246,23 @@ export const ko: TranslationKeys = {
       dragToAdjust: "드래그하여 조정",
       scrollToZoom: "스크롤하여 확대/축소",
       photoGenerated: "사진이 생성되었습니다. 왼쪽 패널에서 다운로드하세요.",
+    },
+    "transcribe-audio": {
+      language: "언어",
+      autoDetect: "자동 감지",
+      outputFormat: "출력 형식",
+      plainText: "일반 텍스트",
+      submit: "전사",
+      submitBatch: "전사 ({count}개 파일)",
+      progressLabel: "오디오 전사 중",
+    },
+    "auto-subtitles": {
+      language: "언어",
+      autoDetect: "자동 감지",
+      format: "자막 형식",
+      submit: "자막 생성",
+      submitBatch: "자막 생성 ({count}개 파일)",
+      progressLabel: "자막 생성 중",
     },
     "transparency-fixer": {
       description: "가짜 투명 배경의 PNG를 업로드하면 원클릭으로 수정해 드립니다.",

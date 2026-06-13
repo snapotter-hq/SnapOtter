@@ -188,6 +188,14 @@ export const vi: TranslationKeys = {
       description:
         "Tạo ảnh hộ chiếu, thị thực và giấy tờ tùy thân đạt chuẩn với phát hiện khuôn mặt tự động",
     },
+    "transcribe-audio": {
+      name: "Phien am thanh",
+      description: "Chuyen doi giong noi thanh van ban voi phien am bang AI",
+    },
+    "auto-subtitles": {
+      name: "Phu De Tu Dong",
+      description: "Tao tep phu de tu ban am thanh video",
+    },
     "transparency-fixer": {
       name: "Sửa trong suốt PNG",
       description: "Sửa ảnh PNG giả trong suốt chỉ với một cú nhấp",
@@ -1295,6 +1303,23 @@ export const vi: TranslationKeys = {
       dragToAdjust: "Kéo để điều chỉnh",
       scrollToZoom: "Cuộn để thu phóng",
       photoGenerated: "Ảnh đã được tạo. Tải xuống từ bảng bên trái.",
+    },
+    "transcribe-audio": {
+      language: "Ngon ngu",
+      autoDetect: "Tu dong phat hien",
+      outputFormat: "Dinh dang dau ra",
+      plainText: "Van ban thuan",
+      submit: "Phien am",
+      submitBatch: "Phien am ({count} tep)",
+      progressLabel: "Dang phien am",
+    },
+    "auto-subtitles": {
+      language: "Ngon ngu",
+      autoDetect: "Tu dong phat hien",
+      format: "Dinh dang phu de",
+      submit: "Tao phu de",
+      submitBatch: "Tao phu de ({count} tep)",
+      progressLabel: "Dang tao phu de",
     },
     "transparency-fixer": {
       description: "Tải lên PNG có nền giả trong suốt và chúng tôi sẽ sửa chỉ với một cú nhấp.",

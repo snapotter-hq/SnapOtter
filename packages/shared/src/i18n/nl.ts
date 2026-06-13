@@ -189,6 +189,14 @@ export const nl: TranslationKeys = {
       description:
         "Officieel geldige pas-, visum- en ID-foto's maken met automatische gezichtsdetectie",
     },
+    "transcribe-audio": {
+      name: "Audio transcriberen",
+      description: "Spraak naar tekst omzetten met AI-aangedreven transcriptie",
+    },
+    "auto-subtitles": {
+      name: "Automatische ondertiteling",
+      description: "Ondertitelingsbestanden genereren uit video-audiotracks",
+    },
     "transparency-fixer": {
       name: "PNG-transparantie repareren",
       description: "Nep-transparante PNGs met een klik repareren",
@@ -1296,6 +1304,23 @@ export const nl: TranslationKeys = {
       dragToAdjust: "Sleep om aan te passen",
       scrollToZoom: "Scroll om te zoomen",
       photoGenerated: "Foto gegenereerd. Download via het linkerpaneel.",
+    },
+    "transcribe-audio": {
+      language: "Taal",
+      autoDetect: "Automatisch detecteren",
+      outputFormat: "Uitvoerformaat",
+      plainText: "Platte tekst",
+      submit: "Transcriberen",
+      submitBatch: "Transcriberen ({count} bestanden)",
+      progressLabel: "Audio transcriberen",
+    },
+    "auto-subtitles": {
+      language: "Taal",
+      autoDetect: "Automatisch detecteren",
+      format: "Ondertitelingsformaat",
+      submit: "Ondertiteling genereren",
+      submitBatch: "Ondertiteling genereren ({count} bestanden)",
+      progressLabel: "Ondertiteling genereren",
     },
     "transparency-fixer": {
       description:

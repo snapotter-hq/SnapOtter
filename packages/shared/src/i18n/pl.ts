@@ -187,6 +187,14 @@ export const pl: TranslationKeys = {
       description:
         "Tworzenie zdjęć paszportowych, wizowych i do dowodów zgodnych z wymogami z automatycznym wykrywaniem twarzy",
     },
+    "transcribe-audio": {
+      name: "Transkrypcja audio",
+      description: "Zamien mowe na tekst za pomoca transkrypcji opartej na AI",
+    },
+    "auto-subtitles": {
+      name: "Automatyczne napisy",
+      description: "Generuj pliki napisow ze sciezek dzwiekowych wideo",
+    },
     "transparency-fixer": {
       name: "Naprawa przezroczystości PNG",
       description: "Naprawa fałszywej przezroczystości PNG jednym kliknięciem",
@@ -1298,6 +1306,23 @@ export const pl: TranslationKeys = {
       dragToAdjust: "Przeciągnij, aby dostosować",
       scrollToZoom: "Przewiń, aby powiększyć",
       photoGenerated: "Zdjęcie wygenerowane. Pobierz z lewego panelu.",
+    },
+    "transcribe-audio": {
+      language: "Jezyk",
+      autoDetect: "Automatyczne wykrywanie",
+      outputFormat: "Format wyjsciowy",
+      plainText: "Zwykly tekst",
+      submit: "Transkrybuj",
+      submitBatch: "Transkrybuj ({count} plikow)",
+      progressLabel: "Transkrypcja audio",
+    },
+    "auto-subtitles": {
+      language: "Jezyk",
+      autoDetect: "Automatyczne wykrywanie",
+      format: "Format napisow",
+      submit: "Generuj napisy",
+      submitBatch: "Generuj napisy ({count} plikow)",
+      progressLabel: "Generowanie napisow",
     },
     "transparency-fixer": {
       description: "Prześlij PNG z fałszywą przezroczystością, a naprawimy to jednym kliknięciem.",

@@ -344,6 +344,16 @@ const ColorBlindnessSettings = lazy(() =>
     default: m.ColorBlindnessSettings,
   })),
 );
+const TranscribeAudioSettings = lazy(() =>
+  import("@/components/tools/transcribe-audio-settings").then((m) => ({
+    default: m.TranscribeAudioSettings,
+  })),
+);
+const AutoSubtitlesSettings = lazy(() =>
+  import("@/components/tools/auto-subtitles-settings").then((m) => ({
+    default: m.AutoSubtitlesSettings,
+  })),
+);
 const ConvertVideoSettings = lazy(() =>
   import("@/components/tools/convert-video-settings").then((m) => ({
     default: m.ConvertVideoSettings,
@@ -965,6 +975,8 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["transparency-fixer", { Settings: TransparencyFixerSettings }],
   ["content-aware-resize", { Settings: ContentAwareResizeSettings }],
   ["ai-canvas-expand", { Settings: AiCanvasExpandSettings }],
+  ["transcribe-audio", { accept: AUDIO_INPUTS.join(","), Settings: TranscribeAudioSettings }],
+  ["auto-subtitles", { accept: VIDEO_INPUTS.join(","), Settings: AutoSubtitlesSettings }],
 
   // Video tools
   ["convert-video", { accept: VIDEO_INPUTS.join(","), Settings: ConvertVideoSettings }],

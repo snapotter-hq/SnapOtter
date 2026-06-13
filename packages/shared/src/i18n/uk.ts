@@ -186,6 +186,14 @@ export const uk: TranslationKeys = {
       description:
         "Створення фотографій для паспорта, візи та посвідчень з автоматичним виявленням обличчя",
     },
+    "transcribe-audio": {
+      name: "Транскрипцiя аудiо",
+      description: "Перетворення мовлення на текст за допомогою ШI",
+    },
+    "auto-subtitles": {
+      name: "Автоматичнi субтитри",
+      description: "Генерацiя файлiв субтитрiв з аудiодорiжок вiдео",
+    },
     "transparency-fixer": {
       name: "Виправлення прозорості PNG",
       description: "Виправлення хибної прозорості PNG в один клік",
@@ -1296,6 +1304,23 @@ export const uk: TranslationKeys = {
       dragToAdjust: "Перетягніть для налаштування",
       scrollToZoom: "Прокрутіть для масштабування",
       photoGenerated: "Фото створено. Завантажте з лівої панелі.",
+    },
+    "transcribe-audio": {
+      language: "Мова",
+      autoDetect: "Автовизначення",
+      outputFormat: "Формат виводу",
+      plainText: "Звичайний текст",
+      submit: "Транскрибувати",
+      submitBatch: "Транскрибувати ({count} файлiв)",
+      progressLabel: "Транскрипцiя аудiо",
+    },
+    "auto-subtitles": {
+      language: "Мова",
+      autoDetect: "Автовизначення",
+      format: "Формат субтитрiв",
+      submit: "Створити субтитри",
+      submitBatch: "Створити субтитри ({count} файлiв)",
+      progressLabel: "Створення субтитрiв",
     },
     "transparency-fixer": {
       description: "Завантажте PNG з хибною прозорістю, і ми виправимо його в один клік.",

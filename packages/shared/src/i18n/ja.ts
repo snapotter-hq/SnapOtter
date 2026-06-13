@@ -163,6 +163,14 @@ export const ja: TranslationKeys = {
       name: "証明写真",
       description: "顔自動検出付き、政府規格準拠のパスポート、ビザ、身分証写真を作成",
     },
+    "transcribe-audio": {
+      name: "音声文字起こし",
+      description: "AI搭載の文字起こしで音声をテキストに変換",
+    },
+    "auto-subtitles": {
+      name: "自動字幕",
+      description: "動画の音声トラックから字幕ファイルを生成",
+    },
     "transparency-fixer": {
       name: "PNG透過修正",
       description: "偽の透過PNGをワンクリックで修正",
@@ -1252,6 +1260,23 @@ export const ja: TranslationKeys = {
       dragToAdjust: "ドラッグで調整",
       scrollToZoom: "スクロールでズーム",
       photoGenerated: "写真が生成されました。左パネルからダウンロードしてください。",
+    },
+    "transcribe-audio": {
+      language: "言語",
+      autoDetect: "自動検出",
+      outputFormat: "出力形式",
+      plainText: "プレーンテキスト",
+      submit: "文字起こし",
+      submitBatch: "文字起こし ({count}ファイル)",
+      progressLabel: "音声を文字起こし中",
+    },
+    "auto-subtitles": {
+      language: "言語",
+      autoDetect: "自動検出",
+      format: "字幕形式",
+      submit: "字幕を生成",
+      submitBatch: "字幕を生成 ({count}ファイル)",
+      progressLabel: "字幕を生成中",
     },
     "transparency-fixer": {
       description: "偽の透過背景のPNGをアップロードすると、ワンクリックで修正します。",

@@ -188,6 +188,14 @@ export const fr: TranslationKeys = {
       description:
         "Creez des photos de passeport, visa et pieces d'identite conformes aux normes officielles avec detection automatique du visage",
     },
+    "transcribe-audio": {
+      name: "Transcrire l'audio",
+      description: "Convertir la parole en texte avec la transcription par IA",
+    },
+    "auto-subtitles": {
+      name: "Sous-titres automatiques",
+      description: "Generer des fichiers de sous-titres a partir des pistes audio video",
+    },
     "transparency-fixer": {
       name: "Correcteur de transparence PNG",
       description: "Corrigez les PNG a fausse transparence en un clic",
@@ -1299,6 +1307,23 @@ export const fr: TranslationKeys = {
       dragToAdjust: "Glissez pour ajuster",
       scrollToZoom: "Faites defiler pour zoomer",
       photoGenerated: "Photo generee. Telechargez-la depuis le panneau de gauche.",
+    },
+    "transcribe-audio": {
+      language: "Langue",
+      autoDetect: "Detection automatique",
+      outputFormat: "Format de sortie",
+      plainText: "Texte brut",
+      submit: "Transcrire",
+      submitBatch: "Transcrire ({count} fichiers)",
+      progressLabel: "Transcription de l'audio",
+    },
+    "auto-subtitles": {
+      language: "Langue",
+      autoDetect: "Detection automatique",
+      format: "Format des sous-titres",
+      submit: "Generer les sous-titres",
+      submitBatch: "Generer les sous-titres ({count} fichiers)",
+      progressLabel: "Generation des sous-titres",
     },
     "transparency-fixer": {
       description:

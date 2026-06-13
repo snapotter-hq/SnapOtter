@@ -184,6 +184,14 @@ export const th: TranslationKeys = {
       name: "ภาพหนังสือเดินทาง",
       description: "สร้างภาพหนังสือเดินทาง วีซ่า และบัตรประชาชนตามมาตรฐานราชการด้วยการตรวจจับใบหน้าอัตโนมัติ",
     },
+    "transcribe-audio": {
+      name: "ถอดเสียงเป็นข้อความ",
+      description: "แปลงเสียงพูดเป็นข้อความด้วยการถอดเสียง AI",
+    },
+    "auto-subtitles": {
+      name: "คำบรรยายอัตโนมัติ",
+      description: "สร้างไฟล์คำบรรยายจากแทร็กเสียงของวิดีโอ",
+    },
     "transparency-fixer": {
       name: "แก้ไขความโปร่งใส PNG",
       description: "แก้ไข PNG ที่มีพื้นหลังโปร่งใสปลอมในคลิกเดียว",
@@ -1276,6 +1284,23 @@ export const th: TranslationKeys = {
       dragToAdjust: "ลากเพื่อปรับ",
       scrollToZoom: "เลื่อนเพื่อซูม",
       photoGenerated: "สร้างภาพแล้ว ดาวน์โหลดจากแผงซ้าย",
+    },
+    "transcribe-audio": {
+      language: "ภาษา",
+      autoDetect: "ตรวจจับอัตโนมัติ",
+      outputFormat: "รูปแบบผลลัพธ์",
+      plainText: "ข้อความธรรมดา",
+      submit: "ถอดเสียง",
+      submitBatch: "ถอดเสียง ({count} ไฟล์)",
+      progressLabel: "กำลังถอดเสียง",
+    },
+    "auto-subtitles": {
+      language: "ภาษา",
+      autoDetect: "ตรวจจับอัตโนมัติ",
+      format: "รูปแบบคำบรรยาย",
+      submit: "สร้างคำบรรยาย",
+      submitBatch: "สร้างคำบรรยาย ({count} ไฟล์)",
+      progressLabel: "กำลังสร้างคำบรรยาย",
     },
     "transparency-fixer": {
       description: "อัปโหลด PNG ที่มีพื้นหลังโปร่งใสปลอม แล้วเราจะแก้ไขให้ในคลิกเดียว",

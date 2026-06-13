@@ -162,6 +162,14 @@ export const en = {
       description:
         "Create government-compliant passport, visa, and ID photos with auto face detection",
     },
+    "transcribe-audio": {
+      name: "Transcribe Audio",
+      description: "Convert speech to text with AI-powered transcription",
+    },
+    "auto-subtitles": {
+      name: "Auto Subtitles",
+      description: "Generate subtitle files from video audio tracks",
+    },
     "transparency-fixer": {
       name: "PNG Transparency Fixer",
       description: "Fix fake transparent PNGs in one click",
@@ -1245,6 +1253,23 @@ export const en = {
       dragToAdjust: "Drag to adjust",
       scrollToZoom: "Scroll to zoom",
       photoGenerated: "Photo generated. Download from the left panel.",
+    },
+    "transcribe-audio": {
+      language: "Language",
+      autoDetect: "Auto-detect",
+      outputFormat: "Output Format",
+      plainText: "Plain Text",
+      submit: "Transcribe",
+      submitBatch: "Transcribe ({count} files)",
+      progressLabel: "Transcribing audio",
+    },
+    "auto-subtitles": {
+      language: "Language",
+      autoDetect: "Auto-detect",
+      format: "Subtitle Format",
+      submit: "Generate Subtitles",
+      submitBatch: "Generate Subtitles ({count} files)",
+      progressLabel: "Generating subtitles",
     },
     "transparency-fixer": {
       description: "Upload a PNG with a fake transparent background and we'll fix it in one click.",

@@ -188,6 +188,14 @@ export const tr: TranslationKeys = {
       description:
         "Otomatik yüz algılama ile devlet standartlarına uygun pasaport, vize ve kimlik fotoğrafları oluşturun",
     },
+    "transcribe-audio": {
+      name: "Ses Transkripsiyonu",
+      description: "Yapay zeka destekli transkripsiyon ile konusmayi metne donusturun",
+    },
+    "auto-subtitles": {
+      name: "Otomatik Altyazi",
+      description: "Video ses izlerinden altyazi dosyalari olusturun",
+    },
     "transparency-fixer": {
       name: "PNG Saydamlık Düzeltici",
       description: "Sahte saydam PNG dosyalarını tek tıkla düzeltin",
@@ -1297,6 +1305,23 @@ export const tr: TranslationKeys = {
       dragToAdjust: "Ayarlamak için sürükleyin",
       scrollToZoom: "Yakınlaştırmak için kaydırın",
       photoGenerated: "Fotoğraf oluşturuldu. Sol panelden indirin.",
+    },
+    "transcribe-audio": {
+      language: "Dil",
+      autoDetect: "Otomatik algilama",
+      outputFormat: "Cikti Formati",
+      plainText: "Duz Metin",
+      submit: "Transkribe Et",
+      submitBatch: "Transkribe Et ({count} dosya)",
+      progressLabel: "Ses transkripsiyonu yapiliyor",
+    },
+    "auto-subtitles": {
+      language: "Dil",
+      autoDetect: "Otomatik algilama",
+      format: "Altyazi Formati",
+      submit: "Altyazi Olustur",
+      submitBatch: "Altyazi Olustur ({count} dosya)",
+      progressLabel: "Altyazi olusturuluyor",
     },
     "transparency-fixer": {
       description: "Sahte saydam arka planlı bir PNG yükleyin, tek tıkla düzeltelim.",

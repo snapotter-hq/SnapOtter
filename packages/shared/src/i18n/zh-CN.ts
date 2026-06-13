@@ -160,6 +160,14 @@ export const zhCN: TranslationKeys = {
       name: "证件照",
       description: "自动人脸检测，生成符合各国规格的护照、签证和证件照",
     },
+    "transcribe-audio": {
+      name: "音频转文字",
+      description: "使用AI转录将语音转换为文字",
+    },
+    "auto-subtitles": {
+      name: "自动字幕",
+      description: "从视频音轨生成字幕文件",
+    },
     "transparency-fixer": {
       name: "PNG 透明度修复",
       description: "一键修复伪透明 PNG 图片",
@@ -1230,6 +1238,23 @@ export const zhCN: TranslationKeys = {
       dragToAdjust: "拖动调整",
       scrollToZoom: "滚轮缩放",
       photoGenerated: "照片已生成。从左侧面板下载。",
+    },
+    "transcribe-audio": {
+      language: "语言",
+      autoDetect: "自动检测",
+      outputFormat: "输出格式",
+      plainText: "纯文本",
+      submit: "转录",
+      submitBatch: "转录 ({count} 个文件)",
+      progressLabel: "正在转录音频",
+    },
+    "auto-subtitles": {
+      language: "语言",
+      autoDetect: "自动检测",
+      format: "字幕格式",
+      submit: "生成字幕",
+      submitBatch: "生成字幕 ({count} 个文件)",
+      progressLabel: "正在生成字幕",
     },
     "transparency-fixer": {
       description: "上传一张伪透明 PNG 图片，一键修复透明背景。",

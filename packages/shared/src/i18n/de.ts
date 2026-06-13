@@ -187,6 +187,14 @@ export const de: TranslationKeys = {
       description:
         "Normgerechte Pass-, Visa- und Ausweisfotos mit automatischer Gesichtserkennung erstellen",
     },
+    "transcribe-audio": {
+      name: "Audio transkribieren",
+      description: "Sprache mit KI-gestuetzter Transkription in Text umwandeln",
+    },
+    "auto-subtitles": {
+      name: "Automatische Untertitel",
+      description: "Untertiteldateien aus Video-Audiospuren generieren",
+    },
     "transparency-fixer": {
       name: "PNG-Transparenzkorrektur",
       description: "Unechte transparente PNGs mit einem Klick reparieren",
@@ -1298,6 +1306,23 @@ export const de: TranslationKeys = {
       dragToAdjust: "Ziehen zum Anpassen",
       scrollToZoom: "Scrollen zum Zoomen",
       photoGenerated: "Foto generiert. Laden Sie es im linken Bereich herunter.",
+    },
+    "transcribe-audio": {
+      language: "Sprache",
+      autoDetect: "Automatisch erkennen",
+      outputFormat: "Ausgabeformat",
+      plainText: "Klartext",
+      submit: "Transkribieren",
+      submitBatch: "Transkribieren ({count} Dateien)",
+      progressLabel: "Audio wird transkribiert",
+    },
+    "auto-subtitles": {
+      language: "Sprache",
+      autoDetect: "Automatisch erkennen",
+      format: "Untertitelformat",
+      submit: "Untertitel generieren",
+      submitBatch: "Untertitel generieren ({count} Dateien)",
+      progressLabel: "Untertitel werden generiert",
     },
     "transparency-fixer": {
       description:

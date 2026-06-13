@@ -185,6 +185,14 @@ export const ar: TranslationKeys = {
       description:
         "إنشاء صور جواز سفر وتأشيرة وهوية متوافقة مع المتطلبات الحكومية مع اكتشاف تلقائي للوجه",
     },
+    "transcribe-audio": {
+      name: "تحويل الصوت إلى نص",
+      description: "تحويل الكلام إلى نص باستخدام النسخ المدعوم بالذكاء الاصطناعي",
+    },
+    "auto-subtitles": {
+      name: "ترجمة تلقائية",
+      description: "إنشاء ملفات ترجمة من المسارات الصوتية للفيديو",
+    },
     "transparency-fixer": {
       name: "إصلاح شفافية PNG",
       description: "إصلاح ملفات PNG ذات الشفافية المزيفة بنقرة واحدة",
@@ -1287,6 +1295,23 @@ export const ar: TranslationKeys = {
       dragToAdjust: "اسحب للتعديل",
       scrollToZoom: "مرر للتكبير",
       photoGenerated: "تم إنشاء الصورة. حمّلها من اللوحة اليسرى.",
+    },
+    "transcribe-audio": {
+      language: "اللغة",
+      autoDetect: "اكتشاف تلقائي",
+      outputFormat: "صيغة الإخراج",
+      plainText: "نص عادي",
+      submit: "تحويل إلى نص",
+      submitBatch: "تحويل إلى نص ({count} ملف)",
+      progressLabel: "جاري تحويل الصوت إلى نص",
+    },
+    "auto-subtitles": {
+      language: "اللغة",
+      autoDetect: "اكتشاف تلقائي",
+      format: "صيغة الترجمة",
+      submit: "إنشاء ترجمة",
+      submitBatch: "إنشاء ترجمة ({count} ملف)",
+      progressLabel: "جاري إنشاء الترجمة",
     },
     "transparency-fixer": {
       description: "ارفع ملف PNG بخلفية شفافة مزيفة وسنصلحه بنقرة واحدة.",

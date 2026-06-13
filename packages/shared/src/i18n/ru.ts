@@ -187,6 +187,14 @@ export const ru: TranslationKeys = {
       description:
         "Создание фотографий для паспорта, визы и удостоверений с автоматическим обнаружением лица",
     },
+    "transcribe-audio": {
+      name: "Транскрипция аудио",
+      description: "Преобразование речи в текст с помощью ИИ",
+    },
+    "auto-subtitles": {
+      name: "Автоматические субтитры",
+      description: "Генерация файлов субтитров из аудиодорожек видео",
+    },
     "transparency-fixer": {
       name: "Исправление прозрачности PNG",
       description: "Исправление ложной прозрачности PNG в один клик",
@@ -1296,6 +1304,23 @@ export const ru: TranslationKeys = {
       dragToAdjust: "Перетащите для настройки",
       scrollToZoom: "Прокрутите для масштабирования",
       photoGenerated: "Фото создано. Скачайте с левой панели.",
+    },
+    "transcribe-audio": {
+      language: "Язык",
+      autoDetect: "Автоопределение",
+      outputFormat: "Формат вывода",
+      plainText: "Простой текст",
+      submit: "Транскрибировать",
+      submitBatch: "Транскрибировать ({count} файлов)",
+      progressLabel: "Транскрипция аудио",
+    },
+    "auto-subtitles": {
+      language: "Язык",
+      autoDetect: "Автоопределение",
+      format: "Формат субтитров",
+      submit: "Создать субтитры",
+      submitBatch: "Создать субтитры ({count} файлов)",
+      progressLabel: "Создание субтитров",
     },
     "transparency-fixer": {
       description: "Загрузите PNG с ложной прозрачностью, и мы исправим его в один клик.",

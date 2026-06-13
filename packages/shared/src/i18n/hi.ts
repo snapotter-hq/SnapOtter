@@ -184,6 +184,14 @@ export const hi: TranslationKeys = {
       name: "पासपोर्ट फोटो",
       description: "ऑटो फेस डिटेक्शन के साथ सरकारी मानकों के अनुरूप पासपोर्ट, वीज़ा और ID फोटो बनाएं",
     },
+    "transcribe-audio": {
+      name: "ऑडियो ट्रांसक्राइब करें",
+      description: "AI-संचालित ट्रांसक्रिप्शन से भाषण को टेक्स्ट में बदलें",
+    },
+    "auto-subtitles": {
+      name: "स्वचालित उपशीर्षक",
+      description: "वीडियो ऑडियो ट्रैक से उपशीर्षक फ़ाइलें बनाएं",
+    },
     "transparency-fixer": {
       name: "PNG ट्रांसपेरेंसी फिक्सर",
       description: "नकली पारदर्शी PNG को एक क्लिक में ठीक करें",
@@ -1283,6 +1291,23 @@ export const hi: TranslationKeys = {
       dragToAdjust: "समायोजित करने के लिए खींचें",
       scrollToZoom: "ज़ूम करने के लिए स्क्रॉल करें",
       photoGenerated: "फोटो जनरेट हो गई। बाएं पैनल से डाउनलोड करें।",
+    },
+    "transcribe-audio": {
+      language: "भाषा",
+      autoDetect: "स्वतः पहचान",
+      outputFormat: "आउटपुट प्रारूप",
+      plainText: "सादा टेक्स्ट",
+      submit: "ट्रांसक्राइब करें",
+      submitBatch: "ट्रांसक्राइब करें ({count} फ़ाइलें)",
+      progressLabel: "ऑडियो ट्रांसक्राइब हो रहा है",
+    },
+    "auto-subtitles": {
+      language: "भाषा",
+      autoDetect: "स्वतः पहचान",
+      format: "उपशीर्षक प्रारूप",
+      submit: "उपशीर्षक बनाएं",
+      submitBatch: "उपशीर्षक बनाएं ({count} फ़ाइलें)",
+      progressLabel: "उपशीर्षक बन रहे हैं",
     },
     "transparency-fixer": {
       description: "नकली पारदर्शी बैकग्राउंड वाला PNG अपलोड करें और हम इसे एक क्लिक में ठीक कर देंगे।",

@@ -187,6 +187,14 @@ export const id: TranslationKeys = {
       description:
         "Buat foto paspor, visa, dan KTP sesuai standar pemerintah dengan deteksi wajah otomatis",
     },
+    "transcribe-audio": {
+      name: "Transkripsi Audio",
+      description: "Ubah ucapan menjadi teks dengan transkripsi bertenaga AI",
+    },
+    "auto-subtitles": {
+      name: "Subtitle Otomatis",
+      description: "Buat file subtitle dari trek audio video",
+    },
     "transparency-fixer": {
       name: "Perbaikan Transparansi PNG",
       description: "Perbaiki PNG transparansi palsu dalam satu klik",
@@ -1294,6 +1302,23 @@ export const id: TranslationKeys = {
       dragToAdjust: "Seret untuk menyesuaikan",
       scrollToZoom: "Gulir untuk zoom",
       photoGenerated: "Foto telah dibuat. Unduh dari panel kiri.",
+    },
+    "transcribe-audio": {
+      language: "Bahasa",
+      autoDetect: "Deteksi otomatis",
+      outputFormat: "Format Output",
+      plainText: "Teks Biasa",
+      submit: "Transkripsi",
+      submitBatch: "Transkripsi ({count} file)",
+      progressLabel: "Mentranskripsi audio",
+    },
+    "auto-subtitles": {
+      language: "Bahasa",
+      autoDetect: "Deteksi otomatis",
+      format: "Format Subtitle",
+      submit: "Buat Subtitle",
+      submitBatch: "Buat Subtitle ({count} file)",
+      progressLabel: "Membuat subtitle",
     },
     "transparency-fixer": {
       description:
