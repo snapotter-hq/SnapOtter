@@ -116,6 +116,10 @@ export const zhTW: TranslationKeys = {
       name: "OCR / 文字擷取",
       description: "透過AI精準辨識擷取影像中的文字",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "使用AI驅動的OCR從PDF文件中擷取文字",
+    },
     "blur-faces": {
       name: "臉部/隱私模糊",
       description: "自動偵測並模糊臉部和敏感資訊",
@@ -1019,6 +1023,17 @@ export const zhTW: TranslationKeys = {
       submit: "擷取文字",
       submitBatch: "擷取文字（{count}個檔案）",
       progressLabel: "正在擷取文字",
+    },
+    "ocr-pdf": {
+      quality: "品質",
+      language: "語言",
+      autoDetect: "自動偵測",
+      pages: "頁面",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "輸入頁碼或範圍（例如 1-3, 5, 8-10）。最多50頁。",
+      submit: "擷取文字",
+      submitBatch: "擷取文字（{count}個檔案）",
+      progressLabel: "正在從PDF中擷取文字",
     },
     "blur-faces": {
       blurRadius: "模糊半徑",

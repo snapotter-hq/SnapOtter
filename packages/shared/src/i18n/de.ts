@@ -141,6 +141,10 @@ export const de: TranslationKeys = {
       name: "OCR / Texterkennung",
       description: "Text aus Bildern mit AI-gestuetzter Genauigkeit extrahieren",
     },
+    "ocr-pdf": {
+      name: "PDF-OCR",
+      description: "Text aus PDF-Dokumenten mit KI-gestuetzter OCR extrahieren",
+    },
     "blur-faces": {
       name: "Gesichter / PII weichzeichnen",
       description: "Gesichter und sensible Daten automatisch erkennen und weichzeichnen",
@@ -1081,6 +1085,17 @@ export const de: TranslationKeys = {
       submit: "Text extrahieren",
       submitBatch: "Text extrahieren ({count} Dateien)",
       progressLabel: "Text wird extrahiert",
+    },
+    "ocr-pdf": {
+      quality: "Qualitaet",
+      language: "Sprache",
+      autoDetect: "Automatisch erkennen",
+      pages: "Seiten",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Seitennummern oder Bereiche eingeben (z.B. 1-3, 5, 8-10). Max. 50 Seiten.",
+      submit: "Text extrahieren",
+      submitBatch: "Text extrahieren ({count} Dateien)",
+      progressLabel: "Text wird aus PDF extrahiert",
     },
     "blur-faces": {
       blurRadius: "Weichzeichnerradius",

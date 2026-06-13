@@ -116,6 +116,10 @@ export const en = {
       name: "OCR / Text Extraction",
       description: "Extract text from images with AI-powered accuracy",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "Extract text from PDF documents using AI-powered OCR",
+    },
     "blur-faces": {
       name: "Face / PII Blur",
       description: "Auto-detect and blur faces and sensitive info",
@@ -1030,6 +1034,17 @@ export const en = {
       submit: "Extract Text",
       submitBatch: "Extract Text ({count} files)",
       progressLabel: "Extracting text",
+    },
+    "ocr-pdf": {
+      quality: "Quality",
+      language: "Language",
+      autoDetect: "Auto-detect",
+      pages: "Pages",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Enter page numbers or ranges (e.g. 1-3, 5, 8-10). Max 50 pages.",
+      submit: "Extract Text",
+      submitBatch: "Extract Text ({count} files)",
+      progressLabel: "Extracting text from PDF",
     },
     "blur-faces": {
       blurRadius: "Blur Radius",

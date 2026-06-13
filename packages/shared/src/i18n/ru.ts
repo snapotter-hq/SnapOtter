@@ -140,6 +140,10 @@ export const ru: TranslationKeys = {
       name: "OCR / Извлечение текста",
       description: "Извлечение текста из изображений с точностью AI",
     },
+    "ocr-pdf": {
+      name: "OCR PDF",
+      description: "Извлечение текста из PDF-документов с помощью OCR на базе ИИ",
+    },
     "blur-faces": {
       name: "Размытие лиц / ПД",
       description: "Автоматическое обнаружение и размытие лиц и конфиденциальной информации",
@@ -1079,6 +1083,17 @@ export const ru: TranslationKeys = {
       submit: "Извлечь текст",
       submitBatch: "Извлечь текст ({count} файлов)",
       progressLabel: "Извлечение текста",
+    },
+    "ocr-pdf": {
+      quality: "Качество",
+      language: "Язык",
+      autoDetect: "Автоопределение",
+      pages: "Страницы",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Введите номера страниц или диапазоны (напр. 1-3, 5, 8-10). Макс. 50 страниц.",
+      submit: "Извлечь текст",
+      submitBatch: "Извлечь текст ({count} файлов)",
+      progressLabel: "Извлечение текста из PDF",
     },
     "blur-faces": {
       blurRadius: "Радиус размытия",

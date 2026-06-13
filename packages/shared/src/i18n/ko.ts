@@ -116,6 +116,10 @@ export const ko: TranslationKeys = {
       name: "OCR / 텍스트 추출",
       description: "AI로 이미지에서 높은 정확도로 텍스트 추출",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "AI 기반 OCR로 PDF 문서에서 텍스트 추출",
+    },
     "blur-faces": {
       name: "얼굴/개인정보 블러",
       description: "얼굴과 민감한 정보를 자동 감지하여 블러 처리",
@@ -1024,6 +1028,17 @@ export const ko: TranslationKeys = {
       submit: "텍스트 추출",
       submitBatch: "텍스트 추출 ({count}개 파일)",
       progressLabel: "텍스트 추출 중",
+    },
+    "ocr-pdf": {
+      quality: "품질",
+      language: "언어",
+      autoDetect: "자동 감지",
+      pages: "페이지",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "페이지 번호 또는 범위를 입력하세요 (예: 1-3, 5, 8-10). 최대 50페이지.",
+      submit: "텍스트 추출",
+      submitBatch: "텍스트 추출 ({count}개 파일)",
+      progressLabel: "PDF에서 텍스트 추출 중",
     },
     "blur-faces": {
       blurRadius: "블러 반경",

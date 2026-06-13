@@ -140,6 +140,10 @@ export const ar: TranslationKeys = {
       name: "OCR / استخراج النصوص",
       description: "استخراج النصوص من الصور بدقة مدعومة بـ AI",
     },
+    "ocr-pdf": {
+      name: "OCR للمستندات PDF",
+      description: "استخراج النصوص من مستندات PDF باستخدام OCR مدعوم بـ AI",
+    },
     "blur-faces": {
       name: "تمويه الوجوه / المعلومات الحساسة",
       description: "اكتشاف تلقائي وتمويه الوجوه والمعلومات الحساسة",
@@ -1072,6 +1076,17 @@ export const ar: TranslationKeys = {
       submit: "استخراج النص",
       submitBatch: "استخراج النص ({count} ملف)",
       progressLabel: "جاري استخراج النص",
+    },
+    "ocr-pdf": {
+      quality: "الجودة",
+      language: "اللغة",
+      autoDetect: "اكتشاف تلقائي",
+      pages: "الصفحات",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "ادخل ارقام الصفحات او النطاقات (مثال 1-3, 5, 8-10). الحد الاقصى 50 صفحة.",
+      submit: "استخراج النص",
+      submitBatch: "استخراج النص ({count} ملف)",
+      progressLabel: "جاري استخراج النص من PDF",
     },
     "blur-faces": {
       blurRadius: "نصف قطر التمويه",

@@ -139,6 +139,10 @@ export const fr: TranslationKeys = {
       name: "OCR / Extraction de texte",
       description: "Extrayez du texte a partir d'images avec une precision alimentee par l'AI",
     },
+    "ocr-pdf": {
+      name: "OCR de PDF",
+      description: "Extrayez du texte de documents PDF avec OCR alimente par l'IA",
+    },
     "blur-faces": {
       name: "Floutage de visages / donnees sensibles",
       description: "Detectez et floutez automatiquement les visages et informations sensibles",
@@ -1082,6 +1086,17 @@ export const fr: TranslationKeys = {
       submit: "Extraire le texte",
       submitBatch: "Extraire le texte ({count} fichiers)",
       progressLabel: "Extraction du texte",
+    },
+    "ocr-pdf": {
+      quality: "Qualite",
+      language: "Langue",
+      autoDetect: "Detection automatique",
+      pages: "Pages",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Entrez des numeros de pages ou des plages (ex. 1-3, 5, 8-10). Max 50 pages.",
+      submit: "Extraire le texte",
+      submitBatch: "Extraire le texte ({count} fichiers)",
+      progressLabel: "Extraction du texte du PDF",
     },
     "blur-faces": {
       blurRadius: "Rayon du flou",

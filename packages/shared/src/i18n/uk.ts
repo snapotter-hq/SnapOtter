@@ -139,6 +139,10 @@ export const uk: TranslationKeys = {
       name: "OCR / Витягування тексту",
       description: "Витягування тексту із зображень з точністю AI",
     },
+    "ocr-pdf": {
+      name: "OCR PDF",
+      description: "Витягування тексту з PDF-документiв за допомогою OCR на базi ШI",
+    },
     "blur-faces": {
       name: "Розмиття облич / ПД",
       description: "Автоматичне виявлення та розмиття облич і конфіденційних даних",
@@ -1079,6 +1083,17 @@ export const uk: TranslationKeys = {
       submit: "Витягнути текст",
       submitBatch: "Витягнути текст ({count} файлів)",
       progressLabel: "Витягування тексту",
+    },
+    "ocr-pdf": {
+      quality: "Якiсть",
+      language: "Мова",
+      autoDetect: "Автовизначення",
+      pages: "Сторiнки",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Введiть номери сторiнок або дiапазони (напр. 1-3, 5, 8-10). Макс. 50 сторiнок.",
+      submit: "Витягнути текст",
+      submitBatch: "Витягнути текст ({count} файлiв)",
+      progressLabel: "Витягування тексту з PDF",
     },
     "blur-faces": {
       blurRadius: "Радіус розмиття",

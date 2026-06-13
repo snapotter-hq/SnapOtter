@@ -141,6 +141,10 @@ export const id: TranslationKeys = {
       name: "OCR / Ekstraksi Teks",
       description: "Ekstrak teks dari gambar dengan akurasi AI",
     },
+    "ocr-pdf": {
+      name: "OCR PDF",
+      description: "Ekstrak teks dari dokumen PDF menggunakan OCR bertenaga AI",
+    },
     "blur-faces": {
       name: "Blur Wajah / Info Pribadi",
       description: "Deteksi otomatis dan blur wajah serta informasi sensitif",
@@ -1078,6 +1082,17 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Teks",
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak teks",
+    },
+    "ocr-pdf": {
+      quality: "Kualitas",
+      language: "Bahasa",
+      autoDetect: "Deteksi otomatis",
+      pages: "Halaman",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Masukkan nomor halaman atau rentang (mis. 1-3, 5, 8-10). Maks 50 halaman.",
+      submit: "Ekstrak Teks",
+      submitBatch: "Ekstrak Teks ({count} file)",
+      progressLabel: "Mengekstrak teks dari PDF",
     },
     "blur-faces": {
       blurRadius: "Radius Blur",

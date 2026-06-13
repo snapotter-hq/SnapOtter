@@ -116,6 +116,10 @@ export const zhCN: TranslationKeys = {
       name: "OCR / 文字提取",
       description: "AI 高精度图片文字识别",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "使用AI驱动的OCR从PDF文档中提取文字",
+    },
     "blur-faces": {
       name: "人脸 / 隐私模糊",
       description: "自动检测并模糊人脸和敏感信息",
@@ -1020,6 +1024,17 @@ export const zhCN: TranslationKeys = {
       submit: "提取文字",
       submitBatch: "提取文字（{count} 个文件）",
       progressLabel: "正在提取文字",
+    },
+    "ocr-pdf": {
+      quality: "质量",
+      language: "语言",
+      autoDetect: "自动检测",
+      pages: "页面",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "输入页码或范围（例如 1-3, 5, 8-10）。最多50页。",
+      submit: "提取文字",
+      submitBatch: "提取文字（{count}个文件）",
+      progressLabel: "正在从PDF中提取文字",
     },
     "blur-faces": {
       blurRadius: "模糊半径",

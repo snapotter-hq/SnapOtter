@@ -53,3 +53,48 @@ export async function extractText(
     engine: result.engine,
   };
 }
+
+// ── PDF OCR ───────────────────────────────────────────────────────────
+
+export interface PdfOcrOptions {
+  quality?: OcrQuality;
+  language?: string;
+  pages?: string;
+}
+
+export interface PdfOcrResult {
+  text: string;
+  engine: string;
+  pages: number;
+}
+
+export async function extractPdfText(
+  inputPath: string,
+  opts: PdfOcrOptions = {},
+  onProgress?: ProgressCallback,
+): Promise<PdfOcrResult> {
+  const optionsJson = JSON.stringify({
+    quality: opts.quality ?? "balanced",
+    language: opts.language ?? "auto",
+    pages: opts.pages ?? "all",
+  });
+
+  const { stdout } = await runPythonWithProgress("ocr_pdf.py", [inputPath, optionsJson], {
+    timeout: 30 * 60_000,
+    onProgress,
+  });
+
+  const result = parseStdoutJson(stdout);
+  if (result.error) {
+    throw new Error(result.error);
+  }
+  if (!result.success) {
+    throw new Error(result.error || "PDF OCR failed");
+  }
+
+  return {
+    text: result.text ?? "",
+    engine: result.engine ?? "unknown",
+    pages: result.pages ?? 0,
+  };
+}

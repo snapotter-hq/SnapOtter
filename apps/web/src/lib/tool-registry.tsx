@@ -269,6 +269,9 @@ const UpscaleSettings = lazy(() =>
 const OcrSettings = lazy(() =>
   import("@/components/tools/ocr-settings").then((m) => ({ default: m.OcrSettings })),
 );
+const OcrPdfSettings = lazy(() =>
+  import("@/components/tools/ocr-pdf-settings").then((m) => ({ default: m.OcrPdfSettings })),
+);
 const BlurFacesSettings = lazy(() =>
   import("@/components/tools/blur-faces-settings").then((m) => ({
     default: m.BlurFacesSettings,
@@ -962,6 +965,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["remove-background", { Settings: RemoveBgSettings }],
   ["upscale", { Settings: UpscaleSettings }],
   ["ocr", { Settings: OcrSettings }],
+  ["ocr-pdf", { accept: ".pdf", Settings: OcrPdfSettings }],
   ["blur-faces", { Settings: BlurFacesSettings }],
   ["enhance-faces", { Settings: EnhanceFacesSettings }],
   ["erase-object", { Settings: EraseObjectSettingsWrapper as never }],

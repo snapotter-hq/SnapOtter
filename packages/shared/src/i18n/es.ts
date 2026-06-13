@@ -130,6 +130,10 @@ export const es: TranslationKeys = {
       name: "OCR / Extraccion de texto",
       description: "Extrae texto de imagenes con precision potenciada por AI",
     },
+    "ocr-pdf": {
+      name: "OCR de PDF",
+      description: "Extrae texto de documentos PDF con OCR potenciado por IA",
+    },
     "blur-faces": {
       name: "Desenfocar rostros / datos sensibles",
       description: "Detecta y desenfoca rostros e informacion sensible automaticamente",
@@ -1064,6 +1068,17 @@ export const es: TranslationKeys = {
       submit: "Extraer texto",
       submitBatch: "Extraer texto ({count} archivos)",
       progressLabel: "Extrayendo texto",
+    },
+    "ocr-pdf": {
+      quality: "Calidad",
+      language: "Idioma",
+      autoDetect: "Detectar automaticamente",
+      pages: "Paginas",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Ingrese numeros de pagina o rangos (ej. 1-3, 5, 8-10). Maximo 50 paginas.",
+      submit: "Extraer texto",
+      submitBatch: "Extraer texto ({count} archivos)",
+      progressLabel: "Extrayendo texto del PDF",
     },
     "blur-faces": {
       blurRadius: "Radio de desenfoque",

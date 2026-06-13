@@ -140,6 +140,10 @@ export const th: TranslationKeys = {
       name: "OCR / แยกข้อความ",
       description: "แยกข้อความจากภาพด้วยความแม่นยำของ AI",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "แยกข้อความจากเอกสาร PDF ด้วย OCR ที่ขับเคลื่อนด้วย AI",
+    },
     "blur-faces": {
       name: "เบลอใบหน้า / ข้อมูลส่วนตัว",
       description: "ตรวจจับอัตโนมัติและเบลอใบหน้าและข้อมูลที่ละเอียดอ่อน",
@@ -1066,6 +1070,17 @@ export const th: TranslationKeys = {
       submit: "แยกข้อความ",
       submitBatch: "แยกข้อความ ({count} ไฟล์)",
       progressLabel: "กำลังแยกข้อความ",
+    },
+    "ocr-pdf": {
+      quality: "คุณภาพ",
+      language: "ภาษา",
+      autoDetect: "ตรวจจับอัตโนมัติ",
+      pages: "หน้า",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "ป้อนหมายเลขหน้าหรือช่วง (เช่น 1-3, 5, 8-10) สูงสุด 50 หน้า",
+      submit: "แยกข้อความ",
+      submitBatch: "แยกข้อความ ({count} ไฟล์)",
+      progressLabel: "กำลังแยกข้อความจาก PDF",
     },
     "blur-faces": {
       blurRadius: "รัศมีเบลอ",

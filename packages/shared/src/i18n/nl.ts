@@ -143,6 +143,10 @@ export const nl: TranslationKeys = {
       name: "OCR / Tekstherkenning",
       description: "Tekst uit afbeeldingen halen met AI-nauwkeurigheid",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "Tekst uit PDF-documenten extraheren met AI-gestuurde OCR",
+    },
     "blur-faces": {
       name: "Gezichten / PII vervagen",
       description: "Gezichten en gevoelige info automatisch detecteren en vervagen",
@@ -1079,6 +1083,17 @@ export const nl: TranslationKeys = {
       submit: "Tekst extraheren",
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Tekst extraheren",
+    },
+    "ocr-pdf": {
+      quality: "Kwaliteit",
+      language: "Taal",
+      autoDetect: "Automatisch detecteren",
+      pages: "Pagina's",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Voer paginanummers of bereiken in (bijv. 1-3, 5, 8-10). Max 50 pagina's.",
+      submit: "Tekst extraheren",
+      submitBatch: "Tekst extraheren ({count} bestanden)",
+      progressLabel: "Tekst uit PDF extraheren",
     },
     "blur-faces": {
       blurRadius: "Vervagingsradius",

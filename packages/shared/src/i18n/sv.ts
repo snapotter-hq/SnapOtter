@@ -141,6 +141,10 @@ export const sv: TranslationKeys = {
       name: "OCR / Textextraktion",
       description: "Extrahera text fran bilder med AI-precision",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "Extrahera text fran PDF-dokument med AI-driven OCR",
+    },
     "blur-faces": {
       name: "Ansikts- / PII-oskarpning",
       description: "Detektera och gora ansikten och kanslig information oskarpa automatiskt",
@@ -1076,6 +1080,17 @@ export const sv: TranslationKeys = {
       submit: "Extrahera text",
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar text",
+    },
+    "ocr-pdf": {
+      quality: "Kvalitet",
+      language: "Sprak",
+      autoDetect: "Automatisk identifiering",
+      pages: "Sidor",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Ange sidnummer eller intervall (t.ex. 1-3, 5, 8-10). Max 50 sidor.",
+      submit: "Extrahera text",
+      submitBatch: "Extrahera text ({count} filer)",
+      progressLabel: "Extraherar text fran PDF",
     },
     "blur-faces": {
       blurRadius: "Oskarpningsradie",

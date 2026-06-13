@@ -119,6 +119,10 @@ export const ja: TranslationKeys = {
       name: "OCR / テキスト抽出",
       description: "AIで画像からテキストを高精度に抽出",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "AI搭載のOCRでPDF文書からテキストを抽出",
+    },
     "blur-faces": {
       name: "顔/個人情報ぼかし",
       description: "顔と機密情報を自動検出してぼかし",
@@ -1037,6 +1041,17 @@ export const ja: TranslationKeys = {
       submit: "テキスト抽出",
       submitBatch: "テキスト抽出（{count}ファイル）",
       progressLabel: "テキストを抽出中",
+    },
+    "ocr-pdf": {
+      quality: "品質",
+      language: "言語",
+      autoDetect: "自動検出",
+      pages: "ページ",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "ページ番号または範囲を入力（例: 1-3, 5, 8-10）。最大50ページ。",
+      submit: "テキスト抽出",
+      submitBatch: "テキスト抽出（{count}ファイル）",
+      progressLabel: "PDFからテキストを抽出中",
     },
     "blur-faces": {
       blurRadius: "ぼかし半径",

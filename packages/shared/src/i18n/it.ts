@@ -140,6 +140,10 @@ export const it: TranslationKeys = {
       name: "OCR / Estrazione testo",
       description: "Estrai testo dalle immagini con precisione basata sull'IA",
     },
+    "ocr-pdf": {
+      name: "OCR PDF",
+      description: "Estrai testo da documenti PDF con OCR basato su IA",
+    },
     "blur-faces": {
       name: "Sfocatura volti / dati sensibili",
       description: "Rileva e sfoca automaticamente volti e informazioni sensibili",
@@ -1077,6 +1081,17 @@ export const it: TranslationKeys = {
       submit: "Estrai testo",
       submitBatch: "Estrai testo ({count} file)",
       progressLabel: "Estrazione testo",
+    },
+    "ocr-pdf": {
+      quality: "Qualita",
+      language: "Lingua",
+      autoDetect: "Rilevamento automatico",
+      pages: "Pagine",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Inserisci numeri di pagina o intervalli (es. 1-3, 5, 8-10). Max 50 pagine.",
+      submit: "Estrai testo",
+      submitBatch: "Estrai testo ({count} file)",
+      progressLabel: "Estrazione testo dal PDF",
     },
     "blur-faces": {
       blurRadius: "Raggio sfocatura",

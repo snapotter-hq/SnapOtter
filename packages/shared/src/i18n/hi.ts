@@ -140,6 +140,10 @@ export const hi: TranslationKeys = {
       name: "OCR / टेक्स्ट एक्सट्रैक्शन",
       description: "AI-संचालित सटीकता से इमेज से टेक्स्ट निकालें",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "AI-संचालित OCR से PDF दस्तावेजों से टेक्स्ट निकालें",
+    },
     "blur-faces": {
       name: "चेहरा / संवेदनशील जानकारी ब्लर",
       description: "चेहरों और संवेदनशील जानकारी को ऑटो-डिटेक्ट करें और ब्लर करें",
@@ -1068,6 +1072,17 @@ export const hi: TranslationKeys = {
       submit: "टेक्स्ट निकालें",
       submitBatch: "टेक्स्ट निकालें ({count} फाइलें)",
       progressLabel: "टेक्स्ट निकाला जा रहा है",
+    },
+    "ocr-pdf": {
+      quality: "क्वालिटी",
+      language: "भाषा",
+      autoDetect: "ऑटो-डिटेक्ट",
+      pages: "पेज",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "पेज नंबर या रेंज दर्ज करें (जैसे 1-3, 5, 8-10)। अधिकतम 50 पेज।",
+      submit: "टेक्स्ट निकालें",
+      submitBatch: "टेक्स्ट निकालें ({count} फाइलें)",
+      progressLabel: "PDF से टेक्स्ट निकाला जा रहा है",
     },
     "blur-faces": {
       blurRadius: "ब्लर रेडियस",

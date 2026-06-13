@@ -142,6 +142,10 @@ export const vi: TranslationKeys = {
       name: "OCR / Trích xuất văn bản",
       description: "Trích xuất văn bản từ hình ảnh với độ chính xác cao nhờ AI",
     },
+    "ocr-pdf": {
+      name: "OCR PDF",
+      description: "Trich xuat van ban tu tai lieu PDF bang OCR ho tro boi AI",
+    },
     "blur-faces": {
       name: "Làm mờ khuôn mặt / Thông tin nhạy cảm",
       description: "Tự động phát hiện và làm mờ khuôn mặt cùng thông tin nhạy cảm",
@@ -1079,6 +1083,17 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất văn bản",
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất văn bản",
+    },
+    "ocr-pdf": {
+      quality: "Chat luong",
+      language: "Ngon ngu",
+      autoDetect: "Tu dong nhan dien",
+      pages: "Trang",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Nhap so trang hoac pham vi (vd. 1-3, 5, 8-10). Toi da 50 trang.",
+      submit: "Trich xuat van ban",
+      submitBatch: "Trich xuat van ban ({count} tep)",
+      progressLabel: "Dang trich xuat van ban tu PDF",
     },
     "blur-faces": {
       blurRadius: "Bán kính làm mờ",

@@ -141,6 +141,10 @@ export const tr: TranslationKeys = {
       name: "OCR / Metin Çıkarma",
       description: "AI destekli doğrulukla görüntülerden metin çıkarın",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "AI destekli OCR ile PDF belgelerinden metin cikarma",
+    },
     "blur-faces": {
       name: "Yüz / Kişisel Bilgi Bulanıklaştırma",
       description: "Yüzleri ve hassas bilgileri otomatik algılayıp bulanıklaştırın",
@@ -1081,6 +1085,17 @@ export const tr: TranslationKeys = {
       submit: "Metin Çıkar",
       submitBatch: "Metin Çıkar ({count} dosya)",
       progressLabel: "Metin çıkarılıyor",
+    },
+    "ocr-pdf": {
+      quality: "Kalite",
+      language: "Dil",
+      autoDetect: "Otomatik algilama",
+      pages: "Sayfalar",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Sayfa numaralari veya araliklar girin (orn. 1-3, 5, 8-10). Maks. 50 sayfa.",
+      submit: "Metni cikar",
+      submitBatch: "Metni cikar ({count} dosya)",
+      progressLabel: "PDF'den metin cikariliyor",
     },
     "blur-faces": {
       blurRadius: "Bulanıklaştırma Yarıçapı",

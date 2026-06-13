@@ -139,6 +139,10 @@ export const pl: TranslationKeys = {
       name: "OCR / Wyodrębnianie tekstu",
       description: "Wyodrębnianie tekstu z obrazów z dokładnością AI",
     },
+    "ocr-pdf": {
+      name: "PDF OCR",
+      description: "Wyodrebnianie tekstu z dokumentów PDF za pomoca OCR opartego na AI",
+    },
     "blur-faces": {
       name: "Rozmywanie twarzy / danych",
       description: "Automatyczne wykrywanie i rozmywanie twarzy oraz danych wrażliwych",
@@ -1081,6 +1085,17 @@ export const pl: TranslationKeys = {
       submit: "Wyodrębnij tekst",
       submitBatch: "Wyodrębnij tekst ({count} plików)",
       progressLabel: "Wyodrębnianie tekstu",
+    },
+    "ocr-pdf": {
+      quality: "Jakosc",
+      language: "Jezyk",
+      autoDetect: "Automatyczne wykrywanie",
+      pages: "Strony",
+      pagesPlaceholder: "all, 1-3, 5",
+      pagesHint: "Wprowadz numery stron lub zakresy (np. 1-3, 5, 8-10). Maks. 50 stron.",
+      submit: "Wyodrebnij tekst",
+      submitBatch: "Wyodrebnij tekst ({count} plików)",
+      progressLabel: "Wyodrębnianie tekstu z PDF",
     },
     "blur-faces": {
       blurRadius: "Promień rozmycia",

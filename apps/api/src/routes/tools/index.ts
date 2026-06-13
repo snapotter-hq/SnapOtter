@@ -88,6 +88,7 @@ import { registerNoiseRemoval } from "./noise-removal.js";
 import { registerNormalizeAudio } from "./normalize-audio.js";
 import { registerNupPdf } from "./nup-pdf.js";
 import { registerOcr } from "./ocr.js";
+import { registerOcrPdf } from "./ocr-pdf.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
 import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
@@ -351,6 +352,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "remove-background", register: registerRemoveBackground },
     { id: "upscale", register: registerUpscale },
     { id: "ocr", register: registerOcr },
+    { id: "ocr-pdf", register: registerOcrPdf },
     { id: "blur-faces", register: registerBlurFaces },
     { id: "erase-object", register: registerEraseObject },
     { id: "smart-crop", register: registerSmartCrop },
