@@ -24,4 +24,6 @@ export { outpaint } from "./outpainting.js";
 export { removeRedEye } from "./red-eye-removal.js";
 export { restorePhoto } from "./restoration.js";
 export { seamCarve } from "./seam-carving.js";
+export type { TranscribeOptions, TranscriptionResult, TranscriptSegment } from "./transcription.js";
+export { transcribeAudio } from "./transcription.js";
 export { upscale } from "./upscaling.js";
