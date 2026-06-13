@@ -15,6 +15,7 @@ import { buildTestApp, loginAsAdmin, type TestApp } from "./test-server.js";
  *    URLs (consolidated into adjust-colors).
  */
 const REGISTRY_EXEMPT = new Set([
+  "auto-subtitles",
   "barcode-generate",
   "barcode-read",
   "bulk-rename",
@@ -30,10 +31,12 @@ const REGISTRY_EXEMPT = new Set([
   "image-to-pdf",
   "info",
   "ocr",
+  "ocr-pdf",
   "pdf-to-image",
   "qr-generate",
   "stitch",
   "svg-to-raster",
+  "transcribe-audio",
   "watermark-image",
 ]);
 
