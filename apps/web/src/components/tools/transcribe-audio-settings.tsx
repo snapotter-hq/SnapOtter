@@ -9,9 +9,9 @@ import { useFileStore } from "@/stores/file-store";
 const LANGUAGE_OPTIONS = [
   { value: "auto", labelKey: "autoDetect" },
   { value: "en", label: "English" },
-  { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Francais" },
-  { value: "es", label: "Espanol" },
+  { value: "de", label: "German" },
+  { value: "fr", label: "French" },
+  { value: "es", label: "Spanish" },
   { value: "zh", label: "Chinese" },
   { value: "ja", label: "Japanese" },
   { value: "ko", label: "Korean" },
