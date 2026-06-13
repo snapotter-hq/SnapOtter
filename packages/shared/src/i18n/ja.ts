@@ -179,6 +179,14 @@ export const ja: TranslationKeys = {
       name: "PNG透過修正",
       description: "偽の透過PNGをワンクリックで修正",
     },
+    "background-replace": {
+      name: "背景置換",
+      description: "画像の背景を単色に置き換えます",
+    },
+    "blur-background": {
+      name: "背景ぼかし",
+      description: "被写体を鮮明に保ちながら背景をぼかします",
+    },
     "watermark-text": {
       name: "テキストウォーターマーク",
       description: "テキストウォーターマークを追加",
@@ -1304,6 +1312,18 @@ export const ja: TranslationKeys = {
       submit: "透過を修正",
       submitBatch: "透過を修正（{count}ファイル）",
       progressLabel: "透過を修正中",
+    },
+    "background-replace": {
+      color: "背景色",
+      submit: "背景を置換",
+      submitBatch: "背景を置換 ({count} ファイル)",
+      progressLabel: "背景を置換中",
+    },
+    "blur-background": {
+      intensity: "ぼかし強度",
+      submit: "背景をぼかす",
+      submitBatch: "背景をぼかす ({count} ファイル)",
+      progressLabel: "背景をぼかし中",
     },
     "watermark-text": {
       watermarkText: "ウォーターマークテキスト",

@@ -200,6 +200,14 @@ export const th: TranslationKeys = {
       name: "แก้ไขความโปร่งใส PNG",
       description: "แก้ไข PNG ที่มีพื้นหลังโปร่งใสปลอมในคลิกเดียว",
     },
+    "background-replace": {
+      name: "เปลี่ยนพื้นหลัง",
+      description: "เปลี่ยนพื้นหลังของภาพเป็นสีพื้น",
+    },
+    "blur-background": {
+      name: "เบลอพื้นหลัง",
+      description: "เบลอพื้นหลังโดยยังคงความชัดของวัตถุ",
+    },
     "watermark-text": {
       name: "ลายน้ำข้อความ",
       description: "เพิ่มลายน้ำข้อความซ้อนทับ",
@@ -1328,6 +1336,18 @@ export const th: TranslationKeys = {
       submit: "แก้ไขความโปร่งใส",
       submitBatch: "แก้ไขความโปร่งใส ({count} ไฟล์)",
       progressLabel: "กำลังแก้ไขความโปร่งใส",
+    },
+    "background-replace": {
+      color: "สีพื้นหลัง",
+      submit: "เปลี่ยนพื้นหลัง",
+      submitBatch: "เปลี่ยนพื้นหลัง ({count} ไฟล์)",
+      progressLabel: "กำลังเปลี่ยนพื้นหลัง",
+    },
+    "blur-background": {
+      intensity: "ความเข้มเบลอ",
+      submit: "เบลอพื้นหลัง",
+      submitBatch: "เบลอพื้นหลัง ({count} ไฟล์)",
+      progressLabel: "กำลังเบลอพื้นหลัง",
     },
     "watermark-text": {
       watermarkText: "ข้อความลายน้ำ",

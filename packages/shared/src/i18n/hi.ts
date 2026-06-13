@@ -200,6 +200,14 @@ export const hi: TranslationKeys = {
       name: "PNG ट्रांसपेरेंसी फिक्सर",
       description: "नकली पारदर्शी PNG को एक क्लिक में ठीक करें",
     },
+    "background-replace": {
+      name: "पृष्ठभूमि बदलें",
+      description: "छवि पृष्ठभूमि को एक ठोस रंग से बदलें",
+    },
+    "blur-background": {
+      name: "पृष्ठभूमि धुंधला",
+      description: "विषय को स्पष्ट रखते हुए पृष्ठभूमि को धुंधला करें",
+    },
     "watermark-text": {
       name: "टेक्स्ट वॉटरमार्क",
       description: "टेक्स्ट वॉटरमार्क जोड़ें",
@@ -1335,6 +1343,18 @@ export const hi: TranslationKeys = {
       submit: "ट्रांसपेरेंसी ठीक करें",
       submitBatch: "ट्रांसपेरेंसी ठीक करें ({count} फाइलें)",
       progressLabel: "ट्रांसपेरेंसी ठीक हो रही है",
+    },
+    "background-replace": {
+      color: "पृष्ठभूमि रंग",
+      submit: "पृष्ठभूमि बदलें",
+      submitBatch: "पृष्ठभूमि बदलें ({count} फ़ाइलें)",
+      progressLabel: "पृष्ठभूमि बदली जा रही है",
+    },
+    "blur-background": {
+      intensity: "धुंधलापन तीव्रता",
+      submit: "पृष्ठभूमि धुंधला करें",
+      submitBatch: "पृष्ठभूमि धुंधला करें ({count} फ़ाइलें)",
+      progressLabel: "पृष्ठभूमि धुंधला हो रही है",
     },
     "watermark-text": {
       watermarkText: "वॉटरमार्क टेक्स्ट",

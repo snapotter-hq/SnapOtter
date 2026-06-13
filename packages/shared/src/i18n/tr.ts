@@ -204,6 +204,14 @@ export const tr: TranslationKeys = {
       name: "PNG Saydamlık Düzeltici",
       description: "Sahte saydam PNG dosyalarını tek tıkla düzeltin",
     },
+    "background-replace": {
+      name: "Arka Plan Degistirme",
+      description: "Gorsel arka planini duz renkle degistirin",
+    },
+    "blur-background": {
+      name: "Arka Plan Bulama",
+      description: "Konuyu net tutarak arka plani bulaniklastirin",
+    },
     "watermark-text": {
       name: "Metin Filigranı",
       description: "Metin filigranı ekleyin",
@@ -1349,6 +1357,18 @@ export const tr: TranslationKeys = {
       submit: "Saydamlığı Düzelt",
       submitBatch: "Saydamlığı Düzelt ({count} dosya)",
       progressLabel: "Saydamlık düzeltiliyor",
+    },
+    "background-replace": {
+      color: "Arka plan rengi",
+      submit: "Arka plani degistir",
+      submitBatch: "Arka plani degistir ({count} dosya)",
+      progressLabel: "Arka plan degistiriliyor",
+    },
+    "blur-background": {
+      intensity: "Bulama yogunlugu",
+      submit: "Arka plani bulaniklastir",
+      submitBatch: "Arka plani bulaniklastir ({count} dosya)",
+      progressLabel: "Arka plan bulaniklastiriliyor",
     },
     "watermark-text": {
       watermarkText: "Filigran Metni",

@@ -203,6 +203,14 @@ export const it: TranslationKeys = {
       name: "Correttore trasparenza PNG",
       description: "Correggi PNG con falsa trasparenza in un clic",
     },
+    "background-replace": {
+      name: "Sostituzione sfondo",
+      description: "Sostituisci lo sfondo con un colore uniforme",
+    },
+    "blur-background": {
+      name: "Sfocatura sfondo",
+      description: "Sfoca lo sfondo mantenendo il soggetto nitido",
+    },
     "watermark-text": {
       name: "Filigrana testo",
       description: "Aggiungi una filigrana di testo in sovrapposizione",
@@ -1346,6 +1354,18 @@ export const it: TranslationKeys = {
       submit: "Correggi trasparenza",
       submitBatch: "Correggi trasparenza ({count} file)",
       progressLabel: "Correzione trasparenza",
+    },
+    "background-replace": {
+      color: "Colore di sfondo",
+      submit: "Sostituisci sfondo",
+      submitBatch: "Sostituisci sfondo ({count} file)",
+      progressLabel: "Sostituzione sfondo",
+    },
+    "blur-background": {
+      intensity: "Intensita sfocatura",
+      submit: "Sfoca sfondo",
+      submitBatch: "Sfoca sfondo ({count} file)",
+      progressLabel: "Sfocatura sfondo",
     },
     "watermark-text": {
       watermarkText: "Testo della filigrana",

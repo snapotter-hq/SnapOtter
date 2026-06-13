@@ -203,6 +203,14 @@ export const ru: TranslationKeys = {
       name: "Исправление прозрачности PNG",
       description: "Исправление ложной прозрачности PNG в один клик",
     },
+    "background-replace": {
+      name: "Замена фона",
+      description: "Замена фона изображения сплошным цветом",
+    },
+    "blur-background": {
+      name: "Размытие фона",
+      description: "Размытие фона с сохранением резкости объекта",
+    },
     "watermark-text": {
       name: "Текстовый водяной знак",
       description: "Добавление текстового водяного знака",
@@ -1348,6 +1356,18 @@ export const ru: TranslationKeys = {
       submit: "Исправить прозрачность",
       submitBatch: "Исправить прозрачность ({count} файлов)",
       progressLabel: "Исправление прозрачности",
+    },
+    "background-replace": {
+      color: "Цвет фона",
+      submit: "Заменить фон",
+      submitBatch: "Заменить фон ({count} файлов)",
+      progressLabel: "Замена фона",
+    },
+    "blur-background": {
+      intensity: "Интенсивность размытия",
+      submit: "Размыть фон",
+      submitBatch: "Размыть фон ({count} файлов)",
+      progressLabel: "Размытие фона",
     },
     "watermark-text": {
       watermarkText: "Текст водяного знака",

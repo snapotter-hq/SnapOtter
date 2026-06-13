@@ -203,6 +203,14 @@ export const sv: TranslationKeys = {
       name: "PNG-transparensfix",
       description: "Fixa falska transparenta PNGs med ett klick",
     },
+    "background-replace": {
+      name: "Byt bakgrund",
+      description: "Ersatt bildens bakgrund med en enfargad yta",
+    },
+    "blur-background": {
+      name: "Oskarp bakgrund",
+      description: "Gor bakgrunden oskarp och behall motivet skarpt",
+    },
     "watermark-text": {
       name: "Textvattenstampel",
       description: "Lagg till textvattenstampel",
@@ -1345,6 +1353,18 @@ export const sv: TranslationKeys = {
       submit: "Fixa transparens",
       submitBatch: "Fixa transparens ({count} filer)",
       progressLabel: "Fixar transparens",
+    },
+    "background-replace": {
+      color: "Bakgrundsfarg",
+      submit: "Byt bakgrund",
+      submitBatch: "Byt bakgrund ({count} filer)",
+      progressLabel: "Byter bakgrund",
+    },
+    "blur-background": {
+      intensity: "Oskarpa-intensitet",
+      submit: "Gor bakgrunden oskarp",
+      submitBatch: "Gor bakgrunden oskarp ({count} filer)",
+      progressLabel: "Gor bakgrunden oskarp",
     },
     "watermark-text": {
       watermarkText: "Vattenstampeltext",

@@ -203,6 +203,14 @@ export const de: TranslationKeys = {
       name: "PNG-Transparenzkorrektur",
       description: "Unechte transparente PNGs mit einem Klick reparieren",
     },
+    "background-replace": {
+      name: "Hintergrund ersetzen",
+      description: "Bildhintergrund durch eine einfarbige Flaeche ersetzen",
+    },
+    "blur-background": {
+      name: "Hintergrund unscharf",
+      description: "Hintergrund unscharf stellen und Motiv scharf halten",
+    },
     "watermark-text": {
       name: "Text-Wasserzeichen",
       description: "Text-Wasserzeichen hinzufuegen",
@@ -1351,6 +1359,18 @@ export const de: TranslationKeys = {
       submit: "Transparenz reparieren",
       submitBatch: "Transparenz reparieren ({count} Dateien)",
       progressLabel: "Transparenz wird repariert",
+    },
+    "background-replace": {
+      color: "Hintergrundfarbe",
+      submit: "Hintergrund ersetzen",
+      submitBatch: "Hintergrund ersetzen ({count} Dateien)",
+      progressLabel: "Hintergrund wird ersetzt",
+    },
+    "blur-background": {
+      intensity: "Unschaerfe-Intensitaet",
+      submit: "Hintergrund unscharf stellen",
+      submitBatch: "Hintergrund unscharf stellen ({count} Dateien)",
+      progressLabel: "Hintergrund wird unscharf gestellt",
     },
     "watermark-text": {
       watermarkText: "Wasserzeichen-Text",

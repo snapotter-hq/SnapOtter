@@ -201,6 +201,14 @@ export const ar: TranslationKeys = {
       name: "إصلاح شفافية PNG",
       description: "إصلاح ملفات PNG ذات الشفافية المزيفة بنقرة واحدة",
     },
+    "background-replace": {
+      name: "استبدال الخلفية",
+      description: "استبدال خلفية الصورة بلون واحد",
+    },
+    "blur-background": {
+      name: "تمويه الخلفية",
+      description: "تمويه الخلفية مع الحفاظ على وضوح الهدف",
+    },
     "watermark-text": {
       name: "علامة مائية نصية",
       description: "إضافة علامة مائية نصية",
@@ -1339,6 +1347,18 @@ export const ar: TranslationKeys = {
       submit: "إصلاح الشفافية",
       submitBatch: "إصلاح الشفافية ({count} ملف)",
       progressLabel: "جاري إصلاح الشفافية",
+    },
+    "background-replace": {
+      color: "لون الخلفية",
+      submit: "استبدال الخلفية",
+      submitBatch: "استبدال الخلفية ({count} ملفات)",
+      progressLabel: "جاري استبدال الخلفية",
+    },
+    "blur-background": {
+      intensity: "شدة التمويه",
+      submit: "تمويه الخلفية",
+      submitBatch: "تمويه الخلفية ({count} ملفات)",
+      progressLabel: "جاري تمويه الخلفية",
     },
     "watermark-text": {
       watermarkText: "نص العلامة المائية",

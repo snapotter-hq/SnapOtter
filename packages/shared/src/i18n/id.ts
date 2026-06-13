@@ -203,6 +203,14 @@ export const id: TranslationKeys = {
       name: "Perbaikan Transparansi PNG",
       description: "Perbaiki PNG transparansi palsu dalam satu klik",
     },
+    "background-replace": {
+      name: "Ganti Latar Belakang",
+      description: "Ganti latar belakang gambar dengan warna solid",
+    },
+    "blur-background": {
+      name: "Buramkan Latar Belakang",
+      description: "Buramkan latar belakang sambil menjaga subjek tetap tajam",
+    },
     "watermark-text": {
       name: "Watermark Teks",
       description: "Tambahkan overlay watermark teks",
@@ -1347,6 +1355,18 @@ export const id: TranslationKeys = {
       submit: "Perbaiki Transparansi",
       submitBatch: "Perbaiki Transparansi ({count} file)",
       progressLabel: "Memperbaiki transparansi",
+    },
+    "background-replace": {
+      color: "Warna Latar Belakang",
+      submit: "Ganti Latar Belakang",
+      submitBatch: "Ganti Latar Belakang ({count} file)",
+      progressLabel: "Mengganti latar belakang",
+    },
+    "blur-background": {
+      intensity: "Intensitas Keburaman",
+      submit: "Buramkan Latar Belakang",
+      submitBatch: "Buramkan Latar Belakang ({count} file)",
+      progressLabel: "Memburamkan latar belakang",
     },
     "watermark-text": {
       watermarkText: "Teks Watermark",

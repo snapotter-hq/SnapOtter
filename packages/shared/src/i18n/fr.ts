@@ -204,6 +204,14 @@ export const fr: TranslationKeys = {
       name: "Correcteur de transparence PNG",
       description: "Corrigez les PNG a fausse transparence en un clic",
     },
+    "background-replace": {
+      name: "Remplacement du fond",
+      description: "Remplacer le fond par une couleur unie",
+    },
+    "blur-background": {
+      name: "Flou d'arriere-plan",
+      description: "Flouter le fond en gardant le sujet net",
+    },
     "watermark-text": {
       name: "Filigrane texte",
       description: "Ajoutez un filigrane textuel en superposition",
@@ -1352,6 +1360,18 @@ export const fr: TranslationKeys = {
       submit: "Corriger la transparence",
       submitBatch: "Corriger la transparence ({count} fichiers)",
       progressLabel: "Correction de la transparence",
+    },
+    "background-replace": {
+      color: "Couleur de fond",
+      submit: "Remplacer le fond",
+      submitBatch: "Remplacer le fond ({count} fichiers)",
+      progressLabel: "Remplacement du fond",
+    },
+    "blur-background": {
+      intensity: "Intensite du flou",
+      submit: "Flouter le fond",
+      submitBatch: "Flouter le fond ({count} fichiers)",
+      progressLabel: "Floutage du fond",
     },
     "watermark-text": {
       watermarkText: "Texte du filigrane",

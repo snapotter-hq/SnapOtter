@@ -176,6 +176,14 @@ export const zhCN: TranslationKeys = {
       name: "PNG 透明度修复",
       description: "一键修复伪透明 PNG 图片",
     },
+    "background-replace": {
+      name: "替换背景",
+      description: "将图像背景替换为纯色",
+    },
+    "blur-background": {
+      name: "模糊背景",
+      description: "模糊背景同时保持主体清晰",
+    },
     "watermark-text": { name: "文字水印", description: "添加文字水印覆盖层" },
     "watermark-image": { name: "图片水印", description: "叠加 Logo 作为水印" },
     "text-overlay": { name: "文字叠加", description: "在图片上添加样式化文字" },
@@ -1282,6 +1290,18 @@ export const zhCN: TranslationKeys = {
       submit: "修复透明度",
       submitBatch: "修复透明度（{count} 个文件）",
       progressLabel: "正在修复透明度",
+    },
+    "background-replace": {
+      color: "背景颜色",
+      submit: "替换背景",
+      submitBatch: "替换背景 ({count} 个文件)",
+      progressLabel: "正在替换背景",
+    },
+    "blur-background": {
+      intensity: "模糊强度",
+      submit: "模糊背景",
+      submitBatch: "模糊背景 ({count} 个文件)",
+      progressLabel: "正在模糊背景",
     },
     "watermark-text": {
       watermarkText: "水印文字",

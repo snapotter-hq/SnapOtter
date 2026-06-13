@@ -202,6 +202,14 @@ export const uk: TranslationKeys = {
       name: "Виправлення прозорості PNG",
       description: "Виправлення хибної прозорості PNG в один клік",
     },
+    "background-replace": {
+      name: "Заміна фону",
+      description: "Замінити фон зображення суцільним кольором",
+    },
+    "blur-background": {
+      name: "Розмиття фону",
+      description: "Розмити фон зберігаючи різкість об'єкта",
+    },
     "watermark-text": {
       name: "Текстовий водяний знак",
       description: "Додавання текстового водяного знаку",
@@ -1348,6 +1356,18 @@ export const uk: TranslationKeys = {
       submit: "Виправити прозорість",
       submitBatch: "Виправити прозорість ({count} файлів)",
       progressLabel: "Виправлення прозорості",
+    },
+    "background-replace": {
+      color: "Колір фону",
+      submit: "Замінити фон",
+      submitBatch: "Замінити фон ({count} файлів)",
+      progressLabel: "Заміна фону",
+    },
+    "blur-background": {
+      intensity: "Інтенсивність розмиття",
+      submit: "Розмити фон",
+      submitBatch: "Розмити фон ({count} файлів)",
+      progressLabel: "Розмиття фону",
     },
     "watermark-text": {
       watermarkText: "Текст водяного знаку",

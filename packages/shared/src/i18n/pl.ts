@@ -203,6 +203,14 @@ export const pl: TranslationKeys = {
       name: "Naprawa przezroczystości PNG",
       description: "Naprawa fałszywej przezroczystości PNG jednym kliknięciem",
     },
+    "background-replace": {
+      name: "Zamiana tla",
+      description: "Zamien tlo obrazu na jednolity kolor",
+    },
+    "blur-background": {
+      name: "Rozmycie tla",
+      description: "Rozmyj tlo zachowujac ostrosc obiektu",
+    },
     "watermark-text": {
       name: "Tekstowy znak wodny",
       description: "Dodawanie tekstowego znaku wodnego",
@@ -1350,6 +1358,18 @@ export const pl: TranslationKeys = {
       submit: "Napraw przezroczystość",
       submitBatch: "Napraw przezroczystość ({count} plików)",
       progressLabel: "Naprawa przezroczystości",
+    },
+    "background-replace": {
+      color: "Kolor tla",
+      submit: "Zamien tlo",
+      submitBatch: "Zamien tlo ({count} plikow)",
+      progressLabel: "Zamiana tla",
+    },
+    "blur-background": {
+      intensity: "Intensywnosc rozmycia",
+      submit: "Rozmyj tlo",
+      submitBatch: "Rozmyj tlo ({count} plikow)",
+      progressLabel: "Rozmywanie tla",
     },
     "watermark-text": {
       watermarkText: "Tekst znaku wodnego",

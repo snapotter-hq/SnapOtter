@@ -205,6 +205,14 @@ export const nl: TranslationKeys = {
       name: "PNG-transparantie repareren",
       description: "Nep-transparante PNGs met een klik repareren",
     },
+    "background-replace": {
+      name: "Achtergrond vervangen",
+      description: "Afbeeldingsachtergrond vervangen door een effen kleur",
+    },
+    "blur-background": {
+      name: "Achtergrond vervagen",
+      description: "Achtergrond vervagen terwijl het onderwerp scherp blijft",
+    },
     "watermark-text": {
       name: "Tekst-watermerk",
       description: "Tekst als watermerk toevoegen",
@@ -1349,6 +1357,18 @@ export const nl: TranslationKeys = {
       submit: "Transparantie repareren",
       submitBatch: "Transparantie repareren ({count} bestanden)",
       progressLabel: "Transparantie repareren",
+    },
+    "background-replace": {
+      color: "Achtergrondkleur",
+      submit: "Achtergrond vervangen",
+      submitBatch: "Achtergrond vervangen ({count} bestanden)",
+      progressLabel: "Achtergrond vervangen",
+    },
+    "blur-background": {
+      intensity: "Vervagingsintensiteit",
+      submit: "Achtergrond vervagen",
+      submitBatch: "Achtergrond vervagen ({count} bestanden)",
+      progressLabel: "Achtergrond vervagen",
     },
     "watermark-text": {
       watermarkText: "Watermerktekst",

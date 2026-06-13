@@ -9,9 +9,11 @@ import { registerAudioChannels } from "./audio-channels.js";
 import { registerAudioMetadata } from "./audio-metadata.js";
 import { registerAudioSpeed } from "./audio-speed.js";
 import { registerAutoSubtitles } from "./auto-subtitles.js";
+import { registerBackgroundReplace } from "./background-replace.js";
 import { registerBarcodeGenerate } from "./barcode-generate.js";
 import { registerBarcodeRead } from "./barcode-read.js";
 import { registerBeautify } from "./beautify.js";
+import { registerBlurBackground } from "./blur-background.js";
 import { registerBlurFaces } from "./blur-faces.js";
 import { registerBlurPad } from "./blur-pad.js";
 import { registerBookletPdf } from "./booklet-pdf.js";
@@ -349,6 +351,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "yaml-json", register: registerYamlJson },
 
     // AI Tools
+    { id: "background-replace", register: registerBackgroundReplace },
+    { id: "blur-background", register: registerBlurBackground },
     { id: "remove-background", register: registerRemoveBackground },
     { id: "upscale", register: registerUpscale },
     { id: "ocr", register: registerOcr },

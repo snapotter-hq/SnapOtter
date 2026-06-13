@@ -396,6 +396,28 @@ export const TOOLS: Tool[] = [
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "long",
   },
+  {
+    id: "background-replace",
+    name: "Background Replace",
+    description: "Replace image background with a solid color",
+    category: "ai",
+    icon: "PaintBucket",
+    route: "/background-replace",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
+  },
+  {
+    id: "blur-background",
+    name: "Blur Background",
+    description: "Blur the background while keeping the subject sharp",
+    category: "ai",
+    icon: "Focus",
+    route: "/blur-background",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "long",
+  },
   // Watermark & Overlay
   {
     id: "watermark-text",
@@ -2556,4 +2578,6 @@ export const PYTHON_SIDECAR_TOOLS = [
   "ai-canvas-expand",
   "transcribe-audio",
   "auto-subtitles",
+  "background-replace",
+  "blur-background",
 ] as const;

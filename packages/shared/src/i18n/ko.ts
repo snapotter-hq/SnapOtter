@@ -176,6 +176,14 @@ export const ko: TranslationKeys = {
       name: "PNG 투명도 수정",
       description: "가짜 투명 PNG를 원클릭으로 수정",
     },
+    "background-replace": {
+      name: "배경 교체",
+      description: "이미지 배경을 단색으로 교체합니다",
+    },
+    "blur-background": {
+      name: "배경 흐리게",
+      description: "피사체는 선명하게 유지하면서 배경을 흐리게 합니다",
+    },
     "watermark-text": { name: "텍스트 워터마크", description: "텍스트 워터마크 오버레이 추가" },
     "watermark-image": { name: "이미지 워터마크", description: "로고를 워터마크로 오버레이" },
     "text-overlay": { name: "텍스트 오버레이", description: "이미지에 스타일 텍스트 추가" },
@@ -1290,6 +1298,18 @@ export const ko: TranslationKeys = {
       submit: "투명도 수정",
       submitBatch: "투명도 수정 ({count}개 파일)",
       progressLabel: "투명도 수정 중",
+    },
+    "background-replace": {
+      color: "배경 색상",
+      submit: "배경 교체",
+      submitBatch: "배경 교체 ({count}개 파일)",
+      progressLabel: "배경 교체 중",
+    },
+    "blur-background": {
+      intensity: "흐림 강도",
+      submit: "배경 흐리게",
+      submitBatch: "배경 흐리게 ({count}개 파일)",
+      progressLabel: "배경 흐리게 처리 중",
     },
     "watermark-text": {
       watermarkText: "워터마크 텍스트",

@@ -176,6 +176,14 @@ export const zhTW: TranslationKeys = {
       name: "PNG透明修復",
       description: "一鍵修復偽透明PNG影像",
     },
+    "background-replace": {
+      name: "替換背景",
+      description: "將圖像背景替換為純色",
+    },
+    "blur-background": {
+      name: "模糊背景",
+      description: "模糊背景同時保持主體清晰",
+    },
     "watermark-text": { name: "文字浮水印", description: "加入文字浮水印覆疊" },
     "watermark-image": { name: "影像浮水印", description: "覆疊Logo作為浮水印" },
     "text-overlay": { name: "文字覆疊", description: "在影像上加入樣式文字" },
@@ -1280,6 +1288,18 @@ export const zhTW: TranslationKeys = {
       submit: "修復透明度",
       submitBatch: "修復透明度（{count}個檔案）",
       progressLabel: "正在修復透明度",
+    },
+    "background-replace": {
+      color: "背景顏色",
+      submit: "替換背景",
+      submitBatch: "替換背景 ({count} 個檔案)",
+      progressLabel: "正在替換背景",
+    },
+    "blur-background": {
+      intensity: "模糊強度",
+      submit: "模糊背景",
+      submitBatch: "模糊背景 ({count} 個檔案)",
+      progressLabel: "正在模糊背景",
     },
     "watermark-text": {
       watermarkText: "浮水印文字",

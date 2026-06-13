@@ -204,6 +204,14 @@ export const vi: TranslationKeys = {
       name: "Sửa trong suốt PNG",
       description: "Sửa ảnh PNG giả trong suốt chỉ với một cú nhấp",
     },
+    "background-replace": {
+      name: "Thay doi nen",
+      description: "Thay the nen hinh anh bang mau don sac",
+    },
+    "blur-background": {
+      name: "Lam mo nen",
+      description: "Lam mo nen trong khi giu cho chu the sac net",
+    },
     "watermark-text": {
       name: "Hình mờ văn bản",
       description: "Thêm lớp phủ hình mờ văn bản",
@@ -1347,6 +1355,18 @@ export const vi: TranslationKeys = {
       submit: "Sửa trong suốt",
       submitBatch: "Sửa trong suốt ({count} tệp)",
       progressLabel: "Đang sửa trong suốt",
+    },
+    "background-replace": {
+      color: "Mau nen",
+      submit: "Thay doi nen",
+      submitBatch: "Thay doi nen ({count} tep)",
+      progressLabel: "Dang thay doi nen",
+    },
+    "blur-background": {
+      intensity: "Cuong do lam mo",
+      submit: "Lam mo nen",
+      submitBatch: "Lam mo nen ({count} tep)",
+      progressLabel: "Dang lam mo nen",
     },
     "watermark-text": {
       watermarkText: "Văn bản hình mờ",

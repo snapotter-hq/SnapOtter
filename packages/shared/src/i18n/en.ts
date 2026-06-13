@@ -178,6 +178,14 @@ export const en = {
       name: "PNG Transparency Fixer",
       description: "Fix fake transparent PNGs in one click",
     },
+    "background-replace": {
+      name: "Background Replace",
+      description: "Replace image background with a solid color",
+    },
+    "blur-background": {
+      name: "Blur Background",
+      description: "Blur the background while keeping the subject sharp",
+    },
     "watermark-text": { name: "Text Watermark", description: "Add text watermark overlay" },
     "watermark-image": { name: "Image Watermark", description: "Overlay a logo as watermark" },
     "text-overlay": { name: "Text Overlay", description: "Add styled text to images" },
@@ -1297,6 +1305,18 @@ export const en = {
       submit: "Fix Transparency",
       submitBatch: "Fix Transparency ({count} files)",
       progressLabel: "Fixing transparency",
+    },
+    "background-replace": {
+      color: "Background Color",
+      submit: "Replace Background",
+      submitBatch: "Replace Background ({count} files)",
+      progressLabel: "Replacing background",
+    },
+    "blur-background": {
+      intensity: "Blur Intensity",
+      submit: "Blur Background",
+      submitBatch: "Blur Background ({count} files)",
+      progressLabel: "Blurring background",
     },
     "watermark-text": {
       watermarkText: "Watermark Text",

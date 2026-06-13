@@ -16,8 +16,10 @@ import { buildTestApp, loginAsAdmin, type TestApp } from "./test-server.js";
  */
 const REGISTRY_EXEMPT = new Set([
   "auto-subtitles",
+  "background-replace",
   "barcode-generate",
   "barcode-read",
+  "blur-background",
   "bulk-rename",
   "collage",
   "color-palette",

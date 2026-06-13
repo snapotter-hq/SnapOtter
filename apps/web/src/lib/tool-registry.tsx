@@ -357,6 +357,16 @@ const AutoSubtitlesSettings = lazy(() =>
     default: m.AutoSubtitlesSettings,
   })),
 );
+const BackgroundReplaceSettings = lazy(() =>
+  import("@/components/tools/background-replace-settings").then((m) => ({
+    default: m.BackgroundReplaceSettings,
+  })),
+);
+const BlurBackgroundSettings = lazy(() =>
+  import("@/components/tools/blur-background-settings").then((m) => ({
+    default: m.BlurBackgroundSettings,
+  })),
+);
 const ConvertVideoSettings = lazy(() =>
   import("@/components/tools/convert-video-settings").then((m) => ({
     default: m.ConvertVideoSettings,
@@ -981,6 +991,8 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["ai-canvas-expand", { Settings: AiCanvasExpandSettings }],
   ["transcribe-audio", { accept: AUDIO_INPUTS.join(","), Settings: TranscribeAudioSettings }],
   ["auto-subtitles", { accept: VIDEO_INPUTS.join(","), Settings: AutoSubtitlesSettings }],
+  ["background-replace", { Settings: BackgroundReplaceSettings }],
+  ["blur-background", { Settings: BlurBackgroundSettings }],
 
   // Video tools
   ["convert-video", { accept: VIDEO_INPUTS.join(","), Settings: ConvertVideoSettings }],

@@ -193,6 +193,14 @@ export const es: TranslationKeys = {
       name: "Corrector de transparencia PNG",
       description: "Corrige PNGs con transparencia falsa en un clic",
     },
+    "background-replace": {
+      name: "Reemplazar fondo",
+      description: "Reemplazar el fondo de la imagen con un color solido",
+    },
+    "blur-background": {
+      name: "Desenfocar fondo",
+      description: "Desenfocar el fondo manteniendo el sujeto nitido",
+    },
     "watermark-text": {
       name: "Marca de agua de texto",
       description: "Agrega una marca de agua de texto",
@@ -1333,6 +1341,18 @@ export const es: TranslationKeys = {
       submit: "Corregir transparencia",
       submitBatch: "Corregir transparencia ({count} archivos)",
       progressLabel: "Corrigiendo transparencia",
+    },
+    "background-replace": {
+      color: "Color de fondo",
+      submit: "Reemplazar fondo",
+      submitBatch: "Reemplazar fondo ({count} archivos)",
+      progressLabel: "Reemplazando fondo",
+    },
+    "blur-background": {
+      intensity: "Intensidad de desenfoque",
+      submit: "Desenfocar fondo",
+      submitBatch: "Desenfocar fondo ({count} archivos)",
+      progressLabel: "Desenfocando fondo",
     },
     "watermark-text": {
       watermarkText: "Texto de marca de agua",
