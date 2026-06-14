@@ -17,7 +17,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
-import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
+import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { trackEvent } from "../lib/analytics.js";
 import { autoOrient } from "../lib/auto-orient.js";
@@ -77,6 +77,16 @@ interface ParsedStep {
  * via dbSettings).
  */
 const PASSWORD_TOOLS = new Set(["protect-pdf", "unlock-pdf"]);
+
+/** Recursively inject OTel trace context into every node of a FlowJob tree. */
+function injectTraceContextIntoFlow(node: FlowJob): void {
+  injectTraceContext(node.data as ToolJobData);
+  if (node.children) {
+    for (const child of node.children) {
+      injectTraceContextIntoFlow(child);
+    }
+  }
+}
 
 /**
  * Build a FlowJob tree for a single-file pipeline.
@@ -404,6 +414,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       inputRefs: [],
       settings: {},
     });
+
+    // Inject OTel trace context into every node of the flow tree
+    injectTraceContextIntoFlow(tree);
 
     // Add the flow to BullMQ
     await getFlowProducer().add(tree);
@@ -912,6 +925,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       .update(schema.jobs)
       .set({ settings: { flowChildCount: perFileChildren.length } })
       .where(eq(schema.jobs.id, parentId));
+
+    // Inject OTel trace context into every node of the batch flow tree
+    injectTraceContextIntoFlow(batchTree);
 
     await getFlowProducer().add(batchTree);
 

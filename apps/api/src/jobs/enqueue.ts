@@ -55,6 +55,24 @@ export async function closeFlowProducer(): Promise<void> {
   }
 }
 
+// ── Trace context injection ─────────────────────────────────────
+
+/**
+ * Inject the active OpenTelemetry trace context into a ToolJobData object.
+ * Called from enqueueToolJob (single jobs) and from pipeline/batch routes
+ * that build FlowProducer trees bypassing enqueueToolJob.
+ */
+export function injectTraceContext(data: ToolJobData): void {
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier);
+  if (carrier.traceparent) {
+    data._otel = {
+      traceparent: carrier.traceparent,
+      tracestate: carrier.tracestate,
+    };
+  }
+}
+
 // ── Enqueue + wait ──────────────────────────────────────────────
 
 /**
@@ -83,14 +101,7 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     void computeDeleteAfter(data.jobId, data.userId).catch(() => {});
   }
 
-  const otelCarrier: Record<string, string> = {};
-  propagation.inject(context.active(), otelCarrier);
-  if (otelCarrier.traceparent) {
-    data._otel = {
-      traceparent: otelCarrier.traceparent,
-      tracestate: otelCarrier.tracestate,
-    };
-  }
+  injectTraceContext(data);
 
   const queue = getQueue(data.pool);
   const job = await queue.add(data.toolId, { ...data, jobId: data.jobId }, { jobId: data.jobId });

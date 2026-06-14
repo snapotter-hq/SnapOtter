@@ -18,7 +18,7 @@ import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
-import { getFlowProducer, waitForJob } from "../jobs/enqueue.js";
+import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
@@ -37,6 +37,16 @@ import { getToolConfig } from "./tool-factory.js";
 interface ParsedFile {
   buffer: Buffer;
   filename: string;
+}
+
+/** Recursively inject OTel trace context into every node of a FlowJob tree. */
+function injectTraceContextIntoFlow(node: FlowJob): void {
+  injectTraceContext(node.data as ToolJobData);
+  if (node.children) {
+    for (const child of node.children) {
+      injectTraceContextIntoFlow(child);
+    }
+  }
 }
 
 export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
@@ -296,6 +306,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         .update(schema.jobs)
         .set({ settings: { flowChildCount: flowChildren.length } })
         .where(eq(schema.jobs.id, parentId));
+
+      // Inject OTel trace context into every node of the batch flow tree
+      injectTraceContextIntoFlow(batchTree);
 
       await getFlowProducer().add(batchTree);
 
