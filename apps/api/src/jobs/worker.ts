@@ -24,12 +24,14 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { stripInternalPaths } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
@@ -104,258 +106,307 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const { jobId } = data;
   const startTime = Date.now();
 
-  // Register for cooperative cancellation
-  const ac = registerCancelable(jobId);
-  const signal = ac.signal;
+  // Extract OTel trace context if present (no-op without SDK)
+  const otel = data._otel;
+  const parentCtx = otel?.traceparent ? propagation.extract(ROOT_CONTEXT, otel) : ROOT_CONTEXT;
+  const tracer = trace.getTracer("snapotter-worker");
+  const span = otel?.traceparent
+    ? tracer.startSpan(
+        "job.process",
+        {
+          attributes: {
+            "snapotter.job_id": jobId,
+            "snapotter.tool_id": data.toolId,
+            "snapotter.pool": data.pool,
+            "snapotter.attempt_number": job.attemptsMade + 1,
+          },
+        },
+        parentCtx,
+      )
+    : null;
 
-  // Timeout guard (0 means unlimited; only arm when positive)
-  const timeoutMs = timeoutMsFor(data.pool);
-  const timeoutHandle =
-    timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
+  const runBody = async (): Promise<ToolJobResult> => {
+    if (span) span.addEvent("job.active");
 
-  // Per-job scratch directory
-  const scratchDir = join(scratchRoot(), jobId);
+    // Register for cooperative cancellation
+    const ac = registerCancelable(jobId);
+    const signal = ac.signal;
 
-  try {
-    await mkdir(scratchDir, { recursive: true });
+    // Timeout guard (0 means unlimited; only arm when positive)
+    const timeoutMs = timeoutMsFor(data.pool);
+    const timeoutHandle =
+      timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
 
-    // Mark job as processing in the durable row
-    await db
-      .update(schema.jobs)
-      .set({
-        status: "processing",
-        startedAt: new Date(),
-        attempts: job.attemptsMade + 1,
-      })
-      .where(eq(schema.jobs.id, jobId));
+    // Per-job scratch directory
+    const scratchDir = join(scratchRoot(), jobId);
 
-    // Load all input refs from object storage. The primary input keeps
-    // the client-facing filename; secondary inputs derive filenames from
-    // their ref basenames.
-    const inputs: ToolProcessInputV2[] = await Promise.all(
-      data.inputRefs.map(async (ref) => ({
-        ref,
-        buffer: await getObjectBuffer(ref),
-        filename: ref.split("/").slice(2).join("/") || data.filename,
-      })),
-    );
-    inputs[0].filename = data.filename; // primary keeps the client-facing name
-    const inputBuffer = inputs[0].buffer; // existing metrics/size/preview paths
+    try {
+      await mkdir(scratchDir, { recursive: true });
 
-    // Progress reporter: emits both Redis pub/sub and BullMQ job progress
-    const progressJobId = data.clientJobId ?? jobId;
-    const report = (percent: number, stage?: string) => {
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "processing",
-        percent,
-        stage,
-      });
-      void job.updateProgress({ percent, stage });
-    };
-
-    // Check for cancellation before dispatching
-    if (signal.aborted) throw new Error("Canceled");
-
-    // Build the process context
-    const ctx: ToolProcessCtx = { signal, scratchDir, report };
-
-    // Dispatch: AI handler or standard tool registry
-    let resultBuffer: Buffer;
-    let resultFilename: string;
-    let resultContentType: string;
-    let resultPayload: Record<string, unknown> | undefined;
-    let extraOutputs: Array<{ name: string; buffer: Buffer; contentType: string }> | undefined;
-
-    if (hasAiJobHandler(data.toolId)) {
-      const aiResult = await runAiToolJob(data, inputBuffer, ctx);
-      resultBuffer = aiResult.buffer;
-      resultFilename = aiResult.filename;
-      resultContentType = aiResult.contentType;
-      resultPayload = aiResult.resultPayload;
-      extraOutputs = aiResult.extraOutputs;
-    } else {
-      const config = getToolConfig(data.toolId);
-      if (!config) throw new Error(`No tool config for ${data.toolId}`);
-
-      // Use the resolved v2 process function (adapter or native)
-      if (!config.processV2) throw new Error(`No processV2 for ${data.toolId}`);
-      const result = await config.processV2({
-        inputs,
-        settings: data.settings,
-        scratchDir,
-        signal,
-        report,
-      });
-
-      // Resolve buffer OR scratchPath for the primary output
-      if (result.buffer) {
-        resultBuffer = result.buffer;
-      } else if (result.scratchPath) {
-        resultBuffer = await readFile(result.scratchPath);
-      } else {
-        throw new Error(`Tool ${data.toolId} returned neither buffer nor scratchPath`);
-      }
-      resultFilename = result.filename;
-      resultContentType = result.contentType;
-      resultPayload = result.resultPayload;
-
-      // Resolve extra outputs with the same buffer/scratchPath duality
-      if (result.extraOutputs) {
-        extraOutputs = await Promise.all(
-          result.extraOutputs.map(async (extra) => {
-            let buf: Buffer;
-            if (extra.buffer) {
-              buf = extra.buffer;
-            } else if (extra.scratchPath) {
-              buf = await readFile(extra.scratchPath);
-            } else {
-              throw new Error(`Extra output "${extra.name}" has neither buffer nor scratchPath`);
-            }
-            return { name: extra.name, buffer: buf, contentType: extra.contentType };
-          }),
-        );
-      }
-    }
-
-    // Build output name with tool suffix and extension fixup
-    const outName = buildOutputName(resultFilename, data.filename, data.toolId, resultContentType);
-
-    // Write primary output to object storage
-    const primaryKey = `outputs/${jobId}/${outName}`;
-    await putObject(primaryKey, resultBuffer);
-    const outputRefs: string[] = [primaryKey];
-
-    // Write extra outputs (AI tools may produce multiple files)
-    if (extraOutputs) {
-      for (const extra of extraOutputs) {
-        const extraKey = `outputs/${jobId}/${extra.name}`;
-        await putObject(extraKey, extra.buffer);
-        outputRefs.push(extraKey);
-      }
-    }
-
-    // Generate preview for non-browser-previewable formats
-    const previewRef = await generatePreview(resultBuffer, resultContentType, jobId, inputBuffer);
-
-    // Auto-save to user file library
-    const savedFileId = await autoSaveToLibrary({
-      fileId: data.fileId,
-      userId: data.userId,
-      buffer: resultBuffer,
-      outName,
-      contentType: resultContentType,
-      toolId: data.toolId,
-    });
-
-    const durationMs = Date.now() - startTime;
-
-    // Build the result
-    const jobResult: ToolJobResult = {
-      outputRefs,
-      filename: outName,
-      contentType: resultContentType,
-      originalSize: inputBuffer.length,
-      processedSize: resultBuffer.length,
-      previewRef,
-      savedFileId,
-      resultPayload,
-    };
-
-    // Update durable row to completed
-    await db
-      .update(schema.jobs)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        durationMs,
-        bytesIn: inputBuffer.length,
-        bytesOut: resultBuffer.length,
-        outputRefs,
-        progress: { percent: 100, stage: "complete" },
-      })
-      .where(eq(schema.jobs.id, jobId));
-
-    // Record Prometheus metrics
-    jobsTotal.inc({ pool: data.pool, status: "completed" });
-    jobDuration.observe({ pool: data.pool }, durationMs / 1000);
-
-    // Emit terminal progress event with legacy result payload
-    const legacyResult = buildLegacyResultPayload(jobResult, jobId);
-    updateSingleFileProgress({
-      jobId: progressJobId,
-      phase: "complete",
-      percent: 100,
-      stage: "complete",
-      result: legacyResult,
-    });
-
-    return jobResult;
-  } catch (err) {
-    const durationMs = Date.now() - startTime;
-    const isTimeout = signal.aborted && signal.reason === "timeout";
-    const isCanceled = signal.aborted && !isTimeout;
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    const finalError = isCanceled
-      ? "Canceled"
-      : isTimeout
-        ? `Timed out after ${Math.round(timeoutMs / 1000)}s`
-        : errorMessage;
-
-    const maxAttempts = job.opts.attempts ?? 1;
-    const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
-
-    const progressJobId = data.clientJobId ?? jobId;
-
-    // When the job will be retried, do NOT write a terminal DB row or
-    // emit a terminal SSE frame. The row stays "processing" and the
-    // next attempt overwrites startedAt/attempts as usual.
-    if (!willRetry) {
-      // Record Prometheus metrics on final attempt only
-      jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
-      jobDuration.observe({ pool: data.pool }, durationMs / 1000);
-
+      // Mark job as processing in the durable row
       await db
         .update(schema.jobs)
         .set({
-          status: isCanceled ? "canceled" : "failed",
-          completedAt: new Date(),
-          durationMs,
-          error: { message: finalError },
+          status: "processing",
+          startedAt: new Date(),
+          attempts: job.attemptsMade + 1,
         })
-        .where(eq(schema.jobs.id, jobId))
-        .catch(() => {});
+        .where(eq(schema.jobs.id, jobId));
 
-      if (isCanceled) {
-        // Ephemeral terminal event for live SSE clients. Uses
-        // publishEphemeral so the replay key is set without
-        // overwriting the DB row (which stays "canceled").
-        publishEphemeral({
-          jobId: progressJobId,
-          type: "single",
-          phase: "failed",
-          percent: 0,
-          error: "Canceled",
-        });
-      } else {
+      // Load all input refs from object storage. The primary input keeps
+      // the client-facing filename; secondary inputs derive filenames from
+      // their ref basenames.
+      const inputs: ToolProcessInputV2[] = await Promise.all(
+        data.inputRefs.map(async (ref) => ({
+          ref,
+          buffer: await getObjectBuffer(ref),
+          filename: ref.split("/").slice(2).join("/") || data.filename,
+        })),
+      );
+      inputs[0].filename = data.filename; // primary keeps the client-facing name
+      const inputBuffer = inputs[0].buffer; // existing metrics/size/preview paths
+
+      // Progress reporter: emits both Redis pub/sub and BullMQ job progress
+      const progressJobId = data.clientJobId ?? jobId;
+      const report = (percent: number, stage?: string) => {
         updateSingleFileProgress({
           jobId: progressJobId,
-          phase: "failed",
-          percent: 0,
-          error: stripInternalPaths(finalError),
+          phase: "processing",
+          percent,
+          stage,
         });
-      }
-    }
+        void job.updateProgress({ percent, stage });
+      };
 
-    if (isCanceled) throw new UnrecoverableError("Canceled");
-    if (isTimeout) throw new Error(finalError);
-    throw err;
-  } finally {
-    clearTimeout(timeoutHandle);
-    unregisterCancelable(jobId);
-    // Clean up scratch directory
-    await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      // Check for cancellation before dispatching
+      if (signal.aborted) throw new Error("Canceled");
+
+      // Build the process context
+      const ctx: ToolProcessCtx = { signal, scratchDir, report };
+
+      // Dispatch: AI handler or standard tool registry
+      let resultBuffer: Buffer;
+      let resultFilename: string;
+      let resultContentType: string;
+      let resultPayload: Record<string, unknown> | undefined;
+      let extraOutputs: Array<{ name: string; buffer: Buffer; contentType: string }> | undefined;
+
+      if (hasAiJobHandler(data.toolId)) {
+        const aiResult = await runAiToolJob(data, inputBuffer, ctx);
+        resultBuffer = aiResult.buffer;
+        resultFilename = aiResult.filename;
+        resultContentType = aiResult.contentType;
+        resultPayload = aiResult.resultPayload;
+        extraOutputs = aiResult.extraOutputs;
+      } else {
+        const config = getToolConfig(data.toolId);
+        if (!config) throw new Error(`No tool config for ${data.toolId}`);
+
+        // Use the resolved v2 process function (adapter or native)
+        if (!config.processV2) throw new Error(`No processV2 for ${data.toolId}`);
+        const result = await config.processV2({
+          inputs,
+          settings: data.settings,
+          scratchDir,
+          signal,
+          report,
+        });
+
+        // Resolve buffer OR scratchPath for the primary output
+        if (result.buffer) {
+          resultBuffer = result.buffer;
+        } else if (result.scratchPath) {
+          resultBuffer = await readFile(result.scratchPath);
+        } else {
+          throw new Error(`Tool ${data.toolId} returned neither buffer nor scratchPath`);
+        }
+        resultFilename = result.filename;
+        resultContentType = result.contentType;
+        resultPayload = result.resultPayload;
+
+        // Resolve extra outputs with the same buffer/scratchPath duality
+        if (result.extraOutputs) {
+          extraOutputs = await Promise.all(
+            result.extraOutputs.map(async (extra) => {
+              let buf: Buffer;
+              if (extra.buffer) {
+                buf = extra.buffer;
+              } else if (extra.scratchPath) {
+                buf = await readFile(extra.scratchPath);
+              } else {
+                throw new Error(`Extra output "${extra.name}" has neither buffer nor scratchPath`);
+              }
+              return { name: extra.name, buffer: buf, contentType: extra.contentType };
+            }),
+          );
+        }
+      }
+
+      // Build output name with tool suffix and extension fixup
+      const outName = buildOutputName(
+        resultFilename,
+        data.filename,
+        data.toolId,
+        resultContentType,
+      );
+
+      // Write primary output to object storage
+      const primaryKey = `outputs/${jobId}/${outName}`;
+      await putObject(primaryKey, resultBuffer);
+      const outputRefs: string[] = [primaryKey];
+
+      // Write extra outputs (AI tools may produce multiple files)
+      if (extraOutputs) {
+        for (const extra of extraOutputs) {
+          const extraKey = `outputs/${jobId}/${extra.name}`;
+          await putObject(extraKey, extra.buffer);
+          outputRefs.push(extraKey);
+        }
+      }
+
+      // Generate preview for non-browser-previewable formats
+      const previewRef = await generatePreview(resultBuffer, resultContentType, jobId, inputBuffer);
+
+      // Auto-save to user file library
+      const savedFileId = await autoSaveToLibrary({
+        fileId: data.fileId,
+        userId: data.userId,
+        buffer: resultBuffer,
+        outName,
+        contentType: resultContentType,
+        toolId: data.toolId,
+      });
+
+      const durationMs = Date.now() - startTime;
+
+      // Build the result
+      const jobResult: ToolJobResult = {
+        outputRefs,
+        filename: outName,
+        contentType: resultContentType,
+        originalSize: inputBuffer.length,
+        processedSize: resultBuffer.length,
+        previewRef,
+        savedFileId,
+        resultPayload,
+      };
+
+      // Update durable row to completed
+      await db
+        .update(schema.jobs)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          durationMs,
+          bytesIn: inputBuffer.length,
+          bytesOut: resultBuffer.length,
+          outputRefs,
+          progress: { percent: 100, stage: "complete" },
+        })
+        .where(eq(schema.jobs.id, jobId));
+
+      // Record Prometheus metrics
+      jobsTotal.inc({ pool: data.pool, status: "completed" });
+      jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
+      // Emit terminal progress event with legacy result payload
+      const legacyResult = buildLegacyResultPayload(jobResult, jobId);
+      updateSingleFileProgress({
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: legacyResult,
+      });
+
+      // Record queue wait time and completion on the OTel span
+      if (span && job.processedOn) {
+        span.setAttribute("snapotter.queue.wait_ms", job.processedOn - job.timestamp);
+      }
+      if (span) span.addEvent("job.completed");
+
+      return jobResult;
+    } catch (err) {
+      const durationMs = Date.now() - startTime;
+      const isTimeout = signal.aborted && signal.reason === "timeout";
+      const isCanceled = signal.aborted && !isTimeout;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const finalError = isCanceled
+        ? "Canceled"
+        : isTimeout
+          ? `Timed out after ${Math.round(timeoutMs / 1000)}s`
+          : errorMessage;
+
+      // Record error on the OTel span
+      if (span) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: finalError });
+        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        span.addEvent("job.failed");
+      }
+
+      const maxAttempts = job.opts.attempts ?? 1;
+      const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
+
+      const progressJobId = data.clientJobId ?? jobId;
+
+      // When the job will be retried, do NOT write a terminal DB row or
+      // emit a terminal SSE frame. The row stays "processing" and the
+      // next attempt overwrites startedAt/attempts as usual.
+      if (!willRetry) {
+        // Record Prometheus metrics on final attempt only
+        jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
+        jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
+        await db
+          .update(schema.jobs)
+          .set({
+            status: isCanceled ? "canceled" : "failed",
+            completedAt: new Date(),
+            durationMs,
+            error: { message: finalError },
+          })
+          .where(eq(schema.jobs.id, jobId))
+          .catch(() => {});
+
+        if (isCanceled) {
+          // Ephemeral terminal event for live SSE clients. Uses
+          // publishEphemeral so the replay key is set without
+          // overwriting the DB row (which stays "canceled").
+          publishEphemeral({
+            jobId: progressJobId,
+            type: "single",
+            phase: "failed",
+            percent: 0,
+            error: "Canceled",
+          });
+        } else {
+          updateSingleFileProgress({
+            jobId: progressJobId,
+            phase: "failed",
+            percent: 0,
+            error: stripInternalPaths(finalError),
+          });
+        }
+      }
+
+      if (isCanceled) throw new UnrecoverableError("Canceled");
+      if (isTimeout) throw new Error(finalError);
+      throw err;
+    } finally {
+      if (span) span.end();
+      clearTimeout(timeoutHandle);
+      unregisterCancelable(jobId);
+      // Clean up scratch directory
+      await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+    }
+  };
+
+  // Execute with or without active span context
+  if (span) {
+    const activeCtx = trace.setSpan(parentCtx, span);
+    return context.with(activeCtx, runBody);
   }
+  return runBody();
 }
 
 // ── Pipeline step handler ─────────────────────────────────────
@@ -694,7 +745,7 @@ export function startWorkers(): void {
       });
 
       worker.on("error", (err) => {
-        console.error(`Worker error [${pool}]:`, err);
+        logger.error({ err, pool }, "Worker error");
       });
 
       workers.push(worker);
@@ -722,7 +773,7 @@ export function startWorkers(): void {
     workers.push(worker);
   }
 
-  console.log(
+  logger.info(
     `Workers started: ${POOLS.map((p) => `${p}(${p === "system" || p === "ai" ? 1 : concurrency})`).join(", ")}`,
   );
 }
