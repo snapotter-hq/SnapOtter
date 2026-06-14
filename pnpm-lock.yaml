@@ -531,6 +531,9 @@ importers:
 
   packages/ai:
     dependencies:
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@snapotter/shared':
         specifier: workspace:*
         version: link:../shared

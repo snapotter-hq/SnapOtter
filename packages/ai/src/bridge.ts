@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { context, propagation } from "@opentelemetry/api";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -32,6 +33,9 @@ function buildMinimalEnv(): Record<string, string> {
     "DISPATCHER_MAX_REQUESTS",
     "PYTHON_VENV_PATH",
     "SNAPOTTER_GPU",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_HEADERS",
   ];
   for (const key of passthrough) {
     if (process.env[key] !== undefined) {
@@ -364,7 +368,16 @@ export class PythonDispatcher {
         stderrLines: [],
       });
 
-      const request = JSON.stringify({ id, script: scriptName.replace(".py", ""), args });
+      const msg: Record<string, unknown> = { id, script: scriptName.replace(".py", ""), args };
+      const otelCarrier: Record<string, string> = {};
+      propagation.inject(context.active(), otelCarrier);
+      if (otelCarrier.traceparent) {
+        msg._otel = {
+          traceparent: otelCarrier.traceparent,
+          tracestate: otelCarrier.tracestate,
+        };
+      }
+      const request = JSON.stringify(msg);
       try {
         proc.stdin!.write(request + "\n");
       } catch {

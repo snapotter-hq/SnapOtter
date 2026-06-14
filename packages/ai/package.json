@@ -10,6 +10,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@snapotter/shared": "workspace:*",
     "sharp": "^0.34.5"
   },
