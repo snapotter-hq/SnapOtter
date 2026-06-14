@@ -137,6 +137,38 @@ export default defineConfig({
       zustand: path.join(webNodeModules, "zustand"),
       "posthog-js": path.join(webNodeModules, "posthog-js"),
       "@sentry/react": path.join(webNodeModules, "@sentry/react"),
+      "@opentelemetry/api": path.join(apiNodeModules, "@opentelemetry/api"),
+      "@opentelemetry/sdk-node": path.join(apiNodeModules, "@opentelemetry/sdk-node"),
+      "@opentelemetry/sdk-trace-base": path.join(apiNodeModules, "@opentelemetry/sdk-trace-base"),
+      "@opentelemetry/exporter-trace-otlp-http": path.join(
+        apiNodeModules,
+        "@opentelemetry/exporter-trace-otlp-http",
+      ),
+      "@opentelemetry/resources": path.join(apiNodeModules, "@opentelemetry/resources"),
+      "@opentelemetry/semantic-conventions": path.join(
+        apiNodeModules,
+        "@opentelemetry/semantic-conventions",
+      ),
+      "@opentelemetry/instrumentation-http": path.join(
+        apiNodeModules,
+        "@opentelemetry/instrumentation-http",
+      ),
+      "@opentelemetry/instrumentation-fastify": path.join(
+        apiNodeModules,
+        "@opentelemetry/instrumentation-fastify",
+      ),
+      "@opentelemetry/instrumentation-pg": path.join(
+        apiNodeModules,
+        "@opentelemetry/instrumentation-pg",
+      ),
+      "@opentelemetry/instrumentation-ioredis": path.join(
+        apiNodeModules,
+        "@opentelemetry/instrumentation-ioredis",
+      ),
+      "@opentelemetry/instrumentation-aws-sdk": path.join(
+        apiNodeModules,
+        "@opentelemetry/instrumentation-aws-sdk",
+      ),
     },
   },
 });
