@@ -260,6 +260,9 @@ importers:
       pg:
         specifier: ^8.21.0
         version: 8.21.0
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
       pino-roll:
         specifier: ^4.0.0
         version: 4.0.0

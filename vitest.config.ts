@@ -119,6 +119,7 @@ export default defineConfig({
       qrcode: path.join(apiNodeModules, "qrcode"),
       jsqr: path.join(apiNodeModules, "jsqr"),
       pdfkit: path.join(apiNodeModules, "pdfkit"),
+      pino: path.join(apiNodeModules, "pino"),
       sharp: path.join(apiNodeModules, "sharp"),
       ioredis: path.join(apiNodeModules, "ioredis"),
       bullmq: path.join(apiNodeModules, "bullmq"),

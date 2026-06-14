@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { statfs } from "node:fs/promises";
-import { join } from "node:path";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
@@ -21,7 +20,7 @@ import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analyt
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
-
+import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { getSettingString } from "./lib/settings-helpers.js";
 import { requirePermission } from "./permissions.js";
@@ -188,26 +187,7 @@ function parseTrustProxy(value: string): boolean | number | string {
 
 const app = Fastify({
   genReqId: (req) => (req.headers["x-request-id"] as string) ?? randomUUID(),
-  logger: {
-    level: env.LOG_LEVEL,
-    transport: {
-      targets: [
-        { target: "pino/file", options: { destination: 1 } },
-        {
-          // Rotate at 10 MB, keep 5 files
-          target: "pino-roll",
-          options: {
-            file: join(env.LOG_DIR, "snapotter"),
-            extension: ".log",
-            size: "10m",
-            limit: { count: 5 },
-            mkdir: true,
-          },
-        },
-      ],
-    },
-    redact: ["req.headers.authorization", "req.headers.cookie"],
-  },
+  loggerInstance: logger,
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
   routerOptions: { maxParamLength: 500 },

@@ -60,6 +60,7 @@
     "papaparse": "^5.5.3",
     "pdfkit": "^0.18.0",
     "pg": "^8.21.0",
+    "pino": "^10.3.1",
     "pino-roll": "^4.0.0",
     "playwright": "^1.60.0",
     "posthog-node": "^5.35.9",
