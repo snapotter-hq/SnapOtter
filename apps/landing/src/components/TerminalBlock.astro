@@ -1,0 +1,45 @@
+---
+interface Props {
+  command: string;
+  label?: string;
+}
+
+const { command, label = "terminal" } = Astro.props;
+---
+
+<div class="reveal rounded-xl border border-border/50 bg-terminal-bg p-1 shadow-xl">
+  <!-- Terminal chrome -->
+  <div class="flex items-center gap-2 px-4 py-2.5">
+    <span class="h-3 w-3 rounded-full" style="background: #ff5f57;"></span>
+    <span class="h-3 w-3 rounded-full" style="background: #febc2e;"></span>
+    <span class="h-3 w-3 rounded-full" style="background: #28c840;"></span>
+    <span class="ml-2 text-xs text-terminal-muted">{label}</span>
+  </div>
+  <!-- Command -->
+  <div class="group relative rounded-lg bg-terminal-bg px-5 py-4">
+    <code class="block text-sm leading-relaxed text-terminal-fg md:text-base">
+      <span class="text-terminal-green">$</span>{" "}
+      <span>{command}</span>
+      <span class="cursor-blink"></span>
+    </code>
+    <button
+      class="absolute right-3 top-3 rounded-md border border-terminal-muted/30 px-2 py-1 text-xs text-terminal-muted opacity-0 transition-opacity hover:text-terminal-fg group-hover:opacity-100"
+      data-copy={command}
+      aria-label="Copy command"
+    >
+      Copy
+    </button>
+  </div>
+</div>
+
+<script is:inline>
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy");
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = "Copied!";
+        setTimeout(function () { btn.textContent = "Copy"; }, 2000);
+      });
+    });
+  });
+</script>

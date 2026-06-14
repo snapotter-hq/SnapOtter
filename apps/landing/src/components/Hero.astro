@@ -1,0 +1,82 @@
+---
+import { TOOLS } from "@snapotter/shared";
+import TerminalBlock from "./TerminalBlock.astro";
+
+const toolCount = TOOLS.length;
+
+const modalities = [
+  { label: "Images", href: "/tools", icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' },
+  { label: "Video", href: "/tools", icon: '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>' },
+  { label: "Audio", href: "/tools", icon: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>' },
+  { label: "PDF & Docs", href: "/tools", icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>' },
+  { label: "Data Files", href: "/tools", icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>' },
+];
+---
+
+<section class="relative overflow-hidden px-6 pt-32 pb-16 md:pt-44 md:pb-24">
+  <!-- Gradient mesh background -->
+  <div class="hero-mesh" aria-hidden="true"></div>
+  <div class="hero-mesh-extra" aria-hidden="true"></div>
+
+  <div class="relative mx-auto max-w-4xl text-center">
+    <!-- Enterprise trust badges -->
+    <div class="animate-fade-up flex flex-wrap items-center justify-center gap-2">
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-dark">
+        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        On-premise
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-dark">
+        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        GDPR &amp; HIPAA ready
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-dark">
+        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Open source
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-dark">
+        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        SAML SSO
+      </span>
+    </div>
+
+    <!-- Headline: enterprise-first -->
+    <h1 class="animate-fade-up mt-8 font-display text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl" style="animation-delay: 0.1s;">
+      Every file tool your team needs.<br class="hidden sm:block" />
+      <span class="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">Nothing leaves your network.</span>
+    </h1>
+
+    <!-- Subtitle: business outcome focused -->
+    <p class="animate-fade-up mx-auto mt-6 max-w-2xl text-lg text-muted md:text-xl" style="animation-delay: 0.15s;">
+      {toolCount} tools for images, video, audio, and documents. Deploy on your infrastructure with
+      SAML SSO, audit logging, and per-tool permissions. One platform, zero third-party risk.
+    </p>
+
+    <!-- Category pills -->
+    <div class="animate-fade-up mt-8 flex flex-wrap items-center justify-center gap-2" style="animation-delay: 0.2s;">
+      {modalities.map((mod) => (
+        <a
+          href={mod.href}
+          class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-all hover:border-primary hover:bg-primary-subtle hover:shadow-sm"
+        >
+          <svg class="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={mod.icon} />
+          {mod.label}
+        </a>
+      ))}
+    </div>
+
+    <!-- CTAs: enterprise-first -->
+    <div class="animate-fade-up mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row" style="animation-delay: 0.25s;">
+      <a href="/contact" class="btn-primary rounded-xl px-8 py-3.5 text-base font-semibold">
+        Book a Demo
+      </a>
+      <a href="https://docs.snapotter.com/guide/getting-started" target="_blank" rel="noopener noreferrer" class="btn-outline rounded-xl px-8 py-3.5 text-base font-semibold">
+        Deploy Free
+      </a>
+    </div>
+
+    <!-- Terminal -->
+    <div class="animate-fade-up mx-auto mt-12 max-w-lg" style="animation-delay: 0.35s;">
+      <TerminalBlock command="docker run -d -p 1349:1349 snapotter/snapotter" />
+    </div>
+  </div>
+</section>

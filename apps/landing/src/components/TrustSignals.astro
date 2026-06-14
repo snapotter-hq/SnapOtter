@@ -1,0 +1,116 @@
+---
+import { TOOLS } from "@snapotter/shared";
+
+const toolCount = TOOLS.length;
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return n.toString();
+}
+
+let starCount = 0;
+try {
+  const res = await fetch("https://api.github.com/repos/snapotter-hq/snapotter", {
+    headers: { Accept: "application/vnd.github.v3+json" },
+  });
+  if (res.ok) {
+    const data = await res.json();
+    starCount = data.stargazers_count ?? 0;
+  }
+} catch {
+  starCount = 0;
+}
+
+let dockerPulls = 0;
+try {
+  const res = await fetch("https://hub.docker.com/v2/repositories/snapotter/snapotter/");
+  if (res.ok) {
+    const data = await res.json();
+    dockerPulls = data.pull_count ?? 0;
+  }
+} catch {
+  dockerPulls = 0;
+}
+
+const stats = [
+  {
+    value: toolCount.toString(),
+    label: "Processing Tools",
+    sublabel: "Across 5 file modalities",
+  },
+  {
+    value: starCount > 0 ? formatNumber(starCount) : "--",
+    label: "GitHub Stars",
+    sublabel: "Open-source & growing",
+    href: "https://github.com/snapotter-hq/snapotter",
+  },
+  {
+    value: dockerPulls > 0 ? formatNumber(dockerPulls) : "--",
+    label: "Docker Pulls",
+    sublabel: "Deployed by organizations worldwide",
+    href: "https://hub.docker.com/r/snapotter/snapotter",
+  },
+  {
+    value: "21",
+    label: "Languages",
+    sublabel: "Fully localized UI",
+  },
+];
+
+const badges = [
+  "GDPR Compliant",
+  "Air-Gapped Ready",
+  "SAML SSO",
+  "Audit Logging",
+  "Docker & K8s",
+  "ARM + x86",
+];
+---
+
+<section class="border-y border-border bg-surface px-6 py-16 md:py-20">
+  <div class="mx-auto max-w-5xl">
+
+    <!-- Stats grid -->
+    <div class="reveal grid grid-cols-2 gap-10 sm:gap-12 lg:grid-cols-4">
+      {stats.map((stat) => {
+        const inner = (
+          <div class="text-center">
+            <p class="font-display text-5xl font-extrabold tracking-tight text-primary md:text-6xl">
+              {stat.value}
+            </p>
+            <p class="mt-2 text-sm font-semibold text-foreground">{stat.label}</p>
+            <p class="mt-0.5 text-xs text-muted">{stat.sublabel}</p>
+          </div>
+        );
+
+        return stat.href ? (
+          <a
+            href={stat.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group rounded-xl p-3 transition-colors hover:bg-background-alt"
+          >
+            {inner}
+          </a>
+        ) : (
+          <div class="p-3">{inner}</div>
+        );
+      })}
+    </div>
+
+    <!-- Divider -->
+    <div class="reveal mx-auto my-10 h-px w-24 bg-border md:my-12" />
+
+    <!-- Enterprise compliance badges -->
+    <div class="reveal flex flex-wrap items-center justify-center gap-2.5">
+      {badges.map((badge) => (
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-medium text-muted">
+          <svg class="h-3.5 w-3.5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          {badge}
+        </span>
+      ))}
+    </div>
+
+  </div>
+</section>

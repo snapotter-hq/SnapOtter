@@ -1,0 +1,116 @@
+---
+import Base from "@/layouts/Base.astro";
+import Navbar from "@/components/Navbar.astro";
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+
+const faqs = [
+  {
+    question: "Are my files safe and private?",
+    answer: "All processing happens on your own server. Your files are never sent to any external service. SnapOtter runs entirely on your infrastructure.",
+  },
+  {
+    question: "Is SnapOtter really free?",
+    answer: "Yes. SnapOtter is open source under AGPL-3.0 with no hidden fees, no subscription plans, no usage limits, and no premium-only features. A commercial license is available for organizations that need proprietary use.",
+  },
+  {
+    question: "Do I need an internet connection?",
+    answer: "No. SnapOtter runs fully offline once deployed. No external API calls are made. It works in completely air-gapped environments.",
+  },
+  {
+    question: "Are there any file size or usage limitations?",
+    answer: "No artificial limits. You can process as many files as you want, at any size. The only constraint is your server's hardware resources.",
+  },
+  {
+    question: "What AI features are included?",
+    answer: "SnapOtter includes 15 local AI models for background removal, upscaling, OCR, face detection, colorization, noise removal, photo restoration, and more. All models run on your hardware.",
+  },
+  {
+    question: "Does SnapOtter collect any analytics?",
+    answer: "Analytics is completely optional and disabled by default. If you choose to enable it, SnapOtter collects anonymous usage data and error logs to help improve the software. No personal data or file content is ever collected. You have full control over this in the settings and can disable it at any time.",
+  },
+  {
+    question: "Can I use SnapOtter in my company?",
+    answer: "Yes. Under AGPL-3.0, you can use it freely as long as you comply with the license terms. For proprietary or closed-source use, a commercial license is available.",
+  },
+  {
+    question: "How do I update SnapOtter?",
+    answer: "Pull the latest Docker image and restart the container. Your data persists in the mounted volume.",
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.question,
+    acceptedAnswer: { "@type": "Answer", text: faq.answer },
+  })),
+};
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    { "@type": "ListItem", position: 2, name: "FAQ", item: "https://snapotter.com/faq" },
+  ],
+};
+---
+
+<Base
+  title="FAQ | SnapOtter"
+  description="Frequently asked questions about SnapOtter, the self-hosted file processing suite."
+  canonical="https://snapotter.com/faq"
+>
+  <Fragment slot="head">
+    <JsonLd data={[faqJsonLd, breadcrumbJsonLd]} />
+  </Fragment>
+
+  <Navbar />
+
+  <main id="main" class="px-6 pt-32 pb-20 md:pt-40 md:pb-28">
+    <div class="mx-auto max-w-3xl">
+      <h1 class="reveal font-display text-4xl font-bold tracking-tight md:text-5xl">
+        Frequently Asked Questions
+      </h1>
+      <p class="reveal mt-4 text-lg text-muted">
+        Everything you need to know about SnapOtter.
+      </p>
+
+      <div class="mt-12 divide-y divide-border">
+        {faqs.map((faq) => (
+          <details class="group reveal">
+            <summary class="flex cursor-pointer items-center justify-between py-5 text-base font-medium">
+              {faq.question}
+              <svg
+                class="h-4 w-4 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p class="pb-5 text-sm leading-relaxed text-muted">{faq.answer}</p>
+          </details>
+        ))}
+      </div>
+
+      <div class="reveal mt-16 rounded-xl border border-border bg-surface p-8 text-center">
+        <h2 class="font-display text-xl font-semibold">Still have questions?</h2>
+        <p class="mt-2 text-sm text-muted">Reach out via email or join our community.</p>
+        <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <a href="/contact" class="btn-primary rounded-lg px-6 py-2.5 text-sm font-semibold">Contact Us</a>
+          <a href="https://discord.gg/hr3s7HPUsr" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-border px-6 py-2.5 text-sm font-semibold transition-colors hover:bg-background-alt">Join Discord</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Base>

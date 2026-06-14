@@ -1708,4 +1708,3335 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "ocr-pdf": {
+    searchTitle: "Extract Text From Scanned PDFs",
+    longDescription:
+      "Extract searchable text from scanned PDF documents using AI-powered optical character recognition. Handles multi-page documents, mixed layouts, and handwritten content with high accuracy. All OCR processing runs locally on your server, so sensitive documents never leave your network.",
+    useCases: [
+      "Digitizing archived paper contracts for full-text search in a document management system",
+      "Extracting invoice line items from scanned supplier PDFs for bookkeeping import",
+      "Making legacy research papers searchable without uploading them to third-party services",
+      "Converting scanned government forms into selectable text for accessibility compliance",
+    ],
+    features: [
+      "AI-powered text recognition with support for printed and handwritten content",
+      "Multi-page PDF processing with preserved page structure and reading order",
+      "Automatic language detection across dozens of supported languages",
+      "Outputs searchable PDF with an invisible text layer overlaid on the original",
+      "Handles skewed scans, low-resolution images, and mixed text-photo layouts",
+    ],
+    faqs: [
+      {
+        q: "How accurate is the OCR on low-quality scans?",
+        a: "The AI model handles noise, skew, and low resolution well, though very degraded scans may need preprocessing. All recognition runs locally on your self-hosted instance, so you can re-run with adjusted settings without usage limits.",
+      },
+      {
+        q: "Does it support non-English documents?",
+        a: "Yes, the OCR engine supports dozens of languages and can auto-detect the language in each page. Processing happens entirely on your server, making it safe for documents in any language without external API calls.",
+      },
+      {
+        q: "Can I process confidential legal or medical PDFs?",
+        a: "Absolutely. Because SnapOtter is self-hosted, your PDFs never leave your network. No data is sent to external servers, making it suitable for HIPAA, GDPR, or any privacy-sensitive workflow.",
+      },
+    ],
+  },
+  "transcribe-audio": {
+    searchTitle: "Transcribe Audio to Text Locally",
+    longDescription:
+      "Convert speech in audio files to accurate text transcripts using AI-powered transcription. Supports a wide range of audio formats and handles multiple speakers, accents, and background noise. Runs entirely on your own hardware, keeping confidential recordings private.",
+    useCases: [
+      "Transcribing recorded client meetings for searchable minutes and action items",
+      "Creating text versions of podcast episodes for show notes and SEO indexing",
+      "Converting voicemail recordings to text for a customer support ticketing system",
+      "Generating interview transcripts for qualitative research without cloud services",
+    ],
+    features: [
+      "AI speech recognition with high accuracy across accents and dialects",
+      "Automatic language detection and multi-language transcription support",
+      "Handles common audio formats including MP3, WAV, FLAC, OGG, and M4A",
+      "Timestamps included for easy navigation of longer recordings",
+      "Noise-tolerant model that performs well with background audio",
+    ],
+    faqs: [
+      {
+        q: "What audio formats are supported?",
+        a: "Most common formats are supported including MP3, WAV, FLAC, OGG, M4A, and AAC. The transcription engine converts internally, so no pre-processing is needed on your end.",
+      },
+      {
+        q: "Is this suitable for confidential recordings?",
+        a: "Yes. SnapOtter runs entirely on your own server, so audio files and transcripts never leave your network. This makes it ideal for legal depositions, medical dictation, or any sensitive recordings.",
+      },
+      {
+        q: "How does it handle multiple speakers?",
+        a: "The AI model is trained on conversational audio and handles speaker changes naturally. All processing is local, so even multi-hour recordings with multiple participants stay within your self-hosted environment.",
+      },
+    ],
+  },
+  "auto-subtitles": {
+    searchTitle: "Generate Subtitles From Video Automatically",
+    longDescription:
+      "Automatically generate subtitle files from the audio track of any video using AI speech recognition. Produces properly timed SRT or VTT files ready for embedding or upload. All transcription runs on your own server, keeping unreleased video content private.",
+    useCases: [
+      "Adding captions to corporate training videos before publishing to an internal LMS",
+      "Generating SRT files for YouTube uploads to improve accessibility and discoverability",
+      "Creating subtitles for pre-release film footage without exposing content to cloud services",
+      "Producing captions for social media clips in bulk before a product launch",
+    ],
+    features: [
+      "AI-powered speech-to-text with automatic timing and segmentation",
+      "Outputs industry-standard SRT and WebVTT subtitle formats",
+      "Handles videos with background music, sound effects, and ambient noise",
+      "Supports multiple spoken languages with automatic detection",
+      "Accurate word-level timing for natural, readable caption flow",
+    ],
+    faqs: [
+      {
+        q: "What subtitle formats does it output?",
+        a: "It generates SRT and WebVTT files, which are compatible with virtually every video player, editor, and hosting platform. The generated files include precise timestamps for each caption segment.",
+      },
+      {
+        q: "Can I use this for videos not yet released publicly?",
+        a: "Yes, that is one of the primary benefits. Since SnapOtter is self-hosted, your video audio never leaves your server. This is ideal for pre-release content, internal communications, or proprietary footage.",
+      },
+      {
+        q: "How well does it handle overlapping speech or accents?",
+        a: "The underlying AI model is robust with varied accents and conversational overlap, though heavily noisy sections may need manual review. All processing happens locally, so you can iterate and re-generate without usage caps.",
+      },
+    ],
+  },
+  "background-replace": {
+    searchTitle: "Replace Image Background With Color",
+    longDescription:
+      "Automatically detect the subject in a photo and replace the background with a solid color of your choice. Uses AI-powered segmentation to cleanly separate foreground from background. Runs entirely on your self-hosted server with no images sent to external APIs.",
+    useCases: [
+      "Preparing product photos with white backgrounds for an e-commerce catalog",
+      "Creating consistent headshots with branded color backgrounds for a company directory",
+      "Isolating subjects from cluttered scenes for marketing banners and social posts",
+      "Generating passport-style photos with the required solid background color",
+    ],
+    features: [
+      "AI subject detection with precise edge handling around hair and fine details",
+      "Custom hex color picker for any solid background replacement",
+      "Preserves original image resolution and quality in the output",
+      "Works with complex scenes including multiple subjects and varied lighting",
+      "Batch processing support for high-volume product photography workflows",
+    ],
+    faqs: [
+      {
+        q: "How well does it handle hair and fine edges?",
+        a: "The AI segmentation model is trained to handle challenging edges like hair, fur, and translucent materials. Results are generally clean, and because it runs on your own server, you can re-process with no cost per image.",
+      },
+      {
+        q: "Can I use a transparent background instead of a color?",
+        a: "This tool specifically replaces the background with a solid color. For transparent backgrounds, use the dedicated background removal tool. Both run locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Is this safe for confidential product images?",
+        a: "Yes. All AI processing happens on your own server. Product photos, unreleased designs, and other sensitive images never leave your network, making it safe for pre-launch and NDA-protected work.",
+      },
+    ],
+  },
+  "blur-background": {
+    searchTitle: "Blur Photo Background Keep Subject Sharp",
+    longDescription:
+      "Automatically detect the subject in a photo and apply a realistic blur to the background, simulating a shallow depth-of-field effect. Adjustable blur strength lets you control the intensity from subtle to dramatic. All processing is local on your self-hosted instance.",
+    useCases: [
+      "Adding portrait-mode blur to smartphone photos that lack optical bokeh",
+      "De-emphasizing cluttered office backgrounds in professional headshots",
+      "Drawing viewer focus to a product by softening the surrounding environment",
+      "Improving visual hierarchy in social media images for higher engagement",
+    ],
+    features: [
+      "AI-powered subject segmentation with smooth edge transitions",
+      "Adjustable blur radius from subtle softening to heavy bokeh simulation",
+      "Preserves fine subject details including hair, glasses, and accessories",
+      "Works on portraits, products, pets, and complex multi-subject scenes",
+      "Maintains original resolution and color fidelity in the output",
+    ],
+    faqs: [
+      {
+        q: "Can I control how blurry the background gets?",
+        a: "Yes, you can adjust the blur strength from a gentle softening to an aggressive bokeh effect. Since SnapOtter is self-hosted, you can experiment with different settings freely without per-image charges.",
+      },
+      {
+        q: "Does it work on photos with multiple people?",
+        a: "The AI model can detect multiple subjects and keep them all sharp while blurring the background. Processing runs entirely on your own hardware, so group photos and team headshots stay private.",
+      },
+      {
+        q: "Will it blur parts of the subject by mistake?",
+        a: "The segmentation model handles most subjects cleanly, especially with good contrast against the background. If edges need refinement, you can re-process locally without limits since everything runs on your self-hosted server.",
+      },
+    ],
+  },
+  "barcode-generate": {
+    searchTitle: "Generate Barcodes and Data Matrix Codes",
+    longDescription:
+      "Generate barcodes in multiple industry-standard formats including Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix. Download high-resolution barcode images ready for print or digital use. Processing is instant and runs entirely on your self-hosted server.",
+    useCases: [
+      "Generating UPC-A barcodes for retail product packaging and labeling",
+      "Creating Code 128 barcodes for internal warehouse inventory tracking labels",
+      "Producing EAN-13 codes for international product distribution compliance",
+      "Generating Data Matrix codes for compact industrial part identification",
+    ],
+    features: [
+      "Supports Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix formats",
+      "High-resolution output suitable for commercial print at any size",
+      "Automatic checksum calculation and input validation per standard",
+      "Configurable dimensions, colors, and quiet zone margins",
+      "Instant generation with no external API dependencies",
+    ],
+    faqs: [
+      {
+        q: "Which barcode format should I use for retail products?",
+        a: "Use UPC-A for North American retail or EAN-13 for international markets. SnapOtter validates your input and calculates checksums automatically, all locally on your self-hosted instance.",
+      },
+      {
+        q: "Are the generated barcodes scannable at commercial quality?",
+        a: "Yes, output images are high-resolution and comply with format specifications including quiet zones. They are suitable for direct use in print layouts, packaging, and label printers.",
+      },
+      {
+        q: "Can I generate barcodes in bulk?",
+        a: "You can process multiple barcodes through batch mode. Since SnapOtter runs on your own server, there are no per-barcode fees or rate limits, making it practical for large catalog operations.",
+      },
+    ],
+  },
+  "circle-crop": {
+    searchTitle: "Crop Image Into Circle Shape",
+    longDescription:
+      "Crop any image into a perfect circle centered on the original, with transparent corners for clean overlay on any background. Ideal for avatars, profile pictures, and design elements. Runs instantly on your self-hosted SnapOtter instance with no external services involved.",
+    useCases: [
+      "Creating circular avatar images for user profiles on a web application",
+      "Preparing round headshots for printed name badges and conference materials",
+      "Making circular product thumbnails for a visually consistent catalog grid",
+      "Generating round social media profile pictures from rectangular source photos",
+    ],
+    features: [
+      "Centered circular crop with transparent PNG corners",
+      "Preserves original image resolution within the circular area",
+      "Works with any input aspect ratio by auto-centering the crop",
+      "Clean anti-aliased edges for smooth circular outlines",
+      "Batch processing for generating many circular images at once",
+    ],
+    faqs: [
+      {
+        q: "What format is the output?",
+        a: "The output is a PNG with transparent corners, so the circle can be placed on any background cleanly. Processing runs on your own self-hosted server with no file uploads to third parties.",
+      },
+      {
+        q: "Can I adjust which part of the image is centered?",
+        a: "The crop centers on the image by default, which works well for centered subjects. For off-center subjects, consider cropping the source first, then applying the circle crop on your local SnapOtter instance.",
+      },
+      {
+        q: "Does it handle non-square images?",
+        a: "Yes, it auto-centers and crops to a circle inscribed within the smaller dimension. Rectangular images work fine, and since it runs locally, you can experiment with different source crops at no cost.",
+      },
+    ],
+  },
+  duotone: {
+    searchTitle: "Apply Duotone Color Effect to Images",
+    longDescription:
+      "Transform any image into a striking two-color duotone with custom shadow and highlight colors. The effect maps dark tones to one color and light tones to another, producing bold editorial and graphic design aesthetics. All processing runs locally on your self-hosted server.",
+    useCases: [
+      "Creating on-brand hero images using company colors for a marketing website",
+      "Designing duotone poster artwork for events, concerts, and social campaigns",
+      "Applying a consistent visual style across a batch of blog post header images",
+      "Producing retro-styled photo effects for print zines and editorial layouts",
+    ],
+    features: [
+      "Custom hex color selection for both shadow and highlight tones",
+      "Smooth tonal mapping that preserves image detail and contrast",
+      "Works with photographs, illustrations, and mixed-content images",
+      "Preserves original resolution and outputs in common image formats",
+      "Real-time preview of color combinations before processing",
+    ],
+    faqs: [
+      {
+        q: "Can I use any two colors I want?",
+        a: "Yes, both the shadow and highlight colors are fully customizable via hex color values. You can match your brand palette exactly, and since SnapOtter is self-hosted, you can iterate on combinations freely.",
+      },
+      {
+        q: "Does the effect work well on photos with lots of detail?",
+        a: "The duotone mapping preserves tonal detail while remapping to your two chosen colors. High-detail photos often produce the most striking results. Processing happens entirely on your own server.",
+      },
+      {
+        q: "Can I batch-process images with the same duotone settings?",
+        a: "Yes, batch mode applies identical settings across multiple images. Running on your self-hosted instance means there are no per-image charges, making it practical for large content libraries.",
+      },
+    ],
+  },
+  "image-pad": {
+    searchTitle: "Pad Image to Target Aspect Ratio",
+    longDescription:
+      "Add padding to an image to reach a specific aspect ratio without cropping or distorting the content. Choose a solid background color for the padded areas. Ideal for preparing images for platforms with strict dimension requirements, all processed locally on your server.",
+    useCases: [
+      "Padding portrait photos to square format for Instagram grid consistency",
+      "Fitting product images into uniform 4:3 slots for an e-commerce listing template",
+      "Preparing screenshots with varied dimensions into a consistent 16:9 for a presentation",
+      "Adding colored borders to artwork to match a print frame aspect ratio",
+    ],
+    features: [
+      "Target aspect ratio selection with common presets and custom ratios",
+      "Custom background color via hex picker for padded areas",
+      "Centers the original image within the new canvas automatically",
+      "Preserves full original image content with no cropping or distortion",
+      "Supports batch processing for uniform formatting across image sets",
+    ],
+    faqs: [
+      {
+        q: "Does padding reduce image quality?",
+        a: "No, the original image pixels are untouched. Padding simply adds colored space around the image to reach the target ratio. All processing runs on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Can I pad to an exact pixel dimension instead of a ratio?",
+        a: "This tool works with aspect ratios. For exact pixel dimensions, combine with the resize tool. Both run locally on your server, so chaining operations is fast and private.",
+      },
+      {
+        q: "What background colors can I use for the padding?",
+        a: "Any solid color via hex value, including white, black, or brand colors. Transparent padding is also available when outputting to PNG. Processing stays entirely on your self-hosted server.",
+      },
+    ],
+  },
+  pixelate: {
+    searchTitle: "Pixelate Images or Specific Regions",
+    longDescription:
+      "Apply a mosaic pixelation effect to an entire image or a selected rectangular region. Useful for both creative pixel-art styles and practical privacy redaction of faces, license plates, or sensitive information. All processing happens locally on your self-hosted server.",
+    useCases: [
+      "Redacting faces in street photography before publishing to comply with privacy regulations",
+      "Obscuring license plates and addresses in real estate listing photos",
+      "Creating retro pixel-art effects from photographs for gaming or social media content",
+      "Hiding sensitive information in screenshots before sharing in bug reports or documentation",
+    ],
+    features: [
+      "Adjustable pixel block size from subtle mosaic to heavy redaction",
+      "Full-image or region-specific pixelation with coordinate selection",
+      "Non-reversible mosaic that securely obscures underlying detail",
+      "Preserves original image dimensions and format",
+      "Batch support for redacting consistent regions across image sets",
+    ],
+    faqs: [
+      {
+        q: "Is pixelation secure enough for privacy redaction?",
+        a: "Yes, mosaic pixelation is destructive and non-reversible when the block size is large enough. The original detail is permanently lost in the output. Processing runs on your own self-hosted server, so sensitive images stay private.",
+      },
+      {
+        q: "Can I pixelate just a face or license plate?",
+        a: "Yes, you can define a rectangular region to pixelate while leaving the rest of the image untouched. This runs locally on your SnapOtter instance with no images sent to external services.",
+      },
+      {
+        q: "What block size should I use?",
+        a: "For privacy redaction, use a larger block size that makes the content unrecognizable. For creative effects, smaller sizes preserve more detail. Since it runs on your server, you can preview different sizes freely.",
+      },
+    ],
+  },
+  vignette: {
+    searchTitle: "Add Vignette Effect to Photos",
+    longDescription:
+      "Apply a soft vignette darkening around the edges of a photo to draw the viewer's eye toward the center. Adjustable strength, size, and color let you create anything from subtle film-style fading to dramatic spotlight framing. Processed entirely on your self-hosted server.",
+    useCases: [
+      "Adding a cinematic vignette to portrait photography for a polished editorial look",
+      "Enhancing food photography by subtly darkening plate edges to focus on the dish",
+      "Applying consistent vignette styling across a wedding photo album batch",
+      "Creating moody atmospheric effects on landscape and street photography",
+    ],
+    features: [
+      "Adjustable vignette strength from barely visible to dramatic darkening",
+      "Configurable size and shape to control how far the effect extends inward",
+      "Custom vignette color option beyond the default black fade",
+      "Smooth, natural gradient transition with no hard edges",
+      "Batch processing for applying uniform vignette across a photo set",
+    ],
+    faqs: [
+      {
+        q: "Can I change the vignette color from black to something else?",
+        a: "Yes, the vignette color is configurable, so you can use warm tones, cool tones, or any custom color. Since SnapOtter runs on your own server, experimenting with different styles is instant and free.",
+      },
+      {
+        q: "Will the vignette look natural on different image sizes?",
+        a: "The effect scales proportionally to the image dimensions, so it looks consistent regardless of resolution. All processing happens locally on your self-hosted instance.",
+      },
+      {
+        q: "Can I preview the vignette before saving?",
+        a: "Yes, the live preview shows the effect in real time as you adjust the controls. Everything runs on your local SnapOtter server with no external processing involved.",
+      },
+    ],
+  },
+  "gif-webp": {
+    searchTitle: "Convert Animated GIF to WebP",
+    longDescription:
+      "Convert animated GIFs to WebP and vice versa while preserving all frames, timing, and loop settings. WebP animations offer significantly smaller file sizes at comparable quality. All conversion runs on your self-hosted server with no file uploads to third-party services.",
+    useCases: [
+      "Converting GIF stickers to WebP for faster loading on a messaging platform",
+      "Reducing animated banner file sizes for improved web page performance scores",
+      "Converting WebP animations back to GIF for compatibility with older email clients",
+      "Optimizing animated product demos for mobile web where bandwidth is limited",
+    ],
+    features: [
+      "Bidirectional conversion between animated GIF and animated WebP",
+      "Preserves all frames, frame delays, and loop count settings",
+      "Significant file size reduction when converting GIF to WebP",
+      "Configurable quality and compression settings for the output",
+      "Handles large frame counts and high-resolution animated images",
+    ],
+    faqs: [
+      {
+        q: "How much smaller are WebP animations compared to GIF?",
+        a: "WebP animations are typically 30-50% smaller than equivalent GIFs at similar visual quality. The exact savings depend on content complexity. All conversion runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Will the animation timing be preserved?",
+        a: "Yes, all frame delays, loop counts, and animation metadata are preserved during conversion. The output plays identically to the input, just in a different format, all processed locally.",
+      },
+      {
+        q: "Does it support converting WebP back to GIF?",
+        a: "Yes, conversion works in both directions. This is useful when you need GIF compatibility for platforms that do not support WebP. Processing stays entirely on your own self-hosted server.",
+      },
+    ],
+  },
+  histogram: {
+    searchTitle: "Generate RGB Histogram From Image",
+    longDescription:
+      "Analyze the tonal distribution of any image by generating a detailed RGB histogram chart. Visualize the red, green, and blue channel distributions to evaluate exposure, contrast, and color balance. Processed instantly on your self-hosted server.",
+    useCases: [
+      "Evaluating exposure and highlight clipping before finalizing a photo edit",
+      "Comparing color balance across a series of product photos for visual consistency",
+      "Analyzing tonal range in scanned artwork to guide color correction decisions",
+      "Teaching photography students about exposure using visual channel breakdowns",
+    ],
+    features: [
+      "Separate red, green, and blue channel visualization on a single chart",
+      "Clear histogram rendering with labeled axes and tonal range indicators",
+      "Works with any image format and resolution supported by the platform",
+      "Instant analysis with no external processing or API calls",
+      "Downloadable chart image for inclusion in reports or presentations",
+    ],
+    faqs: [
+      {
+        q: "What does the histogram tell me about my image?",
+        a: "The histogram shows the distribution of dark to light tones across red, green, and blue channels. Peaks at the edges indicate clipping, while the overall shape reveals exposure and contrast characteristics. Analysis runs locally on your server.",
+      },
+      {
+        q: "Can I use this to compare multiple images?",
+        a: "You can generate histograms for each image and compare them visually. Since SnapOtter is self-hosted, you can process as many images as needed without usage limits or uploading files externally.",
+      },
+      {
+        q: "Does it modify my original image?",
+        a: "No, the histogram is a read-only analysis tool. It generates a chart image without altering the original file. All processing happens on your own self-hosted SnapOtter instance.",
+      },
+    ],
+  },
+  "lqip-placeholder": {
+    searchTitle: "Generate Low-Quality Image Placeholders",
+    longDescription:
+      "Create tiny low-quality image placeholders (LQIP) with inline base64 data URIs for instant page rendering while full images load. Dramatically improves perceived loading performance for image-heavy web pages. Generated entirely on your self-hosted server.",
+    useCases: [
+      "Generating blur-up placeholder images for a lazy-loaded photo gallery website",
+      "Creating base64 LQIP strings for server-side rendered pages to eliminate layout shift",
+      "Producing thumbnail previews for a content management system image library",
+      "Building progressive image loading for a bandwidth-sensitive mobile web application",
+    ],
+    features: [
+      "Generates tiny placeholders typically under 1KB in base64-encoded data URIs",
+      "Configurable output size and blur level for quality-size tradeoff control",
+      "Outputs ready-to-embed base64 data URI strings for direct HTML or CSS use",
+      "Preserves aspect ratio to prevent cumulative layout shift during loading",
+      "Batch generation for processing entire image directories at once",
+    ],
+    faqs: [
+      {
+        q: "How small are the generated placeholder images?",
+        a: "Placeholders are typically under 1KB as base64 strings, small enough to inline directly in HTML without meaningful page weight impact. Generation runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Can I control the blur level of the placeholder?",
+        a: "Yes, you can adjust the size and blur parameters to balance between a recognizable preview and minimal file size. All processing is local, so iterating on settings is instant and free.",
+      },
+      {
+        q: "What format is the output?",
+        a: "The output is a base64-encoded data URI string that you can embed directly in img src attributes or CSS background properties. Everything is generated on your own self-hosted server with no external dependencies.",
+      },
+    ],
+  },
+  "sprite-sheet": {
+    searchTitle: "Combine Images Into Sprite Sheet Grid",
+    longDescription:
+      "Combine multiple individual images into a single sprite sheet arranged in a configurable grid layout. Essential for game development, CSS sprite optimization, and animation frame packing. All compositing runs on your self-hosted server with no external uploads.",
+    useCases: [
+      "Packing game animation frames into a single sprite sheet for a 2D game engine",
+      "Combining UI icons into a CSS sprite sheet to reduce HTTP requests on a website",
+      "Creating contact sheets from a set of product photos for client review",
+      "Assembling animation frame sequences for sprite-based web animations",
+    ],
+    features: [
+      "Configurable grid dimensions with custom columns and rows",
+      "Automatic cell sizing based on the largest input image dimensions",
+      "Padding and spacing controls between individual sprite cells",
+      "Supports mixed input image sizes with consistent cell alignment",
+      "Outputs a single image file with optional coordinate metadata",
+    ],
+    faqs: [
+      {
+        q: "Can I set custom grid dimensions?",
+        a: "Yes, you can specify the number of columns and rows, and images fill the grid in order. Cell sizes adjust automatically based on input dimensions. Processing runs entirely on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "What happens if input images are different sizes?",
+        a: "Each cell is sized to fit the largest input image, and smaller images are centered within their cells. This ensures a clean, uniform grid layout, all processed locally on your server.",
+      },
+      {
+        q: "Can I add spacing between sprites?",
+        a: "Yes, configurable padding and spacing options let you add gaps between cells. This is useful for preventing texture bleeding in game engines. All compositing happens on your self-hosted instance.",
+      },
+    ],
+  },
+  "convert-video": {
+    searchTitle: "Convert Video Between MP4 MOV WebM",
+    longDescription:
+      "Convert videos between MP4, MOV, and WebM formats with control over codec, quality, and compatibility settings. Handles format differences transparently while preserving audio, subtitles, and metadata. All transcoding runs locally on your self-hosted server.",
+    useCases: [
+      "Converting MOV files from iPhone recordings to MP4 for universal web playback",
+      "Producing WebM versions of marketing videos for better browser-native performance",
+      "Re-encoding legacy video files into modern codecs for reduced storage costs",
+      "Converting client-delivered footage into the format required by an editing workflow",
+    ],
+    features: [
+      "Supports MP4, MOV, and WebM containers with modern codec options",
+      "Preserves audio tracks, subtitle streams, and file metadata during conversion",
+      "Configurable quality and bitrate settings for size-quality tradeoff control",
+      "Hardware acceleration support for faster transcoding on capable servers",
+      "Handles high-resolution source files including 4K and HDR content",
+    ],
+    faqs: [
+      {
+        q: "Which format should I choose for web playback?",
+        a: "MP4 with H.264 offers the widest compatibility, while WebM with VP9 provides better compression at similar quality. Both work in modern browsers. All transcoding runs on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Will the conversion lose quality?",
+        a: "Some quality loss is inherent in re-encoding, but you can control the tradeoff with quality settings. Higher quality settings produce larger files. Processing stays entirely on your own server.",
+      },
+      {
+        q: "Can I convert videos with subtitles and multiple audio tracks?",
+        a: "Yes, subtitle streams and audio tracks are preserved during conversion by default. All processing happens locally on your self-hosted server, so even large multi-track files stay private.",
+      },
+    ],
+  },
+  "compress-video": {
+    searchTitle: "Compress Video Reduce File Size",
+    longDescription:
+      "Reduce video file size with adjustable quality controls, balancing compression ratio against visual fidelity. Uses efficient encoding to achieve significant size reduction while maintaining watchable quality. All compression runs locally on your self-hosted server.",
+    useCases: [
+      "Shrinking large screen recordings before attaching them to email or Slack messages",
+      "Compressing raw camera footage for faster upload to a video editing collaboration tool",
+      "Reducing video file sizes for a mobile app where storage and bandwidth are constrained",
+      "Archiving surveillance or dashcam footage at reduced size for long-term retention",
+    ],
+    features: [
+      "Adjustable quality slider from visually lossless to aggressive compression",
+      "Real-time size estimation based on selected compression settings",
+      "Preserves audio quality independently from video compression settings",
+      "Two-pass encoding option for optimal quality-to-size ratio",
+      "Progress tracking with estimated time remaining for large files",
+    ],
+    faqs: [
+      {
+        q: "How much can I reduce the file size?",
+        a: "Typical reductions range from 30% to 80% depending on the source material and quality setting. Highly compressed sources yield less savings. All compression runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Will viewers notice the quality difference?",
+        a: "At moderate compression settings, the difference is barely perceptible in most content. Aggressive settings may show artifacts in fast motion or fine detail. You can preview locally since processing is self-hosted.",
+      },
+      {
+        q: "Does it re-encode the audio too?",
+        a: "Audio quality is preserved by default, with an option to compress it separately if needed. Since SnapOtter is self-hosted, your video files never leave your network during the compression process.",
+      },
+    ],
+  },
+  "trim-video": {
+    searchTitle: "Trim and Cut Video Clips",
+    longDescription:
+      "Cut a specific segment from a video by setting precise start and end timestamps. Extract the exact clip you need without re-encoding the entire file. All trimming runs on your self-hosted server, keeping unpublished footage private.",
+    useCases: [
+      "Extracting a key moment from a long webinar recording for social media sharing",
+      "Cutting intro and outro segments from a raw podcast video before publishing",
+      "Isolating a specific scene from security camera footage for an incident report",
+      "Trimming dead air from screen recordings before sharing with a team",
+    ],
+    features: [
+      "Frame-accurate start and end timestamp selection",
+      "Fast stream-copy mode that avoids re-encoding for instant results",
+      "Re-encode option for frame-perfect cuts at any timestamp",
+      "Preserves all audio, subtitle, and metadata tracks in the trimmed output",
+      "Progress indicator for large file operations",
+    ],
+    faqs: [
+      {
+        q: "Does trimming re-encode the entire video?",
+        a: "By default it uses fast stream-copy mode which extracts the segment without re-encoding, making it nearly instant. A re-encode option is available for frame-perfect accuracy. All processing runs on your self-hosted server.",
+      },
+      {
+        q: "Can I trim confidential footage safely?",
+        a: "Yes, since SnapOtter is entirely self-hosted, your video files never leave your network. This makes it suitable for security footage, unreleased content, or any sensitive recordings.",
+      },
+      {
+        q: "How precise are the cut points?",
+        a: "Stream-copy mode cuts at the nearest keyframe, while re-encode mode provides frame-exact precision. Both options are available on your self-hosted SnapOtter instance with no file size limits.",
+      },
+    ],
+  },
+  "mute-video": {
+    searchTitle: "Remove Audio Track From Video",
+    longDescription:
+      "Strip the audio track from any video file, producing a silent video that retains full visual quality. Useful for removing unwanted background noise, music, or conversations. Processing is instant and runs entirely on your self-hosted server.",
+    useCases: [
+      "Removing background conversation from a screen recording before sharing publicly",
+      "Stripping copyrighted music from footage before uploading to avoid content claims",
+      "Preparing silent B-roll clips for a video editor to score with custom audio",
+      "Removing wind noise and ambient sound from drone footage for a clean visual reel",
+    ],
+    features: [
+      "Instant audio track removal via stream copy with no video re-encoding",
+      "Preserves original video quality, resolution, and frame rate completely",
+      "Works with all supported video formats including MP4, MOV, and WebM",
+      "Handles videos with multiple audio tracks by removing all of them",
+      "Batch processing support for muting multiple videos at once",
+    ],
+    faqs: [
+      {
+        q: "Does removing audio re-encode the video?",
+        a: "No, it uses stream copy to strip the audio track without touching the video data. The operation is nearly instant regardless of file size. All processing runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Can I remove just one audio track from a multi-track video?",
+        a: "This tool removes all audio tracks. For selective track management, a video editor is more appropriate. The muting process runs entirely locally on your self-hosted instance.",
+      },
+      {
+        q: "Is this suitable for removing sensitive audio from recordings?",
+        a: "Yes, the audio track is completely removed from the output file. Since SnapOtter is self-hosted, the original recording with audio never leaves your network during processing.",
+      },
+    ],
+  },
+  "video-to-gif": {
+    searchTitle: "Convert Video Clips to Animated GIF",
+    longDescription:
+      "Turn any video clip into an animated GIF with control over resolution, frame rate, and quality. Produce shareable animations from screen recordings, camera footage, or any video source. All conversion happens on your self-hosted server with no external uploads.",
+    useCases: [
+      "Creating animated GIF previews of app features for README files and documentation",
+      "Converting short video clips into shareable reaction GIFs for messaging platforms",
+      "Making animated product demos from screen recordings for email newsletters",
+      "Producing GIF thumbnails from video content for a media library browser",
+    ],
+    features: [
+      "Configurable output resolution and frame rate for size-quality balance",
+      "Adjustable color palette size for optimizing GIF file size",
+      "Start and end time selection to convert a specific video segment",
+      "Dithering options for smoother color gradients in the GIF output",
+      "Loop control including infinite loop, fixed count, or single play",
+    ],
+    faqs: [
+      {
+        q: "How can I keep the GIF file size manageable?",
+        a: "Lower the resolution, reduce the frame rate, and limit the color palette. Shorter clips also produce smaller files. You can experiment freely since processing runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Can I convert just a portion of the video?",
+        a: "Yes, you can set start and end timestamps to convert only a specific segment into a GIF. All processing happens locally on your self-hosted instance without uploading the full video anywhere.",
+      },
+      {
+        q: "What video formats can I convert from?",
+        a: "All common formats are supported including MP4, MOV, WebM, and more. The conversion engine handles format detection automatically. Everything runs on your own server with no external service dependencies.",
+      },
+    ],
+  },
+  "resize-video": {
+    searchTitle: "Resize Video to Any Resolution",
+    longDescription:
+      "Scale videos to a specific resolution, preset size, or percentage while maintaining aspect ratio or applying a custom ratio. Useful for preparing content for different platforms and display requirements. All resizing runs on your self-hosted server.",
+    useCases: [
+      "Downscaling 4K footage to 1080p for faster web streaming and reduced bandwidth",
+      "Resizing screen recordings to fit specific social media platform dimension requirements",
+      "Scaling tutorial videos to a standard resolution for a consistent course catalog",
+      "Reducing video dimensions for embedding in presentations or email-friendly sizes",
+    ],
+    features: [
+      "Custom resolution input with width and height in pixels",
+      "Common presets for 720p, 1080p, 4K, and popular social media sizes",
+      "Aspect ratio lock to prevent distortion during scaling",
+      "High-quality scaling algorithm that minimizes artifacting",
+      "Progress tracking for large file resize operations",
+    ],
+    faqs: [
+      {
+        q: "Will resizing reduce the file size?",
+        a: "Downscaling generally reduces file size since fewer pixels require less data. The exact reduction depends on the codec and quality settings. All resizing runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Can I upscale a low-resolution video?",
+        a: "You can increase the dimensions, though upscaling cannot add detail that is not in the source. The algorithm produces smooth results without blocky artifacts. Processing stays entirely on your local server.",
+      },
+      {
+        q: "Does it maintain the aspect ratio?",
+        a: "Yes, aspect ratio is locked by default to prevent distortion. You can unlock it for custom ratios if needed. All processing happens on your self-hosted instance with no external uploads.",
+      },
+    ],
+  },
+  "crop-video": {
+    searchTitle: "Crop Region From Video Frame",
+    longDescription:
+      "Crop a rectangular region from each frame of a video, removing unwanted outer areas while preserving the content within the selected bounds. Useful for reframing shots, removing borders, and adapting aspect ratios. All cropping runs on your self-hosted server.",
+    useCases: [
+      "Removing black letterbox bars from a video recorded in the wrong aspect ratio",
+      "Cropping a speaker from a wide conference recording into a tighter portrait frame",
+      "Extracting a specific screen region from a multi-monitor desktop recording",
+      "Reframing landscape footage into vertical format for mobile social media posts",
+    ],
+    features: [
+      "Visual crop region selection with adjustable coordinates and dimensions",
+      "Preset aspect ratio guides for common social media and broadcast formats",
+      "Preserves audio and subtitle tracks through the crop operation",
+      "High-quality re-encoding with minimal generation loss",
+      "Frame preview to verify crop positioning before processing",
+    ],
+    faqs: [
+      {
+        q: "Does cropping reduce the video resolution?",
+        a: "Yes, the output resolution matches the cropped region dimensions, which are smaller than the original. This is expected since you are selecting a subset of the frame. Processing runs on your self-hosted server.",
+      },
+      {
+        q: "Can I crop to a specific aspect ratio for social media?",
+        a: "Yes, preset guides for common ratios like 9:16, 1:1, and 4:5 are available to help position the crop region precisely. All processing happens locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Is the audio preserved when cropping?",
+        a: "Yes, all audio and subtitle tracks are preserved unchanged since cropping only affects the visual frame. Everything runs on your own self-hosted server with no external service involved.",
+      },
+    ],
+  },
+  "rotate-video": {
+    searchTitle: "Rotate or Flip Video Orientation",
+    longDescription:
+      "Rotate a video by 90, 180, or 270 degrees, or flip it horizontally or vertically to correct orientation issues. Fixes videos recorded in the wrong orientation or creates mirror effects. All rotation runs locally on your self-hosted server.",
+    useCases: [
+      "Correcting a smartphone video that was accidentally recorded in the wrong orientation",
+      "Flipping tutorial screen recordings to match a mirrored presentation layout",
+      "Rotating security camera footage to the correct viewing angle for a report",
+      "Creating a horizontal mirror effect for artistic video content",
+    ],
+    features: [
+      "Rotation in 90-degree increments: 90, 180, and 270 degrees",
+      "Horizontal and vertical flip operations for mirror effects",
+      "Metadata correction to ensure players respect the new orientation",
+      "Preserves audio, subtitles, and all non-visual tracks",
+      "Fast processing via stream manipulation where codec allows",
+    ],
+    faqs: [
+      {
+        q: "Does rotating re-encode the video?",
+        a: "Simple 90-degree rotations can often be done via metadata without re-encoding, making them nearly instant. More complex transformations may require re-encoding. All processing runs on your self-hosted server.",
+      },
+      {
+        q: "Can I rotate and flip at the same time?",
+        a: "Yes, you can combine rotation with horizontal or vertical flipping in a single operation. This runs locally on your SnapOtter instance and processes both transformations in one pass.",
+      },
+      {
+        q: "Will the audio stay in sync after rotation?",
+        a: "Yes, audio and subtitle tracks are completely unaffected by visual rotation or flipping. All streams remain synchronized in the output. Processing stays on your self-hosted server.",
+      },
+    ],
+  },
+  "change-fps": {
+    searchTitle: "Change Video Frame Rate FPS",
+    longDescription:
+      "Adjust the frame rate of a video to a specific FPS value, converting between cinema, broadcast, gaming, and web standards. Useful for matching delivery requirements or creating slow-motion and time-lapse effects. All processing runs on your self-hosted server.",
+    useCases: [
+      "Converting 60fps gaming footage to 30fps for consistent YouTube upload standards",
+      "Reducing frame rate of security camera footage to save storage on archival drives",
+      "Converting 24fps cinema content to 30fps for broadcast television requirements",
+      "Increasing apparent frame rate of stop-motion content for smoother playback",
+    ],
+    features: [
+      "Custom FPS target with common presets for 24, 25, 30, 48, and 60 fps",
+      "Frame blending option for smoother motion when reducing frame rate",
+      "Frame duplication option for increasing frame rate without interpolation",
+      "Preserves audio sync across frame rate changes",
+      "Handles variable frame rate sources by normalizing to constant FPS",
+    ],
+    faqs: [
+      {
+        q: "Does lowering the frame rate reduce file size?",
+        a: "Yes, fewer frames per second means less data and a smaller file. The reduction is roughly proportional to the FPS decrease. All processing runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Will changing FPS affect audio sync?",
+        a: "No, the audio track is adjusted to maintain perfect synchronization with the new frame rate. Both audio and video timelines stay aligned. Processing happens entirely on your local server.",
+      },
+      {
+        q: "Can I use this to create slow-motion effects?",
+        a: "Reducing FPS can create a choppy slow-motion look. For smooth slow motion, dedicated slow-motion tools with frame interpolation are better suited. This tool focuses on frame rate conversion for delivery standards, all processed locally.",
+      },
+    ],
+  },
+  "video-color": {
+    searchTitle: "Adjust Video Brightness Contrast Saturation",
+    longDescription:
+      "Fine-tune video color properties including brightness, contrast, saturation, and gamma correction. Fix underexposed footage, boost dull colors, or create stylized looks with precise adjustments. All color grading runs locally on your self-hosted server.",
+    useCases: [
+      "Brightening dark indoor footage from a poorly lit conference room recording",
+      "Boosting saturation on product demo videos to make colors more vibrant on screen",
+      "Correcting washed-out contrast in screen recordings displayed on projector footage",
+      "Applying consistent color grading across a batch of tutorial videos for brand consistency",
+    ],
+    features: [
+      "Independent brightness, contrast, saturation, and gamma controls",
+      "Real-time preview of adjustments before committing to processing",
+      "Precise numeric input for repeatable, consistent adjustments across videos",
+      "Handles HDR and high-bit-depth source material",
+      "Batch processing for applying identical corrections across a video series",
+    ],
+    faqs: [
+      {
+        q: "Can I preview changes before processing the full video?",
+        a: "Yes, the interface shows a real-time preview of your adjustments on a frame from the video. Once you are satisfied, the full video is processed on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "What is gamma correction used for?",
+        a: "Gamma adjusts the mid-tone brightness without affecting the darkest shadows or brightest highlights. It is useful for lifting detail in underexposed footage. All adjustments are processed locally on your server.",
+      },
+      {
+        q: "Can I apply the same corrections to multiple videos?",
+        a: "Yes, batch processing applies identical settings across all selected videos. Since SnapOtter is self-hosted, there are no per-video charges and your footage stays on your own network.",
+      },
+    ],
+  },
+  "video-speed": {
+    searchTitle: "Speed Up or Slow Down Video",
+    longDescription:
+      "Change the playback speed of a video from slow motion to fast forward with precise speed multiplier control. Audio pitch can be preserved or shifted naturally with the speed change. All processing runs locally on your self-hosted server.",
+    useCases: [
+      "Creating a 2x speed version of a long tutorial to produce a quick-overview highlight reel",
+      "Slowing down a sports replay to analyze a specific moment in detail",
+      "Producing time-lapse videos from real-time recordings of cooking, drawing, or building",
+      "Adjusting interview footage speed to fit a specific runtime for a documentary edit",
+    ],
+    features: [
+      "Precise speed multiplier from 0.25x slow motion to 4x fast forward",
+      "Audio pitch correction to maintain natural voice at altered speeds",
+      "Option to discard audio entirely for pure visual speed changes",
+      "Smooth frame timing with no dropped frames or stuttering",
+      "Preserves video quality and resolution regardless of speed change",
+    ],
+    faqs: [
+      {
+        q: "Does changing speed affect audio pitch?",
+        a: "By default, audio pitch is preserved so voices sound natural even at different speeds. You can also let pitch shift naturally or remove audio entirely. Processing runs on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "What speed range is supported?",
+        a: "You can set speeds from 0.25x (quarter speed) to 4x (quadruple speed). Both acceleration and deceleration maintain smooth playback. All processing happens locally on your self-hosted instance.",
+      },
+      {
+        q: "Can I speed up just a section of the video?",
+        a: "This tool applies a uniform speed change to the entire video. To speed up a specific section, trim that segment first and then change its speed. Both tools run locally on your self-hosted server.",
+      },
+    ],
+  },
+
+  "reverse-video": {
+    searchTitle: "Reverse Video Clip Online Free",
+    longDescription:
+      "Play any video clip backwards with a single click. SnapOtter reverses the full video stream while preserving the original resolution and frame rate. All processing runs on your own server, so your footage never leaves your network.",
+    useCases: [
+      "Create dramatic reveal shots for social media reels by reversing action sequences",
+      "Review manufacturing line footage in reverse to pinpoint where a defect was introduced",
+      "Generate boomerang-style content from regular video clips for Instagram stories",
+      "Reverse dashcam or security footage to study an incident frame by frame",
+    ],
+    features: [
+      "Preserves original resolution, codec, and frame rate during reversal",
+      "Handles audio reversal alongside video or strips it entirely",
+      "Supports MP4, WebM, MOV, and AVI input formats",
+      "Processes large files via chunked streaming without memory spikes",
+      "Runs entirely on your infrastructure with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "Is the audio also reversed?",
+        a: "Yes, by default the audio track is reversed along with the video. You can choose to strip the audio instead if you prefer a silent result. All processing happens locally on your server.",
+      },
+      {
+        q: "What is the maximum file size supported?",
+        a: "There is no hard-coded limit. The maximum depends on the disk space and memory available on your self-hosted instance. Because files are streamed through your own server, nothing is uploaded to the cloud.",
+      },
+      {
+        q: "Will reversing reduce the video quality?",
+        a: "No. SnapOtter re-encodes at the same quality settings as the original file. The output resolution, frame rate, and bitrate match the source. Processing is done locally so there is no re-compression from a third-party service.",
+      },
+    ],
+  },
+  "video-loudnorm": {
+    searchTitle: "Normalize Video Audio Volume Online",
+    longDescription:
+      "Bring video audio to a consistent broadcast-standard loudness level using EBU R128 two-pass normalization. This fixes clips that are too quiet or painfully loud without clipping. SnapOtter processes everything on your own server, keeping your media private.",
+    useCases: [
+      "Equalize volume across interview clips recorded with different microphones before editing",
+      "Prepare podcast video episodes so listeners do not need to adjust volume between segments",
+      "Normalize corporate training videos so narration is audible over background noise",
+      "Fix user-submitted event recordings that have wildly inconsistent audio levels",
+    ],
+    features: [
+      "EBU R128 two-pass loudness normalization to broadcast standard (-14 LUFS)",
+      "Prevents clipping by applying true-peak limiting during normalization",
+      "Leaves the video stream untouched while only re-encoding the audio",
+      "Supports MP4, WebM, MOV, and MKV containers",
+      "Runs on your own infrastructure with no third-party audio processing",
+    ],
+    faqs: [
+      {
+        q: "What loudness standard does this use?",
+        a: "SnapOtter normalizes to EBU R128 at -14 LUFS, the broadcast standard used by YouTube, Spotify, and major streaming platforms. The two-pass approach measures loudness first, then adjusts precisely. Everything runs locally on your server.",
+      },
+      {
+        q: "Does normalization affect video quality?",
+        a: "No. Only the audio track is re-encoded. The video stream is copied bit-for-bit, so there is zero quality loss on the visual side. All processing stays on your own hardware.",
+      },
+      {
+        q: "Can I normalize multiple clips at once?",
+        a: "Yes, SnapOtter supports batch processing. Upload multiple video files and each will be normalized independently to the target loudness. Files remain on your server throughout the process.",
+      },
+    ],
+  },
+  "aspect-pad": {
+    searchTitle: "Add Letterbox Padding to Video",
+    longDescription:
+      "Add solid-color bars (letterbox or pillarbox) to a video so it fits a target aspect ratio without cropping or stretching. Choose any background color to match your brand or platform requirements. Processing runs entirely on your self-hosted instance.",
+    useCases: [
+      "Convert vertical phone recordings to 16:9 for YouTube upload with black bars",
+      "Prepare widescreen footage for square Instagram feed posts with branded color padding",
+      "Reformat old 4:3 archive footage to 16:9 for a modern presentation",
+      "Add consistent white padding to product demo videos before embedding on a website",
+    ],
+    features: [
+      "Supports any target aspect ratio including 16:9, 9:16, 1:1, and 4:3",
+      "Custom background color picker for padding bars in any hex value",
+      "Preserves original video quality and audio without re-encoding the audio stream",
+      "Handles portrait-to-landscape and landscape-to-portrait conversions",
+      "Processes on your own server with no cloud dependency",
+    ],
+    faqs: [
+      {
+        q: "Does padding reduce the video resolution?",
+        a: "No. The original video frame is embedded at its full resolution inside the new canvas. The output resolution increases to accommodate the padding. All processing runs locally on your server.",
+      },
+      {
+        q: "Can I use a custom color for the bars?",
+        a: "Yes, you can set any hex color for the padding bars. This is useful for matching brand guidelines or creating a clean look. The color is applied during local processing without uploading your file anywhere.",
+      },
+      {
+        q: "What aspect ratios are supported?",
+        a: "You can target any aspect ratio. Common presets include 16:9, 9:16, 1:1, 4:3, and 21:9, but custom ratios are also accepted. SnapOtter calculates the padding automatically on your own server.",
+      },
+    ],
+  },
+  "blur-pad": {
+    searchTitle: "Add Blurred Background Padding to Video",
+    longDescription:
+      "Fill the padding bars around a video with a blurred copy of the footage itself instead of solid color. This creates a polished look popular on social media when repurposing vertical video for horizontal formats. All processing stays on your self-hosted server.",
+    useCases: [
+      "Repurpose vertical TikTok clips for YouTube by filling sides with blurred background",
+      "Convert phone-recorded interviews to 16:9 with a professional blurred backdrop",
+      "Prepare user-generated content for TV broadcast with blurred pillarbox fill",
+      "Create visually cohesive social media compilations from mixed-orientation source clips",
+    ],
+    features: [
+      "Fills padding with a dynamically blurred and scaled copy of the source video",
+      "Adjustable blur intensity to control the background softness",
+      "Supports any target aspect ratio conversion",
+      "Preserves original audio and center-frame video quality",
+      "Runs entirely on your own hardware with no files sent externally",
+    ],
+    faqs: [
+      {
+        q: "How is blur pad different from aspect pad?",
+        a: "Aspect pad fills the bars with a solid color, while blur pad fills them with a blurred, zoomed-in copy of the video itself. This creates a more visually appealing result. Both tools process files locally on your server.",
+      },
+      {
+        q: "Can I control how blurry the background is?",
+        a: "Yes, you can adjust the blur intensity to make the background more or less soft. A higher value creates a smoother, more abstract fill. The setting is applied during local processing on your own instance.",
+      },
+      {
+        q: "Does this work with vertical videos?",
+        a: "Yes, blur pad is ideal for converting vertical (9:16) videos to horizontal (16:9) format. The sides are filled with a blurred version of the footage for a professional look. All processing happens privately on your server.",
+      },
+    ],
+  },
+  "watermark-video": {
+    searchTitle: "Add Text Watermark to Video",
+    longDescription:
+      "Burn a persistent text watermark directly onto video frames. Customize the text, position, font size, color, and opacity to protect your content or add branding. SnapOtter renders the watermark locally on your server so your original footage stays private.",
+    useCases: [
+      "Add a company logo text to client preview videos before final approval",
+      "Watermark stock footage with a copyright notice before distributing samples",
+      "Brand internal training videos with a department name in the corner",
+      "Mark confidential review copies of pre-release marketing content",
+    ],
+    features: [
+      "Customizable watermark text, font size, color, and opacity",
+      "Precise positioning with preset corners and center, or custom coordinates",
+      "Burned directly into frames so it cannot be removed by re-encoding",
+      "Supports all common video formats including MP4, WebM, and MOV",
+      "Processes on your own server without exposing content to third parties",
+    ],
+    faqs: [
+      {
+        q: "Can the watermark be removed after applying?",
+        a: "No. The watermark is burned directly into the video frames, making it a permanent part of the image. Keep your original unwatermarked file if you need a clean version. All processing runs on your own server.",
+      },
+      {
+        q: "Can I adjust the watermark transparency?",
+        a: "Yes, you can set the opacity from fully transparent to fully opaque. A semi-transparent watermark is common for preview copies. The rendering happens locally so your footage never leaves your network.",
+      },
+      {
+        q: "Does watermarking affect video quality?",
+        a: "The video is re-encoded to embed the watermark, but SnapOtter uses high-quality encoding settings to minimize any loss. The output maintains the original resolution and frame rate. Processing stays entirely on your infrastructure.",
+      },
+    ],
+  },
+  "stabilize-video": {
+    searchTitle: "Stabilize Shaky Video Online Free",
+    longDescription:
+      "Reduce camera shake and jitter using a two-pass stabilization algorithm. The first pass analyzes motion vectors, and the second pass applies smooth corrections. SnapOtter handles all processing on your own server, so shaky footage stays private.",
+    useCases: [
+      "Smooth out handheld walking footage for a travel vlog or documentary",
+      "Stabilize drone footage affected by wind turbulence before publishing",
+      "Fix shaky phone recordings of live events for archival purposes",
+      "Clean up action camera footage from cycling or running for a highlight reel",
+    ],
+    features: [
+      "Two-pass vidstab algorithm for accurate motion analysis and correction",
+      "Adjustable stabilization strength and smoothing window",
+      "Automatic border cropping or zoom to hide correction artifacts at edges",
+      "Preserves audio sync throughout the stabilization process",
+      "Runs entirely on your self-hosted instance with no cloud processing",
+    ],
+    faqs: [
+      {
+        q: "How does two-pass stabilization work?",
+        a: "The first pass analyzes every frame to build a motion profile of the camera shake. The second pass applies corrective transforms to smooth out that motion. This two-step approach produces much better results than single-pass methods. All analysis runs on your own server.",
+      },
+      {
+        q: "Will stabilization crop my video?",
+        a: "Slight cropping or zooming at the edges may occur as the algorithm compensates for camera movement. You can control the zoom level to balance stability against visible frame area. Processing happens locally on your hardware.",
+      },
+      {
+        q: "Can I stabilize very long videos?",
+        a: "Yes. SnapOtter streams the video through the stabilization pipeline without loading the entire file into memory. Processing time scales with duration but there is no hard limit. Your files never leave your server.",
+      },
+    ],
+  },
+  "gif-to-video": {
+    searchTitle: "Convert GIF to MP4 Video Free",
+    longDescription:
+      "Convert animated GIFs into efficient MP4 or WebM video files. This dramatically reduces file size while improving visual quality by replacing GIF's 256-color palette with modern video compression. Processing runs on your own self-hosted SnapOtter instance.",
+    useCases: [
+      "Convert GIF animations to MP4 for faster page loads on a website",
+      "Reduce the size of GIF-heavy Slack or documentation assets by converting to WebM",
+      "Prepare GIF content for video editing software that does not support GIF input",
+      "Migrate a library of animated GIFs to video format for bandwidth savings",
+    ],
+    features: [
+      "Output to MP4 (H.264) or WebM (VP9) with configurable quality",
+      "Typically achieves 80-90% file size reduction compared to the source GIF",
+      "Preserves animation timing, loop count, and frame dimensions",
+      "Handles transparent GIF frames by compositing onto a chosen background color",
+      "All conversion runs locally on your server with no external uploads",
+    ],
+    faqs: [
+      {
+        q: "How much smaller will the output be?",
+        a: "Video files are typically 80-90% smaller than the equivalent GIF because modern codecs like H.264 compress far more efficiently than GIF's LZW algorithm. The exact savings depend on the content. Conversion runs locally on your server.",
+      },
+      {
+        q: "Will the animation look the same?",
+        a: "Yes, and often better. GIFs are limited to 256 colors per frame, while MP4 and WebM support millions of colors. The animation timing is preserved exactly. All processing happens on your own infrastructure.",
+      },
+      {
+        q: "Can I choose the output format?",
+        a: "Yes, you can select MP4 or WebM as the output format. MP4 offers the widest compatibility while WebM provides better compression for web use. Both conversions run privately on your self-hosted server.",
+      },
+    ],
+  },
+  "video-to-webp": {
+    searchTitle: "Convert Video to Animated WebP",
+    longDescription:
+      "Convert a video clip into an animated WebP image, ideal for lightweight web animations that outperform GIFs in both quality and file size. Control the frame rate, dimensions, and quality to balance fidelity against file size. All conversion runs on your own server.",
+    useCases: [
+      "Create animated product previews for an e-commerce site without heavy video embeds",
+      "Convert short tutorial clips into WebP animations for documentation pages",
+      "Generate lightweight animated stickers or reactions from video clips",
+      "Replace GIF assets with WebP for faster page loads on a content site",
+    ],
+    features: [
+      "Configurable output frame rate, quality, and dimensions",
+      "Produces significantly smaller files than equivalent GIF animations",
+      "Supports lossy and lossless WebP encoding modes",
+      "Preserves transparency when converting from formats that support it",
+      "Runs entirely on your self-hosted instance with no data leaving your network",
+    ],
+    faqs: [
+      {
+        q: "Why use WebP instead of GIF?",
+        a: "Animated WebP files are typically 50-80% smaller than GIFs at the same visual quality, and they support millions of colors instead of 256. Most modern browsers support animated WebP natively. Conversion runs locally on your server.",
+      },
+      {
+        q: "Can I control the output file size?",
+        a: "Yes, you can adjust the quality setting, frame rate, and dimensions to control the final file size. Lower frame rates and quality produce smaller files. All processing happens privately on your own infrastructure.",
+      },
+      {
+        q: "What browsers support animated WebP?",
+        a: "All modern browsers including Chrome, Firefox, Safari, and Edge support animated WebP. For older browser support, consider converting to GIF or MP4 instead. SnapOtter processes everything locally on your server.",
+      },
+    ],
+  },
+  "video-to-frames": {
+    searchTitle: "Extract Video Frames as Images",
+    longDescription:
+      "Extract individual frames from a video file and download them as a ZIP archive of images. Choose to extract every frame, one frame per second, or at a custom interval. SnapOtter processes the video on your own server, keeping your footage private.",
+    useCases: [
+      "Pull still frames from surveillance footage for an incident report",
+      "Extract keyframes from a product demo video for use in printed marketing materials",
+      "Create a contact sheet of scenes from a film or documentary for editorial review",
+      "Capture frames from a time-lapse video for individual high-resolution prints",
+    ],
+    features: [
+      "Extract every frame, one per second, or at a custom interval",
+      "Output as PNG or JPEG with configurable quality settings",
+      "Downloads all extracted frames as a single ZIP archive",
+      "Preserves original frame resolution and color accuracy",
+      "All extraction runs on your own server with no cloud processing",
+    ],
+    faqs: [
+      {
+        q: "What image format are the extracted frames?",
+        a: "You can choose between PNG for lossless quality or JPEG for smaller file sizes. PNG is best when you need pixel-perfect accuracy. All frame extraction runs locally on your self-hosted server.",
+      },
+      {
+        q: "Can I extract only specific frames?",
+        a: "Yes, you can set a custom interval to control which frames are extracted. Options include every frame, one per second, or a custom frames-per-second rate. Processing happens on your own infrastructure without uploading video anywhere.",
+      },
+      {
+        q: "How large will the ZIP download be?",
+        a: "The size depends on the video resolution, number of extracted frames, and chosen image format. PNG frames are larger but lossless, while JPEG frames are smaller. SnapOtter processes everything locally on your server.",
+      },
+    ],
+  },
+  "merge-videos": {
+    searchTitle: "Merge Multiple Videos Into One",
+    longDescription:
+      "Join multiple video clips into a single continuous file. Upload your clips in the desired order and SnapOtter concatenates them with matching codecs and settings. All processing runs on your own server, so your video content stays private.",
+    useCases: [
+      "Combine multiple event recording segments into one continuous video file",
+      "Join chapter-based lecture recordings into a single video for distribution",
+      "Merge dashcam clips from a road trip into one continuous timeline",
+      "Assemble split-recorded podcast episodes into a single publishable file",
+    ],
+    features: [
+      "Concatenates an unlimited number of video clips in upload order",
+      "Re-encodes to a common format when source clips have different codecs",
+      "Preserves audio tracks across all joined segments",
+      "Supports MP4, WebM, MOV, and MKV input formats",
+      "All merging runs on your self-hosted instance with no external uploads",
+    ],
+    faqs: [
+      {
+        q: "Can I merge videos with different resolutions?",
+        a: "Yes. SnapOtter re-encodes the clips to match a common resolution and codec when they differ. The output will use consistent settings across all segments. Processing runs locally on your own server.",
+      },
+      {
+        q: "Is there a limit on how many clips I can merge?",
+        a: "There is no hard-coded limit on the number of clips. The practical limit depends on available disk space and processing power on your server. All files stay on your own infrastructure throughout the merge.",
+      },
+      {
+        q: "Will there be gaps or glitches between clips?",
+        a: "No. SnapOtter handles the concatenation to produce seamless transitions between clips. If codecs or settings differ, re-encoding ensures a smooth join. Everything processes locally on your server.",
+      },
+    ],
+  },
+  "replace-audio": {
+    searchTitle: "Replace Video Audio Track Online",
+    longDescription:
+      "Swap the audio track of a video with a different audio file. Upload a video and a replacement audio file, and SnapOtter muxes them together while preserving the original video quality. All processing runs on your own self-hosted server.",
+    useCases: [
+      "Replace camera audio with a professionally recorded voiceover for a tutorial",
+      "Add a licensed music track to a corporate video replacing the original ambient sound",
+      "Swap dialogue audio in a multilingual video to create localized versions",
+      "Replace noisy field recording audio with a clean studio narration track",
+    ],
+    features: [
+      "Replaces the audio stream without re-encoding the video track",
+      "Supports MP3, WAV, AAC, OGG, and FLAC as replacement audio sources",
+      "Automatically trims or loops audio to match the video duration",
+      "Preserves original video resolution, frame rate, and codec",
+      "Processes entirely on your own server with files never leaving your network",
+    ],
+    faqs: [
+      {
+        q: "Does replacing audio re-encode the video?",
+        a: "No. The video stream is copied directly without re-encoding, so there is zero video quality loss. Only the audio track is swapped. All processing happens locally on your server.",
+      },
+      {
+        q: "What happens if the audio is longer than the video?",
+        a: "The audio is trimmed to match the video duration. If the audio is shorter, you can choose to pad with silence or loop it. Processing runs on your own self-hosted infrastructure.",
+      },
+      {
+        q: "Can I replace audio in any video format?",
+        a: "SnapOtter supports MP4, WebM, MOV, and MKV containers for audio replacement. The replacement audio can be in MP3, WAV, AAC, OGG, or FLAC format. Everything is processed locally on your server.",
+      },
+    ],
+  },
+  "burn-subtitles": {
+    searchTitle: "Burn Subtitles Into Video Permanently",
+    longDescription:
+      "Permanently render subtitle text directly onto video frames so they are always visible regardless of player support. Upload a video and an SRT or ASS subtitle file, and SnapOtter composites them into the footage. All rendering runs on your own server.",
+    useCases: [
+      "Hardcode subtitles into social media clips where players do not support subtitle tracks",
+      "Burn translated captions into training videos for international distribution",
+      "Add permanent subtitles to archival footage for accessibility compliance",
+      "Create captioned highlight reels for platforms that strip soft subtitle tracks",
+    ],
+    features: [
+      "Renders SRT and ASS subtitle files directly onto video frames",
+      "Customizable font size, color, and positioning for burned text",
+      "Preserves subtitle timing and formatting from the source file",
+      "Supports MP4, WebM, MOV, and MKV video containers",
+      "Processes on your own server so subtitle content remains confidential",
+    ],
+    faqs: [
+      {
+        q: "Can burned subtitles be removed later?",
+        a: "No. Burned subtitles are rendered directly into the video pixels and become a permanent part of the image. Keep the original video file if you need an uncaptioned version. All processing runs on your server.",
+      },
+      {
+        q: "What subtitle formats are supported?",
+        a: "SnapOtter accepts SRT and ASS subtitle files. SRT is the most common plain-text format, while ASS supports advanced styling. Both are processed locally on your self-hosted instance.",
+      },
+      {
+        q: "Can I customize the subtitle appearance?",
+        a: "Yes, you can adjust the font size, color, and position of burned subtitles. ASS files also carry their own styling which is preserved. All rendering happens locally on your own server.",
+      },
+    ],
+  },
+  "embed-subtitles": {
+    searchTitle: "Embed Subtitle Track in Video",
+    longDescription:
+      "Mux a subtitle track into a video container as a soft subtitle stream. Unlike burning, embedded subtitles can be toggled on or off by the viewer in a compatible player. SnapOtter handles the muxing on your own server with no external services.",
+    useCases: [
+      "Add multilingual subtitle tracks to a corporate training video",
+      "Embed closed captions into educational content for accessibility compliance",
+      "Package subtitle files alongside video for distribution on internal platforms",
+      "Prepare videos with toggleable captions for a learning management system",
+    ],
+    features: [
+      "Muxes SRT or ASS subtitles as a soft stream in the video container",
+      "Subtitles can be toggled on or off by the viewer in compatible players",
+      "Copies the video and audio streams without re-encoding",
+      "Supports adding multiple subtitle tracks for different languages",
+      "All processing runs on your self-hosted instance with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "What is the difference between embedding and burning subtitles?",
+        a: "Embedded subtitles are stored as a separate text stream that viewers can toggle on or off. Burned subtitles are rendered into the video pixels permanently. Embedding preserves flexibility. Both options process locally on your server.",
+      },
+      {
+        q: "Does embedding subtitles re-encode the video?",
+        a: "No. Embedding muxes the subtitle stream into the container without touching the video or audio tracks. This means zero quality loss and fast processing. Everything runs on your own server.",
+      },
+      {
+        q: "Will the subtitles work in all players?",
+        a: "Most modern players (VLC, MPV, web browsers) support soft subtitles in MP4 and MKV containers. Some basic players may not display them. SnapOtter processes everything locally so your content stays private.",
+      },
+    ],
+  },
+  "extract-subtitles": {
+    searchTitle: "Extract Subtitles From Video File",
+    longDescription:
+      "Pull the embedded subtitle track out of a video container and save it as a standalone SRT file. Useful for repurposing captions, translating them, or archiving text separately from video. SnapOtter extracts the subtitles on your own server.",
+    useCases: [
+      "Extract captions from a training video to create a text transcript",
+      "Pull subtitle files from videos for translation into other languages",
+      "Archive subtitle tracks separately from large video files to save storage",
+      "Extract closed captions from broadcast recordings for compliance documentation",
+    ],
+    features: [
+      "Extracts embedded subtitle streams as standalone SRT files",
+      "Supports extraction from MP4, MKV, MOV, and WebM containers",
+      "Detects and lists all available subtitle tracks in a file",
+      "Preserves original timing and formatting from the source stream",
+      "Runs on your own server with no video content sent to external services",
+    ],
+    faqs: [
+      {
+        q: "What if my video has multiple subtitle tracks?",
+        a: "SnapOtter detects all embedded subtitle streams and lets you choose which one to extract. You can extract multiple tracks if needed. All processing runs locally on your self-hosted server.",
+      },
+      {
+        q: "Can I extract subtitles from any video format?",
+        a: "SnapOtter supports extraction from MP4, MKV, MOV, and WebM containers. The video must have an embedded subtitle stream; this tool does not generate subtitles from audio. Processing happens on your own server.",
+      },
+      {
+        q: "What format is the output?",
+        a: "Subtitles are extracted as SRT files, the most widely supported subtitle format. SRT is plain text with timestamps, making it easy to edit or translate. All extraction happens locally on your infrastructure.",
+      },
+    ],
+  },
+  "images-to-video": {
+    searchTitle: "Create Video Slideshow From Images",
+    longDescription:
+      "Turn a set of images into a slideshow video with configurable duration per slide and transition effects. Upload your images in the desired order and SnapOtter generates an MP4 or WebM video. All processing runs on your own self-hosted server.",
+    useCases: [
+      "Create a photo slideshow video for a real estate property listing",
+      "Generate a product showcase video from catalog images for social media",
+      "Build a memorial or celebration slideshow from a collection of photos",
+      "Convert design mockup screenshots into a walkthrough video for stakeholder review",
+    ],
+    features: [
+      "Configurable duration per slide to control pacing",
+      "Output in MP4 or WebM with adjustable resolution and frame rate",
+      "Supports JPEG, PNG, WebP, and other common image formats as input",
+      "Maintains image aspect ratios with configurable padding or scaling",
+      "All video generation runs on your own server with no cloud dependency",
+    ],
+    faqs: [
+      {
+        q: "How long will each image appear in the video?",
+        a: "You can set the duration per slide in seconds. The default shows each image for a few seconds, but you can adjust this to any value. All video creation happens locally on your self-hosted server.",
+      },
+      {
+        q: "Can I control the output resolution?",
+        a: "Yes, you can set the target resolution for the output video. Images are scaled to fit the chosen dimensions while preserving their aspect ratios. Processing runs entirely on your own infrastructure.",
+      },
+      {
+        q: "What image formats can I use?",
+        a: "SnapOtter accepts JPEG, PNG, WebP, TIFF, and BMP images as input. They can be mixed in a single slideshow. All processing stays on your server with no files uploaded to external services.",
+      },
+    ],
+  },
+  "video-metadata": {
+    searchTitle: "Strip Video Metadata and EXIF Data",
+    longDescription:
+      "Remove all metadata from a video file including GPS coordinates, camera model, timestamps, and software tags. SnapOtter also reports what metadata was found before stripping it. Processing runs on your own server, protecting sensitive location and device data.",
+    useCases: [
+      "Strip GPS coordinates from phone-recorded videos before sharing publicly",
+      "Remove camera and software metadata from client deliverables for clean handoff",
+      "Sanitize video files before uploading to public platforms to protect privacy",
+      "Audit and clean metadata from archive footage before institutional distribution",
+    ],
+    features: [
+      "Strips all metadata including GPS, EXIF, XMP, and container-level tags",
+      "Generates a report of found metadata before removal",
+      "Copies video and audio streams without re-encoding for zero quality loss",
+      "Supports MP4, MOV, MKV, WebM, and AVI containers",
+      "All processing runs on your own server so sensitive metadata never leaves your network",
+    ],
+    faqs: [
+      {
+        q: "What types of metadata are removed?",
+        a: "SnapOtter strips GPS coordinates, camera model, recording timestamps, software tags, and all EXIF, XMP, and container-level metadata. A report shows everything that was found before removal. Processing happens locally on your server.",
+      },
+      {
+        q: "Does stripping metadata re-encode the video?",
+        a: "No. The video and audio streams are copied directly without re-encoding. Only the metadata container is cleaned, so there is zero quality loss and processing is very fast. Everything runs on your own server.",
+      },
+      {
+        q: "Can I see what metadata was in the file?",
+        a: "Yes. SnapOtter generates a detailed report of all metadata found in the file before stripping it. This lets you audit what information was embedded. All analysis runs locally on your self-hosted instance.",
+      },
+    ],
+  },
+  "convert-audio": {
+    searchTitle: "Convert Audio Between Formats Free",
+    longDescription:
+      "Convert audio files between MP3, WAV, OGG, FLAC, AAC, and other popular formats. Adjust bitrate, sample rate, and channel settings during conversion. SnapOtter handles all encoding on your own server, so your audio content stays private.",
+    useCases: [
+      "Convert WAV recordings to MP3 for web distribution at a smaller file size",
+      "Transform MP3 files to FLAC for lossless archival storage",
+      "Convert OGG files to AAC for compatibility with Apple devices",
+      "Batch convert a library of audio files to a uniform format for a media server",
+    ],
+    features: [
+      "Supports MP3, WAV, OGG, FLAC, AAC, M4A, and WMA formats",
+      "Configurable bitrate, sample rate, and channel count",
+      "Preserves or strips metadata tags during conversion",
+      "Handles batch conversion of multiple files simultaneously",
+      "Runs entirely on your self-hosted instance with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "Which audio formats are supported?",
+        a: "SnapOtter supports MP3, WAV, OGG Vorbis, FLAC, AAC, M4A, and WMA for both input and output. You can convert freely between any combination. All encoding runs locally on your server.",
+      },
+      {
+        q: "Will converting to a lossy format reduce quality?",
+        a: "Converting from a lossless format like WAV or FLAC to a lossy format like MP3 involves some quality reduction, but you can minimize it by choosing a higher bitrate. Converting between lossless formats is perfectly lossless. All processing stays on your server.",
+      },
+      {
+        q: "Can I adjust the bitrate?",
+        a: "Yes, you can set the target bitrate for lossy formats. Higher bitrates produce better quality at larger file sizes. For lossless formats like FLAC, the bitrate is determined automatically. Processing happens on your own infrastructure.",
+      },
+    ],
+  },
+  "trim-audio": {
+    searchTitle: "Trim and Cut Audio Files Online",
+    longDescription:
+      "Cut a specific section out of an audio file by setting precise start and end timestamps. Keep only the portion you need without re-encoding the entire file when possible. SnapOtter processes all trimming on your own server.",
+    useCases: [
+      "Trim dead air from the beginning and end of a podcast recording",
+      "Cut a specific song segment for use as a ringtone or notification sound",
+      "Extract a quote or soundbite from a long interview recording",
+      "Remove unwanted intro or outro sections from audio files before distribution",
+    ],
+    features: [
+      "Precise start and end time selection down to millisecond accuracy",
+      "Stream-copy mode for lossless trimming without re-encoding when possible",
+      "Supports MP3, WAV, OGG, FLAC, AAC, and M4A formats",
+      "Waveform preview for visual selection of trim points",
+      "All trimming runs on your own server with files never leaving your network",
+    ],
+    faqs: [
+      {
+        q: "Does trimming reduce audio quality?",
+        a: "When possible, SnapOtter uses stream-copy mode which trims without re-encoding, preserving the original quality exactly. If re-encoding is necessary, high-quality settings are used. All processing happens locally on your server.",
+      },
+      {
+        q: "How precise can my trim points be?",
+        a: "You can set start and end times with millisecond precision. For stream-copy mode, trims snap to the nearest keyframe. Re-encoding mode supports exact frame-accurate cuts. Everything processes on your own infrastructure.",
+      },
+      {
+        q: "Can I trim multiple sections from one file?",
+        a: "This tool extracts a single continuous section defined by start and end points. For multiple cuts, you can run the tool multiple times on the same source file. Processing stays on your self-hosted server.",
+      },
+    ],
+  },
+  "extract-audio": {
+    searchTitle: "Extract Audio Track From Video",
+    longDescription:
+      "Pull the audio track out of a video file and save it as a standalone audio file. Choose between MP3, WAV, FLAC, or other formats for the extracted audio. SnapOtter extracts the audio on your own server without re-encoding the video.",
+    useCases: [
+      "Extract a podcast audio track from a video recording for audio-only distribution",
+      "Pull background music from a video for use in another project",
+      "Save the audio from a lecture recording as an MP3 for offline listening",
+      "Extract voiceover narration from a video for transcription or translation",
+    ],
+    features: [
+      "Extracts audio without touching the video stream for fast processing",
+      "Output to MP3, WAV, FLAC, OGG, or AAC formats",
+      "Option to copy the audio stream directly or re-encode to a target format",
+      "Supports extraction from MP4, WebM, MOV, MKV, and AVI containers",
+      "All extraction runs on your own server with no files uploaded externally",
+    ],
+    faqs: [
+      {
+        q: "Does extraction re-encode the audio?",
+        a: "By default, SnapOtter copies the audio stream directly without re-encoding for maximum speed and quality. If you choose a different output format, re-encoding is applied with high-quality settings. Everything runs on your server.",
+      },
+      {
+        q: "What audio format should I choose?",
+        a: "MP3 is the most compatible, WAV and FLAC are lossless, and AAC is efficient for mobile. Choose based on your use case. Direct copy preserves the original format and quality. All processing happens locally on your server.",
+      },
+      {
+        q: "Can I extract audio from any video format?",
+        a: "SnapOtter supports MP4, WebM, MOV, MKV, and AVI containers for audio extraction. As long as the video has an audio track, it can be extracted. Processing runs entirely on your self-hosted instance.",
+      },
+    ],
+  },
+  "volume-adjust": {
+    searchTitle: "Adjust Audio Volume Level Online",
+    longDescription:
+      "Increase or decrease the volume of an audio file by a fixed decibel gain. Useful for boosting quiet recordings or reducing loud audio to a comfortable level. SnapOtter processes the adjustment on your own server, keeping your audio private.",
+    useCases: [
+      "Boost the volume of a quiet phone recording to make it clearly audible",
+      "Reduce the volume of a loud music track before mixing it under narration",
+      "Normalize multiple audio clips to a similar volume level for a playlist",
+      "Increase the gain on a field recording that was captured too quietly",
+    ],
+    features: [
+      "Adjustable gain in decibels for precise volume control",
+      "Supports both positive (louder) and negative (quieter) adjustments",
+      "Clipping detection and prevention for over-amplified signals",
+      "Works with MP3, WAV, OGG, FLAC, and AAC formats",
+      "All processing runs locally on your server with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "Will increasing volume cause distortion?",
+        a: "SnapOtter includes clipping detection to warn you if the gain would cause distortion. Moderate boosts on quiet recordings are generally safe. If clipping occurs, consider using the normalize tool instead. Processing happens on your own server.",
+      },
+      {
+        q: "How is this different from normalization?",
+        a: "Volume adjust applies a fixed gain to the entire file uniformly. Normalization analyzes the audio and adjusts dynamically to reach a target loudness. Use volume adjust for simple corrections. Both tools run locally on your server.",
+      },
+      {
+        q: "Can I adjust volume for specific sections only?",
+        a: "This tool adjusts the volume of the entire file by a fixed amount. For section-specific changes, trim the file first, adjust each part, then merge. All processing happens on your self-hosted instance.",
+      },
+    ],
+  },
+  "normalize-audio": {
+    searchTitle: "Normalize Audio Loudness Levels Free",
+    longDescription:
+      "Even out the loudness of an audio file to broadcast-standard levels using EBU R128 normalization. This ensures consistent volume across different recordings and playback environments. SnapOtter processes everything on your own server.",
+    useCases: [
+      "Normalize podcast episodes so all episodes play at the same comfortable volume",
+      "Prepare audio files for radio broadcast compliance with EBU R128 standards",
+      "Even out volume differences between speakers in a multi-guest recording",
+      "Standardize loudness across a music library for consistent playlist playback",
+    ],
+    features: [
+      "EBU R128 loudness normalization to -14 LUFS broadcast standard",
+      "Two-pass analysis for accurate loudness measurement and correction",
+      "True-peak limiting to prevent digital clipping during normalization",
+      "Supports MP3, WAV, OGG, FLAC, and AAC audio formats",
+      "Runs entirely on your own self-hosted server with no external processing",
+    ],
+    faqs: [
+      {
+        q: "What loudness target does normalization use?",
+        a: "SnapOtter normalizes to -14 LUFS following the EBU R128 standard, which is the target used by major streaming platforms like YouTube and Spotify. This ensures your audio sounds consistent everywhere. Processing runs on your server.",
+      },
+      {
+        q: "Is normalization the same as compression?",
+        a: "No. Normalization adjusts the overall loudness of the entire file to a target level. Dynamic range compression changes the ratio between quiet and loud parts. Normalization preserves the original dynamics. All processing happens locally on your server.",
+      },
+      {
+        q: "Can I normalize multiple files at once?",
+        a: "Yes, SnapOtter supports batch processing. Each file is analyzed and normalized independently to the target loudness. This ensures consistency across all files. Processing runs on your own infrastructure.",
+      },
+    ],
+  },
+  "fade-audio": {
+    searchTitle: "Add Fade In Fade Out to Audio",
+    longDescription:
+      "Apply fade-in and fade-out effects to an audio file for smooth beginnings and endings. Set the duration of each fade independently to control the transition timing. SnapOtter processes the fades on your own server with no external uploads.",
+    useCases: [
+      "Add a smooth fade-in and fade-out to background music for a presentation",
+      "Apply a fade-out to a podcast episode ending instead of an abrupt cutoff",
+      "Create radio-ready audio clips with professional fade transitions",
+      "Smooth the start of a recording that begins mid-sentence with a gentle fade-in",
+    ],
+    features: [
+      "Independent fade-in and fade-out duration controls",
+      "Logarithmic fade curve for natural-sounding volume transitions",
+      "Option to apply only fade-in, only fade-out, or both",
+      "Works with MP3, WAV, OGG, FLAC, and AAC formats",
+      "All processing runs locally on your self-hosted server",
+    ],
+    faqs: [
+      {
+        q: "Can I set different durations for fade-in and fade-out?",
+        a: "Yes, the fade-in and fade-out durations are controlled independently. You can set each one to any length in seconds, or disable one while keeping the other. All processing runs on your own server.",
+      },
+      {
+        q: "What type of fade curve is used?",
+        a: "SnapOtter uses a logarithmic fade curve that sounds more natural to the human ear compared to a linear fade. This produces smooth, professional-sounding transitions. Processing happens locally on your server.",
+      },
+      {
+        q: "Will the fade affect the rest of the audio?",
+        a: "No. The fade only affects the beginning and end of the file for the specified duration. The audio between the fades remains unchanged. All processing happens on your self-hosted instance with no external uploads.",
+      },
+    ],
+  },
+  "reverse-audio": {
+    searchTitle: "Reverse Audio Playback Online Free",
+    longDescription:
+      "Play an audio file backwards, reversing the entire waveform from end to start. Useful for creative effects, audio analysis, or just having fun. SnapOtter processes the reversal on your own server, keeping your audio files private.",
+    useCases: [
+      "Create reverse audio effects for music production or sound design",
+      "Reverse speech recordings for phonetic analysis or linguistic research",
+      "Generate reversed cymbal swells and risers for electronic music transitions",
+      "Reverse ambient soundscapes for experimental audio art projects",
+    ],
+    features: [
+      "Reverses the complete audio waveform from end to start",
+      "Preserves original sample rate, bit depth, and channel layout",
+      "Supports MP3, WAV, OGG, FLAC, and AAC input formats",
+      "Handles stereo, mono, and multi-channel audio files",
+      "Processes entirely on your own server with no cloud uploads",
+    ],
+    faqs: [
+      {
+        q: "Does reversing audio reduce quality?",
+        a: "No. SnapOtter preserves the original sample rate, bit depth, and channel layout during reversal. The output is a faithful reverse of the input with no quality degradation. Processing runs locally on your server.",
+      },
+      {
+        q: "Can I reverse just a section of the audio?",
+        a: "This tool reverses the entire file. To reverse a specific section, first trim that section using the Trim Audio tool, reverse it, then merge it back. All processing happens on your own self-hosted server.",
+      },
+      {
+        q: "What formats are supported for reversal?",
+        a: "SnapOtter supports MP3, WAV, OGG, FLAC, and AAC formats for both input and output. The reversed file is saved in the same format as the original. Everything processes locally on your infrastructure.",
+      },
+    ],
+  },
+  "audio-speed": {
+    searchTitle: "Change Audio Playback Speed Online",
+    longDescription:
+      "Speed up or slow down audio playback without changing the pitch. This uses time-stretching algorithms to maintain natural-sounding audio at the new tempo. SnapOtter processes the speed change on your own server.",
+    useCases: [
+      "Speed up lecture recordings for faster review during exam preparation",
+      "Slow down a fast-spoken foreign language recording for easier comprehension",
+      "Adjust podcast playback speed for accessibility or personal preference",
+      "Create slow-motion audio effects for dramatic sound design in video production",
+    ],
+    features: [
+      "Adjustable speed multiplier from very slow to very fast playback",
+      "Pitch-preserving time-stretch for natural-sounding results",
+      "Supports MP3, WAV, OGG, FLAC, and AAC formats",
+      "Maintains audio quality even at extreme speed changes",
+      "All processing runs on your own server with no external dependencies",
+    ],
+    faqs: [
+      {
+        q: "Does changing speed also change the pitch?",
+        a: "No. SnapOtter uses time-stretching algorithms that maintain the original pitch while changing the tempo. Speech and music sound natural at the new speed. Processing runs locally on your server.",
+      },
+      {
+        q: "What speed range is supported?",
+        a: "You can slow audio down or speed it up across a wide range of multipliers. Extreme values may produce artifacts in complex audio. SnapOtter processes everything on your own self-hosted instance.",
+      },
+      {
+        q: "Will changing speed affect audio quality?",
+        a: "Minor artifacts may appear at extreme speed changes, but the time-stretching algorithm preserves quality well for typical adjustments like 0.5x to 2x speed. All processing happens locally on your server.",
+      },
+    ],
+  },
+  "pitch-shift": {
+    searchTitle: "Shift Audio Pitch by Semitones",
+    longDescription:
+      "Raise or lower the pitch of audio by a specified number of semitones without changing the playback speed. Useful for musical transposition, vocal effects, or correcting off-key recordings. SnapOtter handles all processing on your own server.",
+    useCases: [
+      "Transpose a backing track to a different key to match a vocalist's range",
+      "Lower the pitch of a sample to create a deeper, heavier sound for music production",
+      "Shift vocals up or down for creative voice disguise effects in audio content",
+      "Correct slightly off-key instrument recordings by shifting pitch a fraction of a semitone",
+    ],
+    features: [
+      "Shift pitch up or down by any number of semitones",
+      "Preserves original playback speed and duration during pitch changes",
+      "High-quality resampling algorithm minimizes artifacts",
+      "Works with MP3, WAV, OGG, FLAC, and AAC formats",
+      "Runs entirely on your own server with no audio uploaded externally",
+    ],
+    faqs: [
+      {
+        q: "Does pitch shifting change the speed?",
+        a: "No. SnapOtter separates pitch from tempo, so changing the pitch does not affect playback speed or duration. The audio plays at the same length but at a higher or lower pitch. Processing runs locally on your server.",
+      },
+      {
+        q: "How many semitones can I shift?",
+        a: "You can shift pitch by any number of semitones in either direction. Moderate shifts of a few semitones produce the most natural results. Larger shifts may introduce noticeable artifacts. All processing happens on your self-hosted server.",
+      },
+      {
+        q: "Can I use this for musical transposition?",
+        a: "Yes, pitch shifting by semitones is equivalent to musical transposition. Shifting up 2 semitones raises a song by one whole step. This is perfect for adapting backing tracks to a different key. Processing stays on your own infrastructure.",
+      },
+    ],
+  },
+  "audio-channels": {
+    searchTitle: "Convert Audio Mono Stereo Channels",
+    longDescription:
+      "Convert audio between mono and stereo configurations, or swap the left and right channels of a stereo file. Useful for fixing channel issues, preparing audio for specific playback systems, or creating mono mixes. All processing runs on your own server.",
+    useCases: [
+      "Convert a stereo podcast recording to mono for consistent playback on all devices",
+      "Fix a stereo recording where the left and right channels were accidentally swapped",
+      "Create a mono mixdown of a stereo music track for PA system compatibility",
+      "Convert mono voiceover recordings to stereo for video editing software compatibility",
+    ],
+    features: [
+      "Convert between mono and stereo channel layouts",
+      "Swap left and right channels in stereo files",
+      "Preserves original sample rate and bit depth during conversion",
+      "Supports MP3, WAV, OGG, FLAC, and AAC formats",
+      "All processing runs on your own self-hosted server",
+    ],
+    faqs: [
+      {
+        q: "Does converting stereo to mono lose quality?",
+        a: "Converting to mono combines the left and right channels into one. No data is lost in the encoding, but the spatial stereo separation is removed. The resulting mono signal is clear and consistent. Processing runs locally on your server.",
+      },
+      {
+        q: "Can I swap left and right channels?",
+        a: "Yes, SnapOtter can swap the left and right channels of a stereo file. This is useful for fixing recordings where the channels were accidentally reversed. All processing happens on your own self-hosted instance.",
+      },
+      {
+        q: "Will converting mono to stereo create surround sound?",
+        a: "No. Converting mono to stereo duplicates the single channel to both left and right. It does not add spatial effects or surround sound. For stereo widening, a dedicated audio editor is recommended. Processing stays on your server.",
+      },
+    ],
+  },
+
+  "silence-removal": {
+    searchTitle: "Remove Silence From Audio Free",
+    longDescription:
+      "Automatically detect and strip silent sections from audio files. Ideal for tightening podcast episodes, lecture recordings, and voiceovers. SnapOtter processes everything locally on your server so your audio never leaves your network.",
+    useCases: [
+      "Trimming dead air from a podcast episode before publishing",
+      "Shortening a lecture recording by removing long pauses between topics",
+      "Cleaning up a voiceover take by stripping silent gaps between sentences",
+      "Tightening an audiobook chapter recording for faster listener playback",
+    ],
+    features: [
+      "Adjustable silence threshold in decibels for precise detection",
+      "Configurable minimum silence duration to keep intentional pauses",
+      "Supports MP3, WAV, FLAC, OGG, and other common audio formats",
+      "Preserves original audio quality with no re-encoding artifacts",
+      "Batch processing to clean multiple files in one operation",
+    ],
+    faqs: [
+      {
+        q: "Will silence removal change my audio quality?",
+        a: "No. SnapOtter trims silent segments and re-joins the remaining audio without re-encoding the waveform data, so quality stays intact. All processing happens locally on your server.",
+      },
+      {
+        q: "Can I control what counts as silence?",
+        a: "Yes. You can set a decibel threshold and a minimum duration so that brief natural pauses are preserved while longer dead-air gaps are removed. Processing runs entirely on your own hardware.",
+      },
+      {
+        q: "What audio formats are supported?",
+        a: "SnapOtter supports MP3, WAV, FLAC, OGG, AAC, M4A, and other common formats. Your files are processed on your self-hosted instance and never uploaded to external servers.",
+      },
+    ],
+  },
+  "noise-reduction": {
+    searchTitle: "Reduce Audio Background Noise Free",
+    longDescription:
+      "Apply FFT-based denoising to reduce background noise from audio recordings. Perfect for cleaning up interviews, field recordings, and conference calls. SnapOtter runs on your own server so sensitive audio stays private.",
+    useCases: [
+      "Cleaning wind and traffic noise from an outdoor interview recording",
+      "Reducing fan hum and air conditioning buzz from a home studio voiceover",
+      "Improving clarity of a conference call recording with heavy background chatter",
+      "Removing steady hiss from a digitized cassette tape or vinyl rip",
+    ],
+    features: [
+      "FFT-based spectral denoising for effective broadband noise removal",
+      "Adjustable noise reduction strength to balance clarity and naturalness",
+      "Supports MP3, WAV, FLAC, OGG, and other common audio formats",
+      "Preserves speech and music frequencies while targeting noise profiles",
+      "Self-hosted processing keeps confidential recordings on your network",
+    ],
+    faqs: [
+      {
+        q: "How does FFT-based noise reduction work?",
+        a: "It analyzes the frequency spectrum of your audio to identify consistent noise patterns, then subtracts those frequencies while preserving speech and music. All analysis runs locally on your server.",
+      },
+      {
+        q: "Will noise reduction make my audio sound robotic?",
+        a: "At moderate settings, the result sounds natural. You can adjust the strength to find the right balance between noise removal and audio fidelity. Processing happens entirely on your own hardware.",
+      },
+      {
+        q: "Can I denoise a confidential meeting recording?",
+        a: "Yes. SnapOtter is self-hosted, so your audio files never leave your network. There is no cloud upload, making it safe for sensitive legal, medical, or business recordings.",
+      },
+    ],
+  },
+  "merge-audio": {
+    searchTitle: "Merge Audio Files Into One",
+    longDescription:
+      "Combine multiple audio files into a single continuous track. Useful for assembling podcast episodes, audiobook chapters, or music compilations. SnapOtter processes files locally so your audio never touches third-party servers.",
+    useCases: [
+      "Joining intro, interview, and outro segments into a complete podcast episode",
+      "Combining separately recorded audiobook chapters into one continuous file",
+      "Assembling a DJ mix from individual song files in a specific order",
+      "Merging multiple voice memo fragments into a single meeting transcript source",
+    ],
+    features: [
+      "Concatenate unlimited audio files in your chosen order",
+      "Supports mixing different input formats like MP3, WAV, and FLAC",
+      "Configurable output format and bitrate for the merged result",
+      "Automatic sample rate and channel normalization across inputs",
+      "Self-hosted processing with no file size limits imposed by cloud services",
+    ],
+    faqs: [
+      {
+        q: "Can I merge audio files in different formats?",
+        a: "Yes. SnapOtter normalizes sample rates and channels automatically, so you can combine MP3, WAV, FLAC, and other formats into one output file. Everything runs on your local server.",
+      },
+      {
+        q: "Is there a limit to how many files I can merge?",
+        a: "There is no hard limit. You can combine as many files as needed since processing runs on your own server and is not constrained by cloud upload caps.",
+      },
+      {
+        q: "Will the merged file have gaps between tracks?",
+        a: "No. Files are joined seamlessly end to end. If you want pauses between segments, add silent clips at the desired positions. All processing stays on your network.",
+      },
+    ],
+  },
+  "split-audio": {
+    searchTitle: "Split Audio Into Parts Free",
+    longDescription:
+      "Split audio files by time ranges, equal parts, or automatic silence detection. Great for breaking long recordings into chapters or segments. SnapOtter is self-hosted, keeping your files private on your own infrastructure.",
+    useCases: [
+      "Splitting a two-hour lecture into 15-minute segments for easier distribution",
+      "Breaking a live concert recording into individual song tracks at silent gaps",
+      "Extracting a specific time range from a long interview for a highlight clip",
+      "Dividing a full audiobook file into per-chapter segments for a media player",
+    ],
+    features: [
+      "Split by exact time ranges, equal-length parts, or silence detection",
+      "Adjustable silence threshold and duration for automatic splitting",
+      "Supports MP3, WAV, FLAC, OGG, AAC, and other common formats",
+      "Preserves original quality in each output segment",
+      "Downloads all segments as a single ZIP archive for convenience",
+    ],
+    faqs: [
+      {
+        q: "What split modes are available?",
+        a: "You can split by specifying exact start and end times, dividing into equal-length parts, or using automatic silence detection to find natural break points. All processing runs locally on your server.",
+      },
+      {
+        q: "How does silence-based splitting work?",
+        a: "SnapOtter scans the audio for sections below a configurable decibel threshold and duration, then splits at those points. This is ideal for separating songs or chapters. Everything stays on your network.",
+      },
+      {
+        q: "What format are the output segments?",
+        a: "Segments use the same format as your input file by default. You can also choose a different output format. All files are processed on your self-hosted instance without external uploads.",
+      },
+    ],
+  },
+  "ringtone-maker": {
+    searchTitle: "Create Custom Ringtone From Audio",
+    longDescription:
+      "Create a ringtone clip from any audio file by selecting a start and end time. Export in formats compatible with iOS and Android devices. SnapOtter runs on your own server so your music files stay private.",
+    useCases: [
+      "Clipping the chorus of a favorite song for a custom phone ringtone",
+      "Creating a short notification sound from a sound effect library file",
+      "Extracting an alarm tone from a long ambient audio recording",
+      "Making a personalized text message alert from a voice recording",
+    ],
+    features: [
+      "Precise start and end time selection down to the millisecond",
+      "Fade-in and fade-out options for smooth ringtone transitions",
+      "Export to M4R for iPhone or MP3 for Android devices",
+      "Supports any input audio format including MP3, WAV, and FLAC",
+      "Preview the selected clip before saving the final ringtone",
+    ],
+    faqs: [
+      {
+        q: "What format should I use for an iPhone ringtone?",
+        a: "Export as M4R, which is the format iOS requires for custom ringtones. SnapOtter handles the conversion automatically. Your audio is processed locally and never sent to external servers.",
+      },
+      {
+        q: "How long can a ringtone be?",
+        a: "iOS limits ringtones to about 30 seconds while Android has no strict limit. SnapOtter lets you select any duration. All processing happens on your self-hosted instance.",
+      },
+      {
+        q: "Can I add a fade effect to my ringtone?",
+        a: "Yes. You can apply fade-in and fade-out effects so the ringtone starts and ends smoothly instead of cutting abruptly. Processing runs entirely on your own hardware.",
+      },
+    ],
+  },
+  "waveform-image": {
+    searchTitle: "Generate Audio Waveform Image Free",
+    longDescription:
+      "Generate a PNG waveform visualization from any audio file. Useful for social media thumbnails, video overlays, and podcast artwork. SnapOtter processes your audio locally so files never leave your server.",
+    useCases: [
+      "Creating a waveform thumbnail for a podcast episode shared on social media",
+      "Generating a waveform overlay image for a music video or audiogram",
+      "Producing visual proof of audio content duration for legal documentation",
+      "Adding waveform graphics to a presentation slide about a recorded interview",
+    ],
+    features: [
+      "Renders a clean waveform PNG from any supported audio format",
+      "Configurable image dimensions, colors, and background settings",
+      "Supports MP3, WAV, FLAC, OGG, AAC, and other formats as input",
+      "High-resolution output suitable for print and retina displays",
+      "Self-hosted generation with no watermarks or branding on the output",
+    ],
+    faqs: [
+      {
+        q: "What image format is the waveform exported as?",
+        a: "The waveform is exported as a PNG image. You can configure the dimensions and colors to match your branding. Processing runs entirely on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Can I customize the waveform colors?",
+        a: "Yes. You can set the waveform color and background color to match your project's visual style. All rendering happens locally on your server with no external dependencies.",
+      },
+      {
+        q: "What audio formats can I visualize?",
+        a: "SnapOtter supports MP3, WAV, FLAC, OGG, AAC, M4A, and other common audio formats. Your files are processed on your own hardware and never uploaded to third-party services.",
+      },
+    ],
+  },
+  "audio-metadata": {
+    searchTitle: "Edit Audio Tags and Metadata",
+    longDescription:
+      "View, edit, or strip ID3 tags and other metadata from audio files. Manage title, artist, album, year, and cover art fields. SnapOtter is self-hosted so your music library metadata stays on your own network.",
+    useCases: [
+      "Fixing incorrect artist and album tags across a batch of MP3 files",
+      "Stripping all metadata from audio files before sharing them publicly",
+      "Adding cover art and track numbers to a self-produced album",
+      "Reviewing embedded metadata in audio evidence files for legal compliance",
+    ],
+    features: [
+      "View all ID3v1, ID3v2, and Vorbis comment metadata fields",
+      "Edit title, artist, album, year, genre, track number, and more",
+      "Add, replace, or remove embedded album cover art",
+      "Strip all metadata for privacy before sharing files externally",
+      "Supports MP3, FLAC, OGG, M4A, and other tagged audio formats",
+    ],
+    faqs: [
+      {
+        q: "What metadata formats are supported?",
+        a: "SnapOtter handles ID3v1 and ID3v2 tags for MP3 files, Vorbis comments for FLAC and OGG, and MP4 atoms for M4A and AAC. All editing runs locally on your server.",
+      },
+      {
+        q: "Can I strip all metadata from a file?",
+        a: "Yes. You can remove all tags and embedded images in one action, which is useful for privacy before distributing files. Processing happens entirely on your self-hosted instance.",
+      },
+      {
+        q: "Will editing metadata change the audio quality?",
+        a: "No. Metadata editing only modifies the tag containers without touching the audio stream, so quality remains identical. Your files stay on your own network throughout the process.",
+      },
+    ],
+  },
+  "merge-pdf": {
+    searchTitle: "Merge Multiple PDFs Into One",
+    longDescription:
+      "Combine multiple PDF files into a single document in your chosen order. Ideal for assembling reports, contracts, or portfolios. SnapOtter processes everything locally so confidential documents never leave your server.",
+    useCases: [
+      "Combining a cover letter, resume, and references into one application PDF",
+      "Merging individual chapter PDFs into a complete manuscript for printing",
+      "Assembling scanned receipts into a single expense report document",
+      "Joining separately signed contract pages into one final agreement file",
+    ],
+    features: [
+      "Drag-and-drop reordering of files before merging",
+      "Merge unlimited PDFs with no page count restrictions",
+      "Preserves bookmarks, links, and form fields from source files",
+      "Handles mixed page sizes and orientations across input documents",
+      "Self-hosted processing keeps sensitive documents on your network",
+    ],
+    faqs: [
+      {
+        q: "Is there a limit to how many PDFs I can merge?",
+        a: "No. You can merge as many files as your server can handle since there are no cloud-imposed caps. All processing runs locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Will bookmarks and links be preserved?",
+        a: "Yes. SnapOtter retains bookmarks, hyperlinks, and form fields from the source PDFs in the merged output. Your documents never leave your network during processing.",
+      },
+      {
+        q: "Can I reorder the files before merging?",
+        a: "Yes. You can arrange the input PDFs in any order before combining them. Everything is processed on your own server so confidential documents remain private.",
+      },
+    ],
+  },
+  "split-pdf": {
+    searchTitle: "Split PDF Into Separate Files",
+    longDescription:
+      "Split a PDF into individual pages, page ranges, or equal parts. Perfect for extracting sections from large reports or breaking apart scanned documents. SnapOtter runs on your own infrastructure for full document privacy.",
+    useCases: [
+      "Splitting a 200-page manual into per-chapter PDFs for easier distribution",
+      "Extracting a specific page range from a lengthy contract for review",
+      "Breaking apart a scanned multi-page document into individual page files",
+      "Dividing a combined invoice PDF into separate invoices for different clients",
+    ],
+    features: [
+      "Split into individual pages, custom page ranges, or equal parts",
+      "Specify exact page numbers or ranges like 1-5 and 10-15",
+      "Preserves formatting, fonts, and images in each output file",
+      "Downloads all split files as a single ZIP archive",
+      "Handles large PDFs efficiently with low memory usage",
+    ],
+    faqs: [
+      {
+        q: "What split modes are available for PDFs?",
+        a: "You can split into every individual page, specify custom page ranges, or divide into equal-sized parts. All processing happens locally on your self-hosted server.",
+      },
+      {
+        q: "Will split pages retain their original formatting?",
+        a: "Yes. Each output PDF preserves the formatting, fonts, images, and annotations from the original document. Your files never leave your network during processing.",
+      },
+      {
+        q: "Can I split a password-protected PDF?",
+        a: "You need to unlock the PDF first using the Unlock PDF tool, then split it. Both operations run entirely on your own server for complete document privacy.",
+      },
+    ],
+  },
+  "compress-pdf": {
+    searchTitle: "Compress PDF File Size Free",
+    longDescription:
+      "Reduce PDF file size by compressing images and optimizing internal structures. Ideal for email attachments and web uploads. SnapOtter compresses documents locally on your server, keeping sensitive files private.",
+    useCases: [
+      "Shrinking a large presentation PDF to fit within email attachment limits",
+      "Compressing scanned document PDFs with oversized embedded images",
+      "Reducing portfolio PDF size for faster loading on a personal website",
+      "Optimizing architectural plan PDFs for sharing with clients via messaging apps",
+    ],
+    features: [
+      "Adjustable compression level to balance quality and file size",
+      "Recompresses embedded images with configurable quality settings",
+      "Removes duplicate objects and optimizes internal PDF structures",
+      "Displays original and compressed file sizes for comparison",
+      "Supports PDFs with mixed content including images, text, and vector graphics",
+    ],
+    faqs: [
+      {
+        q: "How much can I expect the file size to shrink?",
+        a: "Results vary depending on content. PDFs with large embedded images often see 50-80% reduction, while text-heavy PDFs see smaller gains. Processing runs entirely on your local server.",
+      },
+      {
+        q: "Will compression reduce the visual quality?",
+        a: "You can control the compression level. Higher compression reduces file size more but may slightly reduce image quality. Text and vector graphics remain sharp. All processing stays on your network.",
+      },
+      {
+        q: "Can I compress a PDF with sensitive information?",
+        a: "Yes. SnapOtter is self-hosted so your documents are processed on your own server and never uploaded to external cloud services. This makes it safe for confidential files.",
+      },
+    ],
+  },
+  "rotate-pdf": {
+    searchTitle: "Rotate PDF Pages Online Free",
+    longDescription:
+      "Rotate individual pages or all pages in a PDF by 90, 180, or 270 degrees. Fix scanned documents or correct page orientation. SnapOtter processes files locally so your documents stay on your own server.",
+    useCases: [
+      "Correcting a landscape page scanned in portrait orientation",
+      "Rotating a sideways table or chart page in a financial report",
+      "Fixing upside-down pages from a duplex scanner malfunction",
+      "Adjusting page orientation of a PDF before printing a booklet",
+    ],
+    features: [
+      "Rotate all pages or select specific pages to rotate",
+      "Choose 90, 180, or 270 degree clockwise rotation angles",
+      "Preserves all text, images, annotations, and form fields",
+      "Handles mixed-orientation documents with per-page control",
+      "Instant processing with no quality loss to the original content",
+    ],
+    faqs: [
+      {
+        q: "Can I rotate only specific pages in a PDF?",
+        a: "Yes. You can select individual pages to rotate while leaving others unchanged. This is useful for fixing a few misoriented pages in a large document. Processing happens on your local server.",
+      },
+      {
+        q: "Does rotation affect text searchability?",
+        a: "No. Rotation changes the display orientation but preserves the underlying text layer, so the document remains fully searchable. Your files are processed entirely on your own network.",
+      },
+      {
+        q: "What rotation angles are supported?",
+        a: "You can rotate pages by 90, 180, or 270 degrees clockwise. This covers all common orientation corrections. Everything runs on your self-hosted SnapOtter instance.",
+      },
+    ],
+  },
+  "convert-document": {
+    searchTitle: "Convert Word and Document Formats",
+    longDescription:
+      "Convert between Word, OpenDocument, RTF, and plain text formats. Handle DOCX, ODT, RTF, and TXT conversions in one tool. SnapOtter runs on your own server so confidential documents stay private.",
+    useCases: [
+      "Converting a client's DOCX contract to ODT for editing in LibreOffice",
+      "Exporting an OpenDocument report to RTF for a colleague using older software",
+      "Converting RTF meeting notes to plain text for a searchable archive",
+      "Transforming a batch of legacy DOC files into modern DOCX format",
+    ],
+    features: [
+      "Supports DOCX, ODT, RTF, and TXT as both input and output formats",
+      "Preserves formatting, styles, and images during conversion",
+      "Handles complex documents with tables, headers, and footnotes",
+      "LibreOffice-powered conversion engine for high fidelity results",
+      "Self-hosted processing keeps business documents on your network",
+    ],
+    faqs: [
+      {
+        q: "What document formats are supported?",
+        a: "SnapOtter converts between DOCX, ODT, RTF, and TXT formats. You can convert in any direction between these formats. All conversion runs locally on your self-hosted server.",
+      },
+      {
+        q: "Will formatting be preserved during conversion?",
+        a: "Yes. Tables, styles, images, and other formatting are preserved as closely as possible using the LibreOffice rendering engine. Your documents never leave your network.",
+      },
+      {
+        q: "Can I convert confidential business documents?",
+        a: "Absolutely. SnapOtter is self-hosted, meaning your files are processed on your own infrastructure. No data is sent to external cloud services at any point.",
+      },
+    ],
+  },
+  "convert-presentation": {
+    searchTitle: "Convert PowerPoint Presentation Formats",
+    longDescription:
+      "Convert between PowerPoint and OpenDocument presentation formats. Handle PPTX to ODP and vice versa with preserved slides and animations. SnapOtter processes files locally for complete presentation privacy.",
+    useCases: [
+      "Converting a PPTX sales deck to ODP for a client using LibreOffice",
+      "Transforming ODP lecture slides to PowerPoint for a university submission",
+      "Converting keynote-exported PPTX files to ODP for cross-platform compatibility",
+      "Migrating archived presentations from proprietary to open formats",
+    ],
+    features: [
+      "Converts between PPTX and ODP presentation formats",
+      "Preserves slide layouts, transitions, and embedded media",
+      "Handles complex presentations with charts, tables, and SmartArt",
+      "LibreOffice-powered engine for accurate format translation",
+      "Processes files on your own server with no cloud dependency",
+    ],
+    faqs: [
+      {
+        q: "Will slide animations be preserved?",
+        a: "Basic transitions and animations are preserved during conversion. Complex PowerPoint-specific effects may be simplified in ODP output. All processing happens locally on your server.",
+      },
+      {
+        q: "Can I convert ODP back to PowerPoint?",
+        a: "Yes. SnapOtter converts in both directions between PPTX and ODP formats. Layouts and content are preserved as closely as possible. Your files never leave your network.",
+      },
+      {
+        q: "Are embedded videos and images kept?",
+        a: "Yes. Embedded media, images, and charts are retained during conversion. Processing runs entirely on your self-hosted instance so presentation content stays private.",
+      },
+    ],
+  },
+  "convert-spreadsheet": {
+    searchTitle: "Convert Excel and Spreadsheet Formats",
+    longDescription:
+      "Convert between Excel, OpenDocument, and CSV spreadsheet formats. Multi-sheet workbooks export the first sheet when converting to CSV. SnapOtter runs on your own server so financial data stays confidential.",
+    useCases: [
+      "Converting an XLSX financial report to ODS for sharing with LibreOffice users",
+      "Exporting a spreadsheet to CSV for import into a database or analytics tool",
+      "Transforming ODS budget files to Excel format for corporate compatibility",
+      "Converting legacy XLS files to modern XLSX format for long-term archival",
+    ],
+    features: [
+      "Supports XLSX, ODS, and CSV as both input and output formats",
+      "Preserves formulas, formatting, and cell styles during conversion",
+      "Multi-sheet workbook support with first-sheet CSV export",
+      "Handles large spreadsheets with thousands of rows efficiently",
+      "Self-hosted processing keeps financial data on your network",
+    ],
+    faqs: [
+      {
+        q: "What happens to multiple sheets when exporting to CSV?",
+        a: "CSV only supports a single sheet, so SnapOtter exports the first sheet. For multi-sheet output, use XLSX or ODS format instead. All processing runs locally on your server.",
+      },
+      {
+        q: "Are formulas preserved during conversion?",
+        a: "Formulas are preserved when converting between XLSX and ODS. CSV export converts formulas to their calculated values. Your spreadsheets never leave your self-hosted network.",
+      },
+      {
+        q: "Can I convert spreadsheets with sensitive financial data?",
+        a: "Yes. SnapOtter processes everything on your own server. No data is sent to external services, making it safe for confidential financial, HR, or legal spreadsheets.",
+      },
+    ],
+  },
+  "excel-to-pdf": {
+    searchTitle: "Convert Excel Spreadsheet to PDF",
+    longDescription:
+      "Convert Excel and other spreadsheet files to PDF for easy sharing and printing. Wide sheets may paginate across multiple pages. SnapOtter handles conversion locally so your financial data stays private.",
+    useCases: [
+      "Converting a monthly sales report spreadsheet to PDF for board distribution",
+      "Creating a printable PDF version of an inventory tracking spreadsheet",
+      "Generating a PDF snapshot of a project budget for email attachment",
+      "Archiving quarterly financial spreadsheets as non-editable PDF records",
+    ],
+    features: [
+      "Converts XLSX, ODS, and CSV files to PDF format",
+      "Handles wide sheets with automatic page pagination",
+      "Preserves cell formatting, colors, borders, and fonts",
+      "LibreOffice-powered rendering for accurate layout reproduction",
+      "Self-hosted conversion keeps financial spreadsheets private",
+    ],
+    faqs: [
+      {
+        q: "How are wide spreadsheets handled in PDF?",
+        a: "Wide sheets are automatically paginated across multiple PDF pages to ensure all columns are visible. The layout matches what you would see when printing from a spreadsheet application. Processing runs locally.",
+      },
+      {
+        q: "What spreadsheet formats can I convert to PDF?",
+        a: "SnapOtter supports XLSX, ODS, and CSV files as input. The output is a standard PDF file suitable for sharing and printing. Everything is processed on your own server.",
+      },
+      {
+        q: "Will cell formatting and colors be preserved?",
+        a: "Yes. Cell colors, borders, fonts, bold and italic styles, and number formatting are all preserved in the PDF output. Your spreadsheets are processed locally and never uploaded externally.",
+      },
+    ],
+  },
+  "word-to-pdf": {
+    searchTitle: "Convert Word Document to PDF",
+    longDescription:
+      "Convert Word documents to high-fidelity PDF files preserving layout, fonts, and images. Ideal for sharing finalized reports and contracts. SnapOtter processes conversions on your server so sensitive documents stay private.",
+    useCases: [
+      "Converting a finalized contract to PDF before sending to a client for signature",
+      "Generating a PDF version of a thesis or dissertation for university submission",
+      "Creating a non-editable PDF of company policies for distribution to employees",
+      "Archiving completed project proposals as PDF for long-term record keeping",
+    ],
+    features: [
+      "High-fidelity DOCX to PDF conversion with accurate layout rendering",
+      "Preserves fonts, images, tables, headers, footers, and page breaks",
+      "Handles complex formatting including columns, text boxes, and footnotes",
+      "LibreOffice-powered engine for reliable cross-platform results",
+      "Processes documents locally with no external cloud dependencies",
+    ],
+    faqs: [
+      {
+        q: "Will the PDF look exactly like my Word document?",
+        a: "SnapOtter uses LibreOffice for rendering, which produces high-fidelity results. Complex layouts, tables, and images are preserved accurately. All processing happens on your local server.",
+      },
+      {
+        q: "Are fonts embedded in the output PDF?",
+        a: "Yes. Fonts used in the document are embedded in the PDF to ensure consistent display on any device. Your documents are processed entirely on your own self-hosted infrastructure.",
+      },
+      {
+        q: "Can I convert confidential legal documents?",
+        a: "Yes. SnapOtter is self-hosted so your documents are processed on your own server. No files are transmitted to external services, making it safe for legal, medical, and financial documents.",
+      },
+    ],
+  },
+  "extract-pages": {
+    searchTitle: "Extract Pages From PDF Free",
+    longDescription:
+      "Pull selected pages from a PDF into a new document. Specify individual pages or ranges to extract exactly what you need. SnapOtter processes files locally so sensitive documents never leave your server.",
+    useCases: [
+      "Extracting the executive summary pages from a lengthy annual report",
+      "Pulling specific contract clauses from a multi-section legal agreement",
+      "Isolating a single chart page from a large research PDF for a presentation",
+      "Extracting completed form pages from a multi-form government PDF packet",
+    ],
+    features: [
+      "Select individual pages or page ranges to extract",
+      "Combine non-consecutive pages into one new PDF",
+      "Preserves all formatting, images, and annotations from source pages",
+      "Handles large PDFs with hundreds of pages efficiently",
+      "Self-hosted processing for full control over document privacy",
+    ],
+    faqs: [
+      {
+        q: "Can I extract non-consecutive pages?",
+        a: "Yes. You can specify individual pages and ranges like 1, 3, 7-12, and they will be combined into a single new PDF in that order. All processing runs on your local server.",
+      },
+      {
+        q: "Does the original PDF get modified?",
+        a: "No. The original file is untouched. SnapOtter creates a new PDF containing only the selected pages. Your documents are processed entirely on your own self-hosted infrastructure.",
+      },
+      {
+        q: "Are annotations and form fields preserved?",
+        a: "Yes. All annotations, comments, and form fields on the extracted pages are preserved in the new document. Processing happens locally so confidential content stays private.",
+      },
+    ],
+  },
+  "remove-pages": {
+    searchTitle: "Delete Pages From PDF Free",
+    longDescription:
+      "Remove specific pages from a PDF document without affecting the remaining content. Useful for deleting blank pages, cover sheets, or unwanted sections. SnapOtter processes everything on your server for document privacy.",
+    useCases: [
+      "Removing blank pages inserted by a scanner between document sections",
+      "Deleting an outdated cover page from a report before redistribution",
+      "Stripping advertisement pages from a downloaded catalog PDF",
+      "Removing draft watermark pages from a finalized document set",
+    ],
+    features: [
+      "Delete specific pages by number or range",
+      "Remove multiple non-consecutive pages in one operation",
+      "Preserves all content, links, and bookmarks on remaining pages",
+      "Automatically renumbers pages after deletion",
+      "Self-hosted processing keeps document contents private",
+    ],
+    faqs: [
+      {
+        q: "Can I remove multiple pages at once?",
+        a: "Yes. You can specify individual page numbers and ranges to remove in a single operation. All remaining pages are preserved with their original formatting. Processing runs on your local server.",
+      },
+      {
+        q: "Is the deletion reversible?",
+        a: "The original file is not modified. SnapOtter creates a new PDF without the specified pages, so you always have the original as a backup. Everything is processed on your own self-hosted instance.",
+      },
+      {
+        q: "Are bookmarks updated after page removal?",
+        a: "Yes. Bookmarks and internal links are adjusted to reflect the new page numbering after deletion. Your documents are processed locally and never sent to external services.",
+      },
+    ],
+  },
+  "organize-pdf": {
+    searchTitle: "Reorder PDF Pages Easily Free",
+    longDescription:
+      "Rearrange pages in a PDF by specifying an explicit page order. Fix misordered scans or reorganize document sections. SnapOtter processes documents locally on your server for complete privacy.",
+    useCases: [
+      "Reordering misordered pages from a batch scanner output",
+      "Moving an appendix section to appear before the references in a report",
+      "Rearranging a photo album PDF to match a chronological sequence",
+      "Reorganizing a multi-section proposal to match a client's requested structure",
+    ],
+    features: [
+      "Specify exact page order using a simple page number sequence",
+      "Duplicate pages by including the same page number multiple times",
+      "Preserves all content, annotations, and formatting during reordering",
+      "Handles large documents with hundreds of pages",
+      "Self-hosted processing ensures document privacy on your network",
+    ],
+    faqs: [
+      {
+        q: "How do I specify the new page order?",
+        a: "Provide a comma-separated list of page numbers in your desired order, such as 3,1,2,5,4. SnapOtter creates a new PDF with pages arranged accordingly. Processing runs on your local server.",
+      },
+      {
+        q: "Can I duplicate a page in the new order?",
+        a: "Yes. Include the same page number multiple times in your sequence to duplicate it in the output. All processing happens on your self-hosted instance with no external uploads.",
+      },
+      {
+        q: "Are bookmarks and links preserved?",
+        a: "Yes. Internal links and bookmarks are maintained and adjusted for the new page positions. Your documents are processed entirely on your own server and never leave your network.",
+      },
+    ],
+  },
+  "protect-pdf": {
+    searchTitle: "Password Protect PDF With Encryption",
+    longDescription:
+      "Add AES-256 password protection to PDF files to prevent unauthorized access. Secure confidential documents with industry-standard encryption. SnapOtter encrypts locally so your files never pass through external servers.",
+    useCases: [
+      "Protecting a financial statement PDF before emailing it to a client",
+      "Encrypting employee records PDFs for secure internal distribution",
+      "Adding a password to a legal contract PDF before sharing with opposing counsel",
+      "Securing medical report PDFs to comply with patient privacy regulations",
+    ],
+    features: [
+      "AES-256 encryption for strong document security",
+      "Set an open password required to view the document",
+      "Industry-standard PDF encryption compatible with all major readers",
+      "Preserves all document content, formatting, and metadata",
+      "Self-hosted encryption keeps unprotected originals off external servers",
+    ],
+    faqs: [
+      {
+        q: "What encryption standard is used?",
+        a: "SnapOtter uses AES-256, which is the strongest encryption available for PDF files. It is supported by all major PDF readers. Encryption runs entirely on your local server.",
+      },
+      {
+        q: "Can I set separate open and edit passwords?",
+        a: "You can set a password required to open and view the document. This provides strong protection against unauthorized access. All processing happens on your self-hosted instance.",
+      },
+      {
+        q: "Is the encryption secure enough for compliance?",
+        a: "AES-256 meets the requirements of most compliance frameworks including HIPAA and GDPR. Combined with SnapOtter's local-only processing, your documents never leave your controlled environment.",
+      },
+    ],
+  },
+  "unlock-pdf": {
+    searchTitle: "Remove PDF Password Protection Free",
+    longDescription:
+      "Remove password protection from a PDF when you have the correct password. Unlock documents for editing, printing, or unrestricted access. SnapOtter processes files locally so your password and document stay private.",
+    useCases: [
+      "Unlocking a password-protected report to enable text copying and annotation",
+      "Removing print restrictions from a PDF you received from a vendor",
+      "Unlocking an old archived PDF whose password is known but inconvenient",
+      "Removing protection from a document to merge it with other PDFs",
+    ],
+    features: [
+      "Remove open password protection with the correct password",
+      "Remove permission restrictions like print and copy locks",
+      "Supports all PDF encryption standards including AES-256",
+      "Preserves all document content and formatting after unlocking",
+      "Self-hosted processing keeps your password and files private",
+    ],
+    faqs: [
+      {
+        q: "Do I need to know the password to unlock a PDF?",
+        a: "Yes. SnapOtter requires the correct password to remove protection. It does not crack or bypass unknown passwords. All processing runs locally on your server so your password stays private.",
+      },
+      {
+        q: "Will unlocking change the document content?",
+        a: "No. Unlocking only removes the encryption and permission restrictions. All text, images, and formatting remain identical. Your files are processed entirely on your own network.",
+      },
+      {
+        q: "Can I remove only print restrictions?",
+        a: "Yes. You can remove permission-level restrictions like print, copy, and edit locks without removing the open password if desired. Processing happens on your self-hosted instance.",
+      },
+    ],
+  },
+  "repair-pdf": {
+    searchTitle: "Repair Damaged or Corrupted PDF",
+    longDescription:
+      "Attempt to repair a damaged or corrupted PDF by rebuilding its internal structure. Recover content from files that fail to open in standard readers. SnapOtter processes files locally so your documents never leave your server.",
+    useCases: [
+      "Recovering a PDF that was corrupted during an incomplete file transfer",
+      "Repairing a PDF that crashes Adobe Reader when opened",
+      "Fixing a PDF with missing or garbled pages from a disk error",
+      "Salvaging a partially downloaded PDF report from a broken network connection",
+    ],
+    features: [
+      "Rebuilds corrupted cross-reference tables and object streams",
+      "Recovers readable content from partially damaged files",
+      "Fixes common structural errors that prevent PDF readers from opening files",
+      "Reports the repair status and any unrecoverable sections",
+      "Self-hosted processing keeps damaged confidential files on your network",
+    ],
+    faqs: [
+      {
+        q: "Can all corrupted PDFs be repaired?",
+        a: "Not always. SnapOtter can fix structural issues like broken cross-reference tables, but severely damaged files with overwritten data may be unrecoverable. Processing runs entirely on your local server.",
+      },
+      {
+        q: "Will repaired PDFs look the same as the originals?",
+        a: "In most cases, yes. The repair process rebuilds internal structures without altering content. However, heavily corrupted sections may result in missing elements. Files stay on your network.",
+      },
+      {
+        q: "Is the original file modified during repair?",
+        a: "No. SnapOtter creates a new repaired copy and leaves the original untouched. All processing happens on your self-hosted instance so damaged confidential files remain private.",
+      },
+    ],
+  },
+  "linearize-pdf": {
+    searchTitle: "Web-Optimize PDF for Fast Loading",
+    longDescription:
+      "Linearize a PDF for fast web viewing so the first page displays before the entire file downloads. Essential for large documents hosted online. SnapOtter processes files on your own server for complete control.",
+    useCases: [
+      "Optimizing product catalog PDFs for faster display on an e-commerce site",
+      "Linearizing research papers before hosting them on an institutional repository",
+      "Preparing large manual PDFs for a web-based documentation portal",
+      "Web-optimizing annual reports before publishing them on a corporate website",
+    ],
+    features: [
+      "Linearizes PDFs for progressive page-by-page web loading",
+      "First page displays immediately while remaining pages download",
+      "No visible change to document content, layout, or quality",
+      "Reduces perceived load time for large documents in browsers",
+      "Self-hosted processing with no file size restrictions",
+    ],
+    faqs: [
+      {
+        q: "What does PDF linearization do?",
+        a: "Linearization reorganizes a PDF's internal structure so browsers can display the first page before downloading the entire file. Content and quality are unchanged. Processing runs on your local server.",
+      },
+      {
+        q: "Does linearization change the file size?",
+        a: "File size may increase slightly due to added hint tables, but the perceived load time is significantly faster for web viewers. All processing happens on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Is linearization necessary for all PDFs?",
+        a: "It is most beneficial for large PDFs served over the web. Small documents or files shared via email do not benefit as much. Your files are processed locally and never uploaded to external services.",
+      },
+    ],
+  },
+  "grayscale-pdf": {
+    searchTitle: "Convert PDF to Grayscale Free",
+    longDescription:
+      "Convert all colors in a PDF to grayscale for black-and-white printing or archival purposes. Reduces file size by removing color data. SnapOtter processes files locally so your documents remain on your server.",
+    useCases: [
+      "Converting a color report to grayscale before printing on a monochrome printer",
+      "Preparing court filing documents that require black-and-white submission",
+      "Reducing PDF file size by stripping color from image-heavy presentations",
+      "Creating a grayscale proof version of a brochure to check contrast and readability",
+    ],
+    features: [
+      "Converts all colors including images, text, and vector graphics to grayscale",
+      "Reduces file size by eliminating color channel data",
+      "Preserves text sharpness, layout, and page structure",
+      "Handles PDFs with mixed content types across pages",
+      "Self-hosted processing keeps document content private",
+    ],
+    faqs: [
+      {
+        q: "Does grayscale conversion reduce file size?",
+        a: "Yes, often significantly. Removing color data from embedded images reduces the overall file size, especially for image-heavy documents. Processing runs entirely on your local server.",
+      },
+      {
+        q: "Is the conversion reversible?",
+        a: "No. Once converted to grayscale, the original color information is removed. SnapOtter creates a new file so your original color PDF is preserved. Files stay on your own network.",
+      },
+      {
+        q: "Will text remain sharp after conversion?",
+        a: "Yes. Text is converted to black and remains crisp and fully searchable. Only the color values change, not the rendering quality. All processing happens on your self-hosted instance.",
+      },
+    ],
+  },
+  "pdfa-convert": {
+    searchTitle: "Convert PDF to Archival PDF/A",
+    longDescription:
+      "Convert standard PDFs to the PDF/A-2 archival format for long-term preservation and regulatory compliance. Embeds fonts and removes external dependencies. SnapOtter processes files on your own server for document privacy.",
+    useCases: [
+      "Converting legal documents to PDF/A for court-mandated archival submission",
+      "Preparing government records in PDF/A format for long-term digital preservation",
+      "Converting invoices to PDF/A-2 to meet EU e-invoicing compliance requirements",
+      "Archiving engineering drawings in PDF/A for regulatory retention periods",
+    ],
+    features: [
+      "Converts to PDF/A-2 standard for long-term archival compliance",
+      "Embeds all fonts to ensure display consistency across systems and decades",
+      "Removes JavaScript, multimedia, and external references per the standard",
+      "Validates output against PDF/A-2 conformance requirements",
+      "Self-hosted conversion keeps regulated documents on your infrastructure",
+    ],
+    faqs: [
+      {
+        q: "What is PDF/A and why would I need it?",
+        a: "PDF/A is an ISO-standardized format designed for long-term document preservation. It embeds all fonts and removes external dependencies so the file displays identically decades from now. Processing runs on your server.",
+      },
+      {
+        q: "Will my document look different after conversion?",
+        a: "The visual appearance stays the same. PDF/A conversion embeds fonts, removes scripts, and strips external references, but the visible content and layout are preserved. Files stay on your network.",
+      },
+      {
+        q: "Does PDF/A-2 conversion meet compliance requirements?",
+        a: "PDF/A-2 is widely accepted for legal, government, and financial archival requirements including EU regulations. SnapOtter processes everything locally, keeping regulated documents on your own infrastructure.",
+      },
+    ],
+  },
+  "crop-pdf": {
+    searchTitle: "Crop PDF Page Margins Free",
+    longDescription:
+      "Crop all pages in a PDF with uniform margins to remove whitespace, trim borders, or resize the visible area. Useful for print preparation and slide decks. SnapOtter processes files locally so your documents stay private.",
+    useCases: [
+      "Trimming excessive white margins from a scanned book PDF for e-reader display",
+      "Cropping a slide deck PDF to remove printer margins before screen presentation",
+      "Removing header and footer areas from a document for content-only extraction",
+      "Standardizing page margins across a collection of PDFs from different sources",
+    ],
+    features: [
+      "Set uniform crop margins for top, bottom, left, and right edges",
+      "Apply the same crop to all pages in the document",
+      "Preserves all text, images, and annotations within the crop area",
+      "Handles mixed-size pages by applying consistent margin offsets",
+      "Self-hosted processing keeps document content on your network",
+    ],
+    faqs: [
+      {
+        q: "Does cropping permanently remove content outside the margins?",
+        a: "Cropping adjusts the visible area of each page. Content outside the crop box may still exist in the file data but will not be visible or printed. Processing runs entirely on your local server.",
+      },
+      {
+        q: "Can I set different margins for each side?",
+        a: "Yes. You can specify independent crop values for the top, bottom, left, and right edges. The same margins are applied uniformly to all pages. Files are processed on your self-hosted instance.",
+      },
+      {
+        q: "Will text and images inside the crop area be preserved?",
+        a: "Yes. Everything within the crop boundaries is fully preserved including text, images, annotations, and links. Your documents never leave your own network during processing.",
+      },
+    ],
+  },
+
+  "nup-pdf": {
+    searchTitle: "N-up PDF Multiple Pages Per Sheet",
+    longDescription:
+      "Arrange two, four, or more PDF pages onto a single sheet to save paper and create compact handouts. Configure grid layout, page order, and margins to suit your printing needs. Runs entirely on your self-hosted SnapOtter instance so documents never leave your network.",
+    useCases: [
+      "Printing lecture slides as 4-up handouts for students",
+      "Creating compact reference sheets from multi-page manuals",
+      "Reducing paper usage for internal draft reviews",
+      "Preparing 2-up booklets from single-page documents for meetings",
+    ],
+    features: [
+      "Configurable grid layouts including 2-up, 4-up, 6-up, and 9-up",
+      "Customizable page ordering and reading direction",
+      "Adjustable margins and spacing between pages",
+      "Preserves original page quality and vector content",
+      "Batch processing for multiple PDFs at once",
+    ],
+    faqs: [
+      {
+        q: "What grid layouts are supported?",
+        a: "SnapOtter supports common layouts such as 2-up, 4-up, 6-up, and 9-up arrangements. All processing happens locally on your server, so your documents remain private.",
+      },
+      {
+        q: "Does N-up reduce the quality of my PDF?",
+        a: "No. Pages are scaled to fit the grid but retain their original vector content and resolution. The processing runs entirely on your self-hosted instance with no external uploads.",
+      },
+      {
+        q: "Can I process multiple PDFs at once?",
+        a: "Yes, you can batch process multiple PDF files in a single operation. All files are handled locally on your network without ever being sent to a third-party service.",
+      },
+    ],
+  },
+  "booklet-pdf": {
+    searchTitle: "Create Booklet PDF for Printing",
+    longDescription:
+      "Reorder and impose PDF pages so they can be printed double-sided and folded into a booklet. Handles signature grouping and page rotation automatically. Self-hosted processing keeps your documents on your own infrastructure.",
+    useCases: [
+      "Printing saddle-stitched zines from a standard PDF",
+      "Creating folded event programs from a linear page layout",
+      "Producing booklet-format training manuals for workshops",
+      "Making printable chapbooks from manuscript PDFs",
+    ],
+    features: [
+      "Automatic page imposition for saddle-stitch folding",
+      "Support for different paper sizes and orientations",
+      "Configurable signature grouping for thicker booklets",
+      "Handles odd page counts with automatic blank page insertion",
+      "Preserves fonts, images, and vector graphics",
+    ],
+    faqs: [
+      {
+        q: "How does booklet imposition work?",
+        a: "SnapOtter reorders your pages so that when printed double-sided and folded, they read in the correct sequence. All processing runs on your self-hosted server with no cloud dependency.",
+      },
+      {
+        q: "What if my PDF has an odd number of pages?",
+        a: "Blank pages are automatically inserted where needed to complete the booklet layout. The tool processes everything locally so your content stays private.",
+      },
+      {
+        q: "Can I make booklets from large documents?",
+        a: "Yes, the tool supports signature grouping for thicker documents that need multiple folded sections. Processing happens entirely on your own server without uploading files anywhere.",
+      },
+    ],
+  },
+  "watermark-pdf": {
+    searchTitle: "Add Text Watermark to PDF",
+    longDescription:
+      "Stamp a custom text watermark across every page of a PDF with control over font, size, color, opacity, and rotation. Ideal for marking documents as drafts, confidential, or branded. Runs locally on your SnapOtter instance so sensitive documents stay on your network.",
+    useCases: [
+      "Marking contract drafts as DRAFT before internal review",
+      "Adding CONFIDENTIAL stamps to sensitive financial reports",
+      "Branding proposal PDFs with your company name",
+      "Labeling preview copies sent to clients for approval",
+    ],
+    features: [
+      "Customizable watermark text, font, and size",
+      "Adjustable opacity and color for subtle or bold marks",
+      "Configurable rotation angle and position on each page",
+      "Applied consistently across all pages in the document",
+      "Non-destructive overlay preserving original content",
+    ],
+    faqs: [
+      {
+        q: "Can I control how visible the watermark is?",
+        a: "Yes, you can adjust opacity, color, size, and rotation to make the watermark as subtle or prominent as needed. Everything is processed locally on your server.",
+      },
+      {
+        q: "Does the watermark alter the original PDF content?",
+        a: "No, the watermark is applied as an overlay layer on each page. Your original text, images, and formatting remain untouched, and all processing stays on your own infrastructure.",
+      },
+      {
+        q: "Can I watermark confidential documents safely?",
+        a: "Absolutely. SnapOtter processes files entirely on your self-hosted instance, so sensitive documents are never uploaded to external servers or cloud services.",
+      },
+    ],
+  },
+  "pdf-page-numbers": {
+    searchTitle: "Add Page Numbers to PDF Free",
+    longDescription:
+      "Insert page numbers on every page of a PDF with full control over position, font, size, and starting number. Useful for preparing documents for print or formal submission. All processing is local on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Numbering legal briefs before court filing",
+      "Adding page numbers to a compiled report for distribution",
+      "Preparing thesis chapters with sequential pagination",
+      "Numbering scanned document archives for reference",
+    ],
+    features: [
+      "Configurable position including header and footer corners",
+      "Custom starting page number and numbering format",
+      "Adjustable font family, size, and color",
+      "Option to skip numbering on the first page",
+      "Works with any page size and orientation",
+    ],
+    faqs: [
+      {
+        q: "Can I start numbering from a specific page?",
+        a: "Yes, you can set a custom start number and optionally skip the first page. Processing runs entirely on your self-hosted server with no external services involved.",
+      },
+      {
+        q: "Where can I position the page numbers?",
+        a: "Page numbers can be placed in any corner or center of the header or footer area. All rendering happens locally on your SnapOtter instance, keeping documents private.",
+      },
+      {
+        q: "Does this work with scanned PDFs?",
+        a: "Yes, page numbers are overlaid onto every page regardless of whether the PDF contains text or scanned images. The tool processes files locally and never sends them off your network.",
+      },
+    ],
+  },
+  "flatten-pdf": {
+    searchTitle: "Flatten PDF Forms and Annotations",
+    longDescription:
+      "Permanently bake interactive form fields, annotations, and comments into the static page content of a PDF. This produces a clean, non-editable version suitable for archiving or distribution. Processed entirely on your self-hosted SnapOtter server.",
+    useCases: [
+      "Archiving completed tax forms with filled values permanently embedded",
+      "Preparing signed contracts for long-term storage without editable fields",
+      "Removing interactive annotations before sharing review documents externally",
+      "Flattening form submissions before batch printing",
+    ],
+    features: [
+      "Bakes form field values into static page content",
+      "Flattens annotations, comments, and markup layers",
+      "Produces a clean non-interactive PDF for archival",
+      "Preserves visual appearance of all flattened elements",
+      "Reduces file complexity and potential rendering issues",
+    ],
+    faqs: [
+      {
+        q: "What does flattening a PDF mean?",
+        a: "Flattening converts interactive elements like form fields and annotations into static page content that cannot be edited. SnapOtter handles this locally on your server so your filled forms stay private.",
+      },
+      {
+        q: "Can I undo flattening after it is applied?",
+        a: "No, flattening is permanent. The original interactive elements are baked into the page. We recommend keeping your original file as a backup. All processing stays on your own infrastructure.",
+      },
+      {
+        q: "Is this safe for sensitive form data?",
+        a: "Yes. SnapOtter processes the PDF entirely on your self-hosted instance. Form data and annotations are never sent to any external service during flattening.",
+      },
+    ],
+  },
+  "redact-pdf": {
+    searchTitle: "Redact PDF Text True Redaction",
+    longDescription:
+      "Permanently and irrecoverably remove specified text from a PDF using verified true redaction, not just visual overlay. The underlying text data is stripped from the file so it cannot be recovered by copying or inspecting. Ideal for privacy compliance on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Removing Social Security numbers from government documents before release",
+      "Redacting patient names from medical records for HIPAA compliance",
+      "Stripping confidential financial figures from audit reports",
+      "Removing employee personal data from HR documents before archival",
+    ],
+    features: [
+      "True redaction that removes underlying text data, not just visual masking",
+      "Search-and-redact by text string across all pages",
+      "Verified removal ensuring redacted text cannot be copied or extracted",
+      "Preserves unredacted content and document structure",
+      "Suitable for regulatory and legal compliance workflows",
+    ],
+    faqs: [
+      {
+        q: "Is this true redaction or just a black box overlay?",
+        a: "This is true redaction. The specified text is permanently removed from the PDF data so it cannot be recovered by copying, searching, or inspecting the file. All processing runs locally on your server.",
+      },
+      {
+        q: "Can I redact specific words across all pages?",
+        a: "Yes, you provide the text occurrences to redact and the tool finds and removes them from every page. Processing happens entirely on your self-hosted SnapOtter instance for maximum privacy.",
+      },
+      {
+        q: "Is this suitable for HIPAA or GDPR compliance?",
+        a: "The tool performs verified true redaction, making it appropriate for compliance workflows. Because SnapOtter is self-hosted, sensitive documents never leave your network during processing.",
+      },
+    ],
+  },
+  "pdf-to-text": {
+    searchTitle: "Extract Text From PDF Free",
+    longDescription:
+      "Extract all readable text from a PDF into a plain text file, preserving paragraph structure where possible. Works best with text-based PDFs; for scanned documents, use the OCR tool instead. All extraction runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Extracting article text from research paper PDFs for indexing",
+      "Pulling contract text for keyword searching and analysis",
+      "Converting PDF reports to plain text for data pipelines",
+      "Extracting text from PDF invoices for record-keeping systems",
+    ],
+    features: [
+      "Extracts embedded text content from all PDF pages",
+      "Preserves paragraph and line break structure",
+      "Handles multi-column layouts and text regions",
+      "Outputs clean plain text ready for further processing",
+      "Fast extraction without OCR overhead for text-based PDFs",
+    ],
+    faqs: [
+      {
+        q: "Does this work with scanned PDFs?",
+        a: "This tool extracts embedded text data and works best with text-based PDFs. For scanned or image-based PDFs, use the OCR tool instead. All processing is local on your server.",
+      },
+      {
+        q: "Is the formatting preserved in the output?",
+        a: "Paragraph structure and line breaks are preserved where possible, but complex formatting like tables and columns may be simplified. Extraction runs entirely on your self-hosted instance.",
+      },
+      {
+        q: "Can I extract text from password-protected PDFs?",
+        a: "The PDF must be accessible for text extraction. Processing happens locally on your SnapOtter server so your document content is never sent to any external service.",
+      },
+    ],
+  },
+  "pdf-to-word": {
+    searchTitle: "Convert PDF to Word Document",
+    longDescription:
+      "Convert text-based PDFs to editable Word documents (DOCX) while preserving layout and formatting. Best suited for PDFs that contain selectable text rather than scanned images. Runs on your self-hosted SnapOtter instance so documents remain private.",
+    useCases: [
+      "Editing a received contract PDF in Word for markup and comments",
+      "Converting archived PDF reports to editable Word format",
+      "Repurposing PDF marketing materials into editable templates",
+      "Turning PDF meeting minutes into editable documents for revision",
+    ],
+    features: [
+      "Converts text-based PDFs to editable DOCX format",
+      "Preserves paragraphs, headings, and basic formatting",
+      "Retains embedded images in the output document",
+      "Handles multi-page documents with consistent layout",
+      "Clean Word output compatible with all major editors",
+    ],
+    faqs: [
+      {
+        q: "Does this work with scanned PDFs?",
+        a: "This tool is optimized for text-based PDFs with selectable text. Scanned or image-based PDFs should be processed with OCR first. All conversion runs locally on your server.",
+      },
+      {
+        q: "Will my formatting be preserved exactly?",
+        a: "Paragraphs, headings, and basic styling are preserved. Complex layouts like multi-column designs may be simplified. Processing happens entirely on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Is it safe to convert confidential documents?",
+        a: "Yes. SnapOtter is self-hosted and processes all files locally on your own infrastructure. Your documents are never uploaded to any external cloud service.",
+      },
+    ],
+  },
+  "pdf-metadata": {
+    searchTitle: "Read and Edit PDF Metadata",
+    longDescription:
+      "View and modify PDF document metadata including title, author, subject, keywords, and creation dates. Useful for organizing document libraries or cleaning metadata before distribution. All processing happens locally on your self-hosted SnapOtter server.",
+    useCases: [
+      "Setting author and title fields on reports before publishing",
+      "Stripping metadata from PDFs before sharing externally",
+      "Adding keywords to PDF archives for searchability",
+      "Reviewing creation dates and producer info on received documents",
+    ],
+    features: [
+      "Read all standard PDF metadata fields",
+      "Write and update title, author, subject, and keywords",
+      "View creation date, modification date, and producer info",
+      "Strip existing metadata for clean distribution",
+      "Batch metadata editing for multiple files",
+    ],
+    faqs: [
+      {
+        q: "What metadata fields can I edit?",
+        a: "You can read and write standard fields including title, author, subject, keywords, and custom properties. All processing runs locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Can I remove all metadata from a PDF?",
+        a: "Yes, you can strip metadata fields to produce a clean document for external distribution. Processing happens entirely on your own server so no data is exposed to third parties.",
+      },
+      {
+        q: "Does editing metadata change the PDF content?",
+        a: "No, metadata editing only affects the document properties, not the visible page content. Your files are processed locally and never leave your network.",
+      },
+    ],
+  },
+  "powerpoint-to-pdf": {
+    searchTitle: "Convert PowerPoint to PDF Free",
+    longDescription:
+      "Convert PowerPoint presentations (PPTX) to high-quality PDF documents with accurate rendering of slides, fonts, and graphics. Produces a universally readable PDF from your presentation files. Conversion runs on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Sharing finalized presentation decks as non-editable PDFs",
+      "Archiving quarterly business review slides in PDF format",
+      "Creating printable handouts from training presentations",
+      "Converting pitch decks to PDF before sending to investors",
+    ],
+    features: [
+      "High-fidelity rendering of slides, text, and graphics",
+      "Preserves animations-free static layout per slide",
+      "Handles embedded images, charts, and SmartArt",
+      "Outputs standard PDF compatible with all viewers",
+      "Supports PPTX files from all major presentation tools",
+    ],
+    faqs: [
+      {
+        q: "Are fonts and formatting preserved in the PDF?",
+        a: "Yes, the converter renders slides with high fidelity, preserving text, fonts, and graphic elements. All conversion happens locally on your self-hosted server.",
+      },
+      {
+        q: "What about animations and transitions?",
+        a: "Animations and transitions are not included in the PDF output since PDF is a static format. Each slide becomes one page. Processing runs entirely on your own infrastructure.",
+      },
+      {
+        q: "Can I convert confidential presentations safely?",
+        a: "Yes. SnapOtter processes files on your self-hosted instance, so your presentation content is never uploaded to any external service.",
+      },
+    ],
+  },
+  "html-to-pdf": {
+    searchTitle: "Convert HTML to PDF Privately",
+    longDescription:
+      "Render an HTML file into a styled PDF document. Remote resources are disabled for privacy, ensuring that only local content within the HTML file is rendered. Runs on your self-hosted SnapOtter instance with no external network calls.",
+    useCases: [
+      "Converting HTML email templates to PDF previews for approval",
+      "Turning HTML reports from analytics dashboards into printable PDFs",
+      "Archiving web page exports as PDF documents",
+      "Creating PDF versions of HTML documentation pages",
+    ],
+    features: [
+      "Renders HTML and CSS into a paginated PDF",
+      "Remote resource fetching disabled for privacy and security",
+      "Supports inline styles and embedded images",
+      "Configurable page size and orientation",
+      "Clean PDF output suitable for printing and archival",
+    ],
+    faqs: [
+      {
+        q: "Why are remote resources disabled?",
+        a: "Remote resource fetching is disabled to protect your privacy and prevent potential security risks like SSRF. Only content within the HTML file itself is rendered. Processing is entirely local.",
+      },
+      {
+        q: "Can I use CSS in my HTML file?",
+        a: "Yes, inline styles and embedded CSS are fully supported. External stylesheets referenced via URL are not fetched. All rendering happens on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "What page sizes are supported?",
+        a: "You can configure the output page size and orientation to match your needs, including standard sizes like A4 and Letter. Everything processes locally on your own infrastructure.",
+      },
+    ],
+  },
+  "markdown-to-docx": {
+    searchTitle: "Convert Markdown to Word Document",
+    longDescription:
+      "Transform Markdown files into properly formatted Word documents (DOCX) with headings, lists, code blocks, and tables rendered as native Word elements. Ideal for sharing technical documentation with non-technical teams. Processed locally on your SnapOtter instance.",
+    useCases: [
+      "Converting README files to Word documents for stakeholder review",
+      "Turning technical specs written in Markdown into editable Word docs",
+      "Preparing Markdown meeting notes as Word documents for distribution",
+      "Converting Markdown drafts into Word format for editorial workflows",
+    ],
+    features: [
+      "Converts Markdown headings, lists, and tables to native Word styles",
+      "Renders code blocks with monospace formatting",
+      "Handles inline formatting like bold, italic, and links",
+      "Produces standard DOCX compatible with all Word processors",
+      "Preserves document structure and hierarchy",
+    ],
+    faqs: [
+      {
+        q: "Are Markdown tables converted to Word tables?",
+        a: "Yes, Markdown tables are rendered as native Word tables with proper cell structure. All conversion happens locally on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Does this handle code blocks?",
+        a: "Yes, fenced code blocks are converted with monospace formatting in the Word output. Processing runs entirely on your own infrastructure with no cloud dependency.",
+      },
+      {
+        q: "Can I convert private documentation safely?",
+        a: "Absolutely. SnapOtter is self-hosted and processes everything locally. Your Markdown content is never sent to any external service during conversion.",
+      },
+    ],
+  },
+  "markdown-to-html": {
+    searchTitle: "Convert Markdown to HTML Page",
+    longDescription:
+      "Convert a Markdown file into a standalone HTML page with proper semantic markup. Remote images referenced in the Markdown source are left as-is in the output. All conversion runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Publishing Markdown blog posts as HTML pages",
+      "Generating HTML previews of documentation written in Markdown",
+      "Converting Markdown changelogs to HTML for embedding in websites",
+      "Turning Markdown notes into shareable HTML files",
+    ],
+    features: [
+      "Renders Markdown to clean semantic HTML",
+      "Produces a standalone page with embedded styles",
+      "Preserves remote image references without fetching them",
+      "Supports tables, code blocks, and nested lists",
+      "Output ready for direct browser viewing or embedding",
+    ],
+    faqs: [
+      {
+        q: "Are remote images downloaded during conversion?",
+        a: "No, remote image references in your Markdown are preserved as URLs in the HTML output but are not fetched during conversion. Processing is entirely local on your server.",
+      },
+      {
+        q: "Is the output a complete HTML page?",
+        a: "Yes, the tool produces a standalone HTML page with embedded styles that can be opened directly in a browser. All conversion runs on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Does this support GitHub-flavored Markdown?",
+        a: "Yes, common Markdown extensions like tables, fenced code blocks, and task lists are supported. Processing happens locally on your own infrastructure.",
+      },
+    ],
+  },
+  "markdown-to-pdf": {
+    searchTitle: "Convert Markdown to Styled PDF",
+    longDescription:
+      "Convert a Markdown file into a professionally styled PDF document with clean typography and proper page layout. Remote resources are disabled for privacy. All rendering runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Creating polished PDF reports from Markdown project documentation",
+      "Generating printable PDF versions of technical specifications",
+      "Converting Markdown proposals into professional PDFs for clients",
+      "Producing PDF handouts from Markdown lecture notes",
+    ],
+    features: [
+      "Styled PDF output with clean typography and layout",
+      "Remote resource fetching disabled for privacy",
+      "Renders tables, code blocks, and images",
+      "Configurable page size and margins",
+      "Produces print-ready PDF with proper pagination",
+    ],
+    faqs: [
+      {
+        q: "Why are remote resources disabled?",
+        a: "Remote resource fetching is disabled to protect privacy and prevent external network calls during rendering. Only content within or referenced locally by your Markdown file is included. Processing is entirely local.",
+      },
+      {
+        q: "Can I customize the PDF styling?",
+        a: "You can configure page size and margins to suit your needs. The output uses a clean, professional default style. All rendering happens on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Does this handle code syntax highlighting?",
+        a: "Code blocks are rendered with monospace formatting in the PDF output. Processing runs entirely on your own infrastructure with no cloud services involved.",
+      },
+    ],
+  },
+  "epub-convert": {
+    searchTitle: "Convert EPUB to PDF or DOCX",
+    longDescription:
+      "Convert EPUB e-books to PDF, DOCX, HTML, or Markdown format. Remote resources inside the book are not fetched, ensuring privacy during conversion. All processing runs on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting EPUB books to PDF for printing or annotation",
+      "Extracting EPUB content to DOCX for editing and repurposing",
+      "Converting EPUB documentation to Markdown for developer workflows",
+      "Producing HTML versions of EPUB books for web reading",
+    ],
+    features: [
+      "Converts EPUB to PDF, DOCX, HTML, or Markdown",
+      "Remote resources inside the EPUB are not fetched for security",
+      "Preserves chapter structure and text formatting",
+      "Handles embedded images and metadata",
+      "Supports EPUB 2 and EPUB 3 formats",
+    ],
+    faqs: [
+      {
+        q: "What output formats are available?",
+        a: "You can convert EPUB files to PDF, DOCX, HTML, or Markdown. All conversion happens locally on your self-hosted SnapOtter server with no external dependencies.",
+      },
+      {
+        q: "Why are remote resources not fetched?",
+        a: "Remote resources referenced inside the EPUB are not fetched to prevent potential security risks and protect your privacy. Only content embedded in the EPUB file is converted. Processing stays local.",
+      },
+      {
+        q: "Does this preserve the chapter structure?",
+        a: "Yes, chapter headings and document structure are preserved in the output format. All processing runs on your own infrastructure without sending data to any external service.",
+      },
+    ],
+  },
+  "to-epub": {
+    searchTitle: "Convert Documents to EPUB E-Book",
+    longDescription:
+      "Convert Word documents, Markdown files, HTML pages, or plain text into EPUB e-book format for reading on e-readers and mobile devices. Produces a standards-compliant EPUB ready for distribution. Processed locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting a Word manuscript into EPUB for Kindle or Kobo",
+      "Turning Markdown documentation into an EPUB for offline reading",
+      "Creating EPUB versions of HTML articles for e-reader distribution",
+      "Packaging plain text stories as EPUB e-books",
+    ],
+    features: [
+      "Accepts DOCX, Markdown, HTML, and plain text inputs",
+      "Produces standards-compliant EPUB output",
+      "Preserves headings, formatting, and document structure",
+      "Handles embedded images from source documents",
+      "Compatible with all major e-readers and reading apps",
+    ],
+    faqs: [
+      {
+        q: "What input formats are supported?",
+        a: "You can convert Word (DOCX), Markdown, HTML, and plain text files into EPUB format. All conversion runs locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Will the EPUB work on my e-reader?",
+        a: "Yes, the tool produces standards-compliant EPUB files compatible with Kindle, Kobo, Apple Books, and other major reading platforms. Processing happens entirely on your own server.",
+      },
+      {
+        q: "Are images from my source document included?",
+        a: "Yes, embedded images from the source document are preserved in the EPUB output. All processing is local on your self-hosted instance with no external uploads.",
+      },
+    ],
+  },
+  "chart-maker": {
+    searchTitle: "Create Charts From CSV or JSON",
+    longDescription:
+      "Generate bar, line, or pie charts from CSV or JSON data and export them as images. Ideal for quick data visualization without needing spreadsheet software. All chart rendering happens locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Creating a bar chart from monthly sales CSV data for a report",
+      "Generating line charts from sensor data logs for monitoring dashboards",
+      "Building pie charts from survey results in JSON format",
+      "Producing quick data visualizations for team presentations",
+    ],
+    features: [
+      "Supports bar, line, and pie chart types",
+      "Accepts both CSV and JSON data inputs",
+      "Exports charts as downloadable image files",
+      "Automatic axis labeling and legend generation",
+      "Clean, presentation-ready chart styling",
+    ],
+    faqs: [
+      {
+        q: "What chart types can I create?",
+        a: "You can create bar charts, line charts, and pie charts from your data. All rendering happens locally on your self-hosted SnapOtter server with no external services.",
+      },
+      {
+        q: "What data formats are accepted?",
+        a: "The tool accepts both CSV and JSON data inputs. Upload your data file and select the chart type you need. Processing runs entirely on your own infrastructure.",
+      },
+      {
+        q: "Can I use this for confidential data?",
+        a: "Yes. SnapOtter is self-hosted, so your data never leaves your network. Charts are generated locally without any external API calls or cloud processing.",
+      },
+    ],
+  },
+  "csv-excel": {
+    searchTitle: "Convert CSV to Excel and Back",
+    longDescription:
+      "Convert between CSV and Excel (XLSX) formats in both directions. Import CSV data into structured Excel spreadsheets or export Excel sheets to CSV for data pipelines. All conversion runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting exported CSV database dumps to Excel for business analysts",
+      "Turning Excel budget spreadsheets into CSV for import into accounting software",
+      "Converting CSV log files to Excel for filtering and pivot tables",
+      "Exporting Excel inventory lists to CSV for bulk upload systems",
+    ],
+    features: [
+      "Bidirectional conversion between CSV and XLSX",
+      "Preserves column headers and data types",
+      "Handles large files with thousands of rows",
+      "Supports comma, semicolon, and tab delimiters",
+      "Clean output compatible with all spreadsheet applications",
+    ],
+    faqs: [
+      {
+        q: "Can I convert in both directions?",
+        a: "Yes, the tool converts CSV to Excel and Excel to CSV. Just upload your file and the appropriate direction is handled automatically. All processing is local on your server.",
+      },
+      {
+        q: "Are column headers preserved?",
+        a: "Yes, column headers and data structure are maintained during conversion. Processing runs entirely on your self-hosted SnapOtter instance with no external services.",
+      },
+      {
+        q: "Can I handle large CSV or Excel files?",
+        a: "Yes, the tool is designed to handle files with thousands of rows efficiently. All data processing happens locally on your own infrastructure and never leaves your network.",
+      },
+    ],
+  },
+  "csv-json": {
+    searchTitle: "Convert CSV to JSON and Back",
+    longDescription:
+      "Convert between CSV and JSON formats in both directions. Transform tabular CSV data into structured JSON arrays or flatten JSON data into CSV rows. All processing happens locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting CSV exports to JSON for REST API consumption",
+      "Transforming JSON API responses to CSV for spreadsheet analysis",
+      "Preparing CSV data as JSON for database seeding scripts",
+      "Converting JSON configuration dumps to CSV for review",
+    ],
+    features: [
+      "Bidirectional conversion between CSV and JSON",
+      "Maps CSV rows to JSON objects with header keys",
+      "Flattens JSON arrays to tabular CSV format",
+      "Handles nested JSON structures where applicable",
+      "Preserves data types and special characters",
+    ],
+    faqs: [
+      {
+        q: "How are CSV columns mapped to JSON?",
+        a: "Column headers become JSON object keys, and each row becomes a JSON object in the output array. All conversion runs locally on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "Can I convert JSON back to CSV?",
+        a: "Yes, the tool works in both directions. JSON arrays of objects are flattened into CSV rows with keys as column headers. Processing happens entirely on your own infrastructure.",
+      },
+      {
+        q: "Is my data safe during conversion?",
+        a: "Absolutely. SnapOtter is self-hosted and processes all files locally on your server. Your data is never transmitted to any external service during conversion.",
+      },
+    ],
+  },
+  "json-xml": {
+    searchTitle: "Convert JSON to XML and Back",
+    longDescription:
+      "Convert between JSON and XML formats in both directions. Transform JSON objects into well-formed XML documents or parse XML into clean JSON structures. All conversion runs on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting JSON API responses to XML for legacy system integration",
+      "Parsing XML configuration files into JSON for modern tooling",
+      "Transforming JSON data feeds to XML for SOAP service consumption",
+      "Converting XML reports to JSON for web application dashboards",
+    ],
+    features: [
+      "Bidirectional conversion between JSON and XML",
+      "Produces well-formed XML with proper element nesting",
+      "Parses XML attributes and namespaces into JSON",
+      "Handles arrays, nested objects, and mixed content",
+      "Clean output suitable for direct use in applications",
+    ],
+    faqs: [
+      {
+        q: "How are JSON arrays represented in XML?",
+        a: "JSON arrays are converted to repeating XML elements with consistent naming. The tool handles nested structures and arrays of objects properly. All processing is local on your server.",
+      },
+      {
+        q: "Are XML attributes preserved when converting to JSON?",
+        a: "Yes, XML attributes are parsed and included in the JSON output structure. Conversion runs entirely on your self-hosted SnapOtter instance with no external dependencies.",
+      },
+      {
+        q: "Can I convert complex nested structures?",
+        a: "Yes, the tool handles deeply nested objects, arrays, and mixed content in both directions. All processing happens locally on your own infrastructure.",
+      },
+    ],
+  },
+  "split-csv": {
+    searchTitle: "Split CSV Into Smaller Files",
+    longDescription:
+      "Split a large CSV file into multiple smaller files based on row count, with each output file retaining the original column headers. Ideal for breaking up large datasets for batch processing or import limits. Runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Breaking a 100k-row CSV into 10k-row chunks for bulk email imports",
+      "Splitting large data exports to meet upload size limits on other platforms",
+      "Dividing CSV datasets into manageable parts for parallel processing",
+      "Creating smaller CSV batches from a master customer list for team distribution",
+    ],
+    features: [
+      "Split by configurable row count per output file",
+      "Preserves column headers in every output file",
+      "Handles large files with hundreds of thousands of rows",
+      "Outputs numbered files for easy ordering",
+      "Downloads all parts as a ZIP archive",
+    ],
+    faqs: [
+      {
+        q: "Are headers included in every split file?",
+        a: "Yes, the original column headers are automatically included at the top of every output file. All processing happens locally on your self-hosted SnapOtter server.",
+      },
+      {
+        q: "How many rows per file can I set?",
+        a: "You can configure any row count per output file. The tool splits the CSV accordingly and packages the results. Processing runs entirely on your own infrastructure.",
+      },
+      {
+        q: "Can I split very large CSV files?",
+        a: "Yes, the tool handles large files with hundreds of thousands of rows efficiently. All splitting happens locally on your server without uploading data to any external service.",
+      },
+    ],
+  },
+  "merge-csvs": {
+    searchTitle: "Merge Multiple CSV Files Into One",
+    longDescription:
+      "Combine multiple CSV or TSV files with matching column structures into a single unified file. Ideal for consolidating data exports from different sources or time periods. All processing runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Merging monthly sales CSV exports into a yearly aggregate file",
+      "Combining regional data exports from different offices into one dataset",
+      "Consolidating multiple survey response CSV files for analysis",
+      "Joining split CSV parts back into a single complete file",
+    ],
+    features: [
+      "Merges multiple CSV or TSV files into one",
+      "Validates matching column structure across input files",
+      "Removes duplicate headers from subsequent files",
+      "Supports both comma and tab delimiters",
+      "Handles large combined datasets efficiently",
+    ],
+    faqs: [
+      {
+        q: "Do the CSV files need the same columns?",
+        a: "Yes, the tool validates that input files have matching column structures to ensure a clean merge. All processing happens locally on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Can I merge TSV files as well?",
+        a: "Yes, the tool supports both CSV and TSV formats. It handles comma and tab delimiters automatically. Processing runs entirely on your own server.",
+      },
+      {
+        q: "Is there a limit on how many files I can merge?",
+        a: "You can merge multiple files in a single operation. All merging happens locally on your self-hosted infrastructure so your data never leaves your network.",
+      },
+    ],
+  },
+  "yaml-json": {
+    searchTitle: "Convert YAML to JSON and Back",
+    longDescription:
+      "Convert between YAML and JSON formats in both directions. Transform YAML configuration files into JSON or convert JSON data to human-readable YAML. All processing runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Converting Kubernetes YAML manifests to JSON for API tooling",
+      "Transforming JSON API responses to YAML for configuration files",
+      "Converting YAML CI/CD pipeline configs to JSON for programmatic editing",
+      "Translating JSON schema definitions to YAML for readability",
+    ],
+    features: [
+      "Bidirectional conversion between YAML and JSON",
+      "Preserves data types, arrays, and nested structures",
+      "Handles multi-document YAML files",
+      "Produces clean, properly indented output in both formats",
+      "Supports comments-to-JSON stripping and JSON-to-YAML annotation",
+    ],
+    faqs: [
+      {
+        q: "Are YAML comments preserved when converting to JSON?",
+        a: "JSON does not support comments, so YAML comments are stripped during conversion to JSON. Converting back to YAML produces clean output. All processing is local on your server.",
+      },
+      {
+        q: "Does this handle multi-document YAML files?",
+        a: "Yes, YAML files with multiple documents separated by --- are supported. Processing runs entirely on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Can I convert complex nested configurations?",
+        a: "Yes, the tool preserves nested objects, arrays, and data types accurately in both directions. All conversion happens locally on your own infrastructure.",
+      },
+    ],
+  },
+  "xml-to-csv": {
+    searchTitle: "Extract XML Data to CSV Table",
+    longDescription:
+      "Extract repeating elements from an XML document and organize them into a flat CSV table. Ideal for pulling structured data out of XML feeds, reports, or exports. All processing runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Extracting product listings from an XML catalog feed into CSV",
+      "Converting XML transaction records to CSV for spreadsheet analysis",
+      "Pulling repeating data elements from XML reports into tabular format",
+      "Transforming XML API responses into CSV for database import",
+    ],
+    features: [
+      "Identifies and extracts repeating XML elements",
+      "Maps element attributes and child values to CSV columns",
+      "Handles nested structures by flattening to tabular format",
+      "Produces clean CSV output with proper headers",
+      "Supports large XML documents with many records",
+    ],
+    faqs: [
+      {
+        q: "How does the tool decide which elements to extract?",
+        a: "The tool identifies repeating elements in your XML structure and maps their attributes and child values to CSV columns. All processing happens locally on your self-hosted server.",
+      },
+      {
+        q: "Can it handle deeply nested XML?",
+        a: "Yes, nested structures are flattened into a tabular CSV format with compound column names where needed. Processing runs entirely on your own SnapOtter instance.",
+      },
+      {
+        q: "Is this safe for sensitive XML data?",
+        a: "Yes. SnapOtter is self-hosted and processes files entirely on your own infrastructure. Your XML data is never sent to any external service during extraction.",
+      },
+    ],
+  },
+  "create-zip": {
+    searchTitle: "Create ZIP Archive From Files",
+    longDescription:
+      "Bundle multiple files into a single ZIP archive for easy sharing, storage, or transfer. Upload your files and download a compressed ZIP containing all of them. All archiving runs locally on your self-hosted SnapOtter instance.",
+    useCases: [
+      "Packaging project deliverables into a single ZIP for client handoff",
+      "Bundling multiple images for batch download from a shared folder",
+      "Creating ZIP archives of document sets for email attachment",
+      "Compressing a collection of reports for archival storage",
+    ],
+    features: [
+      "Bundles multiple files into a single ZIP archive",
+      "Preserves original filenames and directory structure",
+      "Standard ZIP format compatible with all operating systems",
+      "Handles a wide variety of file types and sizes",
+      "Fast compression with efficient file handling",
+    ],
+    faqs: [
+      {
+        q: "Is there a limit on the number of files?",
+        a: "You can bundle multiple files in a single ZIP operation. All archiving happens locally on your self-hosted SnapOtter server without any external services.",
+      },
+      {
+        q: "Are the original filenames preserved?",
+        a: "Yes, all original filenames are maintained in the ZIP archive. Processing runs entirely on your own infrastructure with no cloud dependency.",
+      },
+      {
+        q: "Can I ZIP confidential files safely?",
+        a: "Yes. SnapOtter is self-hosted and processes everything locally. Your files are never uploaded to any external service during ZIP creation.",
+      },
+    ],
+  },
+  "extract-zip": {
+    searchTitle: "Extract ZIP Archive With Protection",
+    longDescription:
+      "Safely extract files from a ZIP archive with built-in zip bomb detection and protection. Single-file archives return the file directly without wrapping. All extraction runs on your self-hosted SnapOtter instance with no external services.",
+    useCases: [
+      "Extracting deliverables received as ZIP attachments from clients",
+      "Unpacking ZIP archives from data exports for review",
+      "Safely opening ZIP files from untrusted sources with bomb protection",
+      "Extracting single files from ZIP archives without manual decompression",
+    ],
+    features: [
+      "Built-in zip bomb detection and protection",
+      "Single-file archives return the file directly",
+      "Extracts all common file types from ZIP archives",
+      "Preserves original filenames and directory structure",
+      "Safe handling of nested and compressed entries",
+    ],
+    faqs: [
+      {
+        q: "What is zip bomb protection?",
+        a: "Zip bomb protection detects maliciously crafted archives that expand to enormous sizes when extracted, preventing resource exhaustion. SnapOtter checks for this before extracting. All processing is local.",
+      },
+      {
+        q: "What happens with single-file ZIP archives?",
+        a: "If the ZIP contains only one file, it is returned directly without being wrapped in a folder. All extraction runs on your self-hosted SnapOtter instance.",
+      },
+      {
+        q: "Is it safe to extract unknown ZIP files?",
+        a: "Yes, the built-in bomb protection guards against malicious archives. Processing happens entirely on your own server, so extracted contents stay within your network.",
+      },
+    ],
+  },
 };

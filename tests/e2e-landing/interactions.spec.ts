@@ -1,50 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("BentoGrid Interactions", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-  });
-
-  test("search filters tools by name", async ({ page }) => {
-    const input = page.getByPlaceholder("Search tools...");
-    await input.fill("resize");
-    await expect(page.getByText("Resize", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/Showing \d+ of 53 tools/)).toBeVisible();
-  });
-
-  test("category pill filters tools", async ({ page }) => {
-    await page.getByText(/AI Tools/).click();
-    await expect(page.getByText(/Showing 16 of 53 tools/)).toBeVisible();
-    await expect(page.getByText("Remove Background")).toBeVisible();
-  });
-
-  test("clicking All resets category filter", async ({ page }) => {
-    await page.getByText(/AI Tools/).click();
-    await expect(page.getByText(/Showing 16 of 53 tools/)).toBeVisible();
-
-    await page.getByText(/All \(53\)/).click();
-    await expect(page.getByText(/Showing 53 of 53 tools/)).toBeVisible();
-  });
-
-  test("search with no results shows empty state", async ({ page }) => {
-    const input = page.getByPlaceholder("Search tools...");
-    await input.fill("xyznonexistent");
-    await expect(page.getByText("No tools found. Try a different search.")).toBeVisible();
-    await expect(page.getByText(/Showing 0 of 53 tools/)).toBeVisible();
-  });
-
-  test("combined search and category filter works", async ({ page }) => {
-    await page.getByText(/AI Tools/).click();
-    const input = page.getByPlaceholder("Search tools...");
-    await input.fill("background");
-    await expect(page.getByText("Remove Background")).toBeVisible();
-  });
-});
-
-test.describe("HowItWorks Copy Button", () => {
+test.describe("Docker Command Copy Button", () => {
   test("copy button shows Copied! feedback", async ({ page }) => {
     await page.goto("/");
-    const copyButton = page.locator("button").filter({ hasText: "docker run" });
+    const copyButton = page.locator("button[data-copy]");
     await copyButton.click();
     await expect(page.getByText("Copied!")).toBeVisible();
   });
@@ -94,6 +53,7 @@ test.describe("Mobile Navigation", () => {
     const toggle = page.getByLabel("Toggle menu");
     await toggle.click();
     await expect(page.getByRole("link", { name: "Features" }).last()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Enterprise" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Pricing" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Docs" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact" }).last()).toBeVisible();

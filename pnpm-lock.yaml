@@ -358,6 +358,9 @@ importers:
       astro:
         specifier: ^5.8.0
         version: 5.18.2(@types/node@25.8.0)(ioredis@5.10.1)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.8.3)
+      lucide:
+        specifier: ^1.18.0
+        version: 1.18.0
     devDependencies:
       '@astrojs/check':
         specifier: ^0.9.0
@@ -5814,6 +5817,9 @@ packages:
     resolution: {integrity: sha512-4LjoFv2eEPwYDPg/CUdBJQSDfPyzXCRrVW1X7jrx/trgxnxkHFjnVZINbzvzxjN70dxychOfg+FTYwBiS3pQ5A==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lucide@1.18.0:
+    resolution: {integrity: sha512-xzUa3LbA/Uvn3DCs7B7YfDcOZeqV8aZ4r4OFyCgJSfZGUdMglJiK3PJSbd26SXLLQvGGsYX9PdETCRXvfK4rnA==}
 
   luxon@3.7.2:
     resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
@@ -14020,6 +14026,8 @@ snapshots:
   lucide-react@0.577.0(react@19.2.7):
     dependencies:
       react: 19.2.7
+
+  lucide@1.18.0: {}
 
   luxon@3.7.2: {}
 

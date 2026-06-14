@@ -41,6 +41,7 @@ test.describe("Privacy Page", () => {
 
   test("renders all section headings", async ({ page }) => {
     const headings = [
+      "Data Controller",
       "Overview",
       "Website (snapotter.com)",
       "Self-Hosted Software",
@@ -72,6 +73,7 @@ test.describe("Terms Page", () => {
 
   test("renders all section headings", async ({ page }) => {
     const headings = [
+      "Who We Are",
       "Overview",
       "Software License",
       "Website Use",
@@ -92,16 +94,16 @@ test.describe("Terms Page", () => {
 });
 
 test.describe("Cross-Page Navigation", () => {
-  test("footer Privacy Policy link navigates to /privacy", async ({ page }) => {
+  test("footer Privacy link navigates to /privacy", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Privacy Policy" }).click();
+    await page.locator("footer").getByRole("link", { name: "Privacy" }).click();
     await expect(page).toHaveURL("/privacy");
     await expect(page.getByText("Privacy Policy").first()).toBeVisible();
   });
 
   test("footer Terms link navigates to /terms", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Terms and Conditions" }).click();
+    await page.locator("footer").getByRole("link", { name: "Terms" }).click();
     await expect(page).toHaveURL("/terms");
     await expect(page.getByText("Terms and Conditions").first()).toBeVisible();
   });

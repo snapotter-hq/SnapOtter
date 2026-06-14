@@ -7,6 +7,7 @@ test.describe("Heading Hierarchy", () => {
     { path: "/faq", name: "FAQ" },
     { path: "/privacy", name: "Privacy" },
     { path: "/terms", name: "Terms" },
+    { path: "/enterprise", name: "Enterprise" },
   ];
 
   for (const { path, name } of pages) {
@@ -45,6 +46,15 @@ test.describe("Landmark Elements", () => {
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.locator("main")).toBeVisible();
     await expect(page.locator("footer")).toBeVisible();
+  });
+});
+
+test.describe("Skip Link", () => {
+  test("skip link targets main content", async ({ page }) => {
+    await page.goto("/");
+    const skipLink = page.locator('a.skip-link[href="#main"]');
+    await expect(skipLink).toHaveAttribute("href", "#main");
+    await expect(page.locator("main#main")).toBeAttached();
   });
 });
 

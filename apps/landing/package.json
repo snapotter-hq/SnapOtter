@@ -4,25 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 1350",
-    "build": "next build",
-    "start": "next start",
+    "dev": "astro dev --port 1350",
+    "build": "astro build",
+    "preview": "astro preview --port 1350",
     "lint": "biome check src/",
-    "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .next"
+    "typecheck": "astro check && tsc --noEmit",
+    "clean": "rm -rf dist .astro"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.3.0",
     "@snapotter/shared": "workspace:*",
-    "framer-motion": "^11.18.0",
-    "lucide-react": "^0.577.0",
-    "next": "^15.5.18",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "astro": "^5.8.0",
+    "lucide": "^1.18.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.0",
-    "@types/react": "^19.2.16",
-    "@types/react-dom": "^19.0.0",
+    "@astrojs/check": "^0.9.0",
+    "@tailwindcss/vite": "^4.3.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.7.0"
   }

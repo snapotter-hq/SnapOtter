@@ -1,98 +1,75 @@
 # SnapOtter
 
-> Open-source, self-hostable image manipulation suite with 53 tools. Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
+> Open-source, self-hostable file processing suite with 157 tools across 5 modalities (image, video, audio, document, data). Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
 
-SnapOtter runs entirely on your own infrastructure. Images are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need.
+SnapOtter runs entirely on your own infrastructure. Files are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need. Supports GDPR, HIPAA, and CCPA compliance by architecture.
 
 ## Getting Started
 
 - [Documentation](https://docs.snapotter.com/guide/getting-started): Installation, configuration, and deployment guide
-- [Docker Hub](https://hub.docker.com/r/snapotter/snapotter): Official Docker image with multi-arch support
+- [Docker Hub](https://hub.docker.com/r/snapotter/snapotter): Official Docker image with multi-arch support (ARM + x86)
 - [GitHub](https://github.com/snapotter-hq/snapotter): Source code, issues, and contributions
+- [API Reference](https://docs.snapotter.com/api/rest): Full REST API with OpenAPI documentation
+- [Demo](https://demo.snapotter.com): Try SnapOtter without installing
 
-## Core Tools
+## Image Tools (64 tools)
 
-- [Resize](https://snapotter.com/tools/resize): Resize images by pixels, percentage, or social media presets
-- [Crop](https://snapotter.com/tools/crop): Freeform, fixed aspect ratio, and shape-based cropping
-- [Rotate](https://snapotter.com/tools/rotate): Rotate by any angle, flip, and auto-straighten
-- [Convert](https://snapotter.com/tools/convert): Convert between JPEG, PNG, WebP, AVIF, TIFF, GIF, HEIC, RAW
-- [Compress](https://snapotter.com/tools/compress): Quality-based or target file size compression
-- [Optimize for Web](https://snapotter.com/tools/optimize-for-web): Smart format selection and quality tuning for web delivery
-- [Strip Metadata](https://snapotter.com/tools/strip-metadata): Remove EXIF, GPS, and camera data for privacy
-- [Edit Metadata](https://snapotter.com/tools/edit-metadata): View and edit EXIF, IPTC, and XMP fields
-- [Bulk Rename](https://snapotter.com/tools/bulk-rename): Pattern-based batch renaming with variables
-- [Image to PDF](https://snapotter.com/tools/image-to-pdf): Combine images into multi-page PDFs
-- [Favicon](https://snapotter.com/tools/favicon): Generate all favicon sizes from a single image
+Core: Resize, Crop, Rotate & Flip, Convert (JPEG/PNG/WebP/AVIF/TIFF/GIF/HEIC/RAW), Compress, Optimize for Web, Strip Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator.
 
-## Color and Adjustment Tools
+Adjustments: Adjust Colors (brightness/contrast/saturation/temperature), Sharpening, Replace Color, Color Blindness Simulation, Duotone, Vignette, Pixelate.
 
-- [Adjust Colors](https://snapotter.com/tools/adjust-colors): Brightness, contrast, saturation, temperature, and effects
-- [Sharpening](https://snapotter.com/tools/sharpening): Adaptive, unsharp mask, and high-pass sharpening
-- [Replace Color](https://snapotter.com/tools/replace-color): Swap colors with tolerance control or invert
-- [Color Blindness](https://snapotter.com/tools/color-blindness): Simulate 8 types of color vision deficiency
+AI-Powered: Remove Background (rembg), Upscale 2x/4x (RealESRGAN), Object Eraser (LaMa), OCR (PaddleOCR, 80+ languages), Face/PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo (30+ countries), Content-Aware Resize, AI Canvas Expand, Background Replace, Blur Background, PNG Transparency Fixer.
 
-## AI-Powered Tools
+Watermark & Overlay: Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator.
 
-- [Remove Background](https://snapotter.com/tools/remove-background): AI background removal (rembg) running 100% locally
-- [Upscale](https://snapotter.com/tools/upscale): 2x and 4x AI super-resolution with RealESRGAN
-- [Erase Object](https://snapotter.com/tools/erase-object): AI inpainting to remove unwanted objects (LaMa)
-- [OCR](https://snapotter.com/tools/ocr): Extract text from images with PaddleOCR (80+ languages)
-- [Blur Faces](https://snapotter.com/tools/blur-faces): AI face detection with blur for GDPR compliance
-- [Smart Crop](https://snapotter.com/tools/smart-crop): Subject-aware and face-centered cropping
-- [Image Enhancement](https://snapotter.com/tools/image-enhancement): One-click auto-fix for exposure, contrast, and color
-- [Enhance Faces](https://snapotter.com/tools/enhance-faces): AI face restoration for blurry or low-res portraits
-- [Colorize](https://snapotter.com/tools/colorize): Convert black-and-white photos to full color with AI
-- [Noise Removal](https://snapotter.com/tools/noise-removal): AI denoising for ISO noise, JPEG artifacts, and grain
-- [Red Eye Removal](https://snapotter.com/tools/red-eye-removal): Automatic red-eye detection and correction
-- [Restore Photo](https://snapotter.com/tools/restore-photo): AI repair of scratches, tears, and damage
-- [Passport Photo](https://snapotter.com/tools/passport-photo): Compliant passport/ID photos for 30+ countries
-- [Content-Aware Resize](https://snapotter.com/tools/content-aware-resize): Seam carving that preserves subjects
-- [AI Canvas Expand](https://snapotter.com/tools/ai-canvas-expand): Outpainting to extend image borders with AI
-- [Transparency Fixer](https://snapotter.com/tools/transparency-fixer): Fix PNGs with fake transparent backgrounds
+Analysis: Image Info, Compare, Find Duplicates, Color Palette, Histogram, LQIP Placeholder.
 
-## Watermark and Overlay Tools
+Layout: Collage (25+ templates), Stitch/Combine, Split, Border & Frame, Beautify Screenshot, Circle Crop, Image Pad, Sprite Sheet.
 
-- [Text Watermark](https://snapotter.com/tools/watermark-text): Add text watermarks with tiling and opacity control
-- [Image Watermark](https://snapotter.com/tools/watermark-image): Overlay logos with position and opacity control
-- [Text Overlay](https://snapotter.com/tools/text-overlay): Add styled text, captions, and titles to images
-- [Compose](https://snapotter.com/tools/compose): Layer and composite multiple images with blending
-- [Meme Generator](https://snapotter.com/tools/meme-generator): Create memes with custom text and templates
+Format: SVG to Raster, Image to SVG (vectorize), GIF Tools, GIF/WebP Converter, Image to Base64.
 
-## Analysis and Utility Tools
+Generators: QR Code Generator, Barcode Generator, Barcode Reader, HTML to Image.
 
-- [Image Info](https://snapotter.com/tools/info): View dimensions, EXIF, GPS, color space, and file details
-- [Compare](https://snapotter.com/tools/compare): Side-by-side image comparison with slider overlay
-- [Find Duplicates](https://snapotter.com/tools/find-duplicates): Perceptual hashing for near-duplicate detection
-- [Color Palette](https://snapotter.com/tools/color-palette): Extract dominant colors as hex/RGB values
-- [QR Code Generator](https://snapotter.com/tools/qr-generate): Custom QR codes with colors, logos, and patterns
-- [Barcode Reader](https://snapotter.com/tools/barcode-read): Decode QR, Code 128, EAN-13, and more from images
-- [Image to Base64](https://snapotter.com/tools/image-to-base64): Generate data URIs for HTML/CSS embedding
-- [HTML to Image](https://snapotter.com/tools/html-to-image): Capture webpages as high-quality images (PNG, JPG, WebP)
+## Video Tools (29 tools)
 
-## Layout and Composition Tools
+Convert Video (MP4/MOV/WebM), Compress Video, Trim Video, Mute Video, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color Adjust, Video Speed, Reverse Video, Normalize Audio, Stabilize Video, Aspect Pad, Blur Pad, Watermark Video, Merge Videos, Replace Audio, Extract Audio, Video to GIF, GIF to Video, Video to WebP, Video to Frames, Images to Video, Auto Subtitles (AI transcription), Burn Subtitles, Embed Subtitles, Extract Subtitles, Clean Video Metadata.
 
-- [Collage](https://snapotter.com/tools/collage): 25+ grid templates for photo collages
-- [Stitch](https://snapotter.com/tools/stitch): Join images side by side, stacked, or in grids
-- [Split](https://snapotter.com/tools/split): Cut images into grid tiles for Instagram and print
-- [Border](https://snapotter.com/tools/border): Add borders, rounded corners, and drop shadows
-- [Beautify](https://snapotter.com/tools/beautify): Screenshot mockups with device frames and backgrounds
+## Audio Tools (17 tools)
 
-## Format Conversion Tools
+Transcribe Audio (AI speech-to-text), Convert Audio (MP3/WAV/OGG/FLAC/AAC), Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels (mono/stereo), Silence Removal, Noise Reduction (FFT), Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata.
 
-- [SVG to Raster](https://snapotter.com/tools/svg-to-raster): Convert SVG to PNG, JPEG, WebP at custom scale/DPI
-- [Vectorize](https://snapotter.com/tools/vectorize): Trace raster images to SVG vector paths
-- [GIF Tools](https://snapotter.com/tools/gif-tools): Resize, optimize, reverse, and extract GIF frames
-- [PDF to Image](https://snapotter.com/tools/pdf-to-image): Convert PDF pages to images at custom DPI
+## Document Tools (37 tools)
+
+PDF: Merge, Split, Compress, Rotate, Extract Pages, Remove Pages, Organize, Protect (AES-256), Unlock, Repair, Web-Optimize (linearize), Grayscale, PDF/A Convert, Crop, N-up, Booklet, Watermark, Page Numbers, Flatten, Redact, PDF to Text, PDF to Word, PDF to Image, PDF Metadata, PDF OCR (AI).
+
+Conversion: Word to PDF, Excel to PDF, PowerPoint to PDF, HTML to PDF, Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Markdown to Word, Markdown to HTML, Markdown to PDF, Convert EPUB, Convert to EPUB.
+
+## Data & File Tools (10 tools)
+
+Chart Maker (bar/line/pie from CSV/JSON), CSV to Excel, CSV to JSON, JSON to XML, YAML to JSON, XML to CSV, Split CSV, Merge CSVs, Create ZIP, Extract ZIP.
+
+## AI Models (15, all running locally)
+
+Background Removal (rembg), Super-Resolution (RealESRGAN 2x/4x), Object Eraser (LaMa inpainting), OCR (PaddleOCR, 80+ languages), PDF OCR, Speech Transcription (faster-whisper), Face Detection (MediaPipe), Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Smart Crop, Content-Aware Resize, AI Canvas Expand (outpainting).
+
+## Enterprise Features
+
+SAML SSO (Okta, Azure AD, Google Workspace, any OIDC), SCIM Provisioning, Multi-Factor Auth (TOTP), Multi-Tenancy, Per-Tool Permissions, Role-Based Access Control (admin/editor/user + custom), Audit Log Export, S3-Compatible Storage (AWS S3, MinIO, R2), Webhooks, API Keys with Scoped Permissions.
 
 ## Key Features
 
 - Self-hosted: all processing on your infrastructure, no cloud dependency
-- Privacy-first: images never leave your network
-- Batch processing: process hundreds of files at once
-- Pipelines: chain tools sequentially for automated workflows
-- REST API: integrate with any system via HTTP
+- Privacy-first: files never leave your network, air-gapped capable
+- 157 tools across 5 modalities (image, video, audio, document, data)
+- 15 local AI models, no external API calls
+- Batch processing with ZIP output
+- Pipeline automation: chain tools sequentially
+- Full REST API with OpenAPI documentation
 - 21 languages supported
-- Docker: single container deployment
+- Docker: single container with Postgres + Redis bundled
+- Kubernetes and bare metal deployment
+- ARM and x86 architectures
+- Layer-based image editor (Konva)
 - Open source: AGPLv3 with commercial license available
 
 ## Links
@@ -102,3 +79,4 @@ SnapOtter runs entirely on your own infrastructure. Images are processed locally
 - GitHub: https://github.com/snapotter-hq/snapotter
 - Docker Hub: https://hub.docker.com/r/snapotter/snapotter
 - Discord: https://discord.gg/hr3s7HPUsr
+- Contact: contact@snapotter.com

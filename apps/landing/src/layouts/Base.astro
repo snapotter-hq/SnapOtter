@@ -1,0 +1,100 @@
+---
+import "@/styles/globals.css";
+import { TOOLS } from "@snapotter/shared";
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  ogImage?: string;
+  ogType?: string;
+  noindex?: boolean;
+}
+
+const toolCount = TOOLS.length;
+const defaultTitle = `SnapOtter | Self-Hosted File Processing Suite`;
+const defaultDescription = `${toolCount} file processing tools across 5 modalities with local AI. Runs 100% offline. Your files never leave your network. Open source and free forever.`;
+
+const {
+  title = defaultTitle,
+  description = defaultDescription,
+  canonical = "https://snapotter.com",
+  ogImage = "/og-image.png",
+  ogType = "website",
+  noindex = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Color scheme -->
+    <meta name="color-scheme" content="light only" />
+    <meta name="darkreader-lock" content="true" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="SnapOtter" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content={`https://snapotter.com${ogImage}`} />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="SnapOtter - Self-Hosted File Processing Suite" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@SnapOtterHQ" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`https://snapotter.com${ogImage}`} />
+
+    <!-- LLM discovery -->
+    <link rel="llms-txt" href="/llms.txt" />
+
+    <!-- Fonts: self-hosted in /fonts/ (loaded via @font-face in globals.css) -->
+
+    <!-- Structured data slot -->
+    <slot name="head" />
+  </head>
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+    <slot />
+
+    <!-- Scroll-triggered reveal observer -->
+    <script is:inline>
+      (function () {
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { rootMargin: "-40px", threshold: 0.01 }
+        );
+        document.querySelectorAll(".reveal").forEach(function (el) {
+          observer.observe(el);
+        });
+      })();
+    </script>
+  </body>
+</html>
