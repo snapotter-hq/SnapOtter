@@ -5,6 +5,7 @@
  * the appropriate BullMQ queue. waitForJob() blocks the HTTP request
  * until the worker produces a result or the sync-wait window expires.
  */
+import { context, propagation } from "@opentelemetry/api";
 import { FlowProducer, type Job, QueueEvents } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
@@ -80,6 +81,15 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   // Fire-and-forget: compute deleteAfter from team retention override
   if (data.userId) {
     void computeDeleteAfter(data.jobId, data.userId).catch(() => {});
+  }
+
+  const otelCarrier: Record<string, string> = {};
+  propagation.inject(context.active(), otelCarrier);
+  if (otelCarrier.traceparent) {
+    data._otel = {
+      traceparent: otelCarrier.traceparent,
+      tracestate: otelCarrier.tracestate,
+    };
   }
 
   const queue = getQueue(data.pool);

@@ -46,6 +46,7 @@ export interface ToolJobData {
   parentId?: string;
   totalFiles?: number;
   fileIndex?: number;
+  _otel?: { traceparent: string; tracestate?: string };
 }
 
 /** Result returned by a completed BullMQ job. */
