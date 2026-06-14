@@ -55,6 +55,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
+import { shutdownTracing } from "./tracing.js";
 
 // Run before anything else
 try {
@@ -648,6 +649,17 @@ async function shutdown(signal: string) {
   // Close BullMQ resources before database (workers first so no new jobs start)
   try {
     await closeWorkers();
+  } catch (err) {
+    console.error("Error closing workers:", err);
+  }
+
+  try {
+    await shutdownTracing();
+  } catch {
+    // tracing shutdown is best-effort
+  }
+
+  try {
     await closeFlowProducer();
     await closeQueueEvents();
     await closeQueues();
