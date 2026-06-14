@@ -23,6 +23,7 @@ export const ENTERPRISE_FEATURES = [
   "config_export_import",
   "upgrade_management",
   "admin_alerts",
+  "distributed_tracing",
 ] as const;
 
 export type EnterpriseFeature = (typeof ENTERPRISE_FEATURES)[number];

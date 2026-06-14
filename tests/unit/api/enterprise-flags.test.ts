@@ -32,7 +32,13 @@ describe("enterprise feature flags", () => {
     }
   });
 
-  it("has exactly 18 features total", () => {
-    expect(ENTERPRISE_FEATURES).toHaveLength(18);
+  it("has exactly 19 features total", () => {
+    expect(ENTERPRISE_FEATURES).toHaveLength(19);
+  });
+
+  it("includes distributed_tracing in enterprise plan only", () => {
+    expect(ENTERPRISE_FEATURES).toContain("distributed_tracing");
+    expect(PLAN_FEATURES.enterprise).toContain("distributed_tracing");
+    expect(PLAN_FEATURES.team).not.toContain("distributed_tracing");
   });
 });
