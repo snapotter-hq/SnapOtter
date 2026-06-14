@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { context, propagation } from "@opentelemetry/api";
+import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -580,28 +580,58 @@ export class PythonDispatcher {
       timeout?: number;
     } = {},
   ): Promise<{ stdout: string; stderr: string }> {
-    // Try persistent dispatcher first
-    const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
-    if (dispatcherPromise) {
-      return dispatcherPromise.catch((err: Error) => {
-        if (
-          err.message === "Python dispatcher exited unexpectedly" ||
-          err.message === "Python dispatcher stdin closed unexpectedly"
-        ) {
-          console.warn(
-            `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
-          );
-          return this.runPerRequest(scriptName, args, options).then((result) => ({
-            ...result,
-            stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
-          }));
-        }
-        throw err;
-      });
-    }
+    const tracer = trace.getTracer("snapotter-sidecar");
+    const span = trace.getActiveSpan()
+      ? tracer.startSpan("sidecar.execute", {
+          attributes: {
+            "sidecar.script": scriptName.replace(".py", ""),
+            "sidecar.profile": this.profile,
+          },
+        })
+      : null;
 
-    // Fall back to per-request spawning
-    return this.runPerRequest(scriptName, args, options);
+    const doRun = (): Promise<{ stdout: string; stderr: string }> => {
+      // Try persistent dispatcher first
+      const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
+      if (dispatcherPromise) {
+        return dispatcherPromise.catch((err: Error) => {
+          if (
+            err.message === "Python dispatcher exited unexpectedly" ||
+            err.message === "Python dispatcher stdin closed unexpectedly"
+          ) {
+            console.warn(
+              `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
+            );
+            return this.runPerRequest(scriptName, args, options).then((result) => ({
+              ...result,
+              stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
+            }));
+          }
+          throw err;
+        });
+      }
+
+      // Fall back to per-request spawning
+      return this.runPerRequest(scriptName, args, options);
+    };
+
+    if (!span) return doRun();
+
+    return doRun().then(
+      (result) => {
+        span.end();
+        return result;
+      },
+      (err) => {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        span.end();
+        throw err;
+      },
+    );
   }
 }
 
