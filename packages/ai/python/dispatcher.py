@@ -28,6 +28,32 @@ import os
 import traceback
 
 
+# ── Optional OpenTelemetry tracing (enterprise only) ─────────────
+_tracer = None
+_tracer_provider = None
+
+def _init_tracing():
+    """Initialize OTel tracing if OTEL_EXPORTER_OTLP_ENDPOINT is set."""
+    global _tracer, _tracer_provider
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+    try:
+        from opentelemetry import trace as otel_trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import Resource
+
+        resource = Resource.create({"service.name": "snapotter-sidecar"})
+        _tracer_provider = TracerProvider(resource=resource)
+        _tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        otel_trace.set_tracer_provider(_tracer_provider)
+        _tracer = otel_trace.get_tracer("snapotter-sidecar")
+    except ImportError:
+        pass
+
+
 # ── Script allowlist ───────────────────────────────────────────────────
 # Only these script names (without .py) may be dispatched. This is the
 # primary security gate -- no path traversal, no arbitrary file execution.
@@ -319,6 +345,8 @@ def main():
     print(json.dumps({"ready": True, "gpu": gpu}), file=sys.stderr, flush=True)
     print(f"[dispatcher] Ready. GPU: {gpu}. Max requests: {MAX_REQUESTS}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
 
+    _init_tracing()
+
     request_count = 0
 
     for line in sys.stdin:
@@ -335,8 +363,38 @@ def main():
         script_name = request.get("script", "")
         args = request.get("args", [])
 
+        otel_data = request.pop("_otel", None)
+        otel_ctx = None
+        if otel_data and _tracer:
+            from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+            from opentelemetry import context as otel_context
+            propagator = TraceContextTextMapPropagator()
+            otel_ctx = propagator.extract(carrier=otel_data)
+
         try:
-            stdout_output, exit_code = _run_script_main(script_name, args)
+            if otel_ctx and _tracer:
+                from opentelemetry import trace as otel_trace
+                from opentelemetry.trace import StatusCode
+                from opentelemetry import context as otel_context
+                token = otel_context.attach(otel_ctx)
+                span = _tracer.start_span(f"sidecar.{script_name}", context=otel_ctx)
+                try:
+                    stdout_output, exit_code = _run_script_main(script_name, args)
+                    if exit_code != 0:
+                        span.set_status(StatusCode.ERROR, f"exit code {exit_code}")
+                except Exception as exc:
+                    span.set_status(StatusCode.ERROR, str(exc))
+                    span.record_exception(exc)
+                    raise
+                finally:
+                    span.end()
+                    otel_context.detach(token)
+                    try:
+                        _tracer_provider.force_flush()
+                    except Exception:
+                        pass
+            else:
+                stdout_output, exit_code = _run_script_main(script_name, args)
             response = {
                 "id": request_id,
                 "stdout": stdout_output,
@@ -360,6 +418,12 @@ def main():
             print(f"[dispatcher] Reached max requests ({MAX_REQUESTS}), shutting down for restart",
                   file=sys.stderr, flush=True)
             break
+
+    if _tracer_provider:
+        try:
+            _tracer_provider.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
