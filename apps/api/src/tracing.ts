@@ -9,6 +9,8 @@ export function isTracingActive(): boolean {
 }
 
 export async function initTracing(options: { exporter?: SpanExporter } = {}): Promise<void> {
+  if (_active) return;
+
   const { NodeSDK } = await import("@opentelemetry/sdk-node");
   const { BatchSpanProcessor } = await import("@opentelemetry/sdk-trace-base");
   const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");

@@ -19,13 +19,15 @@ describe("tracing bootstrap", () => {
 
   it("is inactive when enterprise package is unavailable", async () => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
-    vi.stubEnv("LICENSE_KEY", "");
+    vi.doMock("@snapotter/enterprise", () => {
+      throw new Error("Cannot find module '@snapotter/enterprise'");
+    });
     const { isTracingActive } = await import("../../../apps/api/src/tracing.js");
     expect(isTracingActive()).toBe(false);
   });
 
   it("initializes with valid config and enterprise license", async () => {
-    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
+    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "");
     vi.doMock("@snapotter/enterprise", () => ({
       isFeatureEnabled: (f: string) => f === "distributed_tracing",
       initEnterprise: () => true,
