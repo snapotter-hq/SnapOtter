@@ -3,6 +3,7 @@ import { statfs } from "node:fs/promises";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import { trace } from "@opentelemetry/api";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
@@ -30,6 +31,7 @@ import {
   ensureAnonymousUser,
   ensureBuiltinRoles,
   ensureDefaultAdmin,
+  getAuthUser,
 } from "./plugins/auth.js";
 import { registerMfa } from "./plugins/mfa.js";
 import { oidcRoutes } from "./plugins/oidc.js";
@@ -310,6 +312,18 @@ await authMiddleware(app);
 
 // Per-user rate limiting (after auth so request.user is populated)
 await registerPerUserRateLimit(app);
+
+// Enrich active OTel span with tool_id and user_id when available
+app.addHook("preHandler", (request, _reply, done) => {
+  const span = trace.getActiveSpan();
+  if (span) {
+    const params = request.params as Record<string, string> | undefined;
+    if (params?.toolId) span.setAttribute("snapotter.tool_id", params.toolId);
+    const user = getAuthUser(request);
+    if (user) span.setAttribute("snapotter.user_id", user.id);
+  }
+  done();
+});
 
 // Auth routes
 await authRoutes(app);
