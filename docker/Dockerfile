@@ -27,7 +27,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 # Run on the native build platform to avoid QEMU crashes with esbuild on
 # Apple Silicon.  The output (HTML/CSS/JS) is architecture-agnostic so it
 # is safe to build on arm64 and copy into the amd64 production layer.
-FROM --platform=$BUILDPLATFORM node:22-bookworm@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6 AS builder
+FROM --platform=$BUILDPLATFORM node:22-bookworm@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3 AS builder
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -161,12 +161,12 @@ RUN curl -fsSL --retry 3 --retry-delay 5 "https://github.com/strukturag/libheif/
 # Stage 3: Platform-specific base images
 # Pin tags to specific major.minor for reproducible builds.
 # ============================================
-FROM node:22-bookworm@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6 AS base-linux-arm64
+FROM node:22-bookworm@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3 AS base-linux-arm64
 FROM nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04@sha256:070f8f2672df1b05b84c0409a5fd1d54ddfd646e5b9d8dee7878131271b563fc AS base-linux-amd64
 
 # Node.js donor: provides Node binaries for the CUDA amd64 image without
 # relying on NodeSource apt repos or Ubuntu mirrors (which are flaky on CI).
-FROM node:22-bookworm@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6 AS node-bins
+FROM node:22-bookworm@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3 AS node-bins
 
 # ============================================
 # Stage 4: Production runtime
