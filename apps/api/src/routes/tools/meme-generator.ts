@@ -170,9 +170,20 @@ async function processMeme(
     gif: "image/gif",
   };
 
+  // Ensure the output filename extension matches the actual raster format
+  // (e.g. SVG input produces a PNG buffer, so the name must end in .png).
+  const extMap: Record<string, string> = {
+    jpeg: ".jpg",
+    png: ".png",
+    webp: ".webp",
+    gif: ".gif",
+  };
+  const correctExt = extMap[detectedFormat] ?? ".png";
+  const outFilename = filename.replace(/\.[^.]+$/, correctExt);
+
   return {
     buffer: result,
-    filename,
+    filename: outFilename,
     contentType: mimeMap[detectedFormat] ?? "image/png",
   };
 }

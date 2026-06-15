@@ -211,7 +211,41 @@ async function decodeRaw(buffer: Buffer, ext?: string): Promise<Buffer> {
       // ExifTool not available or no embedded JPEG -- fall through
     }
 
-    // Attempt 2: ImageMagick + LibRaw delegate (full decode)
+    // Attempt 1b: ExifTool PreviewImage extraction (some formats store
+    // preview under a different tag than JpgFromRaw).
+    try {
+      const { stdout } = await execFileAsync("exiftool", ["-b", "-PreviewImage", inputPath], {
+        encoding: "buffer",
+        maxBuffer: 50 * 1024 * 1024,
+        timeout: 30_000,
+      } as never);
+      const previewBuf = stdout as unknown as Buffer;
+      if (previewBuf && previewBuf.length > 1000) {
+        if (previewBuf[0] === 0xff && previewBuf[1] === 0xd8) {
+          return previewBuf;
+        }
+      }
+    } catch {
+      // fall through
+    }
+
+    // Attempt 2: dcraw_emu from libraw-bin (direct LibRaw decode to TIFF).
+    // More reliable than ImageMagick's delegate chain for Camera RAW.
+    try {
+      await execFileAsync("dcraw_emu", ["-T", "-w", "-o", "1", inputPath], { timeout: 120_000 });
+      // dcraw_emu writes output next to the input with a .tiff extension
+      const dcrawOutput = inputPath.replace(/\.[^.]+$/, ".tiff");
+      const tiffBuf = await readFile(dcrawOutput);
+      await rm(dcrawOutput, { force: true }).catch(() => {});
+      if (tiffBuf.length > 0) {
+        // Convert TIFF to PNG via Sharp (Sharp handles TIFF natively)
+        return await sharp(tiffBuf).png().toBuffer();
+      }
+    } catch {
+      // dcraw_emu not available or unsupported format -- fall through
+    }
+
+    // Attempt 3: ImageMagick + LibRaw delegate (full decode)
     const cmd = await findMagickCmd();
     await execFileAsync(
       cmd,

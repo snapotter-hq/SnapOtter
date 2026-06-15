@@ -23,13 +23,19 @@ export function registerVideoToGif(app: FastifyInstance) {
       const outName = `${base}.gif`;
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+        // Place -ss/-t AFTER -i (output-side seeking) so ffmpeg decodes
+        // from the start.  Input-side seeking relies on a keyframe index
+        // which FLV (and some other legacy containers) often lack, causing
+        // zero decoded frames and exit 234.
         return [
+          "-fflags",
+          "+genpts",
+          "-i",
+          inPath,
           "-ss",
           String(settings.startS),
           "-t",
           String(settings.durationS),
-          "-i",
-          inPath,
           "-vf",
           `fps=${settings.fps},scale=${settings.width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
           out,

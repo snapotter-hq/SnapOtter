@@ -142,19 +142,18 @@ def main():
             elif was_auto:
                 current_lang = language  # already detected
 
-            # Run OCR engine based on quality tier
-            if quality == "fast":
-                text = ocr_module.run_tesseract(png_path, current_lang, is_auto=was_auto)
-                engine_used = "tesseract"
-            elif quality == "balanced":
-                text = ocr_module.run_paddleocr_v5(png_path, current_lang)
-                engine_used = "paddleocr-v5"
-            elif quality == "best":
-                text = ocr_module.run_paddleocr_vl(png_path)
-                engine_used = "paddleocr-vl"
-            else:
+            # Always route PDF OCR through tesseract.  PaddleOCR segfaults
+            # on arm64 CPU when processing rasterised PDF pages (SIGSEGV in
+            # the doc-orientation / structural-analysis stage).  Tesseract is
+            # reliable for page-level images and is already installed in the
+            # container with multi-language packs.  The image-OCR tool still
+            # offers PaddleOCR tiers for single images where it is stable.
+            if quality not in ("fast", "balanced", "best"):
                 print(json.dumps({"error": f"Unknown quality: {quality}"}))
                 sys.exit(1)
+
+            text = ocr_module.run_tesseract(png_path, current_lang, is_auto=was_auto)
+            engine_used = "tesseract"
 
             page_texts.append((page_num, text))
 

@@ -243,6 +243,13 @@ export async function validateImageBuffer(
     detectedFormat = "png";
   }
 
+  // RAW formats with non-TIFF magic bytes (Panasonic RW2, some Olympus ORF,
+  // Pentax PEF, etc.) are not caught by MAGIC_BYTES.  Fall back to
+  // extension-based detection for known Camera RAW extensions.
+  if (!detectedFormat && ext && isRawExtension(ext)) {
+    detectedFormat = "raw";
+  }
+
   if (!detectedFormat) {
     return { valid: false, reason: "Unrecognized image format" };
   }

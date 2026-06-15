@@ -200,7 +200,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     tini \
     imagemagick \
     libjxl-tools \
-    libraw-dev \
+    libraw-dev libraw-bin \
     libopenexr-dev \
     potrace \
     ghostscript \
@@ -309,9 +309,13 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
     npm pkg delete scripts.prepare && \
     pnpm install --frozen-lockfile --prod
 
-# Install Playwright Chromium for HTML-to-Image tool
+# Install Playwright Chromium for HTML-to-Image tool.
+# PLAYWRIGHT_BROWSERS_PATH puts browsers in a shared location so the
+# non-root snapotter user can find and execute them at runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN npx playwright install chromium --with-deps && \
-    rm -rf /tmp/* /root/.cache/ms-playwright/.links
+    chmod -R a+rX /opt/playwright-browsers && \
+    rm -rf /tmp/*
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
 COPY apps/api/src ./apps/api/src

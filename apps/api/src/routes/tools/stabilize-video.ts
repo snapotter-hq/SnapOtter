@@ -1,5 +1,5 @@
 import { extname, join } from "node:path";
-import { probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
+import { type EncoderTarget, probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
@@ -8,6 +8,44 @@ import { createToolRoute } from "../tool-factory.js";
 const settingsSchema = z.object({
   smoothing: z.number().int().min(5).max(60).default(15),
 });
+
+/**
+ * Choose a codec that is valid for the given container extension.
+ * webm requires VP9 (or VP8/AV1); ogv requires Theora; everything
+ * else gets H.264 (mp4/mov/mkv/avi/ts).
+ */
+function codecForContainer(ext: string): {
+  target: EncoderTarget;
+  encodeArgs: string[];
+} {
+  const lower = ext.toLowerCase();
+  if (lower === ".webm") {
+    return {
+      target: "vp9",
+      encodeArgs: ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"],
+    };
+  }
+  if (lower === ".ogv" || lower === ".ogg") {
+    // Theora has no HW-accel path; use libtheora directly.
+    return {
+      target: "h264", // unused, just for the type
+      encodeArgs: ["-c:v", "libtheora", "-q:v", "7"],
+    };
+  }
+  return {
+    target: "h264",
+    encodeArgs: [
+      "-c:v",
+      resolveEncoder("h264"),
+      "-crf",
+      "20",
+      "-preset",
+      "medium",
+      "-pix_fmt",
+      "yuv420p",
+    ],
+  };
+}
 
 export function registerStabilizeVideo(app: FastifyInstance) {
   createToolRoute(app, {
@@ -38,9 +76,19 @@ export function registerStabilizeVideo(app: FastifyInstance) {
         },
       );
 
-      // Pass 2: stabilization with re-encode
+      // Pass 2: stabilization with re-encode using a container-appropriate codec.
       ctx.report(50, "Stabilizing");
       const outPath = join(ctx.scratchDir, "media", outName);
+      const { encodeArgs } = codecForContainer(origExt);
+
+      // Audio: webm/ogv need Opus/Vorbis; for other containers just copy.
+      const audioArgs =
+        origExt.toLowerCase() === ".webm"
+          ? ["-c:a", resolveEncoder("opus")]
+          : origExt.toLowerCase() === ".ogv" || origExt.toLowerCase() === ".ogg"
+            ? ["-c:a", "libvorbis"]
+            : ["-c:a", "copy"];
+
       await runFfmpegWithProgress(
         ctx,
         [
@@ -48,16 +96,8 @@ export function registerStabilizeVideo(app: FastifyInstance) {
           inPath,
           "-vf",
           `vidstabtransform=input=${trf}:smoothing=${settings.smoothing}`,
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
-          "-pix_fmt",
-          "yuv420p",
-          "-c:a",
-          "copy",
+          ...encodeArgs,
+          ...audioArgs,
           outPath,
         ],
         info.durationS,
