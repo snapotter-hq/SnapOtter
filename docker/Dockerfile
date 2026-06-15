@@ -132,7 +132,7 @@ RUN set -e; \
 # files with multiple auxiliary images (depth maps, HDR gain maps).
 # Build libheif >= 1.19 from source for the fix (GitHub #183).
 # Base images match production to avoid shared-library ABI mismatches.
-FROM debian:bookworm@sha256:ed4fcc40bb1162b6d2d32e7bec15044d13963779abbe63f67f1cd62b06220519 AS libheif-base-arm64
+FROM debian:bookworm@sha256:49ba348354a28e39c70beffd6cf43bdb8d55d81ce4b746b0428717d054b8bbc4 AS libheif-base-arm64
 FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54 AS libheif-base-amd64
 
 ARG TARGETARCH
