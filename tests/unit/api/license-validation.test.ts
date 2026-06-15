@@ -214,8 +214,8 @@ describe("PLAN_FEATURES", () => {
     expect(PLAN_FEATURES.team).not.toContain("config_export_import");
   });
 
-  it("enterprise plan has all 18 features", () => {
-    expect(PLAN_FEATURES.enterprise).toHaveLength(18);
+  it("enterprise plan has all 19 features", () => {
+    expect(PLAN_FEATURES.enterprise).toHaveLength(19);
   });
 
   it("enterprise plan is a superset of team plan", () => {
@@ -230,8 +230,8 @@ describe("PLAN_FEATURES", () => {
 });
 
 describe("ENTERPRISE_FEATURES", () => {
-  it("contains exactly 18 features", () => {
-    expect(ENTERPRISE_FEATURES).toHaveLength(18);
+  it("contains exactly 19 features", () => {
+    expect(ENTERPRISE_FEATURES).toHaveLength(19);
   });
 
   it("has no duplicate entries", () => {
@@ -259,6 +259,7 @@ describe("ENTERPRISE_FEATURES", () => {
       "config_export_import",
       "upgrade_management",
       "admin_alerts",
+      "distributed_tracing",
     ];
     expect([...ENTERPRISE_FEATURES].sort()).toEqual([...expected].sort());
   });

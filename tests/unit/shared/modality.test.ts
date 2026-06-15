@@ -1,4 +1,10 @@
-import { detectModalityFromMime, MODALITIES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
+import {
+  detectModalityFromMime,
+  MODALITIES,
+  MODALITY_POOL,
+  PYTHON_SIDECAR_TOOLS,
+  TOOLS,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("modality metadata", () => {
@@ -37,15 +43,16 @@ describe("modality metadata", () => {
     const pdfToImage = TOOLS.find((t) => t.id === "pdf-to-image");
     expect(pdfToImage).toBeDefined();
     expect(pdfToImage!.modality).toBe("document");
-    expect(pdfToImage!.category).toBe("documents");
+    expect(pdfToImage!.category).toBe("pdf-organize");
     expect(pdfToImage!.acceptedInputs).toEqual([".pdf"]);
   });
 
-  it("AI tools are hinted long (except pure-CV ones)", () => {
-    const ai = TOOLS.filter((t) => t.category === "ai");
+  it("AI (sidecar) tools are hinted long (except pure-CV ones)", () => {
+    const sidecar = new Set<string>(PYTHON_SIDECAR_TOOLS as readonly string[]);
+    const ai = TOOLS.filter((t) => sidecar.has(t.id));
     expect(ai.length).toBeGreaterThan(0);
-    // image-enhancement is categorized "ai" but its core path is pure
-    // sharp/CV; only the optional deepEnhance invokes a model.
+    // image-enhancement uses pure sharp/CV (only the optional deepEnhance hits a
+    // model); it is not a sidecar tool, but keep the guard explicit.
     const pureCvAiTools = new Set(["image-enhancement"]);
     for (const t of ai) {
       if (pureCvAiTools.has(t.id)) {

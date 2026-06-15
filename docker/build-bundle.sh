@@ -174,6 +174,12 @@ bundle = manifest["bundles"][os.environ["BUNDLE_ID"]]
 models = bundle.get("models", [])
 models_dir = os.environ["MODELS_DIR"]
 
+# Point rembg's model home at the staging dir so downloaded ONNX models
+# end up inside the tarball (default U2NET_HOME is outside MODELS_DIR).
+rembg_home = os.path.join(models_dir, "rembg")
+os.makedirs(rembg_home, exist_ok=True)
+os.environ["U2NET_HOME"] = rembg_home
+
 if not models:
     print("  No models to download")
     sys.exit(0)
@@ -221,9 +227,27 @@ for model in models:
         args = model["args"]
         session_name = args[0]
         print(f"  [{model_id}] rembg session: {session_name}", flush=True)
-        from rembg.sessions import new_session
-        new_session(session_name)
-        print(f"  [{model_id}] Done")
+
+        # birefnet-matting and birefnet-hr-matting are custom sessions
+        # registered at runtime in remove_bg.py (not in rembg's built-in
+        # session registry). new_session() cannot resolve them, so
+        # download their ONNX files directly using the same URLs and
+        # filenames the custom session classes use.
+        CUSTOM_BIREFNET = {
+            "birefnet-matting": "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx",
+            "birefnet-hr-matting": "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_HR-matting-epoch_135.onnx",
+        }
+        if session_name in CUSTOM_BIREFNET:
+            dest = os.path.join(models_dir, "rembg", f"{session_name}.onnx")
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            print(f"  [{model_id}] Custom BiRefNet -> rembg/{session_name}.onnx", flush=True)
+            urllib.request.urlretrieve(CUSTOM_BIREFNET[session_name], dest)
+            size = os.path.getsize(dest)
+            print(f"  [{model_id}] Done ({size:,} bytes)")
+        else:
+            from rembg.sessions import new_session
+            new_session(session_name)
+            print(f"  [{model_id}] Done")
 
     else:
         print(f"  WARNING: Unknown download method for {model_id}", file=sys.stderr)

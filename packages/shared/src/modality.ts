@@ -114,8 +114,6 @@ export const DOCUMENT_INPUTS = [
   ".md",
   ".html",
   ".epub",
-  ".mobi",
-  ".azw3",
 ];
 export const FILE_INPUTS = [".csv", ".json", ".xml", ".yaml", ".yml", ".zip"];
 

@@ -34,6 +34,8 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "epub-convert": { format: "html" },
   "convert-presentation": { format: "odp" },
   "convert-spreadsheet": { format: "ods" },
+  "content-aware-resize": { width: 50 },
+  "ai-canvas-expand": { extendRight: 32 },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {
