@@ -1,0 +1,79 @@
+# Isolated QA stack for the exhaustive tool QA sweep.
+# Uses the pre-built snapotter/snapotter:latest image (built from docker/docker-compose.yml).
+# Auth disabled (synthetic admin), high limits, fresh volumes, host port 13499 to avoid
+# clashing with a native dev server on 1349.
+#   docker compose -f tests/qa/docker-compose.qa.yml up -d
+#   open http://localhost:13499
+name: snapotter-qa
+
+services:
+  app:
+    image: snapotter/snapotter:latest
+    container_name: snapotter-qa
+    ports:
+      - "13499:1349"
+    volumes:
+      - qa-data:/data
+      - qa-workspace:/tmp/workspace
+    environment:
+      - AUTH_ENABLED=false
+      - RATE_LIMIT_PER_MIN=100000
+      - PROCESSING_TIMEOUT_S=600
+      - MAX_UPLOAD_SIZE_MB=0
+      - MAX_BATCH_SIZE=0
+      - MAX_MEGAPIXELS=0
+      - CONCURRENT_JOBS=0
+      - MAX_WORKER_THREADS=0
+      - MAX_PIPELINE_STEPS=50
+      - ANALYTICS_ENABLED=false
+      - TRUST_PROXY=true
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: snapotter-qa-postgres
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - qa-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:8-alpine
+    container_name: snapotter-qa-redis
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - qa-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  qa-data:
+  qa-workspace:
+  qa-pgdata:
+  qa-redisdata:
