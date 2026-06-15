@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -16,7 +17,13 @@ export function DocumentView() {
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const hasProcessedUrl = !!entry?.processedUrl;
   const src = entry?.processedUrl ?? entry?.blobUrl;
+
+  // F6: detect non-PDF input files (word, excel, html, markdown, etc.)
+  const isPdfInput = entry?.file?.name?.toLowerCase().endsWith(".pdf") ?? false;
+  const showInputFallback = !isPdfInput && !hasProcessedUrl;
 
   /* A+B: reset pagination and clear stale errors when the document changes.
      src is intentionally a trigger-only dep (not read inside the callback). */
@@ -29,8 +36,10 @@ export function DocumentView() {
 
   /* C+D: cancel in-flight renders and destroy the doc proxy on cleanup. */
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const file = entry?.file;
+    if (!canvasRef.current || showInputFallback) return;
+    // F22: when processedUrl is available, use URL-based loading instead of
+    // entry.file (which is the original non-PDF input and would fail pdf.js)
+    const file = hasProcessedUrl ? undefined : entry?.file;
     if (!file && !src) return;
     let cancelled = false;
     let doc: pdfjs.PDFDocumentProxy | undefined;
@@ -63,9 +72,25 @@ export function DocumentView() {
       renderTask?.cancel();
       doc?.loadingTask.destroy();
     };
-  }, [src, page, entry?.file]);
+  }, [src, page, entry?.file, showInputFallback, hasProcessedUrl]);
 
   if (!entry) return null;
+
+  // F6: graceful fallback for non-PDF input files
+  if (showInputFallback) {
+    const ext = entry.file?.name?.split(".").pop()?.toUpperCase() ?? "";
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-2">
+          <FileText className="h-8 w-8 text-muted-foreground" />
+        </div>
+        {ext && <p className="text-xs text-muted-foreground">{ext}</p>}
+        <p className="text-sm text-muted-foreground text-center">
+          {t.tools.documentView.inputNotPreviewable}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col items-center gap-2 overflow-auto p-4">

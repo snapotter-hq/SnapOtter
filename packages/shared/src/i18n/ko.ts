@@ -674,6 +674,7 @@ export const ko: TranslationKeys = {
       loadFailed: "Failed to load document.",
       previousPage: "Previous page",
       nextPage: "Next page",
+      inputNotPreviewable: "Preview not available for this file type",
     },
   },
   toolSettings: {
@@ -2422,6 +2423,7 @@ export const ko: TranslationKeys = {
     downloadAsFile: "Download as file",
     downloadAll: "Download All",
     downloadFiles: "Download {count} files",
+    audioDecodeUnsupported: "This audio format cannot be previewed in the browser",
   },
   homePage: {
     generatingPreview: "미리보기 생성 중...",
@@ -2440,6 +2442,7 @@ export const ko: TranslationKeys = {
     documents: "Documents",
     data: "Data",
     toolCount: "{count} tools",
+    heading: "SnapOtter Tools",
   },
   fullscreenGrid: {
     searchPlaceholder: "도구 검색...",
@@ -3401,6 +3404,7 @@ export const ko: TranslationKeys = {
     settingsDialog: "Settings",
     helpDialog: "Help",
     navigationMenu: "Navigation",
+    homeLink: "SnapOtter home",
   },
 } as const;
 

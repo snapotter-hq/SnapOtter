@@ -119,6 +119,7 @@ export function HomePage() {
   return (
     <AppLayout>
       <div>
+        <h1 className="sr-only">{t.homePage.heading}</h1>
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <HomeSearchBar
             value={search}

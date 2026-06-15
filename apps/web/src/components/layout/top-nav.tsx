@@ -95,7 +95,7 @@ export function TopNav({
             </span>
           </div>
         ) : (
-          <Link to="/" className="shrink-0">
+          <Link to="/" className="shrink-0" aria-label={t.a11y.homeLink}>
             <OtterLogo className="h-7 w-7" />
           </Link>
         )}
@@ -128,7 +128,7 @@ export function TopNav({
       )}
     >
       {/* Left: Logo */}
-      <Link to="/" className="shrink-0 me-4">
+      <Link to="/" className="shrink-0 me-4" aria-label={t.a11y.homeLink}>
         <OtterLogo className="h-7 w-7" />
       </Link>
 

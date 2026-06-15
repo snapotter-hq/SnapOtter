@@ -673,6 +673,7 @@ export const zhTW: TranslationKeys = {
       loadFailed: "Failed to load document.",
       previousPage: "Previous page",
       nextPage: "Next page",
+      inputNotPreviewable: "Preview not available for this file type",
     },
   },
   toolSettings: {
@@ -2410,6 +2411,7 @@ export const zhTW: TranslationKeys = {
     downloadAsFile: "Download as file",
     downloadAll: "Download All",
     downloadFiles: "Download {count} files",
+    audioDecodeUnsupported: "This audio format cannot be previewed in the browser",
   },
   homePage: {
     generatingPreview: "正在產生預覽...",
@@ -2428,6 +2430,7 @@ export const zhTW: TranslationKeys = {
     documents: "Documents",
     data: "Data",
     toolCount: "{count} tools",
+    heading: "SnapOtter Tools",
   },
   fullscreenGrid: {
     searchPlaceholder: "搜尋工具...",
@@ -3382,6 +3385,7 @@ export const zhTW: TranslationKeys = {
     settingsDialog: "Settings",
     helpDialog: "Help",
     navigationMenu: "Navigation",
+    homeLink: "SnapOtter home",
   },
 } as const;
 

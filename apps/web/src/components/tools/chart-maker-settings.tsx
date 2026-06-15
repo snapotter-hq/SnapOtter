@@ -17,7 +17,7 @@ const INPUT_CLASS =
 export function ChartMakerSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
+  const { processFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("chart-maker");
 
   const [kind, setKind] = useState("bar");
@@ -28,11 +28,7 @@ export function ChartMakerSettings() {
   const handleProcess = () => {
     const settings: Record<string, unknown> = { kind, width, height };
     if (title.trim()) settings.title = title.trim();
-    if (files.length > 1) {
-      processAllFiles(files, settings);
-    } else {
-      processFiles(files, settings);
-    }
+    processFiles(files, settings);
   };
 
   const hasFile = files.length > 0;
@@ -138,9 +134,7 @@ export function ChartMakerSettings() {
           disabled={!canProcess}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1
-            ? t.toolSettings["chart-maker"].submitBatch.replace("{count}", String(files.length))
-            : t.toolSettings["chart-maker"].submit}
+          {t.toolSettings["chart-maker"].submit}
         </button>
       )}
 

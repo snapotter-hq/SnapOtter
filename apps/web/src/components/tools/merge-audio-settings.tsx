@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type AudioFormat = "mp3" | "wav" | "flac" | "m4a";
@@ -11,21 +10,14 @@ export function MergeAudioSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["merge-audio"];
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, progress } =
-    useToolProcessor("merge-audio");
+  const { processFiles, processing, error, progress } = useToolProcessor("merge-audio");
 
   const [outFormat, setOutFormat] = useState<AudioFormat>("mp3");
 
-  const hasFile = files.length > 0;
-  const hasMultiple = files.length > 1;
+  const hasEnough = files.length >= 2;
 
   const handleProcess = () => {
-    const settings = { format: outFormat };
-    if (hasMultiple) {
-      processAllFiles(files, settings);
-    } else {
-      processFiles(files, settings);
-    }
+    processFiles(files, { format: outFormat });
   };
 
   return (
@@ -65,10 +57,10 @@ export function MergeAudioSettings() {
           type="button"
           data-testid="merge-audio-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasEnough || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
+          {s.submit}
         </button>
       )}
     </div>

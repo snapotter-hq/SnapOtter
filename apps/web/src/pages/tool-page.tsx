@@ -366,21 +366,27 @@ export function ToolPage() {
     setMobileSettingsOpen(false);
   }, [toolId]);
 
-  const toolAccept = registryEntry?.accept ?? tool?.acceptedInputs?.join(",");
+  const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
+  const acceptsAnyFile = !registryEntry?.accept && tool?.acceptedInputs?.length === 0;
   const toolAcceptExts = useMemo(
-    () => toolAccept?.split(",").map((e) => e.trim().replace(/^\./, "").toLowerCase()),
+    () =>
+      toolAccept
+        ?.split(",")
+        .map((e) => e.trim().replace(/^\./, "").toLowerCase())
+        .filter(Boolean),
     [toolAccept],
   );
   const toolFileFilter = useMemo(() => {
+    if (acceptsAnyFile) return () => true;
     if (!toolAcceptExts || toolAcceptExts.length === 0) return undefined;
     return (file: File) => {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       return toolAcceptExts.includes(ext);
     };
-  }, [toolAcceptExts]);
+  }, [toolAcceptExts, acceptsAnyFile]);
   const toolAcceptDescription = useMemo(
     () =>
-      toolAcceptExts
+      toolAcceptExts && toolAcceptExts.length > 0
         ? `${toolAcceptExts.map((e) => e.toUpperCase()).join(", ")} files only`
         : undefined,
     [toolAcceptExts],
@@ -415,16 +421,18 @@ export function ToolPage() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept =
-      toolAccept ??
-      "image/*,.avif,.heic,.heif,.hif,.jxl,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.3fr,.iiq,.srw,.x3f,.rwl,.gpr,.fff,.mrw,.mef,.kdc,.dcr,.erf,.ptx,.tga,.psd,.exr,.hdr,.svgz,.jp2,.j2k,.qoi,.eps,.dds,.cur,.apng,.dpx,.cin,.fits,.ppm,.pgm,.pbm,.pfm";
+    if (!acceptsAnyFile) {
+      input.accept =
+        toolAccept ??
+        "image/*,.avif,.heic,.heif,.hif,.jxl,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.3fr,.iiq,.srw,.x3f,.rwl,.gpr,.fff,.mrw,.mef,.kdc,.dcr,.erf,.ptx,.tga,.psd,.exr,.hdr,.svgz,.jp2,.j2k,.qoi,.eps,.dds,.cur,.apng,.dpx,.cin,.fits,.ppm,.pgm,.pbm,.pfm";
+    }
     input.onchange = (e) => {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
       const newFiles = toolFileFilter ? selected.filter(toolFileFilter) : selected;
       if (newFiles.length > 0) addFiles(newFiles);
     };
     input.click();
-  }, [addFiles, toolAccept, toolFileFilter]);
+  }, [addFiles, toolAccept, toolFileFilter, acceptsAnyFile]);
 
   // Page-level drag handlers (active when a file is already loaded)
   const handleDragEnter = useCallback((e: React.DragEvent) => {

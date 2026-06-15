@@ -684,6 +684,7 @@ export const en = {
       loadFailed: "Failed to load document.",
       previousPage: "Previous page",
       nextPage: "Next page",
+      inputNotPreviewable: "Preview not available for this file type",
     },
   },
   toolSettings: {
@@ -2434,6 +2435,7 @@ export const en = {
     downloadAsFile: "Download as file",
     downloadAll: "Download All",
     downloadFiles: "Download {count} files",
+    audioDecodeUnsupported: "This audio format cannot be previewed in the browser",
   },
   homePage: {
     generatingPreview: "Generating preview...",
@@ -2452,6 +2454,7 @@ export const en = {
     documents: "Documents",
     data: "Data",
     toolCount: "{count} tools",
+    heading: "SnapOtter Tools",
   },
   fullscreenGrid: {
     searchPlaceholder: "Search tools...",
@@ -3412,6 +3415,7 @@ export const en = {
     settingsDialog: "Settings",
     helpDialog: "Help",
     navigationMenu: "Navigation",
+    homeLink: "SnapOtter home",
   },
 } as const;
 
