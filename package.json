@@ -54,7 +54,7 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.0",
     "@fast-check/vitest": "^0.4.1",
     "@playwright/test": "^1.60.0",
     "@semantic-release/changelog": "^6.0.3",
@@ -64,8 +64,8 @@
     "@semantic-release/github": "^12.0.8",
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.1.1",
-    "@testcontainers/postgresql": "^12.0.1",
-    "@testcontainers/redis": "^12.0.1",
+    "@testcontainers/postgresql": "^12.0.2",
+    "@testcontainers/redis": "^12.0.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -76,8 +76,8 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
-    "semantic-release": "^25.0.3",
-    "turbo": "^2.9.16",
+    "semantic-release": "^25.0.5",
+    "turbo": "^2.9.18",
     "typescript": "^5.7.0",
     "vitest": "^3.2.6",
     "zod-fast-check": "^0.10.1"
