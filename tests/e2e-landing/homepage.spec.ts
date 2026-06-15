@@ -5,68 +5,62 @@ test.describe("Landing Homepage", () => {
     await page.goto("/");
   });
 
-  test("page loads with correct title", async ({ page }) => {
-    await expect(page).toHaveTitle(/SnapOtter/);
+  test("page loads with enterprise title", async ({ page }) => {
+    await expect(page).toHaveTitle(/SnapOtter \| Self-Hosted File Processing for Enterprise/);
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Features" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Enterprise" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Pricing" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Docs" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Contact" }).first()).toBeVisible();
+    for (const name of ["Features", "Enterprise", "Pricing", "Docs", "Contact"]) {
+      await expect(page.getByRole("link", { name }).first()).toBeVisible();
+    }
   });
 
   test("navbar renders Book a Demo CTA", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Book a Demo" }).first()).toBeVisible();
   });
 
-  test("hero section renders headline and subheadline", async ({ page }) => {
-    await expect(page.getByText("Your files never leave")).toBeVisible();
-    await expect(
-      page.getByText("self-hosted tools for images, video, audio, documents, and data"),
-    ).toBeVisible();
+  test("hero renders the rotating headline and privacy promise", async ({ page }) => {
+    await expect(page.locator("h1")).toContainText("tool you need.");
+    await expect(page.locator("h1")).toContainText("Nothing leaves your network.");
   });
 
-  test("hero CTA links to getting started docs", async ({ page }) => {
-    const cta = page.getByRole("link", { name: "Deploy Free" });
-    await expect(cta).toBeVisible();
-    await expect(cta).toHaveAttribute("href", "https://docs.snapotter.com/guide/getting-started");
-    await expect(cta).toHaveAttribute("target", "_blank");
+  test("hero renders the enterprise subtitle", async ({ page }) => {
+    await expect(page.getByText("for teams that keep sensitive data in-house")).toBeVisible();
   });
 
-  test("hero section renders Docker command", async ({ page }) => {
-    await expect(
-      page.getByText("docker run -d -p 1349:1349 snapotter/snapotter", { exact: false }),
-    ).toBeVisible();
+  test("hero renders enterprise trust badges", async ({ page }) => {
+    for (const badge of ["On-premise", "Privacy-first", "Air-gap ready", "Audit logging"]) {
+      await expect(page.getByText(badge, { exact: true }).first()).toBeVisible();
+    }
+  });
+
+  test("hero tool search renders", async ({ page }) => {
+    await expect(page.getByPlaceholder("Search tools")).toBeVisible();
+  });
+
+  test("hero modality cards render", async ({ page }) => {
+    const cards = ["Image Tools", "Video Tools", "Audio Tools", "PDF & Documents", "Data & Files"];
+    for (const card of cards) {
+      await expect(page.getByText(card, { exact: true }).first()).toBeVisible();
+    }
   });
 
   test("trust signals show stats", async ({ page }) => {
     await expect(page.getByText("Processing Tools")).toBeVisible();
     await expect(page.getByText("GitHub Stars")).toBeVisible();
-    await expect(page.getByText("Docker Pulls")).toBeVisible();
-    await expect(page.getByText("Languages")).toBeVisible();
+    await expect(page.getByText("Image Pulls")).toBeVisible();
+    await expect(page.getByText("Languages", { exact: true })).toBeVisible();
   });
 
-  test("modality explorer renders section heading and cards", async ({ page }) => {
-    await expect(page.getByText("Every file format. One platform.")).toBeVisible();
-    const modalities = ["Image", "Video", "Audio", "Documents", "Data"];
-    for (const mod of modalities) {
-      await expect(page.getByText(mod, { exact: true }).first()).toBeVisible();
-    }
+  test("tool catalog section renders heading and browse link", async ({ page }) => {
+    await expect(page.getByText("One platform. Every file tool.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Browse full tool catalog" })).toBeVisible();
   });
 
-  test("feature highlights section renders heading and features", async ({ page }) => {
-    await expect(page.getByText("Built for serious infrastructure.")).toBeVisible();
-    await expect(page.getByText("Your files stay on your servers")).toBeVisible();
-    await expect(page.getByText("Full REST API for every tool")).toBeVisible();
-    await expect(page.getByText("15 AI models, all running locally")).toBeVisible();
-    await expect(page.getByText("Deploy once, use everywhere")).toBeVisible();
-  });
-
-  test("enterprise section renders feature cards", async ({ page }) => {
+  test("enterprise section renders eyebrow and feature cards", async ({ page }) => {
     await expect(page.getByText("Built for enterprise deployment.")).toBeVisible();
+    await expect(page.getByText("Enterprise-grade security")).toBeVisible();
     const features = [
       "SAML SSO",
       "SCIM Provisioning",
@@ -82,32 +76,29 @@ test.describe("Landing Homepage", () => {
     }
   });
 
-  test("how-it-works section renders steps", async ({ page }) => {
-    await expect(page.getByText("Up and running in 60 seconds.")).toBeVisible();
-    await expect(page.getByText("Run a single Docker command", { exact: false })).toBeVisible();
-    await expect(page.getByText("Navigate to localhost:1349", { exact: false })).toBeVisible();
-    await expect(page.getByText("Upload files, pick a tool", { exact: false })).toBeVisible();
+  test("regulated-environments section renders heading and features", async ({ page }) => {
+    await expect(page.getByText("Built for regulated environments.")).toBeVisible();
+    await expect(page.getByText("Compliant by architecture")).toBeVisible();
+    await expect(page.getByText("AI processing without external APIs")).toBeVisible();
+    await expect(page.getByText("Fits your infrastructure")).toBeVisible();
   });
 
   test("pricing section renders both plans", async ({ page }) => {
     await expect(page.getByText("Free for everyone. Enterprise when you need it.")).toBeVisible();
-    const openSource = page.getByText("Open Source", { exact: true });
-    await expect(openSource.first()).toBeVisible();
+    await expect(page.getByText("Open Source", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Enterprise", { exact: true }).first()).toBeVisible();
   });
 
   test("open-source section renders with GitHub link", async ({ page }) => {
-    await expect(page.getByText("Open source. Always.")).toBeVisible();
+    await expect(page.getByText("Open source. Fully auditable.")).toBeVisible();
     const ghLink = page.getByRole("link", { name: "Star on GitHub" }).first();
     await expect(ghLink).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
   });
 
   test("footer renders all column titles", async ({ page }) => {
-    await expect(page.getByText("Product", { exact: true })).toBeVisible();
-    await expect(page.getByText("Solutions", { exact: true })).toBeVisible();
-    await expect(page.getByText("Resources", { exact: true })).toBeVisible();
-    await expect(page.getByText("Community", { exact: true })).toBeVisible();
-    await expect(page.getByText("Legal", { exact: true })).toBeVisible();
+    for (const col of ["Product", "Solutions", "Resources", "Community", "Legal"]) {
+      await expect(page.getByText(col, { exact: true })).toBeVisible();
+    }
   });
 
   test("footer renders copyright with current year", async ({ page }) => {

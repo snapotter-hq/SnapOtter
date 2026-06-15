@@ -22,7 +22,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `cd apps/landing && npx next dev -p ${LANDING_PORT}`,
+    command: `cd apps/landing && npx astro dev --port ${LANDING_PORT}`,
     port: LANDING_PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

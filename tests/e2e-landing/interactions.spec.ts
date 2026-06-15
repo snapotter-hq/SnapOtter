@@ -1,14 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Docker Command Copy Button", () => {
-  test("copy button shows Copied! feedback", async ({ page }) => {
-    await page.goto("/");
-    const copyButton = page.locator("button[data-copy]");
-    await copyButton.click();
-    await expect(page.getByText("Copied!")).toBeVisible();
-  });
-});
-
 test.describe("FAQ Page Accordion", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/faq");
