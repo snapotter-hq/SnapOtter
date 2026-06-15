@@ -4,13 +4,11 @@ import EnterpriseSection from "@/components/EnterpriseSection.astro";
 import FeatureHighlights from "@/components/FeatureHighlights.astro";
 import Footer from "@/components/Footer.astro";
 import Hero from "@/components/Hero.astro";
-import HowItWorks from "@/components/HowItWorks.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import OpenSource from "@/components/OpenSource.astro";
 import Pricing from "@/components/Pricing.astro";
 import ToolGrid from "@/components/ToolGrid.astro";
-import TrustSignals from "@/components/TrustSignals.astro";
 import Base from "@/layouts/Base.astro";
 
 const toolCount = TOOLS.length;
@@ -109,11 +107,9 @@ const navSchema = {
 
   <main id="main">
     <Hero />
-    <TrustSignals />
     <ToolGrid />
-    <FeatureHighlights />
     <EnterpriseSection />
-    <HowItWorks />
+    <FeatureHighlights />
     <Pricing />
     <OpenSource />
   </main>

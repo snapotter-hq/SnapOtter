@@ -1,0 +1,159 @@
+---
+import { TOOLS } from "@snapotter/shared";
+import * as lucideIcons from "lucide";
+
+const MODALITY_META: Record<string, { label: string; color: string }> = {
+  image: { label: "Image", color: "#E07832" },
+  video: { label: "Video", color: "#BE4A3C" },
+  audio: { label: "Audio", color: "#2C7A75" },
+  document: { label: "PDF", color: "#44568C" },
+  file: { label: "Data", color: "#5C8642" },
+};
+
+function renderIcon(iconName: string): string {
+  const iconData = (lucideIcons as Record<string, unknown>)[iconName];
+  if (!iconData || !Array.isArray(iconData)) return "";
+  return iconData
+    .map(([tag, attrs]: [string, Record<string, string>]) => {
+      const attrStr = Object.entries(attrs)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ");
+      return `<${tag} ${attrStr}/>`;
+    })
+    .join("");
+}
+---
+
+<div class="hero-search animate-fade-up relative z-30 mx-auto mt-8 max-w-xl" style="animation-delay: 0.18s;">
+  <div class="relative">
+    <svg class="pointer-events-none absolute top-1/2 left-5 h-5 w-5 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input
+      type="text"
+      id="hero-tool-search"
+      autocomplete="off"
+      placeholder="Search tools"
+      class="w-full rounded-2xl border border-border bg-surface py-4 pr-4 pl-12 text-base shadow-sm outline-none transition-all placeholder:text-muted focus:border-primary focus:shadow-md"
+      aria-label="Search tools"
+      aria-expanded="false"
+      aria-controls="hero-search-results"
+    />
+  </div>
+
+  <!-- Live results dropdown -->
+  <div
+    id="hero-search-results"
+    class="absolute z-20 mt-2 hidden w-full overflow-hidden rounded-2xl border border-border bg-surface text-start shadow-xl"
+  >
+    <ul id="hero-search-list" class="max-h-80 overflow-y-auto py-1.5">
+      {TOOLS.map((tool) => {
+        const mod = MODALITY_META[tool.modality];
+        return (
+          <li
+            class="hero-result"
+            data-name={tool.name.toLowerCase()}
+            data-desc={tool.description.toLowerCase()}
+            data-mod={(mod?.label || "").toLowerCase()}
+            hidden
+          >
+            <a
+              href={`/tools/${tool.id}`}
+              class="flex items-center gap-3 px-4 py-2.5 no-underline transition-colors hover:bg-primary-subtle"
+            >
+              <svg
+                class="h-5 w-5 shrink-0"
+                style={{ color: mod?.color }}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                set:html={renderIcon(tool.icon)}
+              />
+              <span class="flex-1 text-sm font-medium text-foreground">{tool.name}</span>
+              <span
+                class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={`background-color: ${mod?.color}1a; color: ${mod?.color}`}
+              >
+                {mod?.label}
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+    <p id="hero-search-empty" class="hidden px-4 py-3 text-sm text-muted">
+      No tools match. Try "resize", "convert", or "compress".
+    </p>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    var input = document.getElementById("hero-tool-search");
+    var box = document.getElementById("hero-search-results");
+    var empty = document.getElementById("hero-search-empty");
+    var items = Array.prototype.slice.call(
+      document.querySelectorAll("#hero-search-list .hero-result"),
+    );
+    var MAX = 7;
+    var firstHref = null;
+
+    function close() {
+      box.classList.add("hidden");
+      input.setAttribute("aria-expanded", "false");
+    }
+
+    function open() {
+      box.classList.remove("hidden");
+      input.setAttribute("aria-expanded", "true");
+    }
+
+    function run() {
+      var q = input.value.toLowerCase().trim();
+      if (!q) {
+        close();
+        return;
+      }
+      var tokens = q.split(/\s+/);
+      var shown = 0;
+      firstHref = null;
+      items.forEach(function (li) {
+        var hay =
+          (li.getAttribute("data-name") || "") +
+          " " +
+          (li.getAttribute("data-desc") || "") +
+          " " +
+          (li.getAttribute("data-mod") || "");
+        var hit = tokens.every(function (t) {
+          return hay.indexOf(t) !== -1;
+        });
+        if (hit && shown < MAX) {
+          li.hidden = false;
+          shown++;
+          if (!firstHref) firstHref = li.querySelector("a").getAttribute("href");
+        } else {
+          li.hidden = true;
+        }
+      });
+      empty.classList.toggle("hidden", shown !== 0);
+      open();
+    }
+
+    input.addEventListener("input", run);
+    input.addEventListener("focus", function () {
+      if (input.value.trim()) run();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && firstHref) {
+        window.location.href = firstHref;
+      } else if (e.key === "Escape") {
+        close();
+        input.blur();
+      }
+    });
+    document.addEventListener("click", function (e) {
+      if (!box.contains(e.target) && e.target !== input) close();
+    });
+  })();
+</script>

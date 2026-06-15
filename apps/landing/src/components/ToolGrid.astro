@@ -34,26 +34,13 @@ function renderIcon(iconName: string): string {
 
 <section class="bg-background-alt px-6 py-20 md:py-28" id="features">
   <SectionHeading
-    title={`${toolCount} tools. One platform.`}
-    subtitle="Replace dozens of cloud subscriptions with a single deployment your team controls."
+    title="One platform. Every file tool."
+    subtitle="Browse 150+ self-hosted tools across image, video, audio, documents, and data."
   />
 
   <div class="mx-auto max-w-6xl">
-    <!-- Search bar -->
-    <div class="mx-auto max-w-md">
-      <div class="relative">
-        <svg class="absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input
-          type="text"
-          id="tool-search"
-          placeholder="Search tools..."
-          class="w-full rounded-xl border border-border bg-surface py-3 pr-4 pl-11 text-sm outline-none transition-colors placeholder:text-muted focus:border-primary"
-        />
-      </div>
-    </div>
-
     <!-- Modality pills -->
-    <div class="mt-6 flex flex-wrap items-center justify-center gap-2" id="modality-pills">
+    <div class="flex flex-wrap items-center justify-center gap-2" id="modality-pills">
       {modalities.map((m) => (
         <button
           type="button"
@@ -125,7 +112,7 @@ function renderIcon(iconName: string): string {
 
     <!-- Empty state -->
     <p class="mt-8 hidden text-center text-muted" id="tool-empty">
-      No tools found. Try a different search.
+      No tools match these filters.
     </p>
 
     <!-- Browse all link -->
@@ -140,7 +127,6 @@ function renderIcon(iconName: string): string {
 
 <script is:inline>
   (function () {
-    var search = document.getElementById("tool-search");
     var grid = document.getElementById("tool-grid");
     var countEl = document.getElementById("tool-count");
     var emptyEl = document.getElementById("tool-empty");
@@ -169,17 +155,13 @@ function renderIcon(iconName: string): string {
     }
 
     function filter() {
-      var q = search.value.toLowerCase().trim();
       var visible = 0;
       cards.forEach(function (card) {
-        var name = card.getAttribute("data-name") || "";
-        var desc = card.getAttribute("data-desc") || "";
         var mod = card.getAttribute("data-modality") || "";
         var cat = card.getAttribute("data-category") || "";
-        var matchSearch = !q || name.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
         var matchMod = activeModality === "all" || activeModality.split(",").indexOf(mod) !== -1;
         var matchCat = !activeCategory || cat === activeCategory;
-        if (matchSearch && matchMod && matchCat) {
+        if (matchMod && matchCat) {
           card.style.display = "";
           visible++;
         } else {
@@ -190,8 +172,6 @@ function renderIcon(iconName: string): string {
       emptyEl.style.display = visible === 0 ? "block" : "none";
       grid.style.display = visible === 0 ? "none" : "";
     }
-
-    search.addEventListener("input", filter);
 
     document.querySelectorAll("#modality-pills .tool-pill").forEach(function (btn) {
       btn.addEventListener("click", function () {

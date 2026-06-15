@@ -1,8 +1,4 @@
 ---
-import { TOOLS } from "@snapotter/shared";
-
-const toolCount = TOOLS.length;
-
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -22,54 +18,52 @@ try {
   starCount = 0;
 }
 
-let dockerPulls = 0;
+// Docker Hub pull count (public API, refreshed at build time)
+let dockerHubPulls = 0;
 try {
   const res = await fetch("https://hub.docker.com/v2/repositories/snapotter/snapotter/");
   if (res.ok) {
     const data = await res.json();
-    dockerPulls = data.pull_count ?? 0;
+    dockerHubPulls = data.pull_count ?? 0;
   }
 } catch {
-  dockerPulls = 0;
+  dockerHubPulls = 0;
 }
+
+// GHCR (ghcr.io) has no public pull-count API, so this is a manual figure (update as it grows).
+const GHCR_PULLS = 28_800;
+const dockerForTotal = dockerHubPulls > 0 ? dockerHubPulls : 89_100;
+const totalPulls = dockerForTotal + GHCR_PULLS;
+const pullsDisplay =
+  totalPulls >= 1_000_000
+    ? `${Math.floor(totalPulls / 100_000) / 10}M+`
+    : `${Math.floor(totalPulls / 100_000) * 100}K+`;
 
 const stats = [
   {
-    value: toolCount.toString(),
+    value: "150+",
     label: "Processing Tools",
     sublabel: "Across 5 file modalities",
   },
   {
-    value: starCount > 0 ? formatNumber(starCount) : "--",
+    value: starCount > 0 ? formatNumber(starCount) : "1.6k",
     label: "GitHub Stars",
     sublabel: "Open-source & growing",
-    href: "https://github.com/snapotter-hq/snapotter",
   },
   {
-    value: dockerPulls > 0 ? formatNumber(dockerPulls) : "--",
-    label: "Docker Pulls",
-    sublabel: "Deployed by organizations worldwide",
-    href: "https://hub.docker.com/r/snapotter/snapotter",
+    value: pullsDisplay,
+    label: "Image Pulls",
+    sublabel: "Deployed worldwide",
   },
   {
-    value: "21",
+    value: "20+",
     label: "Languages",
-    sublabel: "Fully localized UI",
+    sublabel: "Speaks your language",
   },
-];
-
-const badges = [
-  "GDPR Compliant",
-  "Air-Gapped Ready",
-  "SAML SSO",
-  "Audit Logging",
-  "Docker & K8s",
-  "ARM + x86",
 ];
 ---
 
-<section class="border-y border-border bg-surface px-6 py-16 md:py-20">
-  <div class="mx-auto max-w-5xl">
+<div class="relative mx-auto mt-10 max-w-5xl border-t border-border/70 pt-10">
 
     <!-- Stats grid -->
     <div class="reveal grid grid-cols-2 gap-10 sm:gap-12 lg:grid-cols-4">
@@ -84,33 +78,8 @@ const badges = [
           </div>
         );
 
-        return stat.href ? (
-          <a
-            href={stat.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="group rounded-xl p-3 transition-colors hover:bg-background-alt"
-          >
-            {inner}
-          </a>
-        ) : (
-          <div class="p-3">{inner}</div>
-        );
+        return <div class="p-3">{inner}</div>;
       })}
     </div>
 
-    <!-- Divider -->
-    <div class="reveal mx-auto my-10 h-px w-24 bg-border md:my-12" />
-
-    <!-- Enterprise compliance badges -->
-    <div class="reveal flex flex-wrap items-center justify-center gap-2.5">
-      {badges.map((badge) => (
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-medium text-muted">
-          <svg class="h-3.5 w-3.5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          {badge}
-        </span>
-      ))}
-    </div>
-
-  </div>
-</section>
+</div>

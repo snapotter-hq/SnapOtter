@@ -1,5 +1,6 @@
 ---
 import { CATEGORIES, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
+import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
@@ -19,6 +20,20 @@ const related = TOOLS.filter((t) => t.category === tool.category && t.id !== too
 const catColor = category?.color ?? "#737373";
 const isAiTool = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(tool.id);
 const toolCount = TOOLS.length;
+
+function renderIcon(iconName: string): string {
+  const iconData = (lucideIcons as Record<string, unknown>)[iconName];
+  if (!iconData || !Array.isArray(iconData))
+    return '<rect width="14" height="14" x="5" y="5" rx="2" />';
+  return iconData
+    .map(([tag, attrs]: [string, Record<string, string>]) => {
+      const attrStr = Object.entries(attrs)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ");
+      return `<${tag} ${attrStr}/>`;
+    })
+    .join("");
+}
 
 const title = seo ? `${seo.searchTitle} | SnapOtter` : `${tool.name} | SnapOtter`;
 const description = seo?.longDescription ?? tool.description;
@@ -169,9 +184,8 @@ const allJsonLd = [
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-            >
-              <rect width="14" height="14" x="5" y="5" rx="2" />
-            </svg>
+              set:html={renderIcon(tool.icon)}
+            />
           </div>
           <span
             class="rounded-full px-3 py-1 text-xs font-semibold"
@@ -348,9 +362,8 @@ const allJsonLd = [
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                    >
-                      <rect width="14" height="14" x="5" y="5" rx="2" />
-                    </svg>
+                      set:html={renderIcon(t.icon)}
+                    />
                     <span class="mt-3 text-sm font-bold">{t.name}</span>
                     <p class="mt-1.5 text-xs leading-relaxed text-muted">{t.description}</p>
                     <span class="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-medium text-primary transition-all group-hover:gap-2">

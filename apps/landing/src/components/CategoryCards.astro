@@ -1,0 +1,85 @@
+---
+import { TOOLS } from "@snapotter/shared";
+import * as lucideIcons from "lucide";
+
+function renderIcon(iconName: string): string {
+  const iconData = (lucideIcons as Record<string, unknown>)[iconName];
+  if (!iconData || !Array.isArray(iconData)) return "";
+  return iconData
+    .map(([tag, attrs]: [string, Record<string, string>]) => {
+      const attrStr = Object.entries(attrs)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ");
+      return `<${tag} ${attrStr}/>`;
+    })
+    .join("");
+}
+
+const MODALITIES = [
+  {
+    id: "image",
+    label: "Image Tools",
+    blurb: "Resize, convert, and enhance",
+    icon: "Image",
+    color: "#E07832",
+  },
+  {
+    id: "video",
+    label: "Video Tools",
+    blurb: "Trim, convert, and caption",
+    icon: "Video",
+    color: "#BE4A3C",
+  },
+  {
+    id: "audio",
+    label: "Audio Tools",
+    blurb: "Convert, trim, and transcribe",
+    icon: "Music",
+    color: "#2C7A75",
+  },
+  {
+    id: "document",
+    label: "PDF & Documents",
+    blurb: "Merge, split, and convert",
+    icon: "FileText",
+    color: "#44568C",
+  },
+  {
+    id: "file",
+    label: "Data & Files",
+    blurb: "Convert and transform",
+    icon: "Database",
+    color: "#5C8642",
+  },
+];
+
+const cards = MODALITIES.map((m) => {
+  const tools = TOOLS.filter((t) => t.modality === m.id);
+  return { ...m, count: tools.length };
+});
+---
+
+<div class="animate-fade-up mt-10" style="animation-delay: 0.22s;">
+  <div class="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    {cards.map((c) => (
+      <a
+        href="/tools"
+        class="group flex flex-col rounded-2xl p-4 text-start text-white no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+        style={`background-color: ${c.color}`}
+      >
+        <div class="flex items-center justify-between">
+          <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={renderIcon(c.icon)} />
+          </span>
+          <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{c.count} tools</span>
+        </div>
+
+        <div class="mt-4 flex items-center gap-1.5">
+          <p class="font-display text-base font-bold leading-tight">{c.label}</p>
+          <svg class="h-4 w-4 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+        <p class="mt-1 text-xs text-white/80">{c.blurb}</p>
+      </a>
+    ))}
+  </div>
+</div>

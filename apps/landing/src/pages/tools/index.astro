@@ -27,6 +27,19 @@ const groups = CATEGORIES.map((cat) => ({
 
 const toolCount = TOOLS.length;
 
+const modalityFilters = [
+  { id: "all", label: "All", count: TOOLS.length },
+  { id: "image", label: "Image", count: TOOLS.filter((t) => t.modality === "image").length },
+  { id: "video", label: "Video", count: TOOLS.filter((t) => t.modality === "video").length },
+  { id: "audio", label: "Audio", count: TOOLS.filter((t) => t.modality === "audio").length },
+  {
+    id: "document",
+    label: "PDF & Docs",
+    count: TOOLS.filter((t) => t.modality === "document").length,
+  },
+  { id: "file", label: "Data", count: TOOLS.filter((t) => t.modality === "file").length },
+];
+
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -97,9 +110,40 @@ const collectionJsonLd = {
       </div>
     </section>
 
+    <!-- Filter bar -->
+    <section class="sticky top-16 z-30 border-y border-border bg-background/95 backdrop-blur">
+      <div class="mx-auto max-w-5xl px-6 py-4">
+        <div class="relative">
+          <svg class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            id="tools-search"
+            type="text"
+            autocomplete="off"
+            placeholder={`Search ${toolCount} tools by name...`}
+            class="w-full rounded-xl border border-border bg-surface py-2.5 pr-4 pl-11 text-sm outline-none transition-colors placeholder:text-muted focus:border-primary"
+          />
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          {modalityFilters.map((m) => (
+            <button
+              type="button"
+              data-modality={m.id}
+              class:list={[
+                "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                m.id === "all" ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt",
+              ]}
+            >
+              {m.label} ({m.count})
+            </button>
+          ))}
+        </div>
+        <p id="tools-count" class="mt-3 text-sm text-muted">Showing all {toolCount} tools</p>
+      </div>
+    </section>
+
     <!-- Tool categories -->
     {groups.map((group) => (
-      <section class="border-t border-border py-12 even:bg-background-alt">
+      <section class="border-t border-border py-12 even:bg-background-alt" data-cat-section>
         <div class="mx-auto max-w-5xl px-6">
           <div class="reveal">
             <div class="mb-8 flex items-center gap-3">
@@ -142,7 +186,10 @@ const collectionJsonLd = {
               {group.tools.map((tool) => (
                 <a
                   href={`/tools/${tool.id}`}
-                  class="group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
+                  class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
+                  data-name={tool.name.toLowerCase()}
+                  data-desc={tool.description.toLowerCase()}
+                  data-modality={tool.modality}
                 >
                   <div
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -179,6 +226,11 @@ const collectionJsonLd = {
       </section>
     ))}
 
+    <!-- Empty state -->
+    <p id="tools-empty" class="hidden border-t border-border py-20 text-center text-muted">
+      No tools match your search. Try a different term or modality.
+    </p>
+
     <!-- Bottom CTA -->
     <section class="border-t border-border py-20">
       <div class="mx-auto max-w-5xl px-6 text-center">
@@ -212,6 +264,66 @@ const collectionJsonLd = {
       </div>
     </section>
   </main>
+
+  <script is:inline>
+    (function () {
+      var search = document.getElementById("tools-search");
+      var countEl = document.getElementById("tools-count");
+      var emptyEl = document.getElementById("tools-empty");
+      var items = Array.prototype.slice.call(document.querySelectorAll(".tool-item"));
+      var sections = Array.prototype.slice.call(document.querySelectorAll("[data-cat-section]"));
+      var modBtns = Array.prototype.slice.call(document.querySelectorAll(".tools-mod-btn"));
+      var total = items.length;
+      var activeMod = "all";
+
+      function setBtns() {
+        modBtns.forEach(function (b) {
+          var on = b.getAttribute("data-modality") === activeMod;
+          b.className =
+            "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
+            (on ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt");
+        });
+      }
+
+      function filter() {
+        var q = search.value.toLowerCase().trim();
+        var visible = 0;
+        items.forEach(function (el) {
+          var matchMod = activeMod === "all" || el.getAttribute("data-modality") === activeMod;
+          var matchQ =
+            !q ||
+            el.getAttribute("data-name").indexOf(q) !== -1 ||
+            el.getAttribute("data-desc").indexOf(q) !== -1;
+          var show = matchMod && matchQ;
+          el.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+        sections.forEach(function (sec) {
+          var anyVisible = Array.prototype.some.call(
+            sec.querySelectorAll(".tool-item"),
+            function (el) {
+              return el.style.display !== "none";
+            },
+          );
+          sec.style.display = anyVisible ? "" : "none";
+        });
+        emptyEl.style.display = visible === 0 ? "block" : "none";
+        countEl.textContent =
+          q || activeMod !== "all"
+            ? "Showing " + visible + " of " + total + " tools"
+            : "Showing all " + total + " tools";
+      }
+
+      search.addEventListener("input", filter);
+      modBtns.forEach(function (b) {
+        b.addEventListener("click", function () {
+          activeMod = b.getAttribute("data-modality");
+          setBtns();
+          filter();
+        });
+      });
+    })();
+  </script>
 
   <Footer />
 </Base>
