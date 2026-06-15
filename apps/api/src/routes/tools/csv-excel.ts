@@ -20,8 +20,10 @@ export function registerCsvExcel(app: FastifyInstance) {
       const base = input.filename.replace(/\.[^.]+$/, "");
       const lower = input.filename.toLowerCase();
 
-      // Dynamic import: exceljs is heavy; load it only when this tool runs
-      const ExcelJS = await import("exceljs");
+      // Dynamic import: exceljs is heavy; load it only when this tool runs.
+      // exceljs is CJS, so under ESM the constructor lives on the default export
+      // (namespace `.Workbook` is undefined -> "is not a constructor").
+      const { default: ExcelJS } = await import("exceljs");
 
       if (lower.endsWith(".xlsx")) {
         // xlsx -> csv: load workbook, pick the Nth worksheet, extract rows
