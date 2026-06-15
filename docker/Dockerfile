@@ -312,8 +312,11 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
 # Install Playwright Chromium for HTML-to-Image tool.
 # PLAYWRIGHT_BROWSERS_PATH puts browsers in a shared location so the
 # non-root snapotter user can find and execute them at runtime.
+# Use the workspace's pinned Playwright (not `npx playwright`, which fetches a
+# NEWER version and installs a chromium build the runtime playwright cannot
+# resolve) so the installed browser matches chromium.executablePath().
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN npx playwright install chromium --with-deps && \
+RUN pnpm --filter @snapotter/api exec playwright install chromium --with-deps && \
     chmod -R a+rX /opt/playwright-browsers && \
     rm -rf /tmp/*
 
