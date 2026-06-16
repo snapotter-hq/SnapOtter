@@ -51,6 +51,13 @@ export default defineConfig({
       "tests/e2e-landing/**",
       "tests/e2e-docker/**",
       "tests/e2e-analytics/**",
+      // tests/qa/* are Playwright QA-sweep specs (and .mts harnesses), not
+      // vitest tests; they import @playwright/test and break a bare `vitest run`.
+      "tests/qa/**",
+      // Stale: the landing app migrated from Next.js to Astro, so these React
+      // unit tests import @landing/app/* and @landing/components/* modules that
+      // no longer exist (components are now .astro). Excluded until rewritten.
+      "tests/unit/landing/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/.{idea,git,cache,output,temp}/**",
