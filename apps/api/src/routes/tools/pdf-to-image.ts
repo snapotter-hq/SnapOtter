@@ -171,6 +171,13 @@ async function readPdfFromParts(
   return { fileBuffer, settingsRaw };
 }
 
+// PDFs begin with "%PDF-" within the first bytes. mupdf.openDocument sniffs the
+// real format and would otherwise accept non-PDF inputs (images, etc.),
+// violating the .pdf-only contract; gate on the magic bytes up front.
+function isPdfBuffer(buf: Buffer): boolean {
+  return buf.subarray(0, 1024).includes("%PDF-");
+}
+
 // ── Route registration ───────────────────────────────────────────
 export function registerPdfToImage(app: FastifyInstance) {
   // ── Info endpoint ────────────────────────────────────────────
@@ -188,6 +195,10 @@ export function registerPdfToImage(app: FastifyInstance) {
 
     if (!fileBuffer || fileBuffer.length === 0) {
       return reply.status(400).send({ error: "No PDF file provided" });
+    }
+
+    if (!isPdfBuffer(fileBuffer)) {
+      return reply.status(400).send({ error: "Invalid or corrupt PDF file" });
     }
 
     let doc: mupdf.Document | null = null;
@@ -226,6 +237,10 @@ export function registerPdfToImage(app: FastifyInstance) {
 
     if (!fileBuffer || fileBuffer.length === 0) {
       return reply.status(400).send({ error: "No PDF file provided" });
+    }
+
+    if (!isPdfBuffer(fileBuffer)) {
+      return reply.status(400).send({ error: "Invalid or corrupt PDF file" });
     }
 
     let doc: mupdf.Document | null = null;
@@ -290,6 +305,10 @@ export function registerPdfToImage(app: FastifyInstance) {
 
     if (!fileBuffer || fileBuffer.length === 0) {
       return reply.status(400).send({ error: "No PDF file provided" });
+    }
+
+    if (!isPdfBuffer(fileBuffer)) {
+      return reply.status(400).send({ error: "Invalid or corrupt PDF file" });
     }
 
     let settings: z.infer<typeof settingsSchema>;
