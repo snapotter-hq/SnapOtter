@@ -39,6 +39,23 @@ export const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   "image/vnd.ms-dds": ".dds",
   "image/x-dpx": ".dpx",
   "image/fits": ".fits",
+  // Video
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "video/quicktime": ".mov",
+  // Audio
+  "audio/mpeg": ".mp3",
+  "audio/wav": ".wav",
+  "audio/flac": ".flac",
+  "audio/ogg": ".ogg",
+  "audio/aac": ".aac",
+  // Document / data
+  "application/pdf": ".pdf",
+  "text/plain": ".txt",
+  "text/csv": ".csv",
+  "application/json": ".json",
+  "application/xml": ".xml",
+  "application/zip": ".zip",
 };
 
 // ── Build output filename ──────────────────────────────────────

@@ -598,6 +598,14 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     phase: "complete",
     percent: 100,
     stage: "complete",
+    // Carry the result so the SSE fallback path (sync-window timeout) still
+    // delivers a downloadable output, mirroring processToolJob's complete event.
+    result: {
+      jobId: data.jobId,
+      downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(outFilename)}`,
+      originalSize: firstBytesIn,
+      processedSize: lastBytesOut,
+    },
   });
 
   // Batch progress (pipeline-batch only)

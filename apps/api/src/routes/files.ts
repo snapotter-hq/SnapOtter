@@ -52,16 +52,12 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         // Skip empty parts (e.g. empty file field)
         if (buffer.length === 0) continue;
 
-        // Validate the image (pass filename for extension-based format detection)
-        const validation = await validateImageBuffer(buffer, part.filename);
-        if (!validation.valid) {
-          return reply.status(400).send({
-            error: `Invalid file "${part.filename}": ${validation.reason}`,
-          });
-        }
+        // Try image validation; non-image files are accepted with format from extension
+        const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
+        const isValidImage = validation?.valid === true;
 
         // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
-        const safeBuffer = isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
+        const safeBuffer = isValidImage && isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
 
         // Sanitize filename (canonical; do NOT re-sanitize downstream)
         const safeName = sanitizeFilename(part.filename ?? "upload");
@@ -69,10 +65,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         // Write to object storage uploads prefix
         await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
 
+        const fileExt = safeName.split(".").pop()?.toLowerCase() ?? "";
         uploadedFiles.push({
           name: safeName,
           size: safeBuffer.length,
-          format: validation.format,
+          format: isValidImage ? validation.format : fileExt,
         });
       }
 

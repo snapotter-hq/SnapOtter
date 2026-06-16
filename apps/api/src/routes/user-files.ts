@@ -32,6 +32,7 @@ import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { getAuthUser, requireAuth } from "../plugins/auth.js";
 
@@ -62,6 +63,20 @@ function extToMime(ext: string): string {
     tiff: "image/tiff",
     tif: "image/tiff",
     avif: "image/avif",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    flac: "audio/flac",
+    ogg: "audio/ogg",
+    aac: "audio/aac",
+    pdf: "application/pdf",
+    txt: "text/plain",
+    csv: "text/csv",
+    json: "application/json",
+    xml: "application/xml",
+    zip: "application/zip",
   };
   return map[clean] ?? "application/octet-stream";
 }
@@ -480,6 +495,34 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         const rawBuffer = await readStoredFile(file.storedName);
+
+        // Video thumbnail via ffmpeg poster frame
+        if (file.mimeType.startsWith("video/")) {
+          const poster = await videoPosterPreview(rawBuffer);
+          if (!poster) {
+            return reply.status(422).send({ error: "Could not generate thumbnail" });
+          }
+          saveThumbnail(file.storedName, poster).catch(() => {});
+          return reply
+            .header("Content-Type", "image/webp")
+            .header("Cache-Control", "public, max-age=86400, immutable")
+            .send(poster);
+        }
+
+        // PDF thumbnail via ghostscript first page
+        if (file.mimeType === "application/pdf") {
+          const page = await pdfFirstPagePreview(rawBuffer);
+          if (!page) {
+            return reply.status(422).send({ error: "Could not generate thumbnail" });
+          }
+          saveThumbnail(file.storedName, page).catch(() => {});
+          return reply
+            .header("Content-Type", "image/png")
+            .header("Cache-Control", "public, max-age=86400, immutable")
+            .send(page);
+        }
+
+        // Image thumbnail (existing path)
         const validation = await validateImageBuffer(rawBuffer, file.originalName);
         let decoded: Buffer<ArrayBuffer> = Buffer.from(rawBuffer);
         if (validation.valid && validation.format === "heif") {
@@ -671,13 +714,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: "parentId is required" });
     }
 
-    // Validate the image
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      return reply.status(400).send({
-        error: `Invalid file: ${validation.reason}`,
-      });
-    }
+    // Try image validation; non-image outputs from trusted tools are accepted
+    const validation = await validateImageBuffer(fileBuffer, filename).catch(() => null);
+    const isValidImage = validation?.valid === true;
 
     // Look up the parent to compute the next version and carry forward the tool chain
     const [parent] = await db
@@ -700,7 +739,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const baseName = parent.originalName.replace(/\.[^.]+$/, "");
     const resultName = `${baseName}${ext}`;
 
-    const mimeType = formatToMime(validation.format) || extToMime(ext);
+    const mimeType = isValidImage ? formatToMime(validation.format) : extToMime(ext);
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
     const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
@@ -727,8 +766,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         storedName,
         mimeType,
         size: fileSize,
-        width: validation.width,
-        height: validation.height,
+        width: isValidImage ? validation.width : null,
+        height: isValidImage ? validation.height : null,
         version: nextVersion,
         parentId,
         toolChain: newChain,

@@ -101,7 +101,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             if (buffer.length > 0) {
               files.push({
                 buffer,
-                filename: sanitizeFilename(part.filename ?? "image"),
+                filename: sanitizeFilename(part.filename ?? "file"),
               });
             }
           } else if (part.fieldname === "settings") {
@@ -121,7 +121,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (files.length === 0) {
-        return reply.status(400).send({ error: "No image files provided" });
+        return reply.status(400).send({ error: "No files provided" });
       }
 
       // Enforce batch size limit

@@ -38,6 +38,34 @@ const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-e
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 
+/** Extension to MIME type for batch ZIP blob construction. Falls back to undefined (generic). */
+const MIME_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  svg: "image/svg+xml",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  ogv: "video/ogg",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  flac: "audio/flac",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  csv: "text/csv",
+  json: "application/json",
+  xml: "application/xml",
+  html: "text/html",
+  zip: "application/zip",
+};
+
 export function useToolProcessor(toolId: string) {
   const { t } = useTranslation();
   const {
@@ -116,7 +144,7 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               clearActiveJob();
               setError(
-                "Processing timed out with no progress for 5 minutes. Try again or use a smaller image.",
+                "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
               );
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -264,7 +292,7 @@ export function useToolProcessor(toolId: string) {
             error: "Processing timed out",
           });
           setError(
-            "Processing timed out with no progress for 5 minutes. Try again or use a smaller image.",
+            "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
           );
           setProcessing(false);
           setProgress(IDLE_PROGRESS);
@@ -604,7 +632,8 @@ export function useToolProcessor(toolId: string) {
         for (let i = 0; i < entries.length; i++) {
           const processedName = fileResults[String(i)];
           if (processedName && extracted[processedName]) {
-            const blobType = processedName.endsWith(".svg") ? "image/svg+xml" : undefined;
+            const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
+            const blobType = MIME_BY_EXT[ext];
             const blob = new Blob(
               [extracted[processedName] as BlobPart],
               blobType ? { type: blobType } : undefined,

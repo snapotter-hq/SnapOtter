@@ -230,7 +230,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const jobId = randomUUID();
       const maxInputs = config.maxInputs ?? 1;
       const minInputs = config.minInputs ?? 1;
-      let filename = "image";
+      let filename = "file";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
       let clientJobId: string | null = null;
@@ -318,7 +318,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Require at least one file
       if (received.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
+        return reply.status(400).send({ error: "No file provided" });
       }
 
       // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
@@ -590,7 +590,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             is_ai_tool: getBundleForTool(config.toolId) !== null,
             error_code: err instanceof Error ? err.constructor.name : "UnknownError",
             error_message:
-              err instanceof Error ? err.message.slice(0, 200) : "Image processing failed",
+              err instanceof Error ? err.message.slice(0, 200) : "Processing failed",
           });
           return reply.status(422).send({
             error: "Processing failed",

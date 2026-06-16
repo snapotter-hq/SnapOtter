@@ -66,7 +66,12 @@ const NonNativePreview = lazy(() =>
   })),
 );
 
-/** Formats that browsers can render in <img> tags. */
+/**
+ * Formats that browsers can render in <img> tags.
+ * Intentionally image-only: all consumers (BeforeAfterSlider, SideBySideComparison,
+ * ImageViewer) render via <img>. Video/audio/PDF processed outputs are handled by
+ * dedicated display-mode branches (media-player, document) before this check runs.
+ */
 const BROWSER_PREVIEWABLE_EXTS = new Set([
   "jpg",
   "jpeg",
@@ -505,7 +510,7 @@ export function ToolPage() {
     const url = URL.createObjectURL(batchZipBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = batchZipFilename ?? "processed-images.zip";
+    a.download = batchZipFilename ?? "processed-files.zip";
     a.click();
     URL.revokeObjectURL(url);
   }, [batchZipBlob, batchZipFilename]);
@@ -584,9 +589,9 @@ export function ToolPage() {
   const processedFileName =
     currentEntry?.processedFilename ??
     (processedUrl
-      ? decodeURIComponent(processedUrl.split("/").pop() ?? "processed-image")
-      : "processed-image");
-  const processedFileType = processedFileName.split(".").pop()?.toUpperCase() || "IMAGE";
+      ? decodeURIComponent(processedUrl.split("/").pop() ?? "processed-file")
+      : "processed-file");
+  const processedFileType = processedFileName.split(".").pop()?.toUpperCase() || "FILE";
   const isProcessedPreviewable = processedUrl
     ? canBrowserPreview(processedUrl, currentEntry?.processedFilename ?? processedFileName)
     : false;

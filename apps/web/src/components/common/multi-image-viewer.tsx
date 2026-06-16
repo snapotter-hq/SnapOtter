@@ -6,6 +6,11 @@ import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFileStore } from "@/stores/file-store";
 
+/**
+ * Formats that browsers can render in <img> tags.
+ * Intentionally image-only: consumers (BeforeAfterSlider, ImageViewer) render via <img>.
+ * Video/audio/PDF outputs should use dedicated viewer components instead.
+ */
 const BROWSER_PREVIEWABLE_EXTS = new Set([
   "jpg",
   "jpeg",
