@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { compositeOnColor } from "../../lib/bg-effects.js";
+import { compositeOnColor, createGradientBackground } from "../../lib/bg-effects.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -14,12 +15,42 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
 const settingsSchema = z.object({
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .default("#ffffff"),
+  backgroundType: z.enum(["color", "gradient"]).default("color"),
+  color: z.string().regex(HEX_RE).default("#ffffff"),
+  gradientColor1: z.string().regex(HEX_RE).optional(),
+  gradientColor2: z.string().regex(HEX_RE).optional(),
+  gradientAngle: z.number().int().min(0).max(360).default(180),
+  feather: z.number().int().min(0).max(20).default(0),
+  format: z.enum(["png", "webp"]).default("png"),
 });
+
+/**
+ * Soften the alpha edges of a subject PNG by blurring its alpha channel.
+ * Keeps RGB intact; only the transparency boundary gets smoothed.
+ */
+async function featherEdges(subjectBuffer: Buffer, radius: number): Promise<Buffer> {
+  // Read the subject as raw RGBA plus a separately-blurred copy of its alpha,
+  // then overwrite the alpha channel in place. joinChannel does not reliably
+  // re-tag the merged channel as alpha, so we splice the raw bytes directly.
+  const { data: rgba, info } = await sharp(subjectBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { data: blurredAlpha } = await sharp(subjectBuffer)
+    .extractChannel(3)
+    .blur(radius)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  for (let p = 3, a = 0; p < rgba.length; p += 4, a++) {
+    rgba[p] = blurredAlpha[a];
+  }
+  return sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png()
+    .toBuffer();
+}
 
 // -- AI job handler (runs inside the BullMQ worker) --
 registerAiJobHandler("background-replace", async (input, data, ctx) => {
@@ -33,17 +64,46 @@ registerAiJobHandler("background-replace", async (input, data, ctx) => {
     ctx.report(Math.min(scaled, 80), stage);
   });
 
-  ctx.report(85, "Compositing on color");
+  // Feather alpha edges before compositing
+  let subject = subjectPng;
+  if (settings.feather > 0) {
+    ctx.report(82, "Feathering edges");
+    subject = await featherEdges(subjectPng, settings.feather);
+  }
 
-  const result = await compositeOnColor(subjectPng, settings.color);
+  ctx.report(85, "Compositing background");
+
+  let composited: Buffer;
+  if (settings.backgroundType === "gradient") {
+    const meta = await sharp(subject).metadata();
+    if (!meta.width || !meta.height) throw new Error("Cannot read subject dimensions");
+    const gradBg = await createGradientBackground(
+      meta.width,
+      meta.height,
+      settings.gradientColor1 ?? "#ffffff",
+      settings.gradientColor2 ?? "#000000",
+      settings.gradientAngle,
+    );
+    composited = await sharp(gradBg)
+      .composite([{ input: subject, blend: "over" }])
+      .png()
+      .toBuffer();
+  } else {
+    composited = await compositeOnColor(subject, settings.color);
+  }
+
+  // Encode to requested output format
+  const fmt = settings.format;
+  const result =
+    fmt === "webp" ? await sharp(composited).webp({ lossless: true }).toBuffer() : composited;
 
   const base = data.filename.replace(/\.[^.]+$/, "");
-  const outName = `${base}_bg.png`;
+  const outName = `${base}_bg.${fmt}`;
 
   return {
     buffer: result,
     filename: outName,
-    contentType: "image/png",
+    contentType: fmt === "webp" ? "image/webp" : "image/png",
   };
 });
 

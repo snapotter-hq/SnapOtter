@@ -30,11 +30,18 @@ export function registerPixelate(app: FastifyInstance) {
       let buf: Buffer;
 
       if (settings.region) {
-        const r = settings.region;
-        // Validate region bounds
-        if (r.left + r.width > w || r.top + r.height > h) {
+        // Reject if origin is completely outside image bounds
+        if (settings.region.left >= w || settings.region.top >= h) {
           throw new InputValidationError("Region exceeds image bounds");
         }
+
+        // Clamp region dimensions to image edges (handles rounding from normalized coords)
+        const r = {
+          left: settings.region.left,
+          top: settings.region.top,
+          width: Math.min(settings.region.width, w - settings.region.left),
+          height: Math.min(settings.region.height, h - settings.region.top),
+        };
 
         // Extract region, pixelate it, composite back
         const rw = Math.max(1, Math.round(r.width / bs));

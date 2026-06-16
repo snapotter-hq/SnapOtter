@@ -104,8 +104,8 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "ocr-pdf": "custom-results",
   "transcribe-audio": "no-comparison",
   "auto-subtitles": "media-player",
-  "background-replace": "no-comparison",
-  "blur-background": "no-comparison",
+  "background-replace": "before-after",
+  "blur-background": "before-after",
 
   // Video tools
   "convert-video": "media-player",

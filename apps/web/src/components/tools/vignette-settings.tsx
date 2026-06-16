@@ -1,11 +1,17 @@
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
-export function VignetteSettings() {
+export function VignetteSettings({
+  onImageStyle,
+  onImageOverlay,
+}: {
+  onImageStyle?: (style: React.CSSProperties | null) => void;
+  onImageOverlay?: (node: React.ReactNode) => void;
+}) {
   const { t } = useTranslation();
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
@@ -13,9 +19,59 @@ export function VignetteSettings() {
 
   const [strength, setStrength] = useState(0.5);
   const [color, setColor] = useState("#000000");
+  const [radius, setRadius] = useState(70);
+  const [softness, setSoftness] = useState(50);
+  const [roundness, setRoundness] = useState(100);
+  const [centerX, setCenterX] = useState(50);
+  const [centerY, setCenterY] = useState(50);
+
+  // Stable refs for the preview callbacks to avoid re-render loops
+  const onOverlayRef = useRef(onImageOverlay);
+  useEffect(() => {
+    onOverlayRef.current = onImageOverlay;
+  });
+  const onStyleRef = useRef(onImageStyle);
+  useEffect(() => {
+    onStyleRef.current = onImageStyle;
+  });
+
+  // Live preview overlay via onImageOverlay
+  useEffect(() => {
+    const outerR = radius / 100;
+    const innerStop = Math.max(0, Math.min(1, outerR * (1 - softness / 100)));
+    const innerPct = (innerStop * 100).toFixed(1);
+
+    const shape = roundness === 100 ? "circle" : "ellipse";
+    const gradientColor = `${color}`;
+
+    const bg = `radial-gradient(${shape} at ${centerX}% ${centerY}%, transparent ${innerPct}%, ${gradientColor} ${(outerR * 100).toFixed(1)}%)`;
+
+    const overlay = (
+      <div
+        data-testid="vignette-overlay"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: bg,
+          opacity: strength,
+          pointerEvents: "none",
+          borderRadius: "inherit",
+        }}
+      />
+    );
+
+    // onImageStyle activates the wrapper branch in image-viewer so the overlay
+    // child actually mounts; without it the overlay node is never rendered.
+    onStyleRef.current?.({});
+    onOverlayRef.current?.(overlay);
+    return () => {
+      onStyleRef.current?.(null);
+      onOverlayRef.current?.(null);
+    };
+  }, [strength, color, radius, softness, roundness, centerX, centerY]);
 
   const handleProcess = () => {
-    const settings = { strength, color };
+    const settings = { strength, color, radius, softness, roundness, centerX, centerY };
     if (files.length > 1) {
       processAllFiles(files, settings);
     } else {
@@ -49,6 +105,106 @@ export function VignetteSettings() {
           step={0.05}
           value={strength}
           onChange={(e) => setStrength(Number(e.target.value))}
+          className="w-full mt-1"
+        />
+      </div>
+
+      {/* Radius */}
+      <div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="vignette-radius" className="text-xs text-muted-foreground">
+            Radius
+          </label>
+          <span className="text-xs font-mono text-foreground">{radius}%</span>
+        </div>
+        <input
+          id="vignette-radius"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={radius}
+          onChange={(e) => setRadius(Number(e.target.value))}
+          className="w-full mt-1"
+        />
+      </div>
+
+      {/* Softness */}
+      <div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="vignette-softness" className="text-xs text-muted-foreground">
+            Softness
+          </label>
+          <span className="text-xs font-mono text-foreground">{softness}%</span>
+        </div>
+        <input
+          id="vignette-softness"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={softness}
+          onChange={(e) => setSoftness(Number(e.target.value))}
+          className="w-full mt-1"
+        />
+      </div>
+
+      {/* Roundness */}
+      <div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="vignette-roundness" className="text-xs text-muted-foreground">
+            Roundness
+          </label>
+          <span className="text-xs font-mono text-foreground">{roundness}%</span>
+        </div>
+        <input
+          id="vignette-roundness"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={roundness}
+          onChange={(e) => setRoundness(Number(e.target.value))}
+          className="w-full mt-1"
+        />
+      </div>
+
+      {/* Center X */}
+      <div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="vignette-centerX" className="text-xs text-muted-foreground">
+            Center X
+          </label>
+          <span className="text-xs font-mono text-foreground">{centerX}%</span>
+        </div>
+        <input
+          id="vignette-centerX"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={centerX}
+          onChange={(e) => setCenterX(Number(e.target.value))}
+          className="w-full mt-1"
+        />
+      </div>
+
+      {/* Center Y */}
+      <div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="vignette-centerY" className="text-xs text-muted-foreground">
+            Center Y
+          </label>
+          <span className="text-xs font-mono text-foreground">{centerY}%</span>
+        </div>
+        <input
+          id="vignette-centerY"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={centerY}
+          onChange={(e) => setCenterY(Number(e.target.value))}
           className="w-full mt-1"
         />
       </div>

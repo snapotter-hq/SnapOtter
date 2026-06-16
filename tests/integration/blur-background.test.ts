@@ -38,7 +38,7 @@ describe("blur-background", () => {
   it("returns 501 FEATURE_NOT_INSTALLED when bundle is absent", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: JSON.stringify({}) },
+      { name: "settings", content: JSON.stringify({ intensity: 50, feather: 5, format: "png" }) },
     ]);
 
     const res = await app.inject({
@@ -82,7 +82,7 @@ describe("blur-background", () => {
   it("returns 501 even with invalid intensity (gate fires first)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: JSON.stringify({ intensity: 0 }) },
+      { name: "settings", content: JSON.stringify({ intensity: 0, feather: 25, format: "bmp" }) },
     ]);
 
     const res = await app.inject({
@@ -101,16 +101,65 @@ describe("blur-background", () => {
     expect(json.code).toBe("FEATURE_NOT_INSTALLED");
   });
 
+  // -- 501 with webp format (still gated) --
+
+  it("returns 501 with webp format and feather settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ intensity: 80, feather: 10, format: "webp" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/blur-background",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(501);
+    const json = JSON.parse(res.body);
+    expect(json.code).toBe("FEATURE_NOT_INSTALLED");
+  });
+
+  // -- 501 with defaults (empty settings object, Zod fills defaults) --
+
+  it("returns 501 with empty settings (defaults applied by Zod)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/blur-background",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(501);
+    const json = JSON.parse(res.body);
+    expect(json.code).toBe("FEATURE_NOT_INSTALLED");
+  });
+
   // -- Bundle-gated happy path (skipped: background-removal bundle is 4-5 GB) --
 
   // The background-removal bundle is not installed in any verification environment.
   // These tests exist for future in-container runs after bundle install.
   // The 501 contract + blurBackground unit tests carry the verification.
   describe.skip("with background-removal bundle installed", () => {
-    it("blurs background with default intensity (202 + async)", async () => {
+    it("blurs background with full settings (202 + async)", async () => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-        { name: "settings", content: JSON.stringify({ intensity: 75 }) },
+        {
+          name: "settings",
+          content: JSON.stringify({ intensity: 75, feather: 3, format: "webp" }),
+        },
       ]);
 
       const res = await app.inject({

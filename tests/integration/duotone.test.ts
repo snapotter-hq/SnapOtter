@@ -2,10 +2,9 @@
  * Integration tests for the duotone tool (/api/v1/tools/duotone).
  *
  * Covers duotone color mapping, black-to-shadow and white-to-highlight
- * pixel assertions with tolerance, and schema validation.
+ * pixel assertions with tolerance, intensity blending, and schema validation.
  */
 
-import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
@@ -121,6 +120,62 @@ describe("Duotone", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+  });
+
+  it("blends with original at intensity 40", async () => {
+    // Solid white image -- at intensity 40, output should be a blend of
+    // the original white (255,255,255) and the duotone highlight color.
+    const testImage = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+
+    const shadow = "#1e3a8a";
+    const highlight = "#fbbf24";
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "white.png", contentType: "image/png", content: testImage },
+      {
+        name: "settings",
+        content: JSON.stringify({ shadow, highlight, intensity: 40 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/duotone",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    const rawMeta = await sharp(dlRes.rawPayload)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { data } = rawMeta;
+
+    // White original (255) blended with highlight (#fbbf24 = 251,191,36) at k=0.4:
+    // R: round(255*0.6 + 251*0.4) = round(153 + 100.4) = 253
+    // G: round(255*0.6 + 191*0.4) = round(153 + 76.4) = 229
+    // B: round(255*0.6 + 36*0.4)  = round(153 + 14.4) = 167
+    const tolerance = 8;
+    expect(Math.abs(data[0] - 253)).toBeLessThanOrEqual(tolerance);
+    expect(Math.abs(data[1] - 229)).toBeLessThanOrEqual(tolerance);
+    expect(Math.abs(data[2] - 167)).toBeLessThanOrEqual(tolerance);
   });
 
   it("rejects invalid hex color for shadow", async () => {

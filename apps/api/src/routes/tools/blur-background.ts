@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
@@ -16,6 +17,8 @@ import { receiveUpload } from "../../lib/upload-stream.js";
 
 const settingsSchema = z.object({
   intensity: z.number().int().min(1).max(100).default(50),
+  feather: z.number().int().min(0).max(20).default(0),
+  format: z.enum(["png", "webp"]).default("png"),
 });
 
 // -- AI job handler (runs inside the BullMQ worker) --
@@ -32,15 +35,45 @@ registerAiJobHandler("blur-background", async (input, data, ctx) => {
 
   ctx.report(85, "Blurring background");
 
-  const result = await blurBackground(input, subjectPng, settings.intensity);
+  // If feather > 0, soften the subject alpha edge before compositing. Read the
+  // subject as raw RGBA plus a separately-blurred copy of its alpha and
+  // overwrite the alpha bytes in place; joinChannel does not reliably re-tag the
+  // merged channel as alpha.
+  let compositeSubject = subjectPng;
+  if (settings.feather > 0) {
+    const { data: rgba, info } = await sharp(subjectPng)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { data: blurredAlpha } = await sharp(subjectPng)
+      .extractChannel(3)
+      .blur(settings.feather)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let p = 3, a = 0; p < rgba.length; p += 4, a++) {
+      rgba[p] = blurredAlpha[a];
+    }
+    compositeSubject = await sharp(rgba, {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+  }
 
+  const blurred = await blurBackground(input, compositeSubject, settings.intensity);
+
+  // Encode in the requested output format
+  const fmt = settings.format;
   const base = data.filename.replace(/\.[^.]+$/, "");
-  const outName = `${base}_blurbg.png`;
+  const outName = `${base}_blurbg.${fmt}`;
+  const contentType = fmt === "webp" ? "image/webp" : "image/png";
+  const result =
+    fmt === "webp" ? await sharp(blurred).webp({ lossless: true }).toBuffer() : blurred; // blurBackground already returns PNG
 
   return {
     buffer: result,
     filename: outName,
-    contentType: "image/png",
+    contentType,
   };
 });
 

@@ -101,6 +101,64 @@ describe("background-replace", () => {
     expect(json.code).toBe("FEATURE_NOT_INSTALLED");
   });
 
+  it("returns 501 with gradient settings (gate fires first)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          backgroundType: "gradient",
+          gradientColor1: "#ff0000",
+          gradientColor2: "#0000ff",
+          gradientAngle: 90,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/background-replace",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(501);
+    const json = JSON.parse(res.body);
+    expect(json.code).toBe("FEATURE_NOT_INSTALLED");
+  });
+
+  it("returns 501 with feather and webp format (gate fires first)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          backgroundType: "color",
+          color: "#00ff00",
+          feather: 5,
+          format: "webp",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/background-replace",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(501);
+    const json = JSON.parse(res.body);
+    expect(json.code).toBe("FEATURE_NOT_INSTALLED");
+  });
+
   // -- Bundle-gated happy path (skipped: background-removal bundle is 4-5 GB) --
 
   // The background-removal bundle is not installed in any verification environment.
@@ -111,6 +169,38 @@ describe("background-replace", () => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
         { name: "settings", content: JSON.stringify({ color: "#ff0000" }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/background-replace",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode).toBe(202);
+      const json = JSON.parse(res.body);
+      expect(json.jobId).toBeDefined();
+      expect(json.async).toBe(true);
+    }, 300_000);
+
+    it("replaces background with gradient (202 + async)", async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        {
+          name: "settings",
+          content: JSON.stringify({
+            backgroundType: "gradient",
+            gradientColor1: "#ff0000",
+            gradientColor2: "#0000ff",
+            gradientAngle: 45,
+            feather: 3,
+            format: "webp",
+          }),
+        },
       ]);
 
       const res = await app.inject({

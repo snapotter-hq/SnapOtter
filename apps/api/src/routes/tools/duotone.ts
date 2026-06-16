@@ -9,6 +9,7 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const settingsSchema = z.object({
   shadow: hexColor.default("#1e3a8a"),
   highlight: hexColor.default("#fbbf24"),
+  intensity: z.number().int().min(0).max(100).default(100),
 });
 
 function parseHex(hex: string) {
@@ -26,6 +27,7 @@ export function registerDuotone(app: FastifyInstance) {
     process: async (inputBuffer, settings, filename) => {
       const a = parseHex(settings.shadow);
       const b = parseHex(settings.highlight);
+      const k = settings.intensity / 100;
 
       // Duotone math: output = shadow + (highlight - shadow) * luminance
       // .linear(multipliers, offsets) with per-channel arrays
@@ -40,7 +42,34 @@ export function registerDuotone(app: FastifyInstance) {
         .toColourspace("srgb")
         .toBuffer();
 
-      const buf = await sharp(grayBuf).linear(multipliers, offsets).toBuffer();
+      let buf = await sharp(grayBuf).linear(multipliers, offsets).toBuffer();
+
+      // Blend duotone with original when intensity < 100. Both buffers are read
+      // through the same removeAlpha + sRGB pipeline so they share channel count
+      // and length, and the blended raw buffer is re-encoded to PNG so the final
+      // toFormat() step can decode it again.
+      if (k < 1) {
+        const origRaw = await sharp(inputBuffer)
+          .removeAlpha()
+          .toColourspace("srgb")
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const duo = await sharp(buf).removeAlpha().toColourspace("srgb").raw().toBuffer();
+        const pixels = origRaw.data;
+        const blended = Buffer.alloc(pixels.length);
+        for (let i = 0; i < pixels.length; i++) {
+          blended[i] = Math.round(pixels[i] * (1 - k) + duo[i] * k);
+        }
+        buf = await sharp(blended, {
+          raw: {
+            width: origRaw.info.width,
+            height: origRaw.info.height,
+            channels: origRaw.info.channels as 1 | 2 | 3 | 4,
+          },
+        })
+          .png()
+          .toBuffer();
+      }
 
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       const buffer = await sharp(buf)
