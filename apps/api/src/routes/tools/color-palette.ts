@@ -73,9 +73,11 @@ function medianCut(
 
   // Split until we have enough buckets or can't split further
   while (buckets.length < maxColors) {
-    // Pick the bucket with the widest channel range
+    // Pick the bucket with the widest channel range. bestRange starts at 0 so a
+    // uniform bucket (range 0) is never chosen -- otherwise a solid-color image
+    // would keep splitting into identical swatches.
     let bestIdx = -1;
-    let bestRange = -1;
+    let bestRange = 0;
     let bestCh: 0 | 1 | 2 = 0;
 
     for (let i = 0; i < buckets.length; i++) {
