@@ -25,9 +25,16 @@ services:
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000
-      # Single constrained container; give sync-wait tools more headroom before
-      # the factory falls back to async 202 (default is 8s).
-      - SYNC_WAIT_MS=30000
+      # The macOS Docker VM runs Sharp/FFmpeg ~2-3x slower than the host and
+      # oversubscribes CPU across parallel vitest forks, so heavy ops (e.g. a
+      # 12MP stress-image enhance) blow past the 30s test sync window and fall
+      # back to a 202 that sync-asserting tests reject. Give the sync window
+      # generous headroom (honored by tests/setup/per-fork-env.ts) and keep the
+      # framework test/hook timeouts above it so a slow-but-correct job returns
+      # 200 instead of tripping a vitest timeout. Host/CI keep the 30s defaults.
+      - SYNC_WAIT_MS=120000
+      - VITEST_TEST_TIMEOUT=180000
+      - VITEST_HOOK_TIMEOUT=120000
     tmpfs:
       - /tmp/test-workspace
       - /tmp

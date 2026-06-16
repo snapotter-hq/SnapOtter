@@ -24,8 +24,14 @@ process.env.REDIS_URL = redisBaseUrl;
 process.env.BULLMQ_PREFIX = `snapotter_test_${suffix}`;
 
 // Heavy format conversions can exceed the 8s production default under parallel
-// test forks; 30s keeps tool routes synchronous (200) in tests while production stays at 8s.
-process.env.SYNC_WAIT_MS = "30000";
+// test forks; 30s keeps tool routes synchronous (200) in tests while production
+// stays at 8s. The constrained docker test image (macOS Docker VM, where Sharp
+// and FFmpeg run ~2-3x slower) can request a larger window via SYNC_WAIT_MS;
+// honor it rather than clobbering, but never drop below the 30s test floor.
+const requestedSyncWait = Number(process.env.SYNC_WAIT_MS);
+process.env.SYNC_WAIT_MS = String(
+  Number.isFinite(requestedSyncWait) && requestedSyncWait > 30000 ? requestedSyncWait : 30000,
+);
 const dbName = `snapotter_test_${suffix}`; // pid digits + uuid hex: identifier-safe
 const admin = new pg.Client({ connectionString: baseUrl });
 await admin.connect();

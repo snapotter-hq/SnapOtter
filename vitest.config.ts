@@ -32,8 +32,11 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // Env-overridable so the resource-constrained docker test image (where Sharp
+    // and FFmpeg run ~2-3x slower under the macOS Docker VM) can grant slow
+    // sync-wait jobs more headroom. Host/CI keep the 30s default.
+    testTimeout: Number(process.env.VITEST_TEST_TIMEOUT) || 30_000,
+    hookTimeout: Number(process.env.VITEST_HOOK_TIMEOUT) || 30_000,
     pool: "forks",
     poolOptions: {
       forks: {
