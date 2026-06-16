@@ -7,6 +7,12 @@ import { useFileStore } from "@/stores/file-store";
 
 type SheetFormat = "xlsx" | "ods" | "csv";
 
+const ALL_FORMATS: { value: SheetFormat; label: string }[] = [
+  { value: "xlsx", label: "XLSX" },
+  { value: "ods", label: "ODS" },
+  { value: "csv", label: "CSV" },
+];
+
 export function ConvertSpreadsheetSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["convert-spreadsheet"];
@@ -16,11 +22,20 @@ export function ConvertSpreadsheetSettings() {
 
   const [outFormat, setOutFormat] = useState<SheetFormat>("ods");
 
+  // Never offer the input's own format as a target. LibreOffice rejects a
+  // same-format conversion ("already in that format"), so drop it from the
+  // options and keep the current selection valid.
+  const inputExt = files[0]?.name.split(".").pop()?.toLowerCase();
+  const formats = ALL_FORMATS.filter((f) => f.value !== inputExt);
+  const selected = formats.some((f) => f.value === outFormat)
+    ? outFormat
+    : (formats[0]?.value ?? outFormat);
+
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
   const handleProcess = () => {
-    const settings = { format: outFormat };
+    const settings = { format: selected };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -36,13 +51,15 @@ export function ConvertSpreadsheetSettings() {
         </label>
         <select
           id="cs-format"
-          value={outFormat}
+          value={selected}
           onChange={(e) => setOutFormat(e.target.value as SheetFormat)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="xlsx">XLSX</option>
-          <option value="ods">ODS</option>
-          <option value="csv">CSV</option>
+          {formats.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
         </select>
       </div>
 

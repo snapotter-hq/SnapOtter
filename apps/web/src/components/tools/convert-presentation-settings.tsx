@@ -7,6 +7,11 @@ import { useFileStore } from "@/stores/file-store";
 
 type PresFormat = "pptx" | "odp";
 
+const ALL_FORMATS: { value: PresFormat; label: string }[] = [
+  { value: "pptx", label: "PPTX" },
+  { value: "odp", label: "ODP" },
+];
+
 export function ConvertPresentationSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["convert-presentation"];
@@ -16,11 +21,20 @@ export function ConvertPresentationSettings() {
 
   const [outFormat, setOutFormat] = useState<PresFormat>("odp");
 
+  // Never offer the input's own format as a target. LibreOffice rejects a
+  // same-format conversion ("already in that format"), so drop it from the
+  // options and keep the current selection valid.
+  const inputExt = files[0]?.name.split(".").pop()?.toLowerCase();
+  const formats = ALL_FORMATS.filter((f) => f.value !== inputExt);
+  const selected = formats.some((f) => f.value === outFormat)
+    ? outFormat
+    : (formats[0]?.value ?? outFormat);
+
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
   const handleProcess = () => {
-    const settings = { format: outFormat };
+    const settings = { format: selected };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -36,12 +50,15 @@ export function ConvertPresentationSettings() {
         </label>
         <select
           id="cp-format"
-          value={outFormat}
+          value={selected}
           onChange={(e) => setOutFormat(e.target.value as PresFormat)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="pptx">PPTX</option>
-          <option value="odp">ODP</option>
+          {formats.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
         </select>
       </div>
 

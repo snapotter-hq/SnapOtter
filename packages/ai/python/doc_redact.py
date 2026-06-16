@@ -2,13 +2,11 @@
 none remain extractable. Args: {"path": in, "out": out, "terms": [".."],
 "caseSensitive": false}. Prints {"found": N, "verified": true}.
 
-Case-sensitivity note (PyMuPDF 1.27.2): fitz.Page.search_for is ALWAYS
-case-insensitive. When caseSensitive=true is requested, the search phase
-still finds all case variants (over-redaction, which is the safe direction
-for a legal redaction tool). The verification pass then enforces exact-case
-matching, so a caseSensitive=true request only reports leakage when the
-exact-case term survives. This is the sanctioned fallback documented in
-the wave-2 plan."""
+Case sensitivity: fitz.Page.search_for is ALWAYS case-insensitive, so when
+caseSensitive=true we post-filter the hits to only those whose on-page glyphs
+match the term's exact case (checked with get_textbox). caseSensitive=false
+redacts every case variant. The verification pass applies the same casing
+rule, so it proves the intended occurrences are gone."""
 import json
 import sys
 
@@ -31,7 +29,16 @@ def main():
         found = 0
         for page in doc:
             for term in terms:
-                quads = page.search_for(term, quads=True, flags=flags) if case_sensitive else page.search_for(term, quads=True)
+                if case_sensitive:
+                    # search_for is always case-insensitive; keep only the
+                    # exact-case hits by checking the glyphs under each quad.
+                    quads = [
+                        q
+                        for q in page.search_for(term, quads=True, flags=flags)
+                        if term in page.get_textbox(q.rect)
+                    ]
+                else:
+                    quads = page.search_for(term, quads=True)
                 for quad in quads:
                     page.add_redact_annot(quad, fill=(0, 0, 0))
                     found += 1

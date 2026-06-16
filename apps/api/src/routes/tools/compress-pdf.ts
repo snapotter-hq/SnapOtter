@@ -66,6 +66,13 @@ export function registerCompressPdf(app: FastifyInstance) {
         await gsCompressPdfQuality(inPath, outPath, qualityToDpi(settings.quality ?? 75));
       }
 
+      // A "Compress" tool must never enlarge the file. If re-encoding produced
+      // something at least as large as the original (common for already
+      // compressed or low-DPI scanned PDFs), keep the original bytes instead.
+      if ((await stat(outPath)).size >= input.buffer.length) {
+        await writeFile(outPath, input.buffer);
+      }
+
       ctx.report(95, "Done");
       return {
         scratchPath: outPath,
