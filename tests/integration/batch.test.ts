@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ffmpegAvailable } from "@snapotter/media-engine";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sharedRedis } from "../../apps/api/src/jobs/connection.js";
@@ -19,6 +20,8 @@ const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
 const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
 const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+const TINY_MP4 = readFileSync(join(FIXTURES, "media", "tiny.mp4"));
+const TINY_MOV = readFileSync(join(FIXTURES, "media", "tiny.mov"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -580,4 +583,34 @@ describe("Legacy batch SSE wire parity", () => {
     expect(parsed.status).toBe("completed");
     expect(parsed.type).toBe("batch");
   });
+});
+
+// ── Non-image modality (regression) ─────────────────────────────
+// Batch used to hardcode image validation (validateImageBuffer + Sharp), so
+// every video/audio/document input failed with "Invalid image". The route now
+// validates via the per-modality input handler.
+describe.skipIf(!ffmpegAvailable())("Non-image modality batch", () => {
+  it("processes multiple video files through a video tool and returns a ZIP", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.mp4", contentType: "video/mp4", content: TINY_MP4 },
+      { name: "file", filename: "b.mov", contentType: "video/quicktime", content: TINY_MOV },
+      { name: "settings", content: JSON.stringify({ transform: "cw90" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/rotate-video/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const zip = new AdmZip(res.rawPayload);
+    expect(zip.getEntries().length).toBe(2);
+    // Regression guard: a real video must not be rejected as "Invalid image".
+    const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+    expect(fileResults["0"]).toBeDefined();
+    expect(fileResults["1"]).toBeDefined();
+  }, 60_000);
 });

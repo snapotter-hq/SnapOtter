@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ffmpegAvailable } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
@@ -15,6 +16,7 @@ import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from
 // ---------------------------------------------------------------------------
 const FIXTURES = join(__dirname, "..", "fixtures");
 const PNG_200x150 = readFileSync(join(FIXTURES, "test-200x150.png"));
+const TINY_MP4 = readFileSync(join(FIXTURES, "media", "tiny.mp4"));
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -787,4 +789,46 @@ describe("Pipeline execution response", () => {
     expect(dlRes.statusCode).toBe(200);
     expect(dlRes.rawPayload.length).toBeGreaterThan(0);
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NON-IMAGE PIPELINE (regression)
+// ═══════════════════════════════════════════════════════════════════════════
+// Pipeline execute used to hardcode image validation and rejected video inputs
+// with "Invalid image". It now validates via the first step's modality handler.
+describe.skipIf(!ffmpegAvailable())("Non-image pipeline (video)", () => {
+  it("runs a multi-step video pipeline and returns a downloadable result", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.mp4", content: TINY_MP4, contentType: "video/mp4" },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [
+            { toolId: "rotate-video", settings: { transform: "cw90" } },
+            { toolId: "mute-video", settings: {} },
+          ],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toBeDefined();
+    expect(json.stepsCompleted).toBe(2);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    expect(dlRes.rawPayload.length).toBeGreaterThan(0);
+  }, 60_000);
 });
