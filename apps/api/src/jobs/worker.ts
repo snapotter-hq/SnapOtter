@@ -44,7 +44,7 @@ import { hasAiJobHandler, runAiToolJob } from "./ai-handlers.js";
 import { recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
-import { buildOutputName, generatePreview } from "./postprocess.js";
+import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
 import { runSystemJob } from "./system-jobs.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 
@@ -267,8 +267,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Generate preview for non-browser-previewable formats
       const previewRef = await generatePreview(resultBuffer, resultContentType, jobId, inputBuffer);
 
-      // No auto-save -- users save to library explicitly via the UI
-      const savedFileId: string | undefined = undefined;
+      // Auto-save a new version when the input came from the user's library
+      // (data.fileId is set by tool-factory when the upload referenced a
+      // library file). Without a fileId this is a no-op, so tool-first uploads
+      // are not auto-saved.
+      const savedFileId = await autoSaveToLibrary({
+        fileId: data.fileId,
+        userId: data.userId,
+        buffer: resultBuffer,
+        outName,
+        contentType: resultContentType,
+        toolId: data.toolId,
+      });
 
       const durationMs = Date.now() - startTime;
 
