@@ -70,7 +70,7 @@ export const zhTW: TranslationKeys = {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "PDF & Files",
+    documentsAndFiles: "PDF & Data",
   },
   tools: {
     resize: {
@@ -2428,7 +2428,7 @@ export const zhTW: TranslationKeys = {
     clearSearch: "Clear search",
     all: "All",
     documents: "PDF",
-    data: "Files",
+    data: "Data",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },

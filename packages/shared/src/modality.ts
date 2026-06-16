@@ -8,13 +8,13 @@ export interface ModalityInfo {
 }
 
 // Five modality values in code, surfaced as five UI sections:
-// Image, Video, Audio, PDF ("document" id) and Files ("file" id).
+// Image, Video, Audio, PDF ("document" id) and Data ("file" id).
 export const MODALITIES: ModalityInfo[] = [
   { id: "image", name: "Image", icon: "Image", color: "#3B82F6" },
   { id: "video", name: "Video", icon: "Video", color: "#EF4444" },
   { id: "audio", name: "Audio", icon: "AudioLines", color: "#10B981" },
   { id: "document", name: "PDF", icon: "FileText", color: "#8B5CF6" },
-  { id: "file", name: "Files", icon: "FileArchive", color: "#F59E0B" },
+  { id: "file", name: "Data", icon: "FileArchive", color: "#F59E0B" },
 ];
 
 // Which BullMQ pool a modality's tools run on. AI tools override to "ai"
