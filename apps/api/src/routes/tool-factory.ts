@@ -10,7 +10,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
 import { trackEvent } from "../lib/analytics.js";
-import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
+import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
@@ -548,9 +548,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             error_message:
               err instanceof Error ? err.message.slice(0, 200) : "Image processing failed",
           });
+          // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
+          // but return only a user-safe detail to the client.
+          request.log.error({ err, toolId: config.toolId }, "tool processing failed");
           return reply.status(422).send({
             error: "Processing failed",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+            details: friendlyError(err instanceof Error ? err.message : String(err)),
           });
         }
       } finally {
