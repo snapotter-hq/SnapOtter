@@ -80,8 +80,8 @@ interface SuccessResult {
   filename: string;
   contentType: string;
   size: number;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   downloadUrl: string;
   previewUrl: string | null;
 }
@@ -236,21 +236,25 @@ async function fetchSingleUrl(
     const rawFilename = filenameFromUrl(url);
     const filename = getUniqueName(sanitizeFilename(rawFilename), usedFilenames);
 
-    // Validate as an image
-    const validation = await validateImageBuffer(buffer, filename);
-    if (!validation.valid) {
-      return { success: false, url, error: validation.reason };
-    }
+    // Try image validation; non-image media (audio/video/document/data) is
+    // accepted and typed from the HTTP response so URL import works for every
+    // modality. The consuming tool runs modality-specific validation at
+    // process time, and SSRF + size limits still bound what can be fetched.
+    const validation = await validateImageBuffer(buffer, filename).catch(() => null);
 
     // Save to object storage uploads prefix (raw fetched files)
     await putObject(`uploads/${jobId}/${filename}`, buffer);
 
-    const contentType = FORMAT_TO_MIME[validation.format] ?? "application/octet-stream";
+    const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
+    const contentType = validation?.valid
+      ? (FORMAT_TO_MIME[validation.format] ?? "application/octet-stream")
+      : responseContentType || "application/octet-stream";
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
 
-    // Generate preview for non-browser formats
+    // Generate a webp preview only for non-browser-native image formats.
+    // Non-image media has no image preview; the UI shows a modality icon.
     let previewUrl: string | null = null;
-    if (!BROWSER_PREVIEWABLE.has(contentType)) {
+    if (validation?.valid && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
         const previewBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
@@ -267,8 +271,8 @@ async function fetchSingleUrl(
       filename,
       contentType,
       size: buffer.length,
-      width: validation.width,
-      height: validation.height,
+      width: validation?.valid ? validation.width : undefined,
+      height: validation?.valid ? validation.height : undefined,
       downloadUrl,
       previewUrl,
     };
