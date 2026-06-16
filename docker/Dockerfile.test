@@ -55,11 +55,15 @@ COPY --from=libheif-builder /opt/libheif/lib/ /usr/local/lib/
 ENV LD_LIBRARY_PATH=/usr/local/lib
 RUN ldconfig
 
-# Allow ImageMagick's Ghostscript delegate to read/write EPS (the default
-# Debian policy.xml blocks it).
+# Allow ImageMagick's Ghostscript delegate to read EPS. Decoding an EPS goes
+# through the PostScript (PS) coder, so the default Debian policy.xml blocking
+# PS/PS2/PS3 must be opened too, not just EPS -- otherwise `convert` refuses with
+# a policy error before Ghostscript ever runs.
 RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1) && \
     if [ -n "$POLICY_FILE" ]; then \
-      sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read|write" pattern="EPS"/' "$POLICY_FILE"; \
+      for CODER in EPS PS PS2 PS3; do \
+        sed -i "s/<policy domain=\"coder\" rights=\"none\" pattern=\"${CODER}\"/<policy domain=\"coder\" rights=\"read|write\" pattern=\"${CODER}\"/" "$POLICY_FILE"; \
+      done; \
     fi
 
 WORKDIR /app
@@ -73,6 +77,9 @@ COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
 COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./packages/image-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
+# enterprise ships @aws-sdk/client-s3, which tests/integration/s3-storage.test.ts
+# imports at module load; without it that suite fails to collect.
+COPY packages/enterprise/package.json packages/enterprise/tsconfig.json ./packages/enterprise/
 
 # Install ALL dependencies (including devDependencies for testing)
 RUN pnpm install --frozen-lockfile
