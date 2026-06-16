@@ -39,7 +39,9 @@ export function registerCsvExcel(app: FastifyInstance) {
         ws.eachRow((row) => {
           const cells: string[] = [];
           row.eachCell({ includeEmpty: true }, (cell) => {
-            cells.push(cell.text);
+            // cell.text renders dates via Date.toString() (timezone-dependent and
+            // not round-trippable); emit ISO 8601 for Date values instead.
+            cells.push(cell.value instanceof Date ? cell.value.toISOString() : cell.text);
           });
           rows.push(cells);
         });

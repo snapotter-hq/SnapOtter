@@ -51,7 +51,10 @@ export function registerYamlJson(app: FastifyInstance) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new InputValidationError(`Not valid YAML: ${msg.split("\n")[0]}`);
       }
-      const json = JSON.stringify(parsed, null, 2);
+      // js-yaml returns undefined for empty/comment-only documents; normalize to
+      // null so JSON.stringify yields the string "null" instead of undefined
+      // (Buffer.from(undefined) throws).
+      const json = JSON.stringify(parsed ?? null, null, 2);
       return {
         buffer: Buffer.from(json, "utf8"),
         filename: `${base}.json`,

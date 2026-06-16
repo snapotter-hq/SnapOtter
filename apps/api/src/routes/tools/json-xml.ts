@@ -1,6 +1,7 @@
 import { XMLBuilder, XMLParser } from "fast-xml-parser";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -34,14 +35,22 @@ export function registerJsonXml(app: FastifyInstance) {
       }
 
       // json -> xml
-      const data: unknown = JSON.parse(text);
-      // Wrap in a root element when the top level is an array or has
-      // multiple keys, so the XML is well-formed with a single root.
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new InputValidationError(`Not valid JSON: ${msg.split("\n")[0]}`);
+      }
+      // The builder needs an object/array root; primitives (null, string, number,
+      // boolean) crash builder.build or produce per-character garbage XML.
+      if (data === null || typeof data !== "object") {
+        throw new InputValidationError("JSON must be an object or array to convert to XML");
+      }
+      // Wrap in a root element when the top level is an array or has multiple
+      // keys, so the XML is well-formed with a single root.
       const wrapped =
-        Array.isArray(data) ||
-        (typeof data === "object" && data !== null && Object.keys(data).length !== 1)
-          ? { root: data }
-          : data;
+        Array.isArray(data) || Object.keys(data).length !== 1 ? { root: data } : data;
       const builder = new XMLBuilder({ format: settings.pretty, ignoreAttributes: false });
       const xml = builder.build(wrapped) as string;
       return {

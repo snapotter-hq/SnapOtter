@@ -53,22 +53,22 @@ function readEntryBuffer(zipfile: ZipFile, entry: Entry): Promise<Buffer> {
   });
 }
 
-/** Deduplicate basenames: name-1.ext, name-2.ext on collision. */
+/** Deduplicate basenames: name-1.ext, name-2.ext until each output is unique. */
 function deduplicateNames(names: string[]): string[] {
-  const usedNames = new Map<string, number>();
+  const usedNames = new Set<string>();
   const result: string[] = [];
   for (const raw of names) {
     const name = basename(raw);
     const ext = extname(name);
     const base = name.slice(0, name.length - ext.length) || "file";
-    const key = name.toLowerCase();
-    const count = usedNames.get(key) ?? 0;
-    if (count === 0) {
-      result.push(name);
-    } else {
-      result.push(`${base}-${count}${ext}`);
+    let candidate = name;
+    let n = 1;
+    while (usedNames.has(candidate.toLowerCase())) {
+      candidate = `${base}-${n}${ext}`;
+      n++;
     }
-    usedNames.set(key, count + 1);
+    usedNames.add(candidate.toLowerCase());
+    result.push(candidate);
   }
   return result;
 }
@@ -99,6 +99,10 @@ export function registerExtractZip(app: FastifyInstance) {
         const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
         if (mode === 0o120000) continue;
         fileEntries.push(entry);
+      }
+
+      if (fileEntries.length === 0) {
+        throw new InputValidationError("No extractable files found in the archive");
       }
 
       // Guard: entry count

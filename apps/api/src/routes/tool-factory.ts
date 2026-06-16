@@ -73,6 +73,8 @@ export interface ToolRouteConfig<T> {
    * inputRefs in arrival order.
    */
   maxInputs?: number;
+  /** Minimum number of file parts required (default 1). Fewer returns HTTP 400. */
+  minInputs?: number;
   /**
    * Per-position input kind overrides for mixed-input tools (e.g. video +
    * subtitle). Input i validates with kind inputKinds[Math.min(i, len-1)].
@@ -110,6 +112,7 @@ export interface ToolRouteConfig<T> {
 export interface AnyToolRouteConfig {
   toolId: string;
   maxInputs?: number;
+  minInputs?: number;
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
@@ -215,6 +218,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       const jobId = randomUUID();
       const maxInputs = config.maxInputs ?? 1;
+      const minInputs = config.minInputs ?? 1;
       let filename = "image";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
@@ -304,6 +308,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       // Require at least one file
       if (received.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
+      // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
+      if (received.length < minInputs) {
+        return reply.status(400).send({
+          error: `This tool needs at least ${minInputs} files`,
+        });
       }
 
       const reportProgress = (percent: number, stage?: string) => {

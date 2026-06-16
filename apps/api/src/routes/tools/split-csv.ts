@@ -38,6 +38,9 @@ export function registerSplitCsv(app: FastifyInstance) {
 
       const header = settings.keepHeader ? allRows[0] : null;
       const dataRows = settings.keepHeader ? allRows.slice(1) : allRows;
+      if (dataRows.length === 0) {
+        throw new Error("No data rows to split");
+      }
 
       // Chunk data rows
       const chunks: string[][][] = [];

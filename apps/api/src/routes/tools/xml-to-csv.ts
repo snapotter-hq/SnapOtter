@@ -30,16 +30,42 @@ function findFirstArray(node: unknown): Record<string, unknown>[] | null {
 }
 
 /**
+ * Fallback for a single (non-repeating) record: depth-first, find the first
+ * object whose values are all scalar (a leaf record), skipping the XML
+ * declaration (keys starting with "?"). Lets a 1-element XML still tabulate.
+ */
+function findFirstRecord(node: unknown): Record<string, unknown> | null {
+  if (typeof node !== "object" || node === null || Array.isArray(node)) return null;
+  const entries = Object.entries(node as Record<string, unknown>).filter(
+    ([k]) => !k.startsWith("?"),
+  );
+  const objectChildren = entries.filter(([, v]) => typeof v === "object" && v !== null);
+  const hasScalar = entries.some(([, v]) => v === null || typeof v !== "object");
+  if (hasScalar && objectChildren.length === 0) {
+    return Object.fromEntries(entries);
+  }
+  for (const [, v] of objectChildren) {
+    const found = findFirstRecord(v);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
  * Flatten one level: nested objects and arrays become JSON strings in the cell.
  */
 function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const original = new Set(Object.keys(row));
   for (const [key, val] of Object.entries(row)) {
-    if (val !== null && typeof val === "object") {
-      out[key] = JSON.stringify(val);
-    } else {
-      out[key] = val;
-    }
+    // Strip fast-xml-parser's internal markers from column names: "@_" on
+    // attributes and "#text" for an element's text content -- unless a sibling
+    // element already owns the cleaned-up name.
+    let bare = key;
+    if (key.startsWith("@_")) bare = key.slice(2);
+    else if (key === "#text") bare = "text";
+    const outKey = bare !== key && original.has(bare) ? key : bare;
+    out[outKey] = val !== null && typeof val === "object" ? JSON.stringify(val) : val;
   }
   return out;
 }
@@ -71,13 +97,21 @@ export function registerXmlToCsv(app: FastifyInstance) {
         throw new InputValidationError(`XML parse failed: ${msg.split("\n")[0]}`);
       }
 
-      const rows = findFirstArray(parsed);
+      let rows = findFirstArray(parsed);
+      if (!rows) {
+        // No repeating array: fall back to a single record (1-row table).
+        const single = findFirstRecord(parsed);
+        if (single) rows = [single];
+      }
       if (!rows || rows.length === 0) {
         throw new InputValidationError("No repeating elements found to tabulate");
       }
 
       const flattened = rows.map(flattenRow);
-      const csv = Papa.unparse(flattened);
+      // Papa.unparse derives columns from the first row only; pass the union of
+      // all keys so heterogeneous records don't silently drop columns.
+      const columns = Array.from(new Set(flattened.flatMap((row) => Object.keys(row))));
+      const csv = Papa.unparse(flattened, { columns });
 
       return {
         buffer: Buffer.from(csv, "utf8"),

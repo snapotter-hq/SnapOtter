@@ -21,11 +21,31 @@ export function registerCsvJson(app: FastifyInstance) {
       const lower = input.filename.toLowerCase();
 
       if (lower.endsWith(".json")) {
-        const data: unknown = JSON.parse(input.buffer.toString("utf8"));
+        let data: unknown;
+        try {
+          data = JSON.parse(input.buffer.toString("utf8"));
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`Not valid JSON: ${msg.split("\n")[0]}`);
+        }
         if (!Array.isArray(data)) {
           throw new Error("JSON input must be an array of objects to convert to CSV");
         }
-        const csv = Papa.unparse(data as Record<string, unknown>[]);
+        if (data.some((r) => r === null || typeof r !== "object" || Array.isArray(r))) {
+          throw new Error("JSON array elements must be objects to convert to CSV");
+        }
+        // Flatten nested objects/arrays to JSON strings (Papa would otherwise emit
+        // "[object Object]"), and pass the union of all keys so columns appearing
+        // only in later rows are not dropped.
+        const flattened = (data as Record<string, unknown>[]).map((row) => {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(row)) {
+            out[k] = v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+          }
+          return out;
+        });
+        const columns = Array.from(new Set(flattened.flatMap((row) => Object.keys(row))));
+        const csv = Papa.unparse(flattened, { columns });
         return {
           buffer: Buffer.from(csv, "utf8"),
           filename: `${base}.csv`,
