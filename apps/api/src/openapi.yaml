@@ -7041,3 +7041,5163 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/convert-video:
+    post:
+      operationId: convertVideo
+      tags: [Tools]
+      summary: Convert Video
+      description: Convert videos between MP4, MOV, and WebM.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "mp4") - One of: mp4, mov, webm
+                    - `quality` (string, default "balanced") - One of: high, balanced, small
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/compress-video:
+    post:
+      operationId: compressVideo
+      tags: [Tools]
+      summary: Compress Video
+      description: Shrink video file size with quality control.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `quality` (string, default "balanced") - One of: light, balanced, strong
+                    - `resolution` (string, default "original") - One of: original, 1080p, 720p, 480p
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/trim-video:
+    post:
+      operationId: trimVideo
+      tags: [Tools]
+      summary: Trim Video
+      description: Cut a clip out of a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `startS` (number >= 0, default 0) - Start time in seconds
+                    - `endS` (number, required) - End time in seconds (must be after startS)
+                    - `precise` (boolean, default false) - Re-encode for frame-accurate cuts instead of keyframe seek
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/mute-video:
+    post:
+      operationId: muteVideo
+      tags: [Tools]
+      summary: Mute Video
+      description: Remove the audio track from a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-to-gif:
+    post:
+      operationId: videoToGif
+      tags: [Tools]
+      summary: Video to GIF
+      description: Turn a video clip into an animated GIF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fps` (integer 1-30, default 12) - Output frame rate
+                    - `width` (integer 64-1280, default 480) - Output width in pixels
+                    - `startS` (number >= 0, default 0) - Start time in seconds
+                    - `durationS` (number 0-60, default 5) - Duration in seconds
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/resize-video:
+    post:
+      operationId: resizeVideo
+      tags: [Tools]
+      summary: Resize Video
+      description: Scale a video to a new resolution or preset size.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (integer 16-7680, optional) - Target width in pixels
+                    - `height` (integer 16-4320, optional) - Target height in pixels
+                    - `preset` (string, default "custom") - One of: custom, 2160p, 1440p, 1080p, 720p, 480p, 360p. When "custom", at least width or height is required
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/crop-video:
+    post:
+      operationId: cropVideo
+      tags: [Tools]
+      summary: Crop Video
+      description: Crop a region out of a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (integer >= 16, required) - Crop region width in pixels
+                    - `height` (integer >= 16, required) - Crop region height in pixels
+                    - `x` (integer >= 0, default 0) - Horizontal offset from top-left
+                    - `y` (integer >= 0, default 0) - Vertical offset from top-left
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/rotate-video:
+    post:
+      operationId: rotateVideo
+      tags: [Tools]
+      summary: Rotate Video
+      description: Rotate or flip a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `transform` (string, required) - One of: cw90, ccw90, 180, hflip, vflip
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/change-fps:
+    post:
+      operationId: changeFps
+      tags: [Tools]
+      summary: Change FPS
+      description: Change the frame rate of a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fps` (number 1-120, default 30) - Target frame rate
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-color:
+    post:
+      operationId: videoColor
+      tags: [Tools]
+      summary: Video Color
+      description: Adjust brightness, contrast, saturation, and gamma.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `brightness` (number -1 to 1, default 0) - Brightness adjustment
+                    - `contrast` (number 0-4, default 1) - Contrast multiplier
+                    - `saturation` (number 0-3, default 1) - Saturation multiplier
+                    - `gamma` (number 0.1-10, default 1) - Gamma correction
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-speed:
+    post:
+      operationId: videoSpeed
+      tags: [Tools]
+      summary: Video Speed
+      description: Speed up or slow down a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `factor` (number 0.25-4, default 2) - Speed multiplier (2 = double speed, 0.5 = half speed)
+                    - `keepPitch` (boolean, default true) - Preserve audio pitch when changing speed
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/reverse-video:
+    post:
+      operationId: reverseVideo
+      tags: [Tools]
+      summary: Reverse Video
+      description: Play a video clip backwards. Limited to clips up to 5 minutes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-loudnorm:
+    post:
+      operationId: videoLoudnorm
+      tags: [Tools]
+      summary: Normalize Audio
+      description: Normalize video audio volume to broadcast standard (EBU R128).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/aspect-pad:
+    post:
+      operationId: aspectPad
+      tags: [Tools]
+      summary: Aspect Pad
+      description: Add solid-color bars to fit a target aspect ratio.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `target` (string, default "9:16") - One of: 16:9, 9:16, 1:1, 4:3, 3:4
+                    - `color` (string, default "#000000") - Hex color for padding bars (e.g. "#000000")
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/blur-pad:
+    post:
+      operationId: blurPad
+      tags: [Tools]
+      summary: Blur Pad
+      description: Fill bars with a blurred copy of the video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `target` (string, default "16:9") - One of: 16:9, 9:16, 1:1, 4:3, 3:4
+                    - `blur` (number 2-50, default 20) - Gaussian blur sigma for the background
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/watermark-video:
+    post:
+      operationId: watermarkVideo
+      tags: [Tools]
+      summary: Watermark Video
+      description: Burn a text watermark onto video frames.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `text` (string, required) - Watermark text (1-200 characters)
+                    - `position` (string, default "br") - One of: tl, tc, tr, l, c, r, bl, bc, br
+                    - `fontSize` (integer 8-120, default 36) - Font size in pixels
+                    - `opacity` (number 0.05-1, default 0.5) - Watermark opacity
+                    - `color` (string, default "#ffffff") - Hex color for the text (e.g. "#ffffff")
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/stabilize-video:
+    post:
+      operationId: stabilizeVideo
+      tags: [Tools]
+      summary: Stabilize Video
+      description: Reduce camera shake with two-pass stabilization.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `smoothing` (integer 5-60, default 15) - Smoothing window size in frames
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/gif-to-video:
+    post:
+      operationId: gifToVideo
+      tags: [Tools]
+      summary: GIF to Video
+      description: Convert an animated GIF into an MP4 or WebM video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: GIF file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "mp4") - One of: mp4, webm
+      responses:
+        "200":
+          description: Converted video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-to-webp:
+    post:
+      operationId: videoToWebp
+      tags: [Tools]
+      summary: Video to WebP
+      description: Convert a video clip into an animated WebP image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fps` (integer 1-30, default 12) - Output frame rate
+                    - `width` (integer 16-1920, default 480) - Output width in pixels
+                    - `quality` (integer 1-100, default 75) - WebP compression quality
+                    - `loop` (boolean, default true) - Loop the animation
+      responses:
+        "200":
+          description: Converted animated WebP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-to-frames:
+    post:
+      operationId: videoToFrames
+      tags: [Tools]
+      summary: Video to Frames
+      description: Extract frames from a video as a ZIP of images.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "all") - One of: all, nth, timestamps
+                    - `n` (integer 2-1000, default 10) - Extract every Nth frame (used when mode is "nth")
+                    - `timestamps` (string, default "") - Comma-separated timestamps in seconds (required when mode is "timestamps")
+                    - `format` (string, default "png") - One of: png, jpg
+      responses:
+        "200":
+          description: ZIP archive containing extracted frames
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/merge-videos:
+    post:
+      operationId: mergeVideos
+      tags: [Tools]
+      summary: Merge Videos
+      description: |
+        Join multiple video clips into one MP4 file. All inputs are
+        normalized to the first video's resolution and 30 fps.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more video files to merge (up to 10)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/replace-audio:
+    post:
+      operationId: replaceAudio
+      tags: [Tools]
+      summary: Replace Audio
+      description: Swap the audio track of a video with another file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: A video file followed by an audio file (exactly 2 files)
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/burn-subtitles:
+    post:
+      operationId: burnSubtitles
+      tags: [Tools]
+      summary: Burn Subtitles
+      description: Permanently render subtitles onto video frames.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: A video file followed by a subtitle file (.srt, .vtt, .ass)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fontSize` (integer 8-72, default 24) - Subtitle font size in pixels
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/embed-subtitles:
+    post:
+      operationId: embedSubtitles
+      tags: [Tools]
+      summary: Embed Subtitles
+      description: Mux a subtitle track into the video container.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: A video file followed by a subtitle file (.srt, .vtt, .ass)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `language` (string, default "eng") - ISO 639-2/B language code (3 lowercase letters, e.g. "eng", "fra", "deu")
+      responses:
+        "200":
+          description: Processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/extract-subtitles:
+    post:
+      operationId: extractSubtitles
+      tags: [Tools]
+      summary: Extract Subtitles
+      description: Pull the subtitle track out of a video as an SRT file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file with an embedded subtitle track
+      responses:
+        "200":
+          description: Extracted subtitle file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/images-to-video:
+    post:
+      operationId: imagesToVideo
+      tags: [Tools]
+      summary: Images to Video
+      description: Turn a set of images into a slideshow video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more image files (up to 60)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `secondsPerImage` (number 0.5-10, default 2) - Display duration per image in seconds
+                    - `resolution` (string, default "720p") - One of: 1080p, 720p, square
+                    - `fps` (integer 10-60, default 30) - Output frame rate
+      responses:
+        "200":
+          description: Generated slideshow video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/video-metadata:
+    post:
+      operationId: videoMetadata
+      tags: [Tools]
+      summary: Clean Video Metadata
+      description: Strip metadata from a video and report what was found.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+      responses:
+        "200":
+          description: Processed video with metadata report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/auto-subtitles:
+    post:
+      operationId: autoSubtitles
+      tags: [Tools]
+      summary: Auto Subtitles
+      description: |
+        AI-powered subtitle generation from video audio tracks using
+        faster-whisper. Supports auto-detection and 10 explicit languages.
+        Requires the transcription feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to transcribe
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, id, th, vi
+                    - `format` (string, default "srt") - One of: srt, vtt
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/extract-audio:
+    post:
+      operationId: extractAudio
+      tags: [Tools]
+      summary: Extract Audio
+      description: Pull the audio track out of a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to extract audio from
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "mp3") - One of: mp3, wav, m4a
+      responses:
+        "200":
+          description: Extracted audio file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+  /api/v1/tools/convert-audio:
+    post:
+      operationId: convertAudio
+      tags: [Tools]
+      summary: Convert Audio
+      description: Convert audio between MP3, WAV, OGG, and more.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "mp3") - One of: mp3, wav, ogg, flac, m4a
+                    - `bitrateKbps` (integer 32-320, default 192) - Output bitrate in kbps
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/trim-audio:
+    post:
+      operationId: trimAudio
+      tags: [Tools]
+      summary: Trim Audio
+      description: Cut a section out of an audio file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `startS` (number, min 0, default 0) - Start time in seconds
+                    - `endS` (number, required) - End time in seconds (must be after start)
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/volume-adjust:
+    post:
+      operationId: volumeAdjust
+      tags: [Tools]
+      summary: Volume Adjust
+      description: Increase or decrease audio volume by a fixed gain.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `gainDb` (number -30 to 30, default 3) - Volume adjustment in decibels
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/normalize-audio:
+    post:
+      operationId: normalizeAudio
+      tags: [Tools]
+      summary: Normalize Audio
+      description: Even out loudness to broadcast standard levels (EBU R128, -16 LUFS).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/fade-audio:
+    post:
+      operationId: fadeAudio
+      tags: [Tools]
+      summary: Fade Audio
+      description: Add fade-in and fade-out effects to audio.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fadeInS` (number 0-30, default 1) - Fade-in duration in seconds
+                    - `fadeOutS` (number 0-30, default 1) - Fade-out duration in seconds
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/reverse-audio:
+    post:
+      operationId: reverseAudio
+      tags: [Tools]
+      summary: Reverse Audio
+      description: Play audio backwards.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/audio-speed:
+    post:
+      operationId: audioSpeed
+      tags: [Tools]
+      summary: Audio Speed
+      description: Speed up or slow down audio playback.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `factor` (number 0.25-4, default 1.5) - Speed multiplier (0.25 = quarter speed, 4 = quadruple speed)
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pitch-shift:
+    post:
+      operationId: pitchShift
+      tags: [Tools]
+      summary: Pitch Shift
+      description: Raise or lower pitch by semitones without changing speed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `semitones` (integer -12 to 12, default 3) - Semitones to shift (must be nonzero)
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/audio-channels:
+    post:
+      operationId: audioChannels
+      tags: [Tools]
+      summary: Audio Channels
+      description: Convert between mono, stereo, or swap left and right channels.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, required) - One of: stereo-to-mono, mono-to-stereo, swap
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/silence-removal:
+    post:
+      operationId: removeSilence
+      tags: [Tools]
+      summary: Silence Removal
+      description: Strip silent sections from audio.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `thresholdDb` (number -80 to -20, default -50) - Silence threshold in dB
+                    - `minSilenceS` (number 0.1-5, default 0.5) - Minimum silence duration in seconds to remove
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/noise-reduction:
+    post:
+      operationId: reduceNoise
+      tags: [Tools]
+      summary: Noise Reduction
+      description: Reduce background noise with FFT-based denoising.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `strength` (string, default "medium") - One of: light, medium, strong
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/merge-audio:
+    post:
+      operationId: mergeAudio
+      tags: [Tools]
+      summary: Merge Audio
+      description: Combine multiple audio files into one sequential track.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more audio files to merge (max 10)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "mp3") - One of: mp3, wav, flac, m4a
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/split-audio:
+    post:
+      operationId: splitAudio
+      tags: [Tools]
+      summary: Split Audio
+      description: |
+        Split audio by time, equal parts, or silence detection. Returns a
+        ToolResponse with a downloadUrl pointing to a ZIP archive of segments.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to split
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "time") - One of: time, parts, silence
+                    - `segmentS` (number 1-3600, default 60) - Segment length in seconds (mode=time)
+                    - `parts` (integer 2-20, default 2) - Number of equal parts (mode=parts)
+                    - `thresholdDb` (number -80 to -20, default -40) - Silence threshold in dB (mode=silence)
+                    - `minSilenceS` (number 0.1-10, default 0.3) - Minimum silence gap in seconds (mode=silence)
+      responses:
+        "200":
+          description: Processed audio (downloadUrl points to a ZIP archive)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/ringtone-maker:
+    post:
+      operationId: ringtoneMaker
+      tags: [Tools]
+      summary: Ringtone Maker
+      description: Create a ringtone clip (.m4r) from any audio file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `startS` (number, min 0, default 0) - Start time in seconds
+                    - `durationS` (number 1-30, default 30) - Clip duration in seconds
+      responses:
+        "200":
+          description: Processed audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/waveform-image:
+    post:
+      operationId: waveformImage
+      tags: [Tools]
+      summary: Waveform Image
+      description: Generate a waveform visualization as a PNG image from an audio file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (integer 256-3840, default 1024) - Image width in pixels
+                    - `height` (integer 64-1080, default 256) - Image height in pixels
+                    - `color` (string, default "#4f46e5") - Waveform hex color (e.g. "#4f46e5")
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/audio-metadata:
+    post:
+      operationId: audioMetadata
+      tags: [Tools]
+      summary: Audio Metadata
+      description: |
+        View, edit, or strip audio tags (ID3). The response includes a
+        `metadata` object with container, durationS, bitrateKbps, and tags
+        alongside the standard ToolResponse fields.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `strip` (boolean, default false) - Remove all existing metadata
+                    - `title` (string, optional, max 500) - Set the title tag
+                    - `artist` (string, optional, max 500) - Set the artist tag
+                    - `album` (string, optional, max 500) - Set the album tag
+      responses:
+        "200":
+          description: Processed audio with metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/transcribe-audio:
+    post:
+      operationId: transcribeAudio
+      tags: [Tools]
+      summary: Transcribe Audio
+      description: |
+        AI-powered speech-to-text transcription using faster-whisper. Outputs
+        plain text, SRT, or VTT subtitle formats. Requires the transcription
+        feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to transcribe
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko, id, th, vi
+                    - `outputFormat` (string, default "txt") - One of: txt, srt, vtt
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+  /api/v1/tools/merge-pdf:
+    post:
+      operationId: mergePdf
+      tags: [Tools]
+      summary: Merge PDFs
+      description: Combine multiple PDFs into one. Requires at least two files.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more PDF files to merge (max 20)
+      responses:
+        "200":
+          description: Merged PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/split-pdf:
+    post:
+      operationId: splitPdf
+      tags: [Tools]
+      summary: Split PDF
+      description: |
+        Extract pages or split into parts. In "range" mode returns a single PDF
+        with the selected pages. In "every" mode splits into chunks of N pages
+        and returns a ZIP archive containing the parts.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to split
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "range") - One of: range, every
+                    - `range` (string, optional) - Page range in qpdf syntax, e.g. "1-5,8,10-z" (required when mode is "range")
+                    - `everyN` (integer 1-500, optional) - Split into chunks of N pages (required when mode is "every")
+      responses:
+        "200":
+          description: Split PDF or ZIP archive of parts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/compress-pdf:
+    post:
+      operationId: compressPdf
+      tags: [Tools]
+      summary: Compress PDF
+      description: |
+        Shrink PDF file size by downsampling embedded images. In "quality" mode
+        a 1-100 slider controls image DPI. In "targetSize" mode a binary search
+        finds the highest DPI that fits the target. If compression would enlarge
+        the file, the original bytes are returned unchanged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `mode` (string, default "quality") - One of: quality, targetSize
+                    - `quality` (integer 1-100, optional) - Compression quality (higher = less compression). Used in quality mode
+                    - `targetSizeKb` (number, optional) - Target file size in kilobytes. Used in targetSize mode
+      responses:
+        "200":
+          description: Compressed PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/rotate-pdf:
+    post:
+      operationId: rotatePdf
+      tags: [Tools]
+      summary: Rotate PDF
+      description: Rotate pages in a PDF by 90, 180, or 270 degrees.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `angle` (integer, default 90) - One of: 90, 180, 270
+                    - `range` (string, default "1-z") - Page range in qpdf syntax, e.g. "1-5,8" ("1-z" = all pages)
+      responses:
+        "200":
+          description: Rotated PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/extract-pages:
+    post:
+      operationId: extractPages
+      tags: [Tools]
+      summary: Extract pages
+      description: Pull selected pages into a new PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to extract from
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `range` (string, required) - Page range in qpdf syntax, e.g. "1-5,8,10-z"
+      responses:
+        "200":
+          description: Extracted pages as a new PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/remove-pages:
+    post:
+      operationId: removePages
+      tags: [Tools]
+      summary: Remove pages
+      description: Delete specific pages from a PDF. Cannot remove every page.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pages` (string, required) - Page range to remove in qpdf syntax, e.g. "3,5-7"
+      responses:
+        "200":
+          description: PDF with pages removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/organize-pdf:
+    post:
+      operationId: organizePdf
+      tags: [Tools]
+      summary: Organize PDF
+      description: Reorder pages with an explicit page order.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to reorganize
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `order` (string, required) - Desired page order in qpdf syntax, e.g. "3,1,2,5-z"
+      responses:
+        "200":
+          description: Reorganized PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/protect-pdf:
+    post:
+      operationId: protectPdf
+      tags: [Tools]
+      summary: Protect PDF
+      description: Add password protection with AES-256 encryption. Passwords are redacted from audit logs.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to protect
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `userPassword` (string 1-256 chars, required) - Password required to open the PDF
+                    - `ownerPassword` (string 1-256 chars, optional) - Owner password for permissions; defaults to userPassword if omitted
+      responses:
+        "200":
+          description: Encrypted PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/unlock-pdf:
+    post:
+      operationId: unlockPdf
+      tags: [Tools]
+      summary: Unlock PDF
+      description: Remove password protection from a PDF. The correct password must be provided. Passwords are redacted from audit logs.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Password-protected PDF file
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `password` (string 1-256 chars, required) - Password to decrypt the PDF
+      responses:
+        "200":
+          description: Decrypted PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/repair-pdf:
+    post:
+      operationId: repairPdf
+      tags: [Tools]
+      summary: Repair PDF
+      description: Attempt to repair a damaged or corrupted PDF. Structural validation is skipped on input to allow malformed files.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Damaged PDF file to repair
+      responses:
+        "200":
+          description: Repaired PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/linearize-pdf:
+    post:
+      operationId: linearizePdf
+      tags: [Tools]
+      summary: Web-optimize PDF
+      description: Linearize a PDF for fast web viewing (progressive download).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to linearize
+      responses:
+        "200":
+          description: Linearized PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/grayscale-pdf:
+    post:
+      operationId: grayscalePdf
+      tags: [Tools]
+      summary: Grayscale PDF
+      description: Convert all colors in a PDF to grayscale.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to convert
+      responses:
+        "200":
+          description: Grayscale PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdfa-convert:
+    post:
+      operationId: pdfaConvert
+      tags: [Tools]
+      summary: PDF/A convert
+      description: Convert a PDF to archival PDF/A-2 format for long-term preservation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to convert
+      responses:
+        "200":
+          description: PDF/A-2 compliant file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/crop-pdf:
+    post:
+      operationId: cropPdf
+      tags: [Tools]
+      summary: Crop PDF
+      description: Crop all pages with a uniform margin.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to crop
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `margin` (number 0-2000, default 20) - Uniform crop margin in points
+      responses:
+        "200":
+          description: Cropped PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/nup-pdf:
+    post:
+      operationId: nupPdf
+      tags: [Tools]
+      summary: N-up PDF
+      description: Arrange multiple pages per sheet (e.g. 2-up, 4-up).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `perSheet` (integer, default 2) - One of: 2, 3, 4, 8, 9, 12, 16
+      responses:
+        "200":
+          description: N-up PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/booklet-pdf:
+    post:
+      operationId: bookletPdf
+      tags: [Tools]
+      summary: Booklet PDF
+      description: Arrange pages for folding into a booklet (impose for duplex printing).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `perSheet` (integer, default 2) - One of: 2, 4, 6, 8
+      responses:
+        "200":
+          description: Booklet-imposed PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/watermark-pdf:
+    post:
+      operationId: watermarkPdf
+      tags: [Tools]
+      summary: Watermark PDF
+      description: Add a text watermark to every page of a PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to watermark
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `text` (string 1-200 chars, required) - Watermark text
+                    - `position` (string, default "c") - One of: tl, tc, tr, l, c, r, bl, bc, br
+                    - `fontSize` (integer 6-72, default 48) - Font size in points
+                    - `opacity` (number 0.05-1, default 0.3) - Watermark opacity
+                    - `rotation` (number -180 to 180, default 45) - Rotation angle in degrees
+      responses:
+        "200":
+          description: Watermarked PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf-page-numbers:
+    post:
+      operationId: pdfPageNumbers
+      tags: [Tools]
+      summary: PDF page numbers
+      description: Add page numbers ("Page N of M") to every page of a PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `position` (string, default "bc") - One of: bl, bc, br, tl, tc, tr
+                    - `fontSize` (integer 6-24, default 10) - Font size in points
+      responses:
+        "200":
+          description: PDF with page numbers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+  /api/v1/tools/convert-document:
+    post:
+      operationId: convertDocument
+      tags: [Tools]
+      summary: Convert document
+      description: Convert between Word, OpenDocument, RTF, and plain text formats.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to convert (.docx, .doc, .odt, .rtf, .txt)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, required) — One of: docx, odt, rtf, txt
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/convert-presentation:
+    post:
+      operationId: convertPresentation
+      tags: [Tools]
+      summary: Convert presentation
+      description: Convert between PowerPoint and OpenDocument presentation formats.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Presentation file to convert (.pptx, .ppt, .odp)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, required) — One of: pptx, odp
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/convert-spreadsheet:
+    post:
+      operationId: convertSpreadsheet
+      tags: [Tools]
+      summary: Convert spreadsheet
+      description: Convert between Excel, OpenDocument, and CSV formats. Multi-sheet workbooks export the first sheet to CSV.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Spreadsheet file to convert (.xlsx, .xls, .ods, .csv)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, required) — One of: xlsx, ods, csv
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/excel-to-pdf:
+    post:
+      operationId: excelToPdf
+      tags: [Tools]
+      summary: Excel to PDF
+      description: Convert spreadsheets to PDF. Wide sheets may paginate across multiple pages.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Spreadsheet file to convert (.xlsx, .xls, .ods, .csv)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/word-to-pdf:
+    post:
+      operationId: wordToPdf
+      tags: [Tools]
+      summary: Word to PDF
+      description: Convert Word documents to PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Word document to convert (.docx, .doc, .odt, .rtf, .txt)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/powerpoint-to-pdf:
+    post:
+      operationId: powerpointToPdf
+      tags: [Tools]
+      summary: PowerPoint to PDF
+      description: Convert presentations to PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Presentation file to convert (.pptx, .ppt, .odp)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/html-to-pdf:
+    post:
+      operationId: htmlToPdf
+      tags: [Tools]
+      summary: HTML to PDF
+      description: Convert an HTML file to PDF. Remote resources are disabled for privacy.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: HTML file to convert (.html, .htm)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/markdown-to-docx:
+    post:
+      operationId: markdownToDocx
+      tags: [Tools]
+      summary: Markdown to Word
+      description: Convert a Markdown file to a Word document (DOCX).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Markdown file to convert (.md, .markdown)
+      responses:
+        "200":
+          description: Processed document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/markdown-to-html:
+    post:
+      operationId: markdownToHtml
+      tags: [Tools]
+      summary: Markdown to HTML
+      description: Convert a Markdown file to a standalone HTML page. Remote images in the source are left as-is in the output.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Markdown file to convert (.md, .markdown)
+      responses:
+        "200":
+          description: Processed document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/markdown-to-pdf:
+    post:
+      operationId: markdownToPdf
+      tags: [Tools]
+      summary: Markdown to PDF
+      description: Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Markdown file to convert (.md, .markdown)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/epub-convert:
+    post:
+      operationId: epubConvert
+      tags: [Tools]
+      summary: Convert EPUB
+      description: Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: EPUB file to convert (.epub)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, required) — One of: pdf, docx, html, md
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/to-epub:
+    post:
+      operationId: toEpub
+      tags: [Tools]
+      summary: Convert to EPUB
+      description: Convert Word, Markdown, HTML, or plain text files to EPUB.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to convert (.docx, .md, .html, .txt)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/flatten-pdf:
+    post:
+      operationId: flattenPdf
+      tags: [Tools]
+      summary: Flatten PDF
+      description: Bake forms and annotations into page content.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process (.pdf)
+      responses:
+        "200":
+          description: Processed PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/redact-pdf:
+    post:
+      operationId: redactPdf
+      tags: [Tools]
+      summary: Redact PDF
+      description: Permanently remove text occurrences (verified true redaction).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process (.pdf)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `terms` (string[], required) — Text strings to redact (1-50 terms, each up to 200 characters)
+                    - `caseSensitive` (boolean, default false) — Whether matching is case-sensitive
+      responses:
+        "200":
+          description: Processed PDF
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      found:
+                        type: integer
+                        description: Number of redacted occurrences found
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf-to-text:
+    post:
+      operationId: pdfToText
+      tags: [Tools]
+      summary: PDF to text
+      description: Extract plain text from a PDF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process (.pdf)
+      responses:
+        "200":
+          description: Extracted text file
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      chars:
+                        type: integer
+                        description: Number of characters extracted
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf-to-word:
+    post:
+      operationId: pdfToWord
+      tags: [Tools]
+      summary: PDF to Word
+      description: Best for text-based PDFs; scanned pages need OCR.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to convert (.pdf)
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf-metadata:
+    post:
+      operationId: pdfMetadata
+      tags: [Tools]
+      summary: PDF metadata
+      description: Read and write PDF document metadata.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process (.pdf)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `title` (string, optional, max 500) — Document title
+                    - `author` (string, optional, max 500) — Document author
+                    - `subject` (string, optional, max 500) — Document subject
+                    - `keywords` (string, optional, max 500) — Document keywords
+      responses:
+        "200":
+          description: Processed PDF with updated metadata
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      metadata:
+                        type: object
+                        description: The resulting PDF metadata fields
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/ocr-pdf:
+    post:
+      operationId: ocrPdf
+      tags: [Tools]
+      summary: PDF OCR
+      description: |
+        AI-powered OCR to extract text from PDF documents. Supports
+        multiple quality tiers and languages. Requires the OCR feature
+        bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to process (.pdf)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `quality` (string, default "balanced") — One of: fast, balanced, best
+                    - `language` (string, default "auto") — One of: auto, en, de, fr, es, zh, ja, ko
+                    - `pages` (string, default "all") — Page selection, e.g. "all", "1-3", "1,3,5"
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+  /api/v1/tools/chart-maker:
+    post:
+      operationId: chartMaker
+      tags: [Tools]
+      summary: Chart Maker
+      description: Create bar, line, or pie charts from CSV or JSON data. Returns a PNG image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or JSON data file
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `kind` (string, default "bar") - One of: bar, line, pie
+                    - `title` (string, optional) - Chart title (max 120 characters)
+                    - `width` (integer 320-2048, default 960) - Chart width in pixels
+                    - `height` (integer 240-1536, default 540) - Chart height in pixels
+      responses:
+        "200":
+          description: Generated chart image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/csv-excel:
+    post:
+      operationId: csvExcel
+      tags: [Tools]
+      summary: CSV to Excel
+      description: Convert between CSV and Excel (XLSX), both directions. Upload a CSV or TSV file to get XLSX, or upload an XLSX file to get CSV.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV, TSV, or XLSX file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `sheet` (integer, min 1, default 1) - Worksheet number to export when converting from XLSX
+      responses:
+        "200":
+          description: Converted file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/csv-json:
+    post:
+      operationId: csvJson
+      tags: [Tools]
+      summary: CSV to JSON
+      description: Convert between CSV and JSON, both directions. Upload a CSV or TSV file to get JSON, or upload a JSON array of objects to get CSV.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV, TSV, or JSON file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pretty` (boolean, default true) - Pretty-print JSON output with indentation
+      responses:
+        "200":
+          description: Converted file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/json-xml:
+    post:
+      operationId: jsonXml
+      tags: [Tools]
+      summary: JSON to XML
+      description: Convert between JSON and XML, both directions. Upload a JSON file to get XML, or upload an XML file to get JSON.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JSON or XML file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pretty` (boolean, default true) - Pretty-print output with indentation
+      responses:
+        "200":
+          description: Converted file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/split-csv:
+    post:
+      operationId: splitCsv
+      tags: [Tools]
+      summary: Split CSV
+      description: Split a CSV file into smaller files by row count. Returns a ZIP archive containing the parts.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or TSV file to split
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `rowsPerFile` (integer 1-1000000, default 1000) - Number of data rows per output file
+                    - `keepHeader` (boolean, default true) - Repeat the header row in each output file
+      responses:
+        "200":
+          description: ZIP archive containing split CSV parts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/merge-csvs:
+    post:
+      operationId: mergeCsvs
+      tags: [Tools]
+      summary: Merge CSVs
+      description: Combine multiple CSV or TSV files with matching columns into one merged file. All files must have the same column headers.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more CSV or TSV files to merge (2-20 files)
+      responses:
+        "200":
+          description: Merged CSV file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/yaml-json:
+    post:
+      operationId: yamlJson
+      tags: [Tools]
+      summary: YAML / JSON
+      description: Convert between YAML and JSON, both directions. Upload a YAML file to get JSON, or upload a JSON file to get YAML.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: YAML (.yaml, .yml) or JSON file to convert
+      responses:
+        "200":
+          description: Converted file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/xml-to-csv:
+    post:
+      operationId: xmlToCsv
+      tags: [Tools]
+      summary: XML to CSV
+      description: Extract repeating elements from an XML file into a CSV table. Automatically finds the first array of objects in the XML tree.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: XML file to convert
+      responses:
+        "200":
+          description: Extracted CSV file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/create-zip:
+    post:
+      operationId: createZip
+      tags: [Tools]
+      summary: Create ZIP
+      description: Bundle multiple files into a single ZIP archive. Duplicate filenames are automatically deduplicated.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more files to bundle (2-50 files, any type)
+      responses:
+        "200":
+          description: ZIP archive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/extract-zip:
+    post:
+      operationId: extractZip
+      tags: [Tools]
+      summary: Extract ZIP
+      description: Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly; multi-file archives return a flat ZIP.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ZIP archive to extract
+      responses:
+        "200":
+          description: Extracted file or repackaged ZIP archive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+  /api/v1/tools/background-replace:
+    post:
+      operationId: backgroundReplace
+      tags: [Tools]
+      summary: Background replace
+      description: |
+        AI-powered background replacement. Removes the subject's background
+        and composites it onto a solid color or gradient. Requires the
+        background-removal feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `backgroundType` (string, default "color") - One of: color, gradient
+                    - `color` (string, default "#ffffff") - Background hex color (when backgroundType is color)
+                    - `gradientColor1` (string, optional) - First gradient hex color
+                    - `gradientColor2` (string, optional) - Second gradient hex color
+                    - `gradientAngle` (integer 0-360, default 180) - Gradient angle in degrees
+                    - `feather` (integer 0-20, default 0) - Edge feathering radius
+                    - `format` (string, default "png") - One of: png, webp
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/blur-background:
+    post:
+      operationId: blurBackground
+      tags: [Tools]
+      summary: Blur background
+      description: |
+        AI-powered background blur. Removes the background, blurs the
+        original, and composites the sharp subject on top. Requires the
+        background-removal feature bundle to be installed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `intensity` (integer 1-100, default 50) - Blur intensity
+                    - `feather` (integer 0-20, default 0) - Edge feathering radius
+                    - `format` (string, default "png") - One of: png, webp
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/barcode-generate:
+    post:
+      operationId: generateBarcode
+      tags: [Tools]
+      summary: Barcode generator
+      description: Generate a barcode image from text. This tool accepts a JSON body, not multipart.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                  description: Text to encode in the barcode
+                type:
+                  type: string
+                  enum: [code128, ean13, upca, code39, itf14, datamatrix]
+                  default: code128
+                  description: Barcode format
+                scale:
+                  type: integer
+                  minimum: 1
+                  maximum: 8
+                  default: 3
+                  description: Image scale factor
+                includeText:
+                  type: boolean
+                  default: true
+                  description: Whether to render the text below the barcode
+      responses:
+        "200":
+          description: Generated barcode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/circle-crop:
+    post:
+      operationId: circleCrop
+      tags: [Tools]
+      summary: Circle crop
+      description: Crop an image to a centered circle with transparent corners, optional border, and adjustable zoom/offset.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `zoom` (number 1-5, default 1) - Zoom factor (>=1 crops tighter)
+                    - `offsetX` (number 0-1, default 0.5) - Horizontal center position
+                    - `offsetY` (number 0-1, default 0.5) - Vertical center position
+                    - `borderWidth` (integer 0-200, default 0) - Border width in pixels
+                    - `borderColor` (string, default "#ffffff") - Border hex color
+                    - `background` (string, default "transparent") - "transparent" or a hex color for corners
+                    - `outputSize` (integer 16-4096, optional) - Final square dimension in pixels
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/duotone:
+    post:
+      operationId: duotone
+      tags: [Tools]
+      summary: Duotone
+      description: Apply a two-color duotone effect with custom shadow and highlight colors.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `shadow` (string, default "#1e3a8a") - Shadow hex color
+                    - `highlight` (string, default "#fbbf24") - Highlight hex color
+                    - `intensity` (integer 0-100, default 100) - Effect intensity (0 = original, 100 = full duotone)
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/image-pad:
+    post:
+      operationId: imagePad
+      tags: [Tools]
+      summary: Image pad
+      description: Pad an image to a target aspect ratio with a solid color, transparent, or blurred background.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `target` (string, default "1:1") - One of: 16:9, 9:16, 1:1, 4:3, 3:4, custom
+                    - `ratioW` (integer 1-100, default 1) - Custom ratio width (when target is custom)
+                    - `ratioH` (integer 1-100, default 1) - Custom ratio height (when target is custom)
+                    - `background` (string, default "color") - One of: color, transparent, blur
+                    - `color` (string, default "#ffffff") - Background hex color (when background is color)
+                    - `padding` (integer 0-50, default 0) - Extra padding as percentage of canvas
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pixelate:
+    post:
+      operationId: pixelate
+      tags: [Tools]
+      summary: Pixelate
+      description: Apply a pixelation effect to the full image or a specific rectangular region.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `blockSize` (integer 2-128, default 12) - Pixel block size
+                    - `region` (object, optional) - Restrict pixelation to a rectangle:
+                      - `left` (integer >= 0) - Left offset in pixels
+                      - `top` (integer >= 0) - Top offset in pixels
+                      - `width` (integer >= 1) - Region width in pixels
+                      - `height` (integer >= 1) - Region height in pixels
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/vignette:
+    post:
+      operationId: vignette
+      tags: [Tools]
+      summary: Vignette
+      description: Add a vignette effect with adjustable strength, color, radius, softness, roundness, and center position.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `strength` (number 0.1-1, default 0.5) - Vignette opacity
+                    - `color` (string, default "#000000") - Vignette hex color
+                    - `radius` (integer 0-100, default 70) - Outer radius as percentage of half-diagonal
+                    - `softness` (integer 0-100, default 50) - Feather softness (higher = more gradual)
+                    - `roundness` (integer 0-100, default 100) - 100 = circle, 0 = ellipse matching image aspect ratio
+                    - `centerX` (integer 0-100, default 50) - Horizontal center position as percentage
+                    - `centerY` (integer 0-100, default 50) - Vertical center position as percentage
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/gif-webp:
+    post:
+      operationId: gifWebp
+      tags: [Tools]
+      summary: GIF/WebP converter
+      description: Convert animated GIF to WebP and vice versa, preserving all frames. Only accepts .gif and .webp inputs.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: GIF or WebP file to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `quality` (integer 1-100, default 80) - Output quality for WebP encoding
+                    - `lossless` (boolean, default false) - Use lossless WebP compression
+                    - `resizePercent` (integer 10-100, default 100) - Scale the output by percentage
+      responses:
+        "200":
+          description: Converted animation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/histogram:
+    post:
+      operationId: histogram
+      tags: [Tools]
+      summary: Histogram
+      description: |
+        Generate an RGB histogram chart from an image. Returns a PNG histogram
+        image plus per-channel statistics and raw 256-bin histogram data in
+        the response JSON.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to analyze
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `scale` (string, default "linear") - One of: linear, log
+      responses:
+        "200":
+          description: Histogram image and channel statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      bins:
+                        type: object
+                        description: Raw 256-bin histogram arrays per channel
+                        properties:
+                          r:
+                            type: array
+                            items:
+                              type: integer
+                          g:
+                            type: array
+                            items:
+                              type: integer
+                          b:
+                            type: array
+                            items:
+                              type: integer
+                          lum:
+                            type: array
+                            items:
+                              type: integer
+                      stats:
+                        type: object
+                        description: Per-channel statistics
+                        properties:
+                          r:
+                            type: object
+                            properties:
+                              mean:
+                                type: integer
+                              median:
+                                type: integer
+                              stdev:
+                                type: number
+                          g:
+                            type: object
+                            properties:
+                              mean:
+                                type: integer
+                              median:
+                                type: integer
+                              stdev:
+                                type: number
+                          b:
+                            type: object
+                            properties:
+                              mean:
+                                type: integer
+                              median:
+                                type: integer
+                              stdev:
+                                type: number
+                          lum:
+                            type: object
+                            properties:
+                              mean:
+                                type: integer
+                              median:
+                                type: integer
+                              stdev:
+                                type: number
+                      mean:
+                        type: object
+                        description: Backward-compatible mean values
+                        properties:
+                          r:
+                            type: integer
+                          g:
+                            type: integer
+                          b:
+                            type: integer
+                      max:
+                        type: object
+                        description: Backward-compatible max bin values
+                        properties:
+                          r:
+                            type: integer
+                          g:
+                            type: integer
+                          b:
+                            type: integer
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/lqip-placeholder:
+    post:
+      operationId: lqipPlaceholder
+      tags: [Tools]
+      summary: LQIP placeholder
+      description: |
+        Generate a tiny low-quality image placeholder. Returns a small image
+        file plus a base64 data URI, ready-to-use HTML img tag, and CSS
+        background snippet in the response JSON.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `width` (integer 4-64, default 16) - Target width in pixels
+                    - `blur` (number 0-20, default 2) - Blur radius (for blur strategy)
+                    - `strategy` (string, default "blur") - One of: blur, pixelate, solid
+                    - `format` (string, default "webp") - One of: webp, png, jpeg
+                    - `quality` (integer 1-100, default 50) - Output quality
+      responses:
+        "200":
+          description: LQIP placeholder image and data URI
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      dataUri:
+                        type: string
+                        description: Complete data URI (data:mime;base64,...)
+                      width:
+                        type: integer
+                        description: Placeholder width in pixels
+                      height:
+                        type: integer
+                        description: Placeholder height in pixels
+                      bytes:
+                        type: integer
+                        description: Placeholder file size in bytes
+                      strategy:
+                        type: string
+                        description: Strategy used (blur, pixelate, or solid)
+                      html:
+                        type: string
+                        description: Ready-to-use HTML img tag
+                      css:
+                        type: string
+                        description: Ready-to-use CSS background-image snippet
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/sprite-sheet:
+    post:
+      operationId: spriteSheet
+      tags: [Tools]
+      summary: Sprite sheet
+      description: |
+        Combine multiple images into a single sprite sheet grid. Accepts
+        2 to 64 images. Each image is resized to match the first image's
+        dimensions. Returns the sprite sheet image plus frame coordinate
+        metadata.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more image files to combine (max 64)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `columns` (integer 1-16, default 4) - Number of columns in the grid
+                    - `padding` (integer 0-64, default 0) - Padding between cells in pixels
+                    - `background` (string, default "#ffffff") - Background hex color
+                    - `format` (string, default "png") - One of: png, webp, jpeg
+                    - `quality` (integer 1-100, default 90) - Output quality
+      responses:
+        "200":
+          description: Sprite sheet image with frame metadata
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      frames:
+                        type: array
+                        description: Per-frame coordinates in the sprite sheet
+                        items:
+                          type: object
+                          properties:
+                            index:
+                              type: integer
+                            left:
+                              type: integer
+                            top:
+                              type: integer
+                            width:
+                              type: integer
+                            height:
+                              type: integer
+                      cols:
+                        type: integer
+                        description: Number of columns
+                      rows:
+                        type: integer
+                        description: Number of rows
+                      cellWidth:
+                        type: integer
+                        description: Cell width in pixels
+                      cellHeight:
+                        type: integer
+                        description: Cell height in pixels
+                      canvasWidth:
+                        type: integer
+                        description: Total canvas width in pixels
+                      canvasHeight:
+                        type: integer
+                        description: Total canvas height in pixels
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
