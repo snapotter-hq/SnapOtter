@@ -1,5 +1,5 @@
 import { Download, Redo, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
@@ -21,6 +21,97 @@ const OUTPUT_FORMATS = [
 ] as const;
 const LOSSY_FORMATS = ["jpg", "jpeg", "webp", "avif", "heic", "heif", "jxl"];
 
+const SSE_STALL_TIMEOUT_MS = 5 * 60_000;
+
+interface ProgressHandlers {
+  onProgress?: (percent: number) => void;
+  onComplete: (result: Record<string, unknown>) => void;
+  onFailed: (error: string) => void;
+  onStall: () => void;
+}
+
+/**
+ * Subscribe to async (202) job progress with the same resilience as the
+ * standard tool processor (PRs #203/#204). The original eraser opened a bare
+ * EventSource with no recovery: if SSE silently died (mobile backgrounding,
+ * flaky network, proxy buffering) the UI hung forever at the last percent
+ * (~25%) even though the backend job had finished and saved its result.
+ *
+ * This reconnects on tab refocus -- the progress endpoint replays the
+ * terminal frame from its 10-minute Redis cache, so a job that completed
+ * while SSE was dead still resolves -- and arms a stall timeout that fails
+ * gracefully instead of hanging. Returns a cleanup the caller must invoke on
+ * sync completion, error, or unmount.
+ */
+function subscribeJobProgress(clientJobId: string, handlers: ProgressHandlers): () => void {
+  let es: EventSource | null = null;
+  let stall: ReturnType<typeof setTimeout> | null = null;
+  let done = false;
+
+  const onVisible = () => {
+    if (done || document.visibilityState !== "visible") return;
+    if (es && es.readyState === EventSource.OPEN) return;
+    setTimeout(open, 500);
+  };
+
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    if (stall) clearTimeout(stall);
+    stall = null;
+    if (es) es.close();
+    es = null;
+    document.removeEventListener("visibilitychange", onVisible);
+  };
+
+  const resetStall = () => {
+    if (stall) clearTimeout(stall);
+    stall = setTimeout(() => {
+      cleanup();
+      handlers.onStall();
+    }, SSE_STALL_TIMEOUT_MS);
+  };
+
+  function open() {
+    if (done) return;
+    if (es && es.readyState === EventSource.OPEN) return;
+    if (es) es.close();
+    try {
+      es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    } catch {
+      return;
+    }
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type !== "single") return;
+        resetStall();
+        if (data.phase === "complete" && data.result) {
+          cleanup();
+          handlers.onComplete(data.result as Record<string, unknown>);
+          return;
+        }
+        if (data.phase === "failed") {
+          cleanup();
+          handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
+          return;
+        }
+        if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
+      } catch {
+        // Ignore malformed SSE frames
+      }
+    };
+    // A transient drop triggers the browser's built-in reconnect; on reconnect
+    // the backend replays the terminal frame, so a completed job still resolves.
+    es.onerror = () => {};
+  }
+
+  document.addEventListener("visibilitychange", onVisible);
+  open();
+  resetStall();
+  return cleanup;
+}
+
 interface EraseObjectSettingsProps {
   eraserRef: React.RefObject<EraserCanvasRef | null>;
   hasStrokes: boolean;
@@ -39,21 +130,22 @@ export function EraseObjectSettings({
   maskedFileCount,
 }: EraseObjectSettingsProps) {
   const { t } = useTranslation();
-  const {
-    files,
-    entries,
-    selectedIndex,
-    processing,
-    error,
-    setProcessing,
-    setError,
-    currentEntry,
-  } = useFileStore();
+  const { files, entries, processing, error, setProcessing, setError, currentEntry } =
+    useFileStore();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressCleanupRef = useRef<(() => void) | null>(null);
+
+  // Tear down any live progress subscription if the component unmounts mid-job.
+  useEffect(() => {
+    return () => {
+      progressCleanupRef.current?.();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    };
+  }, []);
 
   const [outputFormat, setOutputFormat] = useState("png");
   const [quality, setQuality] = useState(95);
@@ -66,40 +158,28 @@ export function EraseObjectSettings({
   ): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const clientJobId = generateId();
-      let asyncMode = false;
 
-      const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type !== "single") return;
-          if (data.phase === "complete" && data.result) {
-            es.close();
-            const r = data.result;
-            useFileStore.getState().updateEntry(entryIndex, {
-              processedUrl: r.downloadUrl,
-              processedPreviewUrl: r.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: r.originalSize,
-              processedSize: r.processedSize,
-            });
-            resolve();
-            return;
-          }
-          if (data.phase === "failed" && asyncMode) {
-            es.close();
-            reject(new Error(data.error || "Processing failed"));
-            return;
-          }
-          if (typeof data.percent === "number") {
-            onProgress(data.percent);
-          }
-        } catch {}
+      const applyResult = (r: Record<string, unknown>) => {
+        useFileStore.getState().updateEntry(entryIndex, {
+          processedUrl: r.downloadUrl as string,
+          processedPreviewUrl: (r.previewUrl as string) ?? null,
+          processedFilename: null,
+          status: "completed",
+          originalSize: r.originalSize as number,
+          processedSize: r.processedSize as number,
+        });
       };
-      es.onerror = () => {
-        if (!asyncMode) es.close();
-      };
+
+      const stopProgress = subscribeJobProgress(clientJobId, {
+        onProgress,
+        onComplete: (r) => {
+          applyResult(r);
+          resolve();
+        },
+        onFailed: (err) => reject(new Error(err)),
+        onStall: () =>
+          reject(new Error("Processing timed out. The result may have saved -- check your files.")),
+      });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
       const formData = new FormData();
@@ -112,22 +192,11 @@ export function EraseObjectSettings({
       const xhr = new XMLHttpRequest();
       xhr.timeout = 600_000;
       xhr.onload = () => {
-        if (xhr.status === 202) {
-          asyncMode = true;
-          return;
-        }
-        es.close();
+        if (xhr.status === 202) return;
+        stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const data = JSON.parse(xhr.responseText);
-            useFileStore.getState().updateEntry(entryIndex, {
-              processedUrl: data.downloadUrl,
-              processedPreviewUrl: data.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: data.originalSize,
-              processedSize: data.processedSize,
-            });
+            applyResult(JSON.parse(xhr.responseText));
             resolve();
           } catch {
             reject(new Error("Invalid response"));
@@ -150,11 +219,11 @@ export function EraseObjectSettings({
         }
       };
       xhr.onerror = () => {
-        es.close();
+        stopProgress();
         reject(new Error("Network error"));
       };
       xhr.ontimeout = () => {
-        es.close();
+        stopProgress();
         reject(new Error("Request timed out"));
       };
       xhr.open("POST", "/api/v1/tools/erase-object");
@@ -191,50 +260,49 @@ export function EraseObjectSettings({
     }, 1000);
 
     const clientJobId = generateId();
-    let asyncMode = false;
 
-    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type !== "single") return;
-
-        if (data.phase === "complete" && data.result) {
-          if (elapsedRef.current) clearInterval(elapsedRef.current);
-          es.close();
-          const r = data.result;
-          useFileStore.getState().updateEntry(capturedIndex, {
-            processedUrl: r.downloadUrl,
-            processedPreviewUrl: r.previewUrl ?? null,
-            processedFilename: null,
-            status: "completed",
-            originalSize: r.originalSize,
-            processedSize: r.processedSize,
-          });
-          setProcessing(false);
-          setProgressPhase("idle");
-          setProgressStage(null);
-          return;
-        }
-
-        if (data.phase === "failed" && asyncMode) {
-          if (elapsedRef.current) clearInterval(elapsedRef.current);
-          es.close();
-          setError(data.error || "Processing failed");
-          setProcessing(false);
-          setProgressPhase("idle");
-          return;
-        }
-
-        if (typeof data.percent === "number") {
-          setProgressPhase("processing");
-          setProgressPercent(15 + (data.percent / 100) * 85);
-        }
-      } catch {}
+    const applyResult = (r: Record<string, unknown>) => {
+      useFileStore.getState().updateEntry(capturedIndex, {
+        processedUrl: r.downloadUrl as string,
+        processedPreviewUrl: (r.previewUrl as string) ?? null,
+        processedFilename: null,
+        status: "completed",
+        originalSize: r.originalSize as number,
+        processedSize: r.processedSize as number,
+      });
     };
-    es.onerror = () => {
-      if (!asyncMode) es.close();
+
+    const finishUi = () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      setProcessing(false);
+      setProgressPhase("idle");
+      setProgressStage(null);
     };
+
+    const stopProgress = subscribeJobProgress(clientJobId, {
+      onProgress: (percent) => {
+        setProgressPhase("processing");
+        setProgressPercent(15 + (percent / 100) * 85);
+      },
+      onComplete: (r) => {
+        progressCleanupRef.current = null;
+        applyResult(r);
+        finishUi();
+      },
+      onFailed: (err) => {
+        progressCleanupRef.current = null;
+        setError(err);
+        finishUi();
+      },
+      onStall: () => {
+        progressCleanupRef.current = null;
+        setError(
+          "Processing timed out with no progress. The result may have saved to your files -- otherwise, try again.",
+        );
+        finishUi();
+      },
+    });
+    progressCleanupRef.current = stopProgress;
 
     const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
 
@@ -257,25 +325,15 @@ export function EraseObjectSettings({
       setProgressPercent(15);
     };
     xhr.onload = () => {
-      if (xhr.status === 202) {
-        asyncMode = true;
-        return;
-      }
+      // 202 = async: subscribeJobProgress drives completion via SSE.
+      if (xhr.status === 202) return;
 
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      es.close();
+      stopProgress();
+      progressCleanupRef.current = null;
 
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const data = JSON.parse(xhr.responseText);
-          useFileStore.getState().updateEntry(capturedIndex, {
-            processedUrl: data.downloadUrl,
-            processedPreviewUrl: data.previewUrl ?? null,
-            processedFilename: null,
-            status: "completed",
-            originalSize: data.originalSize,
-            processedSize: data.processedSize,
-          });
+          applyResult(JSON.parse(xhr.responseText));
         } catch {
           setError("Invalid response");
         }
@@ -293,23 +351,19 @@ export function EraseObjectSettings({
           setError(`Processing failed: ${xhr.status}`);
         }
       }
-      setProcessing(false);
-      setProgressPhase("idle");
-      setProgressStage(null);
+      finishUi();
     };
     xhr.onerror = () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      es.close();
+      stopProgress();
+      progressCleanupRef.current = null;
       setError("Network error");
-      setProcessing(false);
-      setProgressPhase("idle");
+      finishUi();
     };
     xhr.ontimeout = () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      es.close();
+      stopProgress();
+      progressCleanupRef.current = null;
       setError("Request timed out - the server may be overloaded. Try again.");
-      setProcessing(false);
-      setProgressPhase("idle");
+      finishUi();
     };
     xhr.open("POST", "/api/v1/tools/erase-object");
     formatHeaders().forEach((value, key) => {
