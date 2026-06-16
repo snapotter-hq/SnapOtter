@@ -15,6 +15,7 @@ import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { getAuthUser } from "../../plugins/auth.js";
 
 const settingsSchema = z.object({
   format: z
@@ -45,11 +46,13 @@ export function registerEraseObject(app: FastifyInstance) {
       });
     }
 
+    const userId = getAuthUser(request)?.id ?? null;
     const jobId = randomUUID();
     let imageBuffer: Buffer | null = null;
     let maskBuffer: Buffer | null = null;
     let filename = "image";
     let clientJobId: string | null = null;
+    let fileId: string | null = null;
     let format = "png";
     let quality = 95;
     let imageKey: string | null = null;
@@ -72,6 +75,8 @@ export function registerEraseObject(app: FastifyInstance) {
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
             clientJobId = raw;
           }
+        } else if (part.fieldname === "fileId") {
+          fileId = part.value as string;
         } else if (part.fieldname === "format") {
           format = (part.value as string) || "png";
         } else if (part.fieldname === "quality") {
@@ -157,12 +162,13 @@ export function registerEraseObject(app: FastifyInstance) {
     await enqueueToolJob({
       jobId,
       toolId,
-      userId: null,
+      userId,
       pool: "ai",
       inputRefs: [imageKey, maskKey],
       filename,
       settings: { format, quality },
       clientJobId: clientJobId ?? undefined,
+      fileId: fileId ?? undefined,
       kind: "ai-tool",
     });
 

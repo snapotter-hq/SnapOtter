@@ -18,6 +18,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { getAuthUser } from "../../plugins/auth.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -78,11 +79,13 @@ export function registerColorize(app: FastifyInstance) {
       });
     }
 
+    const userId = getAuthUser(request)?.id ?? null;
     const jobId = randomUUID();
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let fileId: string | null = null;
     let inputKey: string | null = null;
 
     try {
@@ -99,6 +102,8 @@ export function registerColorize(app: FastifyInstance) {
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
             clientJobId = raw;
           }
+        } else if (part.fieldname === "fileId") {
+          fileId = part.value as string;
         }
       }
     } catch (err) {
@@ -162,12 +167,13 @@ export function registerColorize(app: FastifyInstance) {
     await enqueueToolJob({
       jobId,
       toolId,
-      userId: null,
+      userId,
       pool: "ai",
       inputRefs: [inputKey],
       filename,
       settings,
       clientJobId: clientJobId ?? undefined,
+      fileId: fileId ?? undefined,
       kind: "ai-tool",
     });
 

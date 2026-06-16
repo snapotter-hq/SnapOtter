@@ -12,6 +12,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { type TranscriptSegment, toSrt, toVtt } from "../../lib/subtitle-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { getAuthUser } from "../../plugins/auth.js";
 
 const settingsSchema = z.object({
   language: z
@@ -102,10 +103,12 @@ export function registerAutoSubtitles(app: FastifyInstance) {
       });
     }
 
+    const userId = getAuthUser(request)?.id ?? null;
     const jobId = randomUUID();
     let filename = "video";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let fileId: string | null = null;
     let inputKey: string | null = null;
 
     try {
@@ -122,6 +125,8 @@ export function registerAutoSubtitles(app: FastifyInstance) {
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
             clientJobId = raw;
           }
+        } else if (part.fieldname === "fileId") {
+          fileId = part.value as string;
         }
       }
     } catch (err) {
@@ -155,12 +160,13 @@ export function registerAutoSubtitles(app: FastifyInstance) {
     await enqueueToolJob({
       jobId,
       toolId,
-      userId: null,
+      userId,
       pool: "ai",
       inputRefs: [inputKey],
       filename,
       settings,
       clientJobId: clientJobId ?? undefined,
+      fileId: fileId ?? undefined,
       kind: "ai-tool",
     });
 
