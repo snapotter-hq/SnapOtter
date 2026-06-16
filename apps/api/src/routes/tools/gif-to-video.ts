@@ -34,6 +34,10 @@ export function registerGifToVideo(app: FastifyInstance) {
             "0",
             "-crf",
             "32",
+            // GIFs decode to bgra/gbrap (alpha); libvpx-vp9 rejects those pixel
+            // formats, so flatten to yuv420p just like the mp4 branch does.
+            "-pix_fmt",
+            "yuv420p",
             "-an",
             out,
           ];
