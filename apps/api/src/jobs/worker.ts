@@ -330,9 +330,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           ? `Timed out after ${Math.round(timeoutMs / 1000)}s`
           : errorMessage;
 
-      // Keep the full error (incl. raw tool stderr) in server logs; clients only
-      // ever see friendlyError(finalError).
-      if (!isCanceled && !isTimeout) {
+      // Log genuine processing faults at error level (clients only ever see
+      // friendlyError(finalError)). Expected validation rejections -- bad user
+      // input, not a server fault -- would otherwise flood error logs, so skip
+      // them here; they still reach the OTel span recorded below.
+      const isValidationError = err instanceof Error && err.name === "InputValidationError";
+      if (!isCanceled && !isTimeout && !isValidationError) {
         logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
       }
 
