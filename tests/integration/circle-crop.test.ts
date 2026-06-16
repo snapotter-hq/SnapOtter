@@ -159,4 +159,49 @@ describe("Circle Crop", () => {
     expect(meta.format).toBe("png");
     expect(meta.channels).toBe(4);
   });
+
+  it("applies output size, border, and a solid background", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          zoom: 2,
+          offsetX: 0.5,
+          offsetY: 0.5,
+          borderWidth: 10,
+          borderColor: "#ff0000",
+          background: "#0000ff",
+          outputSize: 128,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/circle-crop",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    // outputSize forces a square 128x128 result
+    expect(meta.width).toBe(128);
+    expect(meta.height).toBe(128);
+
+    // A solid background makes the corners opaque (the default is transparent).
+    const { data, info } = await sharp(dlRes.rawPayload)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const corner = (1 * info.width + 1) * info.channels;
+    expect(data[corner + 3]).toBe(255);
+  });
 });
