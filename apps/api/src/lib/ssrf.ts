@@ -108,13 +108,26 @@ export const URL_FETCH_CONCURRENCY = 4;
  * (private) IP between our SSRF validation and the actual connection.
  */
 function createPinnedAgent(resolvedIp: string, protocol: string): http.Agent | https.Agent {
+  const family = resolvedIp.includes(":") ? 6 : 4;
+  // Node's lookup contract: when called with { all: true } the callback must
+  // return the address(es) as an array. Node 22 invokes the agent's custom
+  // lookup this way, so a single-arg callback passes `undefined` as the
+  // address and every fetch fails with "Invalid IP address: undefined".
+  // Honor both forms while still pinning to the SSRF-validated public IP.
   const pinnedLookup: (
     hostname: string,
-    options: object,
-    callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
-  ) => void = (_hostname, _options, callback) => {
-    const family = resolvedIp.includes(":") ? 6 : 4;
-    callback(null, resolvedIp, family);
+    options: { all?: boolean },
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | Array<{ address: string; family: number }>,
+      family?: number,
+    ) => void,
+  ) => void = (_hostname, options, callback) => {
+    if (options?.all) {
+      callback(null, [{ address: resolvedIp, family }]);
+    } else {
+      callback(null, resolvedIp, family);
+    }
   };
 
   if (protocol === "https:") {
