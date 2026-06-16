@@ -10,7 +10,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).href;
 
 /** pdf.js canvas viewer for the document display mode (spec 4.6). */
-export function DocumentView() {
+export function DocumentView({ inputOnly = false }: { inputOnly?: boolean } = {}) {
   const { t } = useTranslation();
   const entry = useFileStore((s) => s.entries[s.selectedIndex]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,8 +18,10 @@ export function DocumentView() {
   const [pageCount, setPageCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const hasProcessedUrl = !!entry?.processedUrl;
-  const src = entry?.processedUrl ?? entry?.blobUrl;
+  // inputOnly keeps the original input on screen for tools whose output is not
+  // a previewable PDF (e.g. ocr-pdf, whose output is a .txt transcript).
+  const hasProcessedUrl = !inputOnly && !!entry?.processedUrl;
+  const src = inputOnly ? entry?.blobUrl : (entry?.processedUrl ?? entry?.blobUrl);
 
   // F6: detect non-PDF input files (word, excel, html, markdown, etc.)
   const isPdfInput = entry?.file?.name?.toLowerCase().endsWith(".pdf") ?? false;

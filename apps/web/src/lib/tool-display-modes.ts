@@ -101,7 +101,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "transparency-fixer": "before-after",
   "content-aware-resize": "side-by-side",
   "ai-canvas-expand": "before-after",
-  "ocr-pdf": "no-comparison",
+  "ocr-pdf": "custom-results",
   "transcribe-audio": "no-comparison",
   "auto-subtitles": "media-player",
   "background-replace": "no-comparison",
