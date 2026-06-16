@@ -88,66 +88,76 @@ async function runTool(filename: string, content: Buffer, settings: Record<strin
   });
 }
 
+/**
+ * epub-convert is a "long" tool: it returns 202 + jobId and runs async. Poll the
+ * job row to completion, then download the output via the job download route.
+ * Mirrors the pattern the pdf-chain tests below already use.
+ */
+async function convertAndDownload(
+  filename: string,
+  content: Buffer,
+  settings: Record<string, unknown>,
+) {
+  const res = await runTool(filename, content, settings);
+  expect(res.statusCode).toBe(202);
+  const { jobId } = JSON.parse(res.body);
+  const { db, schema } = await import("../../apps/api/src/db/index.js");
+  const { eq } = await import("drizzle-orm");
+  let row: { status: string; outputRefs: unknown; error: { message: string } | null } | undefined;
+  for (let i = 0; i < 120; i++) {
+    [row] = await db
+      .select({
+        status: schema.jobs.status,
+        outputRefs: schema.jobs.outputRefs,
+        error: schema.jobs.error,
+      })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, jobId));
+    if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (row?.status !== "completed") {
+    throw new Error(
+      `epub-convert job ${jobId} ${row?.status}: ${row?.error?.message ?? "unknown"}`,
+    );
+  }
+  const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
+  const dl = await testApp.app.inject({
+    method: "GET",
+    url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+  });
+  expect(dl.statusCode).toBe(200);
+  return dl;
+}
+
 describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
   it("converts epub to HTML containing source text", async () => {
-    const res = await runTool("tiny.epub", EPUB, { format: "html" });
-    expect(res.statusCode).toBe(200);
-    const envelope = JSON.parse(res.body);
-    expect(envelope.downloadUrl).toBeDefined();
-
-    const dl = await testApp.app.inject({
-      method: "GET",
-      url: envelope.downloadUrl,
-    });
-    expect(dl.statusCode).toBe(200);
+    const dl = await convertAndDownload("tiny.epub", EPUB, { format: "html" });
     expect(dl.payload).toContain("SnapOtter test epub");
-  }, 30_000);
+  }, 90_000);
 
   it("converts epub to DOCX with PK magic", async () => {
-    const res = await runTool("tiny.epub", EPUB, { format: "docx" });
-    expect(res.statusCode).toBe(200);
-    const envelope = JSON.parse(res.body);
-    expect(envelope.downloadUrl).toBeDefined();
-
-    const dl = await testApp.app.inject({
-      method: "GET",
-      url: envelope.downloadUrl,
-    });
-    expect(dl.statusCode).toBe(200);
+    const dl = await convertAndDownload("tiny.epub", EPUB, { format: "docx" });
     expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
-  }, 30_000);
+  }, 90_000);
 
-  it("html output passes remote refs through without fetching (no SSRF)", async () => {
+  it("converts an epub with a remote ref without fetching it (no SSRF)", async () => {
     const remoteEpub = buildRemoteRefEpub();
-    const res = await runTool("remote.epub", remoteEpub, { format: "html" });
-    expect(res.statusCode).toBe(200);
-    const envelope = JSON.parse(res.body);
-    expect(envelope.downloadUrl).toBeDefined();
-
-    const dl = await testApp.app.inject({
-      method: "GET",
-      url: envelope.downloadUrl,
-    });
-    expect(dl.statusCode).toBe(200);
-    // The literal remote URL must still be present (pandoc did not inline it)
-    expect(dl.payload).toContain("http://127.0.0.1:9/x.png");
+    // The book references a remote image on a closed port (127.0.0.1:9). The
+    // conversion must complete from the book's own content and never fetch that
+    // ref (resource embedding is off in the route). pandoc strips the
+    // unmanifested remote <img> rather than inlining it; either way it must not
+    // be fetched and inlined as a data: URI.
+    const dl = await convertAndDownload("remote.epub", remoteEpub, { format: "html" });
     expect(dl.payload).toContain("RemoteRefBook");
-  }, 30_000);
+    expect(dl.payload).not.toContain("base64");
+  }, 90_000);
 
   it("converts epub to Markdown containing source text", async () => {
-    const res = await runTool("tiny.epub", EPUB, { format: "md" });
-    expect(res.statusCode).toBe(200);
-    const envelope = JSON.parse(res.body);
-    expect(envelope.downloadUrl).toBeDefined();
-
-    const dl = await testApp.app.inject({
-      method: "GET",
-      url: envelope.downloadUrl,
-    });
-    expect(dl.statusCode).toBe(200);
+    const dl = await convertAndDownload("tiny.epub", EPUB, { format: "md" });
     expect(dl.payload.length).toBeGreaterThan(0);
     expect(dl.payload).toContain("SnapOtter");
-  }, 30_000);
+  }, 90_000);
 });
 
 describe.skipIf(!pandocAvailable() || !pythonWith("weasyprint"))(
@@ -161,17 +171,17 @@ describe.skipIf(!pandocAvailable() || !pythonWith("weasyprint"))(
       const { jobId } = JSON.parse(res.body);
       const { db, schema } = await import("../../apps/api/src/db/index.js");
       const { eq } = await import("drizzle-orm");
-      let row: { status: string; errorMessage: string | null } | undefined;
+      let row: { status: string; error: { message: string } | null } | undefined;
       for (let i = 0; i < 120; i++) {
         [row] = await db
-          .select({ status: schema.jobs.status, errorMessage: schema.jobs.errorMessage })
+          .select({ status: schema.jobs.status, error: schema.jobs.error })
           .from(schema.jobs)
           .where(eq(schema.jobs.id, jobId));
         if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
         await new Promise((r) => setTimeout(r, 500));
       }
       expect(row?.status).toBe("failed");
-      expect(row?.errorMessage).toMatch(/remote resources are disabled/i);
+      expect(row?.error?.message).toMatch(/remote resources are disabled/i);
     }, 90_000);
 
     it("converts epub to PDF via the weasyprint chain", async () => {
