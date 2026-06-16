@@ -10,7 +10,11 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.test
     container_name: SnapOtter-test-unit
-    command: ["pnpm", "test:ci"]
+    # Functional gate: run the suite without --coverage. The lean test image
+    # skips binary-gated tools (AI models need on-demand bundles, etc.), so it
+    # cannot meet the host-calibrated coverage thresholds; coverage stays
+    # enforced on host CI where every tool is present.
+    command: ["pnpm", "vitest", "run", "--reporter=verbose"]
     environment:
       - NODE_ENV=test
       - AUTH_ENABLED=true
