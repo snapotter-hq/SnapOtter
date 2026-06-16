@@ -19,8 +19,18 @@ export function registerNormalizeAudio(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}_normalized${out.ext}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", ...out.encodeArgs, outPath];
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath, info) => {
+        // loudnorm runs internally at 192 kHz and emits at 192 kHz unless we
+        // resample back, so restore the source rate to avoid inflating the file.
+        const sr = info.audioSampleRate ?? 44100;
+        return [
+          "-i",
+          inPath,
+          "-af",
+          `loudnorm=I=-16:TP=-1.5:LRA=11,aresample=${sr}`,
+          ...out.encodeArgs,
+          outPath,
+        ];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },
