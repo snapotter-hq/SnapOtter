@@ -7,13 +7,13 @@ export interface ModalityInfo {
   color: string;
 }
 
-// Five modality values in code; "document" and "file" group as one
-// "Documents & Files" area in the UI (see spec 4.5).
+// Five modality values in code, surfaced as five UI sections:
+// Image, Video, Audio, PDF ("document" id) and Files ("file" id).
 export const MODALITIES: ModalityInfo[] = [
   { id: "image", name: "Image", icon: "Image", color: "#3B82F6" },
   { id: "video", name: "Video", icon: "Video", color: "#EF4444" },
   { id: "audio", name: "Audio", icon: "AudioLines", color: "#10B981" },
-  { id: "document", name: "Documents", icon: "FileText", color: "#8B5CF6" },
+  { id: "document", name: "PDF", icon: "FileText", color: "#8B5CF6" },
   { id: "file", name: "Files", icon: "FileArchive", color: "#F59E0B" },
 ];
 

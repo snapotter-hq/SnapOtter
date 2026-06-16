@@ -73,7 +73,7 @@ export const en = {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "Documents & Files",
+    documentsAndFiles: "PDF & Files",
   },
   tools: {
     resize: {
@@ -2451,8 +2451,8 @@ export const en = {
     noToolsMatch: "No tools match '{query}'",
     clearSearch: "Clear search",
     all: "All",
-    documents: "Documents",
-    data: "Data",
+    documents: "PDF",
+    data: "Files",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },

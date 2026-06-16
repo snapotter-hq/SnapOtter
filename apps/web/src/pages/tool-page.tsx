@@ -229,8 +229,7 @@ export function ToolPage() {
   const breadcrumb = useMemo(() => {
     if (!tool) return undefined;
     const modalityInfo = MODALITIES.find((m) => m.id === tool.modality);
-    const modalityDisplay =
-      tool.modality === "file" ? "Data" : (modalityInfo?.name ?? tool.modality);
+    const modalityDisplay = modalityInfo?.name ?? tool.modality;
     return {
       modality: modalityDisplay,
       toolName: getToolName(t, tool.id, tool.name),

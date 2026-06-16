@@ -39,8 +39,8 @@ const MODALITY_TAB_ORDER = [
   { modalityId: "image", tabKey: "image", label: "Image" },
   { modalityId: "video", tabKey: "video", label: "Video" },
   { modalityId: "audio", tabKey: "audio", label: "Audio" },
-  { modalityId: "document", tabKey: "document", label: "Documents" },
-  { modalityId: "file", tabKey: "data", label: "Data" },
+  { modalityId: "document", tabKey: "document", label: "PDF" },
+  { modalityId: "file", tabKey: "data", label: "Files" },
 ];
 
 export function HomePage() {
