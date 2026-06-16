@@ -4,8 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
-
-type Preset = "screen" | "ebook" | "printer";
+import { CompressControls } from "./compress-settings";
 
 export function CompressPdfSettings() {
   const { t } = useTranslation();
@@ -13,14 +12,16 @@ export function CompressPdfSettings() {
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("compress-pdf");
-
-  const [preset, setPreset] = useState<Preset>("ebook");
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
+  // Quality mode is always runnable; target-size needs a positive target.
+  const canProcess =
+    settings.mode === "quality" ||
+    (settings.mode === "targetSize" && Number(settings.targetSizeKb) > 0);
 
   const handleProcess = () => {
-    const settings = { preset };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -30,21 +31,8 @@ export function CompressPdfSettings() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <label htmlFor="cpdf-preset" className="text-xs text-muted-foreground">
-          {s.preset}
-        </label>
-        <select
-          id="cpdf-preset"
-          value={preset}
-          onChange={(e) => setPreset(e.target.value as Preset)}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        >
-          <option value="screen">{s.screen}</option>
-          <option value="ebook">{s.ebook}</option>
-          <option value="printer">{s.printer}</option>
-        </select>
-      </div>
+      {/* Same quality / target-size controls as the image compress tool */}
+      <CompressControls onChange={setSettings} />
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -62,7 +50,7 @@ export function CompressPdfSettings() {
           type="button"
           data-testid="compress-pdf-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || !canProcess || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}

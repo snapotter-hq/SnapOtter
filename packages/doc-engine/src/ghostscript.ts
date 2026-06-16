@@ -55,6 +55,41 @@ export async function gsCompressPdf(
   ]);
 }
 
+/**
+ * Image-downsampling compression at a target resolution (DPI). Lower DPI
+ * yields a smaller file; image resolution is the dominant size lever for
+ * PDFs. Uses /ebook as a base for sensible JPEG defaults, then overrides the
+ * image resolutions. The compress-pdf tool maps a quality slider (and a
+ * target-size binary search) onto this DPI.
+ */
+export async function gsCompressPdfQuality(
+  inputPath: string,
+  outPath: string,
+  dpi: number,
+): Promise<void> {
+  const res = Math.max(9, Math.min(600, Math.round(dpi)));
+  await runGs([
+    "-dSAFER",
+    "-dBATCH",
+    "-dNOPAUSE",
+    "-dQUIET",
+    "-sDEVICE=pdfwrite",
+    "-dCompatibilityLevel=1.6",
+    "-dPDFSETTINGS=/ebook",
+    "-dDownsampleColorImages=true",
+    "-dColorImageDownsampleType=/Average",
+    `-dColorImageResolution=${res}`,
+    "-dDownsampleGrayImages=true",
+    "-dGrayImageDownsampleType=/Average",
+    `-dGrayImageResolution=${res}`,
+    "-dDownsampleMonoImages=true",
+    "-dMonoImageDownsampleType=/Subsample",
+    `-dMonoImageResolution=${Math.min(600, res * 4)}`,
+    `-sOutputFile=${outPath}`,
+    inputPath,
+  ]);
+}
+
 /** Grayscale re-distillation via DeviceGray color conversion. */
 export async function gsGrayscalePdf(inputPath: string, outPath: string): Promise<void> {
   await runGs([
