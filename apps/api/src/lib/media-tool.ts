@@ -128,7 +128,11 @@ export async function runFfmpegWithProgress(
 export async function runMediaTool(
   ctx: ToolProcessCtxV2,
   outName: string,
-  argsFor: (inPath: string, outPath: string, info: { durationS: number | null }) => string[],
+  argsFor: (
+    inPath: string,
+    outPath: string,
+    info: { durationS: number | null; audioSampleRate: number | null },
+  ) => string[],
   opts: { timeoutMs?: number } = {},
 ): Promise<MediaRunResult> {
   const dir = join(ctx.scratchDir, "media");
@@ -139,7 +143,10 @@ export async function runMediaTool(
   const outPath = join(dir, outName);
   await runFfmpegWithProgress(
     ctx,
-    argsFor(inPath, outPath, { durationS: info.durationS }),
+    argsFor(inPath, outPath, {
+      durationS: info.durationS,
+      audioSampleRate: info.streams.find((s) => s.type === "audio")?.sampleRate ?? null,
+    }),
     info.durationS,
     opts,
   );
