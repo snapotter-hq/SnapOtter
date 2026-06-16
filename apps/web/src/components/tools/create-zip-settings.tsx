@@ -9,7 +9,7 @@ export function CreateZipSettings() {
   const { files } = useFileStore();
   const { processFiles, processing, error, progress } = useToolProcessor("create-zip");
 
-  const hasFile = files.length > 0;
+  const hasEnough = files.length >= 2;
 
   const handleProcess = () => {
     processFiles(files, {});
@@ -33,7 +33,7 @@ export function CreateZipSettings() {
           type="button"
           data-testid="create-zip-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasEnough || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {s.submit}

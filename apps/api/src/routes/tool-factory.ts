@@ -73,6 +73,16 @@ export interface ToolRouteConfig<T> {
    * inputRefs in arrival order.
    */
   maxInputs?: number;
+  /** Minimum number of file parts required (default 1). Fewer returns HTTP 400. */
+  minInputs?: number;
+  /**
+   * Optional pre-enqueue validation hook. Receives the prepared input buffers
+   * and validated settings; throw InputValidationError to reject with its
+   * statusCode (default 400) before any job is enqueued (vs a worker 422).
+   */
+  preValidate?: (ctx: {
+    inputs: { filename: string; buffer: Buffer }[];
+  }) => Promise<void> | void;
   /**
    * Per-position input kind overrides for mixed-input tools (e.g. video +
    * subtitle). Input i validates with kind inputKinds[Math.min(i, len-1)].
@@ -110,6 +120,10 @@ export interface ToolRouteConfig<T> {
 export interface AnyToolRouteConfig {
   toolId: string;
   maxInputs?: number;
+  minInputs?: number;
+  preValidate?: (ctx: {
+    inputs: { filename: string; buffer: Buffer }[];
+  }) => Promise<void> | void;
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
@@ -215,6 +229,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       const jobId = randomUUID();
       const maxInputs = config.maxInputs ?? 1;
+      const minInputs = config.minInputs ?? 1;
       let filename = "image";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
@@ -306,6 +321,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
+      // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
+      if (received.length < minInputs) {
+        return reply.status(400).send({
+          error: `This tool needs at least ${minInputs} files`,
+        });
+      }
+
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
         updateSingleFileProgress({
@@ -361,6 +384,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         // Prepare all files through the modality input handler
         const inputRefs: string[] = [];
+        const preparedInputs: { filename: string; buffer: Buffer }[] = [];
         for (let i = 0; i < received.length; i++) {
           const upload = received[i];
           let fileBuffer = await getObjectBuffer(upload.key);
@@ -404,6 +428,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           if (i === 0) {
             filename = fname;
           }
+
+          if (config.preValidate) {
+            preparedInputs.push({ filename: fname, buffer: fileBuffer });
+          }
         }
 
         reportProgress(15, "Preparing...");
@@ -428,6 +456,22 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         } catch {
           // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        // Optional tool-specific pre-enqueue validation (e.g. zip-entry safety).
+        // Throwing InputValidationError here returns its statusCode (400) before
+        // any job is enqueued, instead of a generic 422 from the worker.
+        if (config.preValidate) {
+          try {
+            await config.preValidate({ inputs: preparedInputs });
+          } catch (err) {
+            if (err instanceof InputValidationError) {
+              const body: Record<string, string> = { error: err.message };
+              if (err.details) body.details = err.details;
+              return reply.status(err.statusCode).send(body);
+            }
+            throw err;
+          }
         }
 
         // Guard: check if the tool's AI feature bundle is installed

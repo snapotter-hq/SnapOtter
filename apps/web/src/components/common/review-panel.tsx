@@ -134,24 +134,14 @@ export function ReviewPanel({
             <span className="text-muted-foreground">{t.toolPage.processed}</span>
             <span className="tabular-nums text-foreground">{formatFileSize(fileSize)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">{t.toolPage.saved}</span>
-            <span
-              className={`tabular-nums font-medium ${
-                sizeDelta > 0
-                  ? "text-emerald-600"
-                  : sizeDelta === 0
-                    ? "text-muted-foreground"
-                    : "text-foreground"
-              }`}
-            >
-              {sizeDelta === 0
-                ? t.toolPage.noChange
-                : sizeDelta > 0
-                  ? `-${sizeDelta}%`
-                  : `+${Math.abs(sizeDelta)}%`}
-            </span>
-          </div>
+          {/* Only claim "Saved" when the output is actually smaller; growth or
+              no-change is already visible from the Original/Processed sizes above. */}
+          {sizeDelta > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t.toolPage.saved}</span>
+              <span className="tabular-nums font-medium text-emerald-600">{sizeDelta}%</span>
+            </div>
+          )}
         </div>
       )}
 

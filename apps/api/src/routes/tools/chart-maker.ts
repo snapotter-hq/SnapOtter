@@ -223,6 +223,11 @@ export function registerChartMaker(app: FastifyInstance) {
           throw new Error("Column 2 must be numeric");
         }
       }
+      // Negative values render as invalid/degenerate SVG (negative bar heights,
+      // backward pie arcs that Sharp silently drops); reject with a clear message.
+      if (data.some((point) => point.value < 0)) {
+        throw new Error("Chart values must be zero or greater");
+      }
 
       let svg: string;
       switch (settings.kind) {

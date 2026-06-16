@@ -40,7 +40,7 @@ const MODALITY_TAB_ORDER = [
   { modalityId: "video", tabKey: "video", label: "Video" },
   { modalityId: "audio", tabKey: "audio", label: "Audio" },
   { modalityId: "document", tabKey: "document", label: "PDF" },
-  { modalityId: "file", tabKey: "data", label: "Files" },
+  { modalityId: "file", tabKey: "data", label: "Data" },
 ];
 
 const MODALITY_TABS = new Set<string>(["all", ...MODALITY_TAB_ORDER.map((m) => m.tabKey)]);

@@ -53,22 +53,22 @@ function readEntryBuffer(zipfile: ZipFile, entry: Entry): Promise<Buffer> {
   });
 }
 
-/** Deduplicate basenames: name-1.ext, name-2.ext on collision. */
+/** Deduplicate basenames: name-1.ext, name-2.ext until each output is unique. */
 function deduplicateNames(names: string[]): string[] {
-  const usedNames = new Map<string, number>();
+  const usedNames = new Set<string>();
   const result: string[] = [];
   for (const raw of names) {
     const name = basename(raw);
     const ext = extname(name);
     const base = name.slice(0, name.length - ext.length) || "file";
-    const key = name.toLowerCase();
-    const count = usedNames.get(key) ?? 0;
-    if (count === 0) {
-      result.push(name);
-    } else {
-      result.push(`${base}-${count}${ext}`);
+    let candidate = name;
+    let n = 1;
+    while (usedNames.has(candidate.toLowerCase())) {
+      candidate = `${base}-${n}${ext}`;
+      n++;
     }
-    usedNames.set(key, count + 1);
+    usedNames.add(candidate.toLowerCase());
+    result.push(candidate);
   }
   return result;
 }
@@ -77,6 +77,39 @@ export function registerExtractZip(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "extract-zip",
     settingsSchema,
+    // Reject path-traversal / absolute-path entries pre-enqueue with a clean 400.
+    // (yauzl also blocks them, but only as a generic worker 422; the processV2
+    // guards below remain as defense-in-depth for the pipeline/batch path.)
+    preValidate: async ({ inputs }) => {
+      const buf = inputs[0]?.buffer;
+      if (!buf) return;
+      let entries: Entry[];
+      try {
+        entries = await collectEntries(await openZipBuffer(buf));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/relative path|absolute path/i.test(msg)) {
+          throw new InputValidationError(
+            "This archive contains an unsafe entry path (path traversal or absolute) and was rejected",
+          );
+        }
+        throw new InputValidationError(
+          "Could not read the archive; it may be corrupt or not a valid .zip",
+        );
+      }
+      for (const e of entries) {
+        const name = e.fileName;
+        if (
+          name.startsWith("/") ||
+          name.startsWith("\\") ||
+          name.split(/[/\\]/).some((s) => s === "..")
+        ) {
+          throw new InputValidationError(
+            "This archive contains an unsafe entry path (path traversal or absolute) and was rejected",
+          );
+        }
+      }
+    },
     process: async () => {
       throw new Error("extract-zip is v2-only");
     },
@@ -99,6 +132,10 @@ export function registerExtractZip(app: FastifyInstance) {
         const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
         if (mode === 0o120000) continue;
         fileEntries.push(entry);
+      }
+
+      if (fileEntries.length === 0) {
+        throw new InputValidationError("No extractable files found in the archive");
       }
 
       // Guard: entry count

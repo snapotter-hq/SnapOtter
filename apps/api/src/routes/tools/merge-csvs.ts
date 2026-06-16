@@ -10,6 +10,7 @@ export function registerMergeCsvs(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "merge-csvs",
     maxInputs: 20,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("merge-csvs is v2-only");

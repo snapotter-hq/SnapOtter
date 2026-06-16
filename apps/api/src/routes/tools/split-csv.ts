@@ -36,8 +36,13 @@ export function registerSplitCsv(app: FastifyInstance) {
         throw new Error("CSV file is empty");
       }
 
-      const header = settings.keepHeader ? allRows[0] : null;
-      const dataRows = settings.keepHeader ? allRows.slice(1) : allRows;
+      // Always treat row 0 as the header; keepHeader only controls whether it is
+      // repeated into each part (false = parts contain data rows only).
+      const header = allRows[0];
+      const dataRows = allRows.slice(1);
+      if (dataRows.length === 0) {
+        throw new Error("No data rows to split");
+      }
 
       // Chunk data rows
       const chunks: string[][][] = [];
@@ -48,7 +53,7 @@ export function registerSplitCsv(app: FastifyInstance) {
       // Write part files to scratch
       const partPaths: string[] = [];
       for (let i = 0; i < chunks.length; i++) {
-        const rows = header ? [header, ...chunks[i]] : chunks[i];
+        const rows = settings.keepHeader ? [header, ...chunks[i]] : chunks[i];
         const csv = Papa.unparse(rows);
         const partPath = join(ctx.scratchDir, `part-${i + 1}.csv`);
         await writeFile(partPath, csv, "utf8");

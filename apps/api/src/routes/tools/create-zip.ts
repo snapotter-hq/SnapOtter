@@ -12,6 +12,7 @@ export function registerCreateZip(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "create-zip",
     maxInputs: 50,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("create-zip is v2-only");
@@ -21,20 +22,22 @@ export function registerCreateZip(app: FastifyInstance) {
         throw new InputValidationError("Zipping needs at least two files");
       }
 
-      // Deduplicate filenames: name-1.ext, name-2.ext on collision
-      const usedNames = new Map<string, number>();
+      // Deduplicate output names: append -1, -2, ... until unique. Checking the
+      // generated name (not just the input name) avoids collisions when an input
+      // is literally named like a generated one (e.g. file.txt, file.txt, file-1.txt).
+      const usedNames = new Set<string>();
       const entryNames: string[] = [];
       for (const input of ctx.inputs) {
         const ext = extname(input.filename);
         const base = input.filename.slice(0, input.filename.length - ext.length) || "file";
-        const key = input.filename.toLowerCase();
-        const count = usedNames.get(key) ?? 0;
-        if (count === 0) {
-          entryNames.push(input.filename);
-        } else {
-          entryNames.push(`${base}-${count}${ext}`);
+        let name = input.filename;
+        let n = 1;
+        while (usedNames.has(name.toLowerCase())) {
+          name = `${base}-${n}${ext}`;
+          n++;
         }
-        usedNames.set(key, count + 1);
+        usedNames.add(name.toLowerCase());
+        entryNames.push(name);
       }
 
       const zipPath = join(ctx.scratchDir, "archive.zip");

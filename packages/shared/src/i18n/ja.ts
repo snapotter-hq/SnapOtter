@@ -70,7 +70,7 @@ export const ja: TranslationKeys = {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "PDF & Files",
+    documentsAndFiles: "PDF & Data",
   },
   tools: {
     resize: {
@@ -2455,7 +2455,7 @@ export const ja: TranslationKeys = {
     clearSearch: "Clear search",
     all: "All",
     documents: "PDF",
-    data: "Files",
+    data: "Data",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },
