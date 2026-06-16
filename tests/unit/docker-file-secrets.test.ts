@@ -117,7 +117,9 @@ describe("Docker _FILE secret convention", () => {
     ).toThrow();
   });
 
-  it("errors when _FILE points to unreadable file", () => {
+  // root (the test container's uid) bypasses chmod-based permission checks, so
+  // the unreadable-file case cannot be exercised there; skip it.
+  it.skipIf(process.getuid?.() === 0)("errors when _FILE points to unreadable file", () => {
     const secretPath = writeSecret("unreadable.txt", "secret");
     chmodSync(secretPath, 0o000);
     try {

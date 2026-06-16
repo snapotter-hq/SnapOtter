@@ -39,6 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libimage-exiftool-perl \
     imagemagick \
     libraw-dev \
+    libjxl-tools \
+    ghostscript \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \
@@ -48,7 +50,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
 COPY --from=libheif-builder /opt/libheif/lib/ /usr/local/lib/
+# The base image ships an older system libheif (~1.15) that shadows our built
+# 1.21 without this, so heif-dec fails with an undefined-symbol error.
+ENV LD_LIBRARY_PATH=/usr/local/lib
 RUN ldconfig
+
+# Allow ImageMagick's Ghostscript delegate to read/write EPS (the default
+# Debian policy.xml blocks it).
+RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1) && \
+    if [ -n "$POLICY_FILE" ]; then \
+      sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read|write" pattern="EPS"/' "$POLICY_FILE"; \
+    fi
 
 WORKDIR /app
 

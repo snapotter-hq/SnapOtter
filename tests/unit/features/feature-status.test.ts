@@ -669,13 +669,18 @@ describe("ensureAiDirs", () => {
     errorSpy.mockRestore();
   });
 
-  it("is a no-op outside managed environments (no manifest, no /.dockerenv)", async () => {
-    process.env.FEATURE_MANIFEST_PATH = join(tempDir, "missing-manifest.json");
-    process.env.DATA_DIR = join(tempDir, "fresh-data");
-    vi.resetModules();
-    mod = await import("../../../apps/api/src/lib/feature-status.js");
+  // /.dockerenv always exists inside the test container, which makes
+  // isDockerEnvironment() true regardless of the manifest path; skip there.
+  it.skipIf(existsSync("/.dockerenv"))(
+    "is a no-op outside managed environments (no manifest, no /.dockerenv)",
+    async () => {
+      process.env.FEATURE_MANIFEST_PATH = join(tempDir, "missing-manifest.json");
+      process.env.DATA_DIR = join(tempDir, "fresh-data");
+      vi.resetModules();
+      mod = await import("../../../apps/api/src/lib/feature-status.js");
 
-    mod.ensureAiDirs();
-    expect(existsSync(join(tempDir, "fresh-data"))).toBe(false);
-  });
+      mod.ensureAiDirs();
+      expect(existsSync(join(tempDir, "fresh-data"))).toBe(false);
+    },
+  );
 });

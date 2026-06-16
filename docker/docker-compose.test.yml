@@ -25,6 +25,9 @@ services:
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
       - RATE_LIMIT_PER_MIN=1000
+      # Single constrained container; give sync-wait tools more headroom before
+      # the factory falls back to async 202 (default is 8s).
+      - SYNC_WAIT_MS=30000
     tmpfs:
       - /tmp/test-workspace
       - /tmp

@@ -203,7 +203,12 @@ def safe_extract(tar_path: str, staging_dir: str) -> None:
             # Block absolute paths and traversal
             if member.name.startswith("/") or ".." in member.name.split("/"):
                 raise RuntimeError(f"Blocked unsafe tar path: {member.name}")
-        tf.extractall(staging_dir, filter="data")
+        # The filter= kwarg was added in Python 3.12; the manual guards above
+        # already block unsafe entries on older interpreters (e.g. 3.11).
+        if sys.version_info >= (3, 12):
+            tf.extractall(staging_dir, filter="data")
+        else:
+            tf.extractall(staging_dir)
 
 
 # -- File move --
