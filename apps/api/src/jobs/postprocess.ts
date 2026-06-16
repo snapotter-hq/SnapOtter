@@ -7,7 +7,10 @@
  * keeps its own workspace-based preview write until Task 8 converts it.
  */
 import { randomUUID } from "node:crypto";
-import { extname } from "node:path";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
+import { probeMedia } from "@snapotter/media-engine";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
@@ -194,21 +197,42 @@ export async function autoSaveToLibrary(opts: AutoSaveOpts): Promise<string | un
       .from(schema.userFiles)
       .where(eq(schema.userFiles.id, opts.fileId));
     if (!parent) return undefined;
+    // Only version a file the requester owns; never create a version on
+    // another user's file via a known fileId.
+    if (parent.userId !== opts.userId) return undefined;
 
     const newVersion = parent.version + 1;
     const parentChain: string[] = parent.toolChain ?? [];
     const newToolChain = [...parentChain, opts.toolId];
     const storedName = await saveFile(opts.buffer, opts.outName);
 
-    // Get image dimensions from the processed output
+    // Output dimensions: sharp for images, ffprobe for video; null where N/A
+    // (audio/document have no pixel dimensions). Non-critical, best-effort.
     let width: number | null = null;
     let height: number | null = null;
-    try {
-      const meta = await sharp(opts.buffer).metadata();
-      width = meta.width ?? null;
-      height = meta.height ?? null;
-    } catch {
-      // dimensions are non-critical
+    if (opts.contentType.startsWith("image/")) {
+      try {
+        const meta = await sharp(opts.buffer).metadata();
+        width = meta.width ?? null;
+        height = meta.height ?? null;
+      } catch {
+        // dimensions are non-critical
+      }
+    } else if (opts.contentType.startsWith("video/")) {
+      const probeDir = join(tmpdir(), `autosave-probe-${randomUUID()}`);
+      try {
+        await mkdir(probeDir, { recursive: true });
+        const probePath = join(probeDir, "input");
+        await writeFile(probePath, opts.buffer);
+        const info = await probeMedia(probePath);
+        const v = info.streams.find((s) => s.type === "video");
+        width = v?.width ?? null;
+        height = v?.height ?? null;
+      } catch {
+        // dimensions are non-critical
+      } finally {
+        await rm(probeDir, { recursive: true, force: true }).catch(() => {});
+      }
     }
 
     const newId = randomUUID();
