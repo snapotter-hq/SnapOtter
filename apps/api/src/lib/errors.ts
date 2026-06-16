@@ -15,12 +15,15 @@ export function stripInternalPaths(message: string): string {
 }
 
 /**
- * Markers of a raw external-tool failure dump (ffmpeg/ffprobe/libvpx/x264/
- * LibreOffice/ghostscript/qpdf/python traceback). These messages are meant for
- * server logs, never for end users.
+ * Unambiguous markers of a raw external-tool failure dump: the
+ * `ffmpeg/ffprobe exited N:` prefix that media-engine throws, a Python
+ * traceback, or a crash. These are matched precisely (not by content
+ * keywords like "pixel format" or "conversion failed", which can appear in
+ * legitimate validation messages) -- longer or multi-line raw dumps are
+ * caught separately by the length/line-count check below.
  */
 const RAW_TOOL_FAILURE =
-  /ffmpeg exited|ffprobe|conversion failed|libvpx|x26[45] \[|stream mapping|pixel format|could not open encoder|segmentation fault|core dump|traceback \(most recent|gs: |libreoffice|qpdf:/i;
+  /ff(?:mpeg|probe) exited \d|traceback \(most recent call|segmentation fault|core dumped/i;
 
 /**
  * Produce a user-safe error detail. Intentional validation messages (short,
