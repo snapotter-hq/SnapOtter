@@ -136,6 +136,9 @@ curl -X POST http://localhost:1349/api/v1/tools/<toolId>/batch \
 | `sharpening` | Sharpening | `method` (adaptive/unsharp-mask/high-pass), `sigma`, `m1`, `m2`, `x1`, `y2`, `y3`, `amount`, `radius`, `threshold`, `strength`, `kernelSize` (3/5), `denoise` (off/light/medium/strong) |
 | `replace-color` | Replace Color | `sourceColor`, `targetColor` (replacement), `makeTransparent`, `tolerance` |
 | `color-blindness` | Color Blindness Simulation | `simulationType` (protanopia/deuteranopia/tritanopia/protanomaly/deuteranomaly/tritanomaly/achromatopsia/blueConeMonochromacy, default "deuteranomaly") |
+| `duotone` | Duotone | `shadow` (hex), `highlight` (hex), `intensity` (0-100) |
+| `pixelate` | Pixelate | `blockSize` (2-128), `region` ({left, top, width, height} for partial pixelation) |
+| `vignette` | Vignette | `strength` (0.1-1), `color` (hex), `radius`, `softness`, `roundness`, `centerX`, `centerY` |
 
 ### AI Tools
 
@@ -158,6 +161,8 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `passport-photo` | Passport Photo | MediaPipe landmarks | `country` (37 countries), `printLayout` (4x6/A4/none), `backgroundColor` |
 | `content-aware-resize` | Content-Aware Resize | Seam carving (caire) | `width`, `height`, `protectFaces`, `blurRadius`, `sobelThreshold`, `square` |
 | `transparency-fixer` | PNG Transparency Fixer | BiRefNet HR-matting | `defringe` (0-100), `outputFormat` (png/webp) |
+| `background-replace` | Background Replace | rembg (BiRefNet) | `backgroundType` (color/gradient), `color` (hex), `gradientColor1`, `gradientColor2`, `gradientAngle`, `feather` (0-20), `format` (png/webp) |
+| `blur-background` | Blur Background | rembg (BiRefNet) | `intensity` (1-100), `feather` (0-20), `format` (png/webp) |
 
 ### Watermark & Overlay
 
@@ -181,6 +186,9 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `barcode-read` | Barcode Reader | - (auto-detects QR, EAN, Code128, DataMatrix, etc.) |
 | `image-to-base64` | Image to Base64 | `format` (data-uri/plain), `mimeType` |
 | `html-to-image` | HTML to Image | `url`, `format` (png/jpg/webp), `quality`, `fullPage`, `devicePreset` (desktop/tablet/mobile/custom), `viewportWidth`, `viewportHeight` |
+| `histogram` | Histogram | `scale` (linear/log) - returns RGB histogram chart + per-channel stats |
+| `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
+| `barcode-generate` | Barcode Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON body, no file upload. |
 
 ### Layout & Composition
 
@@ -191,6 +199,9 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `split` | Image Splitting | `mode` (grid/rows/cols), `rows`, `cols`, `tileWidth`, `tileHeight` |
 | `border` | Border & Frame | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Beautify Screenshot | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
+| `circle-crop` | Circle Crop | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `image-pad` | Image Pad | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
+| `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 images) |
 
 ### Format & Conversion
 
@@ -200,6 +211,119 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `vectorize` | Image to SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
 | `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), action-specific params |
 | `pdf-to-image` | PDF to Image | `pages` (all/range), `format`, `dpi`, `quality` |
+| `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
+
+### Video Tools
+
+| Tool ID | Name | Key settings |
+|---------|------|-------------|
+| `convert-video` | Convert Video | `format` (mp4/mov/webm), `quality` (high/balanced/small) |
+| `compress-video` | Compress Video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
+| `trim-video` | Trim Video | `startS`, `endS`, `precise` (bool, frame-accurate cut) |
+| `mute-video` | Mute Video | - |
+| `video-to-gif` | Video to GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
+| `resize-video` | Resize Video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
+| `crop-video` | Crop Video | `width`, `height`, `x`, `y` |
+| `rotate-video` | Rotate Video | `transform` (cw90/ccw90/180/hflip/vflip) |
+| `change-fps` | Change FPS | `fps` (1-120) |
+| `video-color` | Video Color | `brightness`, `contrast`, `saturation`, `gamma` |
+| `video-speed` | Video Speed | `factor` (0.25-4), `keepPitch` (bool) |
+| `reverse-video` | Reverse Video | - (max 5 minutes) |
+| `video-loudnorm` | Normalize Audio | - (EBU R128) |
+| `aspect-pad` | Aspect Pad | `target` (16:9/9:16/1:1/4:3/3:4), `color` (hex) |
+| `blur-pad` | Blur Pad | `target` (16:9/9:16/1:1/4:3/3:4), `blur` (2-50) |
+| `watermark-video` | Watermark Video | `text`, `position`, `fontSize`, `opacity`, `color` |
+| `stabilize-video` | Stabilize Video | `smoothing` (5-60, in frames) |
+| `gif-to-video` | GIF to Video | `format` (mp4/webm) |
+| `video-to-webp` | Video to WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-frames` | Video to Frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
+| `merge-videos` | Merge Videos | - (multi-file, normalized to first video's resolution) |
+| `replace-audio` | Replace Audio | - (video + audio file, two files) |
+| `burn-subtitles` | Burn Subtitles | `fontSize` (8-72) - video + subtitle file |
+| `embed-subtitles` | Embed Subtitles | `language` (ISO 639-2/B code) - video + subtitle file |
+| `extract-subtitles` | Extract Subtitles | - (outputs SRT) |
+| `images-to-video` | Images to Video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-file |
+| `video-metadata` | Clean Video Metadata | - |
+| `auto-subtitles` | Auto Subtitles (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
+| `extract-audio` | Extract Audio | `format` (mp3/wav/m4a) |
+
+### Audio Tools
+
+| Tool ID | Name | Key settings |
+|---------|------|-------------|
+| `convert-audio` | Convert Audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
+| `trim-audio` | Trim Audio | `startS`, `endS` |
+| `volume-adjust` | Volume Adjust | `gainDb` (-30 to 30) |
+| `normalize-audio` | Normalize Audio | - (EBU R128, -16 LUFS) |
+| `fade-audio` | Fade Audio | `fadeInS` (0-30), `fadeOutS` (0-30) |
+| `reverse-audio` | Reverse Audio | - |
+| `audio-speed` | Audio Speed | `factor` (0.25-4) |
+| `pitch-shift` | Pitch Shift | `semitones` (-12 to 12) |
+| `audio-channels` | Audio Channels | `mode` (stereo-to-mono/mono-to-stereo/swap) |
+| `silence-removal` | Silence Removal | `thresholdDb` (-80 to -20), `minSilenceS` (0.1-5) |
+| `noise-reduction` | Noise Reduction | `strength` (light/medium/strong) |
+| `merge-audio` | Merge Audio | `format` (mp3/wav/flac/m4a) - multi-file |
+| `split-audio` | Split Audio | `mode` (time/parts/silence), `segmentS`, `parts`, `thresholdDb`, `minSilenceS` |
+| `ringtone-maker` | Ringtone Maker | `startS`, `durationS` (1-30) |
+| `waveform-image` | Waveform Image | `width`, `height`, `color` (hex) |
+| `audio-metadata` | Audio Metadata | `strip` (bool), `title`, `artist`, `album` |
+| `transcribe-audio` | Transcribe Audio (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `outputFormat` (txt/srt/vtt) |
+
+### Document Tools
+
+| Tool ID | Name | Key settings |
+|---------|------|-------------|
+| `merge-pdf` | Merge PDFs | - (multi-file, up to 20 PDFs) |
+| `split-pdf` | Split PDF | `mode` (range/every), `range`, `everyN` (1-500) |
+| `compress-pdf` | Compress PDF | `mode` (quality/targetSize), `quality` (1-100), `targetSizeKb` |
+| `rotate-pdf` | Rotate PDF | `angle` (90/180/270), `range` (page range) |
+| `extract-pages` | Extract Pages | `range` (qpdf syntax, e.g. "1-5,8,10-z") |
+| `remove-pages` | Remove Pages | `pages` (qpdf range to remove) |
+| `organize-pdf` | Organize PDF | `order` (qpdf page order, e.g. "3,1,2,5-z") |
+| `protect-pdf` | Protect PDF | `userPassword`, `ownerPassword` (AES-256) |
+| `unlock-pdf` | Unlock PDF | `password` |
+| `repair-pdf` | Repair PDF | - |
+| `linearize-pdf` | Web-Optimize PDF | - (linearize for fast web viewing) |
+| `grayscale-pdf` | Grayscale PDF | - |
+| `pdfa-convert` | PDF/A Convert | - (archival PDF/A-2) |
+| `crop-pdf` | Crop PDF | `margin` (0-2000 points) |
+| `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
+| `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |
+| `watermark-pdf` | Watermark PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
+| `pdf-page-numbers` | PDF Page Numbers | `position` (bl/bc/br/tl/tc/tr), `fontSize` |
+| `flatten-pdf` | Flatten PDF | - (bakes forms and annotations) |
+| `redact-pdf` | Redact PDF | `terms` (string[]), `caseSensitive` (bool) |
+| `pdf-to-text` | PDF to Text | - |
+| `pdf-to-word` | PDF to Word | - |
+| `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords` |
+| `convert-document` | Convert Document | `format` (docx/odt/rtf/txt) |
+| `convert-presentation` | Convert Presentation | `format` (pptx/odp) |
+| `convert-spreadsheet` | Convert Spreadsheet | `format` (xlsx/ods/csv) |
+| `excel-to-pdf` | Excel to PDF | - |
+| `word-to-pdf` | Word to PDF | - |
+| `powerpoint-to-pdf` | PowerPoint to PDF | - |
+| `html-to-pdf` | HTML to PDF | - (remote resources disabled) |
+| `markdown-to-docx` | Markdown to Word | - |
+| `markdown-to-html` | Markdown to HTML | - |
+| `markdown-to-pdf` | Markdown to PDF | - (remote resources disabled) |
+| `epub-convert` | Convert EPUB | `format` (pdf/docx/html/md) |
+| `to-epub` | Convert to EPUB | - (accepts .docx, .md, .html, .txt) |
+| `ocr-pdf` | PDF OCR (AI) | `quality` (fast/balanced/best), `language` (auto/en/de/fr/es/zh/ja/ko), `pages` |
+
+### Data Tools
+
+| Tool ID | Name | Key settings |
+|---------|------|-------------|
+| `chart-maker` | Chart Maker | `kind` (bar/line/pie), `title`, `width`, `height` |
+| `csv-excel` | CSV to Excel | `sheet` (worksheet number for XLSX input) - bidirectional |
+| `csv-json` | CSV to JSON | `pretty` (bool) - bidirectional |
+| `json-xml` | JSON to XML | `pretty` (bool) - bidirectional |
+| `split-csv` | Split CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
+| `merge-csvs` | Merge CSVs | - (multi-file, matching columns) |
+| `yaml-json` | YAML / JSON | - (bidirectional) |
+| `xml-to-csv` | XML to CSV | - (auto-finds repeating elements) |
+| `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
+| `extract-zip` | Extract ZIP | - (bomb-protected) |
 
 ### HTML to Image
 

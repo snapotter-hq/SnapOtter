@@ -214,6 +214,15 @@ export default defineConfig({
               { text: "PNG Transparency Fixer", link: "/tools/transparency-fixer" },
             ],
           },
+          {
+            text: "Video, Audio, Document & Data",
+            items: [
+              { text: "Video tools", link: "/api/rest#video-tools" },
+              { text: "Audio tools", link: "/api/rest#audio-tools" },
+              { text: "Document tools", link: "/api/rest#document-tools" },
+              { text: "Data tools", link: "/api/rest#data-tools" },
+            ],
+          },
         ],
       },
       {
