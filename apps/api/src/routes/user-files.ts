@@ -524,6 +524,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
         // Image thumbnail (existing path)
         const validation = await validateImageBuffer(rawBuffer, file.originalName);
+        if (!validation.valid) {
+          // Audio, data, and non-PDF document files have no raster thumbnail.
+          // Return 422 (not 204) so the client's <img> onError falls back to a
+          // modality icon instead of attempting a doomed Sharp decode below.
+          return reply.status(422).send({ error: "No thumbnail available for this file type" });
+        }
         let decoded: Buffer<ArrayBuffer> = Buffer.from(rawBuffer);
         if (validation.valid && validation.format === "heif") {
           decoded = Buffer.from(await decodeHeic(rawBuffer));

@@ -158,7 +158,7 @@ export async function safeFetch(url: string, signal?: AbortSignal): Promise<Resp
       signal,
       redirect: "manual",
       headers: {
-        "User-Agent": "SnapOtter/1.0 (image-fetch)",
+        "User-Agent": "SnapOtter/2.0 (file-fetch)",
         Host: parsed.host,
       },
     };
@@ -176,7 +176,7 @@ export async function safeFetch(url: string, signal?: AbortSignal): Promise<Resp
             agent,
             signal: signal ?? undefined,
             headers: {
-              "User-Agent": "SnapOtter/1.0 (image-fetch)",
+              "User-Agent": "SnapOtter/2.0 (file-fetch)",
             },
             method: "GET",
           },

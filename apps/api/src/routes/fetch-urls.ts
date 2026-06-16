@@ -110,7 +110,7 @@ function filenameFromUrl(url: string): string {
   } catch {
     // ignore parse errors
   }
-  return `image-${randomUUID().slice(0, 8)}`;
+  return `file-${randomUUID().slice(0, 8)}`;
 }
 
 /**

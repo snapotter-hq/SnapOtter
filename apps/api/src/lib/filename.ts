@@ -1,6 +1,10 @@
 import { basename } from "node:path";
 
-const SAFE_IMAGE_EXTENSIONS = new Set([
+// Recognised, safe file extensions across all five modalities (image, video,
+// audio, document, data). Used to truncate double-extension attacks after the
+// first known-good extension, e.g. "report.csv.php" becomes "report.csv".
+const SAFE_EXTENSIONS = new Set([
+  // Image
   ".jpg",
   ".jpeg",
   ".png",
@@ -11,7 +15,65 @@ const SAFE_IMAGE_EXTENSIONS = new Set([
   ".tif",
   ".avif",
   ".svg",
+  ".heic",
+  ".heif",
+  ".jxl",
+  ".ico",
+  ".jp2",
+  ".qoi",
+  ".psd",
+  ".dng",
+  // Video
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".mkv",
+  ".avi",
+  ".m4v",
+  ".mpg",
+  ".mpeg",
+  ".wmv",
+  ".flv",
+  ".ogv",
+  // Audio
+  ".mp3",
+  ".wav",
+  ".flac",
+  ".ogg",
+  ".oga",
+  ".aac",
+  ".m4a",
+  ".opus",
+  ".wma",
+  ".aiff",
+  ".aif",
+  // Document
   ".pdf",
+  ".doc",
+  ".docx",
+  ".odt",
+  ".rtf",
+  ".txt",
+  ".md",
+  ".markdown",
+  ".html",
+  ".htm",
+  ".epub",
+  ".ppt",
+  ".pptx",
+  ".odp",
+  ".xls",
+  ".xlsx",
+  ".ods",
+  // Data
+  ".csv",
+  ".tsv",
+  ".json",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".zip",
+  ".srt",
 ]);
 
 /**
@@ -19,8 +81,8 @@ const SAFE_IMAGE_EXTENSIONS = new Set([
  *
  * 1. Strips directory separators (basename only).
  * 2. Removes ".." sequences and null bytes.
- * 3. Truncates after the first recognised image extension so that
- *    "photo.png.php" becomes "photo.png".
+ * 3. Truncates after the first recognised file extension so that
+ *    "report.csv.php" becomes "report.csv".
  */
 export function sanitizeFilename(raw: string): string {
   let name = basename(raw);
@@ -30,14 +92,14 @@ export function sanitizeFilename(raw: string): string {
     name = "upload";
   }
 
-  // Guard against double-extension attacks (e.g. "image.png.php").
-  // Walk the dot-separated parts and truncate after the first safe image extension.
+  // Guard against double-extension attacks (e.g. "report.csv.php").
+  // Walk the dot-separated parts and truncate after the first safe extension.
   const dotIndex = name.indexOf(".");
   if (dotIndex !== -1) {
     const parts = name.split(".");
     for (let i = 1; i < parts.length; i++) {
       const ext = `.${parts[i].toLowerCase()}`;
-      if (SAFE_IMAGE_EXTENSIONS.has(ext)) {
+      if (SAFE_EXTENSIONS.has(ext)) {
         // Keep everything up to and including this extension, drop the rest
         name = parts.slice(0, i + 1).join(".");
         break;

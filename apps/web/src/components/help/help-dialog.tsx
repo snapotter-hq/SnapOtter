@@ -80,8 +80,8 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
               <h3 className="text-sm font-semibold">{t.help.gettingStarted.heading}</h3>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Select a tool from the sidebar or search for one with <Kbd keys="mod+k" />. Upload an
-              image by dragging it onto the page or clicking the upload area. Adjust settings and
+              Select a tool from the sidebar or search for one with <Kbd keys="mod+k" />. Upload a
+              file by dragging it onto the page or clicking the upload area. Adjust settings and
               download your result.
             </p>
           </section>

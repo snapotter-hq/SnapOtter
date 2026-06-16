@@ -7,7 +7,7 @@ import { useFileStore } from "@/stores/file-store";
 export function BulkRenameSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
-  const [pattern, setPattern] = useState("image-{{index}}");
+  const [pattern, setPattern] = useState("file-{{index}}");
   const [startIndex, setStartIndex] = useState(1);
   const [downloadReady, setDownloadReady] = useState(false);
 

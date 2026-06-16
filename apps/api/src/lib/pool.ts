@@ -6,7 +6,9 @@ import type { Pool } from "../jobs/types.js";
 export function resolveToolPool(toolId: string): Pool {
   if (hasAiJobHandler(toolId) || TOOL_BUNDLE_MAP[toolId]) return "ai";
   const tool = TOOLS.find((t) => t.id === toolId);
-  return tool ? MODALITY_POOL[tool.modality] : "image";
+  // Unknown tools fall back to the general-purpose "system" pool rather than
+  // assuming the image pool (a legacy image-only default).
+  return tool ? MODALITY_POOL[tool.modality] : "system";
 }
 
 export function shouldSkipSyncWindow(executionHint: "fast" | "long" | undefined): boolean {

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronUp,
   Download,
+  FileImage,
   FolderOpen,
   Layers,
   Play,
@@ -15,7 +16,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { Dropzone } from "@/components/common/dropzone";
@@ -36,6 +37,13 @@ import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
+
+const MediaPlayerView = lazy(() =>
+  import("@/components/tools/media-player-view").then((m) => ({ default: m.MediaPlayerView })),
+);
+const WaveformPlayer = lazy(() =>
+  import("@/components/common/waveform-player").then((m) => ({ default: m.WaveformPlayer })),
+);
 
 export function AutomatePage() {
   const { t } = useTranslation();
@@ -167,7 +175,6 @@ export function AutomatePage() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "image/*,.avif,.heic,.heif,.hif";
     input.onchange = (e) => {
       const picked = Array.from((e.target as HTMLInputElement).files || []);
       if (picked.length > 0) addFiles(picked);
@@ -361,6 +368,102 @@ export function AutomatePage() {
     [addStep, isMobile],
   );
 
+  /**
+   * Render modality-aware preview for the pipeline result or source file.
+   * Mirrors the previewKind switching in tool-page.tsx: images get
+   * BeforeAfterSlider / ImageViewer, video gets MediaPlayerView, audio
+   * gets WaveformPlayer, and document/data get a static info card.
+   */
+  function renderPipelinePreview(mode: "result" | "original") {
+    const kind = currentEntry?.previewKind ?? "image";
+
+    if (mode === "result") {
+      if (kind === "image") {
+        return (
+          <BeforeAfterSlider
+            beforeSrc={originalBlobUrl!}
+            afterSrc={processedUrl as string}
+            beforeSize={originalSize ?? undefined}
+            afterSize={processedSize ?? undefined}
+          />
+        );
+      }
+      if (kind === "video") {
+        return (
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+            <MediaPlayerView />
+          </Suspense>
+        );
+      }
+      if (kind === "audio") {
+        return (
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+            <WaveformPlayer src={processedUrl as string} />
+          </Suspense>
+        );
+      }
+      // document / data: success card with filename + size
+      const fname = currentEntry?.processedFilename ?? selectedFileName ?? files[0]?.name ?? "file";
+      const fsize = processedSize ?? 0;
+      const ext = fname.split(".").pop()?.toUpperCase() ?? "";
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-6 max-w-xs">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-3">
+              <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="font-medium text-foreground mb-1">{fname}</p>
+            <p className="text-xs text-muted-foreground">
+              {ext} &middot; {formatFileSize(fsize)}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // mode === "original"
+    if (kind === "image") {
+      return (
+        <ImageViewer
+          src={originalBlobUrl!}
+          filename={selectedFileName ?? files[0].name}
+          fileSize={selectedFileSize ?? files[0].size}
+        />
+      );
+    }
+    if (kind === "video") {
+      return (
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <MediaPlayerView />
+        </Suspense>
+      );
+    }
+    if (kind === "audio") {
+      return (
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <WaveformPlayer src={originalBlobUrl!} />
+        </Suspense>
+      );
+    }
+    // document / data: placeholder card
+    const fname = selectedFileName ?? files[0]?.name ?? "file";
+    const fsize = selectedFileSize ?? files[0]?.size ?? 0;
+    const ext = fname.split(".").pop()?.toUpperCase() ?? "";
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center p-6 max-w-xs">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+            <FileImage className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-medium text-foreground mb-1">{fname}</p>
+          <p className="text-xs text-muted-foreground">
+            {ext} &middot; {formatFileSize(fsize)}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Mobile Layout                                                      */
   /* ------------------------------------------------------------------ */
@@ -383,7 +486,12 @@ export function AutomatePage() {
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {!hasFile && (
               <div className="mb-4 space-y-2">
-                <Dropzone onFiles={handleFiles} accept="image/*" multiple currentFiles={files} />
+                <Dropzone
+                  onFiles={handleFiles}
+                  multiple
+                  currentFiles={files}
+                  fileFilter={() => true}
+                />
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
@@ -425,18 +533,11 @@ export function AutomatePage() {
               </div>
             )}
 
-            {/* Mobile image preview / result */}
+            {/* Mobile preview / result */}
             {hasFile && hasProcessed && originalBlobUrl && (
               <div className="mb-3 rounded-lg border border-border overflow-hidden">
-                <div className="relative h-48">
-                  <BeforeAfterSlider
-                    beforeSrc={originalBlobUrl}
-                    afterSrc={processedUrl as string}
-                    beforeSize={originalSize ?? undefined}
-                    afterSize={processedSize ?? undefined}
-                  />
-                </div>
-                {processedSize != null && (
+                <div className="relative h-48">{renderPipelinePreview("result")}</div>
+                {processedSize != null && currentEntry?.previewKind === "image" && (
                   <div className="flex items-center justify-between px-3 py-1.5 border-t border-border text-xs text-muted-foreground">
                     <span className="truncate">{selectedFileName ?? files[0].name}</span>
                     <span>
@@ -449,11 +550,7 @@ export function AutomatePage() {
 
             {hasFile && !hasProcessed && originalBlobUrl && currentEntry?.status !== "failed" && (
               <div className="mb-3 rounded-lg border border-border overflow-hidden h-40 flex items-center justify-center bg-muted/20">
-                <ImageViewer
-                  src={originalBlobUrl}
-                  filename={selectedFileName ?? files[0].name}
-                  fileSize={selectedFileSize ?? files[0].size}
-                />
+                {renderPipelinePreview("original")}
               </div>
             )}
 
@@ -949,10 +1046,10 @@ export function AutomatePage() {
                         <div className="w-full max-h-[120px] overflow-hidden">
                           <Dropzone
                             onFiles={handleFiles}
-                            accept="image/*"
                             multiple
                             currentFiles={files}
                             compact
+                            fileFilter={() => true}
                           />
                         </div>
                         <button
@@ -974,25 +1071,13 @@ export function AutomatePage() {
                       </div>
                     )}
 
-                    {hasFile && hasProcessed && originalBlobUrl && (
-                      <BeforeAfterSlider
-                        beforeSrc={originalBlobUrl}
-                        afterSrc={processedUrl as string}
-                        beforeSize={originalSize ?? undefined}
-                        afterSize={processedSize ?? undefined}
-                      />
-                    )}
+                    {hasFile && hasProcessed && originalBlobUrl && renderPipelinePreview("result")}
 
                     {hasFile &&
                       !hasProcessed &&
                       originalBlobUrl &&
-                      currentEntry?.status !== "failed" && (
-                        <ImageViewer
-                          src={originalBlobUrl}
-                          filename={selectedFileName ?? files[0].name}
-                          fileSize={selectedFileSize ?? files[0].size}
-                        />
-                      )}
+                      currentEntry?.status !== "failed" &&
+                      renderPipelinePreview("original")}
                   </div>
 
                   {hasMultiple && (

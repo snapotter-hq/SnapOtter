@@ -113,7 +113,10 @@ export function Dropzone({
   acceptDescription,
 }: DropzoneProps) {
   const { t } = useTranslation();
-  const checkFile = fileFilter ?? isImageFile;
+  // When no explicit filter is given, accept any file: the file picker still
+  // restricts via `accept`, and the server validates per modality. Image tools
+  // pass an explicit fileFilter, so they are unaffected.
+  const checkFile = fileFilter ?? (() => true);
   const resolvedAccept = expandAccept(accept);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +171,7 @@ export function Dropzone({
       if (validFiles.length > 0) {
         onFiles?.(validFiles);
       } else if (droppedFiles.length > 0) {
-        setError(acceptDescription || `This tool accepts ${accept || "image files"}`);
+        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
       }
     },
     [onFiles, checkFile, acceptDescription, accept],
@@ -186,7 +189,7 @@ export function Dropzone({
       if (validFiles.length > 0) {
         onFiles?.(validFiles);
       } else if (picked.length > 0) {
-        setError(acceptDescription || `This tool accepts ${accept || "image files"}`);
+        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
       }
     };
     input.click();

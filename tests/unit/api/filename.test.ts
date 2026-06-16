@@ -69,7 +69,7 @@ describe("sanitizeFilename", () => {
   });
 
   it("handles filename with only unknown extensions", () => {
-    expect(sanitizeFilename("data.csv")).toBe("data.csv");
+    expect(sanitizeFilename("data.xyz")).toBe("data.xyz");
   });
 
   it("truncates very long filenames over 200 bytes", () => {
@@ -137,6 +137,22 @@ describe("sanitizeFilename", () => {
     for (const ext of extensions) {
       const result = sanitizeFilename(`file.${ext}.evil`);
       expect(result).toBe(`file.${ext}`);
+    }
+  });
+
+  it("recognizes safe extensions across all modalities", () => {
+    const cases: Record<string, string> = {
+      "clip.mp4.exe": "clip.mp4",
+      "song.mp3.php": "song.mp3",
+      "report.csv.php": "report.csv",
+      "doc.docx.exe": "doc.docx",
+      "data.json.sh": "data.json",
+      "book.epub.php": "book.epub",
+      "sheet.xlsx.exe": "sheet.xlsx",
+      "subs.srt.php": "subs.srt",
+    };
+    for (const [input, expected] of Object.entries(cases)) {
+      expect(sanitizeFilename(input)).toBe(expected);
     }
   });
 });

@@ -155,7 +155,7 @@ export function FindDuplicatesSettings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "unique-images.zip";
+    a.download = "unique-files.zip";
     a.click();
     URL.revokeObjectURL(url);
   }, [files, results, bestOverrides]);

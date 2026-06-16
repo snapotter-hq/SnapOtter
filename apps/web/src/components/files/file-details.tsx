@@ -502,7 +502,7 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
             <DetailRow label={t.files.name} value={details.originalName} />
             <DetailRow
               label={t.files.format}
-              value={details.mimeType.replace("image/", "").toUpperCase()}
+              value={details.mimeType.split("/").pop()?.toUpperCase() ?? ""}
             />
             <DetailRow label={t.files.size} value={formatSize(details.size)} />
             <DetailRow
