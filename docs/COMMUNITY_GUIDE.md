@@ -12,7 +12,7 @@ Create these 5 categories in **Settings → Discussions → Categories** on GitH
 | Category | Format | Description |
 |----------|--------|-------------|
 | **General** | Open | Announcements, project updates, and casual conversation about SnapOtter. Pinned Welcome post lives here. |
-| **Q&A** | Question / Answer | Ask for help with image processing, tool behavior, or unexpected results. Mark accepted answers so others can find solutions quickly. |
+| **Q&A** | Question / Answer | Ask for help with file processing, tool behavior, or unexpected results. Mark accepted answers so others can find solutions quickly. |
 | **Ideas** | Open | Suggest new tools, improvements to existing features, or workflow changes. Upvote ideas you want to see prioritized. |
 | **Show & Tell** | Open | Share your SnapOtter setup — screenshots of pipelines, Docker Compose configs, automation scripts using the REST API, before/after results. |
 | **Self-Hosting Help** | Question / Answer | Docker, reverse proxy, storage, networking, multi-arch, and environment configuration. If your question is about getting SnapOtter running rather than using its tools, post here. |
@@ -21,7 +21,7 @@ Create these 5 categories in **Settings → Discussions → Categories** on GitH
 
 - **Q&A vs Self-Hosting Help** — Separating "how do I use the resize tool" from
   "how do I get SnapOtter behind Caddy" keeps both channels useful. Self-hosters
-  and image-tool users are often different people with different expertise.
+  and tool users are often different people with different expertise.
 - **Show & Tell** — Pipeline sharing/export isn't built into the app yet, so
   this category is the place to describe your workflows with screenshots and
   step lists. When export lands, this becomes the natural home for shared
@@ -95,7 +95,7 @@ Two posts you can publish yourself to get early activity in the community.
 >
 > **Category:** Show & Tell
 >
-> Pipelines let you chain multiple image tools together and run them in one
+> Pipelines let you chain multiple tools together and run them in one
 > pass. I'd love to see what workflows people are building.
 >
 > Since there's no export button yet, just describe your steps or post a

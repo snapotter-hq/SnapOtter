@@ -188,7 +188,7 @@ function matchRoute(url: string, method: string): Response | null {
     return json(
       {
         error:
-          "This is a demo instance. To process images, self-host SnapOtter from GitHub → github.com/snapotter-hq/SnapOtter",
+          "This is a demo instance. To process files, self-host SnapOtter from GitHub → github.com/snapotter-hq/SnapOtter",
       },
       403,
     );

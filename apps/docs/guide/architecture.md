@@ -47,7 +47,7 @@ Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), an
 
 ### API (`apps/api`)
 
-A Fastify v5 server exposing 53 tool routes (37 standard image operations + 16 AI-powered) that handles:
+A Fastify v5 server exposing 157 tool routes across five modalities (image, video, audio, document, data) that handles:
 - File uploads, temporary workspace management, and persistent file storage
 - User file library with version chains (`user_files` table) -- each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
 - Tool execution (routes each tool request to the image engine or AI bridge)
@@ -78,17 +78,17 @@ This VitePress site. Deployed to Cloudflare Pages automatically on push to `main
 
 ## How a request flows
 
-1. The user picks a tool in the web UI and uploads an image.
+1. The user picks a tool in the web UI and uploads a file.
 2. The frontend sends a multipart POST to `/api/v1/tools/:toolId` with the file and settings.
 3. The API route validates the input with Zod, then dispatches processing.
 4. For standard tools, the request is offloaded to a Piscina worker thread pool so Sharp operations don't block the main event loop. The worker auto-orients the image based on EXIF metadata, runs the tool's process function, and returns the result. If the worker pool is unavailable, processing falls back to the main thread.
 5. For AI tools, the TypeScript bridge sends a request to the persistent Python dispatcher (or spawns a fresh subprocess as fallback), waits for it to finish, and reads the output file.
 6. Job progress is persisted to the `jobs` SQLite table so state survives container restarts. Real-time updates are delivered via SSE at `/api/v1/jobs/:jobId/progress`.
-7. The API returns a `jobId` and `downloadUrl`. The user downloads the processed image from `/api/v1/download/:jobId/:filename`.
+7. The API returns a `jobId` and `downloadUrl`. The user downloads the processed file from `/api/v1/download/:jobId/:filename`.
 
 For pipelines, the API feeds the output of each step as input to the next, running them sequentially.
 
-For batch processing, the API uses p-queue with a configurable concurrency limit (`CONCURRENT_JOBS`) and returns a ZIP file with all processed images.
+For batch processing, the API uses p-queue with a configurable concurrency limit (`CONCURRENT_JOBS`) and returns a ZIP file with all processed files.
 
 ## Resource footprint
 

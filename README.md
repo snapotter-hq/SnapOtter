@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self Hosted Image Manipulator">
+  <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
 </p>
 
 <p align="center">
@@ -19,16 +19,21 @@
 
 ## Key Features
 
-- **53 image tools:** Resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, create GIFs, find duplicates, generate passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
+- **157 tools across 5 modalities:**
+  - **Image (64):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
+  - **Video (29):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, and more
+  - **Audio (17):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, and more
+  - **Documents / PDF (37):** merge, split, compress, convert (Word/Excel/PowerPoint/EPUB), protect/unlock, redact, watermark, page numbers, OCR, and more
+  - **Data (10):** CSV/JSON/XML/YAML conversion, CSV merge/split, chart maker, ZIP create/extract
 - **Image editor:** Layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware
-- **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), expand canvas, fix transparency. All on your hardware, no internet required
+- **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
 - **20 languages:** Arabic, Chinese, Czech, Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
-- **Pipelines:** Chain tools into reusable workflows with unlimited steps. Import/export as JSON. Batch process unlimited images at once
+- **Pipelines:** Chain tools into reusable workflows with unlimited steps. Import/export as JSON. Batch process unlimited files at once
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
 - **Single container:** One `docker run`, no Redis, no Postgres, no external services
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
-- **Privacy first:** Your images never leave your network. SnapOtter asks once whether you'd like to share anonymous product analytics (which tools are used, errors encountered, never file data). Change anytime in Settings, or set `ANALYTICS_ENABLED=false` to disable completely
+- **Privacy first:** Your files never leave your network. SnapOtter asks once whether you'd like to share anonymous product analytics (which tools are used, errors encountered, never file data). Change anytime in Settings, or set `ANALYTICS_ENABLED=false` to disable completely
 
 ## Quick Start
 
@@ -91,7 +96,7 @@ We welcome bug reports, feature ideas, and pull requests. See [CONTRIBUTING.md](
 
 SnapOtter is built and maintained independently with no venture capital or corporate backing. Sponsorships fund infrastructure, keep releases flowing, and ensure the project stays free and open for everyone.
 
-If SnapOtter saves you from paying for cloud image services, consider supporting its development:
+If SnapOtter saves you from paying for cloud file-processing services, consider supporting its development:
 
 <a href="https://github.com/sponsors/snapotter-hq">
   <img src="branding/sponsor-banner.svg" width="100%" alt="Sponsor SnapOtter on GitHub">

@@ -5,7 +5,7 @@ import pkg from "../../../package.json";
 export default defineConfig({
   title: "SnapOtter",
   description:
-    "Documentation for SnapOtter - A Self Hosted Image Manipulator. 53 tools, local AI, pipelines, REST API.",
+    "Documentation for SnapOtter - A Self-Hosted File Manipulation Suite. 157 tools for image, video, audio, PDF, and data processing. Local AI, pipelines, REST API.",
   base: "/",
   appearance: { initialValue: "light" },
   srcDir: ".",
@@ -25,7 +25,7 @@ export default defineConfig({
     ["meta", { property: "og:image", content: "https://docs.snapotter.com/og-image.png" }],
     ["meta", { property: "og:image:width", content: "1280" }],
     ["meta", { property: "og:image:height", content: "640" }],
-    ["meta", { property: "og:image:alt", content: "SnapOtter - Self-Hosted Image Processing" }],
+    ["meta", { property: "og:image:alt", content: "SnapOtter - Self-Hosted File Processing" }],
     ["meta", { property: "og:locale", content: "en_US" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:site", content: "@SnapOtterHQ" }],
@@ -76,9 +76,9 @@ export default defineConfig({
 `,
         customTemplateVariables: {
           description:
-            "SnapOtter is a self-hosted, open-source image processing platform with 53 tools including AI/ML. Runs in a single Docker container with GPU auto-detection.",
+            "SnapOtter is a self-hosted, open-source file processing platform with 157 tools across image, video, audio, PDF, and data. Includes AI/ML tools. Runs via Docker Compose with GPU auto-detection.",
           details:
-            "Resize, compress, convert, remove backgrounds, upscale, run OCR, and more - without sending images to external services.",
+            "Process images (resize, compress, convert, remove backgrounds, upscale, OCR), videos (trim, merge, subtitles), audio (normalize, transcribe, convert), PDFs (merge, split, watermark, redact), and data files (CSV, JSON, XML conversion) - without sending files to external services.",
         },
       }),
     ],

@@ -3023,7 +3023,7 @@ export const it: TranslationKeys = {
     analytics: {
       heading: "Analisi del prodotto",
       description: "Condividi dati di utilizzo anonimi per contribuire a migliorare SnapOtter.",
-      privacyNote: "Le tue immagini non lasciano mai il tuo dispositivo.",
+      privacyNote: "I tuoi file non lasciano mai la tua rete.",
       disabledByAdmin: "L'analisi del prodotto e stata disattivata dall'amministratore del server.",
       enabledLabel: "Analisi attivata",
       disabledLabel: "Analisi disattivata",
@@ -3031,8 +3031,7 @@ export const it: TranslationKeys = {
     },
     aiFeatures: {
       title: "Funzionalità IA",
-      description:
-        "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata delle immagini.",
+      description: "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata dei file.",
       installAll: "Installa tutto",
       diskUsage: "Utilizzo del disco:",
       installed: "Installato",
@@ -3053,7 +3052,7 @@ export const it: TranslationKeys = {
       heading: "Informazioni",
       appName: "SnapOtter",
       appDescription:
-        "Una suite di elaborazione immagini self-hosted e orientata alla privacy, con 70+ strumenti. Ridimensiona, comprimi, converti, aggiungi filigrane e automatizza i tuoi flussi di lavoro senza inviare dati al cloud.",
+        "Una suite di elaborazione file self-hosted e orientata alla privacy, con 157 strumenti. Converti, comprimi, modifica, trascrivi, OCR e automatizza flussi di lavoro per immagini, video, audio, documenti e dati senza inviare dati al cloud.",
       versionLabel: "Versione:",
       linksHeading: "Link",
       githubLink: "Repository GitHub",
@@ -3103,8 +3102,8 @@ export const it: TranslationKeys = {
       "Le modifiche alla password sono gestite dal tuo provider di identita.",
     enterUsername: "Inserisci il nome utente",
     enterPassword: "Inserisci la password",
-    heroTitle: "Le tue immagini. Restano tue.",
-    heroSubtitle: "Tutti gli strumenti per le immagini di cui hai bisogno.",
+    heroTitle: "I tuoi file. Restano tuoi.",
+    heroSubtitle: "Tutti gli strumenti di cui hai bisogno.",
     rotatingPhrases: [
       "Nessuna registrazione. Nessun account.",
       "Nessun caricamento sul cloud. Mai.",
@@ -3113,7 +3112,7 @@ export const it: TranslationKeys = {
       "Nessun limite. Nessun tetto nascosto.",
       "Funziona completamente offline.",
       "Elaborazione in blocco illimitata.",
-      "70+ strumenti per le immagini.",
+      "157 strumenti.",
       "15 modelli IA. Il tuo hardware.",
       "Velocissimo. Basato su Sharp.",
       "Pronto per reti isolate.",
@@ -3125,7 +3124,7 @@ export const it: TranslationKeys = {
       "L'alternativa self-hosted.",
       "Ridimensiona, comprimi, converti. Localmente.",
       "Editor di immagini gratuito. Senza filigrane.",
-      "Elaborazione immagini in blocco. Illimitata.",
+      "Elaborazione file in blocco. Illimitata.",
       "Rimuovi sfondi offline.",
       "Alternativa self-hosted a Canva.",
       "Nessuna chiave API necessaria.",
@@ -3316,12 +3315,12 @@ export const it: TranslationKeys = {
       "La suspense fa parte dell'esperienza...",
       "Insegnando nuovi trucchi al tuo computer...",
       "Configurazione dei tuoi superpoteri...",
-      "Le tue immagini ti ringrazieranno dopo...",
+      "I tuoi file ti ringrazieranno dopo...",
       "Caricamento... ma con stile...",
       "Ottimo momento per un caffe...",
       "Neanche Roma e stata costruita in un giorno...",
       "Shhh... genio al lavoro...",
-      "Le tue foto diventeranno gelose di quello che arriva...",
+      "I tuoi progetti diventeranno gelosi di quello che arriva...",
       "Assemblaggio del dream team...",
       "Spacchettamento di meraviglie...",
       "Quasi finito di pensare di iniziare... scherzo...",
@@ -3340,7 +3339,7 @@ export const it: TranslationKeys = {
     gettingStarted: {
       heading: "Per iniziare",
       description:
-        "Seleziona uno strumento dalla barra laterale o cercane uno. Carica un'immagine trascinandola sulla pagina o facendo clic sull'area di caricamento. Regola le impostazioni e scarica il risultato.",
+        "Seleziona uno strumento dalla barra laterale o cercane uno. Carica un file trascinandolo sulla pagina o facendo clic sull'area di caricamento. Regola le impostazioni e scarica il risultato.",
     },
     keyboardShortcuts: {
       heading: "Scorciatoie da tastiera",
@@ -3381,14 +3380,14 @@ export const it: TranslationKeys = {
   analytics: {
     consentTitle: "Aiuta a migliorare SnapOtter",
     consentDescription:
-      "Le statistiche d'uso anonime ci aiutano a correggere bug e creare gli strumenti di cui hai davvero bisogno. Le tue immagini e i tuoi file restano sul tuo dispositivo.",
+      "Le statistiche d'uso anonime ci aiutano a correggere bug e creare gli strumenti di cui hai davvero bisogno. I tuoi file restano sulla tua rete.",
     consentChangeable: "Puoi disattivare questa opzione in qualsiasi momento nelle Impostazioni.",
     acceptButton: "Certo, va bene",
     declineButton: "Non ora",
     settingsTitle: "Analisi del prodotto",
     settingsDescription:
       "Condividi dati di utilizzo anonimi per contribuire a migliorare SnapOtter.",
-    settingsPrivacy: "Le tue immagini non lasciano mai il tuo dispositivo.",
+    settingsPrivacy: "I tuoi file non lasciano mai la tua rete.",
     settingsDisabledByAdmin:
       "L'analisi del prodotto e stata disattivata dall'amministratore del server.",
     learnMore: "Scopri di piu",

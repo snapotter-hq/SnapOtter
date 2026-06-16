@@ -1,8 +1,12 @@
 ---
-description: 55+ supported input formats including 23 camera RAW formats, and 14 output formats with full compatibility tables.
+description: Supported file formats across all modalities - 55+ image input formats, video, audio, document, and data formats.
 ---
 
-# Supported Image Formats
+# Supported Formats
+
+SnapOtter processes files across five modalities: image, video, audio, document, and data. This page lists all supported formats.
+
+## Image Formats
 
 SnapOtter supports 55+ image formats for input and 14 formats for output.
 
@@ -114,3 +118,38 @@ SnapOtter supports 55+ image formats for input and 14 formats for output.
 | ICO | ImageMagick CLI | Lossless | Convert tool |
 | JP2 | opj_compress CLI | Compression ratio | Convert tool |
 | QOI | Inline codec | Lossless | Convert tool |
+
+## Video Formats
+
+Video processing is handled by FFmpeg (static build). All common containers and codecs are supported.
+
+| Type | Formats |
+|------|---------|
+| **Input** | MP4, MOV, WebM, MKV, AVI, M4V, MTS, M2TS, 3GP, FLV, WMV, MPG, MPEG, TS, OGV |
+| **Output** | MP4 (H.264/H.265), WebM (VP9), MKV, AVI, MOV, GIF, WebP |
+
+Subtitle formats supported for embedding and burning: SRT, VTT, ASS.
+
+## Audio Formats
+
+Audio processing is also handled by FFmpeg.
+
+| Type | Formats |
+|------|---------|
+| **Input** | MP3, WAV, FLAC, AAC, M4A, OGG, OPUS, WMA, AIFF, AMR, AC3 |
+| **Output** | MP3, WAV, FLAC, AAC, M4A, OGG, OPUS |
+
+## Document Formats
+
+Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
+
+| Type | Formats |
+|------|---------|
+| **Input** | PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, ODT, ODS, ODP, RTF, TXT, Markdown, HTML, EPUB |
+| **Output** | PDF, PDF/A, DOCX, HTML, EPUB, images (via PDF to Image) |
+
+## Data Formats
+
+| Type | Formats |
+|------|---------|
+| **Input/Output** | CSV, JSON, XML, YAML, ZIP, Excel (XLSX) |

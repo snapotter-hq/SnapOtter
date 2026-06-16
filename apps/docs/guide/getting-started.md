@@ -72,18 +72,15 @@ pnpm dev
 
 ## What You Can Do
 
-### Image Processing (53 Tools)
+### File Processing (157 Tools)
 
-| Category | Tools |
-|----------|-------|
-| **Essentials** | Resize, Crop, Rotate & Flip, Convert, Compress |
-| **Optimization** | Optimize for Web, Strip Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator |
-| **Adjustments** | Adjust Colors, Sharpening, Replace Color, Color Blindness Simulation |
-| **AI Tools** | Remove Background, Upscale, Erase Object, OCR, Blur Faces, Smart Crop, Image Enhancement, Enhance Faces, Colorize, Noise Removal, Red Eye Removal, Restore Photo, Passport Photo, Content-Aware Resize, AI Canvas Expand, PNG Transparency Fixer |
-| **Watermark & Overlay** | Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator |
-| **Utilities** | Image Info, Compare, Find Duplicates, Color Palette, QR Code Generator, Barcode Reader, Image to Base64, HTML to Image |
-| **Layout** | Collage, Stitch, Split, Border & Frame, Beautify |
-| **Format** | SVG to Raster, Vectorize, GIF Tools, PDF to Image |
+| Modality | Count | Example Tools |
+|----------|-------|---------------|
+| **Image** | 64 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools |
+| **Video** | 29 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize |
+| **Audio** | 17 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker |
+| **PDF / Document** | 37 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
+| **Data** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipelines
 

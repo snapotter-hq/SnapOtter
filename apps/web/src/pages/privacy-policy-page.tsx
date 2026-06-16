@@ -22,7 +22,7 @@ export function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-2">Overview</h2>
             <p>
-              SnapOtter is a self-hosted, open-source image processing application. Your instance is
+              SnapOtter is a self-hosted, open-source file processing application. Your instance is
               operated and controlled entirely by whoever deployed it. This policy describes how the
               software itself handles your data.
             </p>
@@ -31,10 +31,10 @@ export function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-2">Local Processing</h2>
             <p>
-              All image processing happens entirely on the server where SnapOtter is deployed. Your
-              images are never sent to external services or third-party APIs. When you upload an
-              image for processing, it is handled in memory or in temporary storage on the host
-              machine and is not retained after the operation completes.
+              All file processing happens entirely on the server where SnapOtter is deployed. Your
+              files are never sent to external services or third-party APIs. When you upload a file
+              for processing, it is handled in memory or in temporary storage on the host machine
+              and is not retained after the operation completes.
             </p>
           </section>
 
@@ -101,10 +101,10 @@ export function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-2">Third-Party Services</h2>
             <p>
-              All image processing happens locally — your images are never sent anywhere. If you opt
-              in to product analytics, anonymous usage data is sent to PostHog and Sentry as
-              described above. AI-powered features run locally using bundled models. No other
-              external services are contacted.
+              All processing happens locally; your files are never sent anywhere. If you opt in to
+              product analytics, anonymous usage data is sent to PostHog and Sentry as described
+              above. AI-powered features run locally using bundled models. No other external
+              services are contacted.
             </p>
           </section>
 

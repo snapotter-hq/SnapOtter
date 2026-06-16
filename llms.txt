@@ -1,8 +1,8 @@
 # SnapOtter
 
-Open-source, self-hostable image manipulation suite with 53 tools. Single Docker container, no external services required. Dual-licensed AGPLv3 and commercial.
+Open-source, self-hostable file manipulation suite with 157 tools across image, video, audio, document, and data. Single Docker container, no external services required. Dual-licensed AGPLv3 and commercial.
 
-All image processing happens locally. Images never leave your infrastructure. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats.
+All processing happens locally. Files never leave your infrastructure.
 
 ## Quick Start (Docker)
 
@@ -12,30 +12,41 @@ Default credentials: admin / admin (must change on first login).
 Add --gpus all for NVIDIA GPU acceleration on AI tools.
 Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
 
-## Tools by Category
+## Tools
 
-### Essentials
+157 tools across 5 modalities: image (64), video (29), audio (17), document/PDF (37), and data (10). 19 are local AI tools (no cloud APIs).
+
+### Image (64 tools)
+
+#### Essentials
 - resize: Resize by pixels, percentage, or social media presets
 - crop: Freeform crop, aspect ratio presets, shape crop
+- circle-crop: Crop to a centered circle
 - rotate: Rotate, flip, and straighten images
 - convert: Convert between image formats
 - compress: Reduce file size by quality or target size
+- image-pad: Pad to a target aspect ratio
 
-### Optimization
+#### Optimization
 - optimize-for-web: Smart format selection and quality tuning for web delivery
 - strip-metadata: Remove EXIF, GPS, and camera info for privacy
 - edit-metadata: View and edit EXIF, IPTC, and XMP fields
 - bulk-rename: Pattern-based batch renaming with variables
 - image-to-pdf: Combine images into multi-page PDFs
 - favicon: Generate all favicon and app icon sizes from one image
+- lqip-placeholder: Generate tiny low-quality image placeholders
 
-### Adjustments
+#### Adjustments and Effects
 - adjust-colors: Brightness, contrast, saturation, temperature, and effects
 - sharpening: Adaptive, unsharp mask, and high-pass sharpening
 - replace-color: Swap colors with tolerance control or invert
 - color-blindness: Simulate 8 types of color vision deficiency
+- duotone: Two-color duotone effect
+- pixelate: Pixelation effect, full image or region
+- vignette: Adjustable vignette effect
+- histogram: Generate an RGB histogram chart
 
-### AI Tools (local ML, no cloud APIs)
+#### AI Tools (local ML, no cloud APIs)
 - remove-background: AI background removal (rembg)
 - upscale: 2x/4x AI super-resolution (RealESRGAN)
 - erase-object: AI inpainting to remove unwanted objects (LaMa)
@@ -52,15 +63,17 @@ Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
 - content-aware-resize: Seam carving that preserves subjects
 - ai-canvas-expand: Outpainting to extend image borders with AI
 - transparency-fixer: Fix PNGs with fake transparent backgrounds
+- background-replace: Replace the background with a solid color
+- blur-background: Blur the background while keeping the subject sharp
 
-### Watermark and Overlay
+#### Watermark and Overlay
 - watermark-text: Add text watermarks with tiling and opacity
 - watermark-image: Overlay logos with position and opacity control
 - text-overlay: Add styled text, captions, and titles
 - compose: Layer and composite multiple images with blending
 - meme-generator: Create memes with custom text and templates
 
-### Utilities
+#### Utilities
 - info: View dimensions, EXIF, GPS, color space, file details
 - compare: Side-by-side image comparison with slider overlay
 - find-duplicates: Perceptual hashing for near-duplicate detection
@@ -68,20 +81,124 @@ Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
 - qr-generate: Custom QR codes with colors, logos, and patterns
 - html-to-image: Capture webpages as high-quality images
 - barcode-read: Decode QR, Code 128, EAN-13 and more from images
+- barcode-generate: Generate Code 128, EAN-13, UPC-A and more
 - image-to-base64: Generate data URIs for HTML/CSS embedding
 
-### Layout and Composition
+#### Layout and Composition
 - collage: 25+ grid templates for photo collages
 - stitch: Join images side by side, stacked, or in grids
 - split: Cut images into grid tiles for Instagram and print
 - border: Add borders, rounded corners, and drop shadows
 - beautify: Screenshot mockups with device frames and backgrounds
+- sprite-sheet: Combine images into a sprite sheet
 
-### Format and Conversion
+#### Format and Conversion
 - svg-to-raster: Convert SVG to PNG/JPEG/WebP at custom scale/DPI
 - vectorize: Trace raster images to SVG vector paths
 - gif-tools: Resize, optimize, reverse, extract GIF frames
+- gif-webp: Convert between animated GIF and WebP
 - pdf-to-image: Convert PDF pages to images at custom DPI
+
+### Video (29 tools)
+- convert-video: Convert between MP4, MOV, WebM and more
+- compress-video: Shrink file size with quality control
+- trim-video: Cut a clip from a video
+- mute-video: Remove the audio track
+- video-to-gif: Turn a clip into an animated GIF
+- resize-video: Scale to a new resolution or preset
+- crop-video: Crop a region from video
+- rotate-video: Rotate or flip
+- change-fps: Change the frame rate
+- video-color: Brightness, contrast, saturation, gamma
+- video-speed: Speed up or slow down
+- reverse-video: Play backwards
+- video-loudnorm: Normalize audio to broadcast loudness
+- aspect-pad: Add solid-color bars for a target aspect ratio
+- blur-pad: Add blurred-copy bars for padding
+- watermark-video: Burn a text watermark onto frames
+- stabilize-video: Two-pass camera shake reduction
+- gif-to-video: Convert an animated GIF to MP4/WebM
+- video-to-webp: Convert a clip to animated WebP
+- video-to-frames: Extract frames as a ZIP of images
+- merge-videos: Join multiple clips into one
+- replace-audio: Swap the video audio track
+- burn-subtitles: Render subtitles onto frames
+- embed-subtitles: Mux a subtitle track into the container
+- extract-subtitles: Pull a subtitle track out as SRT
+- images-to-video: Build a slideshow video from images
+- video-metadata: Strip metadata from video
+- extract-audio: Pull the audio track from a video
+- auto-subtitles: Generate subtitles from speech with AI
+
+### Audio (17 tools)
+- convert-audio: Convert between MP3, WAV, OGG, FLAC and more
+- trim-audio: Cut a section from audio
+- volume-adjust: Increase or decrease volume by gain
+- normalize-audio: Even out loudness to broadcast levels
+- fade-audio: Add fade-in and fade-out
+- reverse-audio: Play backwards
+- audio-speed: Speed up or slow down playback
+- pitch-shift: Shift pitch without changing speed
+- audio-channels: Mono/stereo conversion and channel swap
+- silence-removal: Strip silent sections
+- noise-reduction: FFT-based background noise reduction
+- merge-audio: Combine multiple files into one
+- split-audio: Split by time, parts, or silence
+- ringtone-maker: Create a ringtone clip from audio
+- waveform-image: Generate a waveform PNG visualization
+- audio-metadata: View, edit, or strip ID3 tags
+- transcribe-audio: Speech-to-text with AI (faster-whisper)
+
+### Document / PDF (37 tools)
+- pdf-to-image: Convert PDF pages to images
+- merge-pdf: Combine multiple PDFs into one
+- split-pdf: Extract pages or split into parts
+- compress-pdf: Shrink PDF file size
+- rotate-pdf: Rotate pages
+- convert-document: Convert between Word, ODT, RTF, TXT
+- convert-presentation: Convert between PowerPoint and ODP
+- convert-spreadsheet: Convert between Excel, ODS, CSV
+- excel-to-pdf: Convert spreadsheets to PDF
+- word-to-pdf: Convert Word documents to PDF
+- extract-pages: Pull selected pages into a new PDF
+- remove-pages: Delete specific pages
+- organize-pdf: Reorder pages
+- protect-pdf: AES-256 password protection
+- unlock-pdf: Remove password protection
+- repair-pdf: Fix damaged or corrupted PDFs
+- linearize-pdf: Linearize for fast web viewing
+- grayscale-pdf: Convert colors to grayscale
+- pdfa-convert: Convert to archival PDF/A-2
+- crop-pdf: Crop pages with a uniform margin
+- nup-pdf: Place multiple pages per sheet
+- booklet-pdf: Arrange pages for folding into a booklet
+- watermark-pdf: Add a text watermark to every page
+- pdf-page-numbers: Add page numbers
+- flatten-pdf: Bake forms and annotations into page content
+- redact-pdf: Permanently remove text (true redaction)
+- pdf-to-text: Extract plain text
+- pdf-to-word: Convert a PDF to a Word document
+- pdf-metadata: Read and write document metadata
+- powerpoint-to-pdf: Convert presentations to PDF
+- html-to-pdf: Convert an HTML file to PDF
+- markdown-to-docx: Convert Markdown to a Word document
+- markdown-to-html: Convert Markdown to standalone HTML
+- markdown-to-pdf: Convert Markdown to a styled PDF
+- epub-convert: Convert EPUB to PDF/DOCX/HTML/Markdown
+- to-epub: Convert Word/Markdown/HTML/TXT to EPUB
+- ocr-pdf: Extract text from scanned PDFs with AI
+
+### Data (10 tools)
+- chart-maker: Bar, line, and pie charts from CSV/JSON
+- csv-excel: Convert between CSV and Excel
+- csv-json: Convert between CSV and JSON
+- json-xml: Convert between JSON and XML
+- split-csv: Split a CSV by row count
+- merge-csvs: Combine CSVs with matching columns
+- yaml-json: Convert between YAML and JSON
+- xml-to-csv: Extract XML elements into a CSV table
+- create-zip: Bundle files into a ZIP archive
+- extract-zip: Safely extract a ZIP (with bomb protection)
 
 ## REST API
 
@@ -104,7 +221,7 @@ Processing a file:
   Body: file (binary), settings (JSON string)
   Response: { jobId, downloadUrl, originalSize, processedSize }
 
-AI tools return 202 Accepted and stream progress via SSE:
+Long-running tools (video, audio, AI) return 202 Accepted and stream progress via SSE:
   GET /api/v1/jobs/:jobId/progress (EventSource)
 
 Pipelines (chained tool workflows):
@@ -119,8 +236,8 @@ Batch processing: POST /api/v1/tools/:toolId/batch (multiple files in, ZIP archi
 ## Tech Stack
 
 Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand
-Backend: Fastify 5, Sharp (image processing), SQLite via Drizzle ORM
-AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, MediaPipe, LaMa)
+Backend: Fastify 5; Sharp (images), FFmpeg (video/audio), qpdf and LibreOffice (documents); Drizzle ORM
+AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, faster-whisper, MediaPipe, LaMa)
 Auth: Session-based with OIDC/SSO support (Google, GitHub, Okta, any OIDC provider)
 Languages: 21 locales with RTL support
 

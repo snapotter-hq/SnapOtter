@@ -4,7 +4,7 @@ description: Security hardening guide for SnapOtter. Container security, network
 
 # Security & Hardening
 
-SnapOtter processes images entirely on your infrastructure. No telemetry, no external API calls, no phone-home behavior. Images never leave the container.
+SnapOtter processes files entirely on your infrastructure. No telemetry, no external API calls, no phone-home behavior. Files never leave the container.
 
 The container runs as a dedicated non-root user (`snapotter`) with all Linux capabilities dropped except the minimum required set. For the full vulnerability disclosure policy and security architecture, see [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) on GitHub.
 
@@ -78,7 +78,7 @@ If you use Kubernetes or Docker's `--user` flag to run as non-root directly (byp
 
 ## Network Isolation
 
-During normal operation, the container makes **zero outbound network connections**. All image processing happens locally using bundled libraries.
+During normal operation, the container makes **zero outbound network connections**. All file processing happens locally using bundled libraries.
 
 ```
 Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)

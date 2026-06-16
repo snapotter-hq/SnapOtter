@@ -135,7 +135,7 @@ These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ry
 | Recommended | All tools + AI on CPU | 4 cores | 4 GB | None | 20 GB |
 | Full | All tools + AI on GPU | 4+ cores | 8 GB | NVIDIA 8 GB+ | 30 GB |
 
-### Minimum (core image tools)
+### Minimum (core tools, no AI)
 
 | Resource | Requirement |
 |---|---|
@@ -144,7 +144,7 @@ These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ry
 | Disk | 3 GB (image) + 1 GB (data volume) |
 | GPU | Not required |
 
-All 35 non-AI tools (resize, crop, rotate, convert, compress, watermark, collage, etc.) run on any hardware. Most operations complete in under 1 second even on a single core. The exception is AVIF encoding, which takes ~27s on 1 core but drops to ~5s on 4 cores.
+All 138 non-AI tools (image resize/crop/convert, video trim/merge, audio normalize/convert, PDF merge/split/compress, data format conversion, and more) run on any hardware. Most operations complete in under 1 second even on a single core. The exception is AVIF encoding, which takes ~27s on 1 core but drops to ~5s on 4 cores.
 
 ```yaml
 deploy:

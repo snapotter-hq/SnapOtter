@@ -101,5 +101,5 @@ services:
 
 The Docker container uses two volumes:
 
-- `/data` -- Persistent storage for the SQLite database and user files. Mount this to keep users, API keys, saved pipelines, and uploaded images across container restarts.
-- `/tmp/workspace` -- Temporary storage for images being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
+- `/data` -- Persistent storage for the database and user files. Mount this to keep users, API keys, saved pipelines, and uploaded files across container restarts.
+- `/tmp/workspace` -- Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.

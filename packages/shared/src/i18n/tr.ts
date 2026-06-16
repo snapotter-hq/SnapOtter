@@ -3024,7 +3024,7 @@ export const tr: TranslationKeys = {
       heading: "Ürün Analitiği",
       description:
         "SnapOtter'ı geliştirmeye yardımcı olmak için anonim kullanım verilerini paylaşın.",
-      privacyNote: "Görüntüleriniz asla cihazınızdan ayrılmaz.",
+      privacyNote: "Dosyalarınız asla ağınızdan ayrılmaz.",
       disabledByAdmin: "Ürün analitiği sunucu yöneticisi tarafından devre dışı bırakıldı.",
       enabledLabel: "Analitik etkin",
       disabledLabel: "Analitik devre dışı",
@@ -3032,7 +3032,7 @@ export const tr: TranslationKeys = {
     },
     aiFeatures: {
       title: "AI Features",
-      description: "Manage AI model bundles for advanced image processing.",
+      description: "Gelişmiş dosya işleme için AI model paketlerini yönetin.",
       installAll: "Install All",
       diskUsage: "Disk usage:",
       installed: "Installed",
@@ -3053,7 +3053,7 @@ export const tr: TranslationKeys = {
       heading: "Hakkında",
       appName: "SnapOtter",
       appDescription:
-        "70+ araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir görüntü işleme paketi. Buluta veri göndermeden boyutlandırma, sıkıştırma, dönüştürme, filigran ekleme ve görüntü iş akışlarınızı otomatikleştirme.",
+        "157 araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir dosya işleme paketi. Buluta veri göndermeden dönüştürme, sıkıştırma, düzenleme, transkripsiyon, OCR ve görüntü, video, ses, belge ve veri iş akışlarınızı otomatikleştirme.",
       versionLabel: "Sürüm:",
       linksHeading: "Bağlantılar",
       githubLink: "GitHub Deposu",
@@ -3103,8 +3103,8 @@ export const tr: TranslationKeys = {
       "Parola değişiklikleri kimlik sağlayıcınız tarafından yönetilmektedir.",
     enterUsername: "Kullanıcı adını girin",
     enterPassword: "Parolanızı girin",
-    heroTitle: "Görüntüleriniz. Sizde kalır.",
-    heroSubtitle: "İhtiyacınız olan her görüntü aracı.",
+    heroTitle: "Dosyalarınız. Sizde kalır.",
+    heroSubtitle: "İhtiyacınız olan her araç.",
     rotatingPhrases: [
       "Kayıt yok. Hesap yok.",
       "Buluta yükleme yok. Asla.",
@@ -3113,7 +3113,7 @@ export const tr: TranslationKeys = {
       "Limit yok. Gizli kota yok.",
       "Tamamen çevrimdışı çalışır.",
       "Sınırsız toplu işleme.",
-      "70+ görüntü aracı.",
+      "157 araç.",
       "16 AI modeli. Sizin donanımınız.",
       "Yıldırım hızında. Sharp ile geliştirildi.",
       "Hava boşluklu ağlar için hazır.",
@@ -3125,7 +3125,7 @@ export const tr: TranslationKeys = {
       "Kendi sunucunuzda barındırılan alternatif.",
       "Boyutlandır, sıkıştır, dönüştür. Yerel olarak.",
       "Ücretsiz görüntü düzenleyici. Filigran yok.",
-      "Toplu görüntü işleme. Sınırsız.",
+      "Toplu dosya işleme. Sınırsız.",
       "Arka planı çevrimdışı kaldır.",
       "Kendi sunucunuzda barındırılan Canva alternatifi.",
       "API anahtarı gerekmez.",
@@ -3316,12 +3316,12 @@ export const tr: TranslationKeys = {
       "Merak da deneyimin bir parçası...",
       "Bilgisayarınıza yeni numaralar öğretiyoruz...",
       "Süper güçleriniz hazırlanıyor...",
-      "Fotoğraflarınız sonra size teşekkür edecek...",
+      "Dosyalarınız sonra size teşekkür edecek...",
       "Yükleniyor... ama şık bir şekilde...",
       "Kahve molası için harika bir zaman...",
       "Roma da bir günde kurulmadı...",
       "Sessiz... dahi iş başında...",
-      "Fotoğraflarınızı kıskandıracak şeyler hazırlanıyor...",
+      "Projelerinizi kıskandıracak şeyler hazırlanıyor...",
       "Rüya takımı kuruluyor...",
       "Muhteşemlik paketten çıkarılıyor...",
       "Başlamayı düşünmeyi neredeyse bitirdik... şaka yapıyoruz...",
@@ -3340,7 +3340,7 @@ export const tr: TranslationKeys = {
     gettingStarted: {
       heading: "Başlarken",
       description:
-        "Kenar çubuğundan bir araç seçin veya arayın. Sayfaya sürükleyerek veya yükleme alanına tıklayarak bir görüntü yükleyin. Ayarları yapın ve sonucunuzu indirin.",
+        "Kenar çubuğundan bir araç seçin veya arayın. Sayfaya sürükleyerek veya yükleme alanına tıklayarak bir dosya yükleyin. Ayarları yapın ve sonucunuzu indirin.",
     },
     keyboardShortcuts: {
       heading: "Klavye Kısayolları",
@@ -3381,14 +3381,14 @@ export const tr: TranslationKeys = {
   analytics: {
     consentTitle: "SnapOtter'ı geliştirmeye yardım edin",
     consentDescription:
-      "Anonim kullanım istatistikleri hataları düzeltmemize ve gerçekten ihtiyaç duyduğunuz araçları oluşturmamıza yardımcı olur. Görüntüleriniz ve dosyalarınız cihazınızda kalır.",
+      "Anonim kullanım istatistikleri hataları düzeltmemize ve gerçekten ihtiyaç duyduğunuz araçları oluşturmamıza yardımcı olur. Dosyalarınız ağınızda kalır.",
     consentChangeable: "Bunu istediğiniz zaman Ayarlar'dan kapatabilirsiniz.",
     acceptButton: "Elbette, kulağa iyi geliyor",
     declineButton: "Şimdi değil",
     settingsTitle: "Ürün Analitiği",
     settingsDescription:
       "SnapOtter'ı geliştirmeye yardımcı olmak için anonim kullanım verilerini paylaşın.",
-    settingsPrivacy: "Görüntüleriniz asla cihazınızdan ayrılmaz.",
+    settingsPrivacy: "Dosyalarınız asla ağınızdan ayrılmaz.",
     settingsDisabledByAdmin: "Ürün analitiği sunucu yöneticisi tarafından devre dışı bırakıldı.",
     learnMore: "Daha fazla bilgi",
   },
