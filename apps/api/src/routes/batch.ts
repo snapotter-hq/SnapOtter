@@ -9,7 +9,10 @@
  * Returns a ZIP file containing all processed images.
  */
 import { randomUUID } from "node:crypto";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -30,6 +33,8 @@ import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectStream, putObject } from "../lib/object-storage.js";
 import { resolveToolPool } from "../lib/pool.js";
+import { InputValidationError } from "../modality/contract.js";
+import { inputHandlerFor } from "../modality/input-handler.js";
 import { getAuthUser } from "../plugins/auth.js";
 import { updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
@@ -175,56 +180,86 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
       let flowChildIndex = 0;
 
+      // Resolve the tool's modality so non-image files (audio/video/document)
+      // validate through their own handler instead of the image validator.
+      const modality = TOOLS.find((t) => t.id === toolId)?.modality ?? "image";
+      const batchScratch = join(tmpdir(), "snapotter-scratch", `batch-${parentId}`);
+      await mkdir(batchScratch, { recursive: true });
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         let processBuffer = file.buffer;
         let processFilename = file.filename;
 
-        const validation = await validateImageBuffer(processBuffer, processFilename);
-        if (!validation.valid) {
-          preFailures.push({
-            originalIndex: i,
-            filename: file.filename,
-            error: `Invalid image: ${validation.reason}`,
-          });
-          continue;
-        }
-
-        // Decode chain (skip for metadata tools that handle all formats natively)
-        const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
-
-        if (!skipPreprocess && validation.format === "heif") {
-          try {
-            processBuffer = await decodeHeic(processBuffer);
-            const ext = processFilename.match(/\.[^.]+$/)?.[0];
-            if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-          } catch {
+        if (modality === "image") {
+          const validation = await validateImageBuffer(processBuffer, processFilename);
+          if (!validation.valid) {
             preFailures.push({
               originalIndex: i,
               filename: file.filename,
-              error: "Failed to decode HEIC file",
+              error: `Invalid image: ${validation.reason}`,
             });
             continue;
           }
-        }
 
-        if (!skipPreprocess && needsCliDecode(validation.format)) {
-          try {
-            const fileExt = processFilename.split(".").pop()?.toLowerCase();
-            processBuffer = await decodeToSharpCompat(processBuffer, validation.format, fileExt);
-          } catch {
+          // Decode chain (skip for metadata tools that handle all formats natively)
+          const skipPreprocess = toolId === "edit-metadata" || toolId === "strip-metadata";
+
+          if (!skipPreprocess && validation.format === "heif") {
             try {
-              await sharp(processBuffer).metadata();
+              processBuffer = await decodeHeic(processBuffer);
+              const ext = processFilename.match(/\.[^.]+$/)?.[0];
+              if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
             } catch {
-              // Neither CLI decode nor Sharp can handle it; upload raw
+              preFailures.push({
+                originalIndex: i,
+                filename: file.filename,
+                error: "Failed to decode HEIC file",
+              });
+              continue;
             }
           }
-          const ext = processFilename.match(/\.[^.]+$/)?.[0];
-          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-        }
 
-        if (!skipPreprocess) {
-          processBuffer = await autoOrient(processBuffer);
+          if (!skipPreprocess && needsCliDecode(validation.format)) {
+            try {
+              const fileExt = processFilename.split(".").pop()?.toLowerCase();
+              processBuffer = await decodeToSharpCompat(processBuffer, validation.format, fileExt);
+            } catch {
+              try {
+                await sharp(processBuffer).metadata();
+              } catch {
+                // Neither CLI decode nor Sharp can handle it; upload raw
+              }
+            }
+            const ext = processFilename.match(/\.[^.]+$/)?.[0];
+            if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+          }
+
+          if (!skipPreprocess) {
+            processBuffer = await autoOrient(processBuffer);
+          }
+        } else {
+          // Non-image modalities (audio/video/document/file): validate and
+          // decode through the tool's own input handler, mirroring the
+          // single-file path. Previously batch validated everything as an
+          // image, which rejected all audio/video/document inputs.
+          try {
+            const prepared = await inputHandlerFor(modality).prepare(
+              processBuffer,
+              processFilename,
+              {
+                scratchDir: batchScratch,
+              },
+            );
+            processBuffer = prepared.buffer;
+            processFilename = prepared.filename;
+          } catch (err) {
+            if (err instanceof InputValidationError) {
+              preFailures.push({ originalIndex: i, filename: file.filename, error: err.message });
+              continue;
+            }
+            throw err;
+          }
         }
 
         // Upload decoded file to object storage
