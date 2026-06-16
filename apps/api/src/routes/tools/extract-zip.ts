@@ -77,6 +77,39 @@ export function registerExtractZip(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "extract-zip",
     settingsSchema,
+    // Reject path-traversal / absolute-path entries pre-enqueue with a clean 400.
+    // (yauzl also blocks them, but only as a generic worker 422; the processV2
+    // guards below remain as defense-in-depth for the pipeline/batch path.)
+    preValidate: async ({ inputs }) => {
+      const buf = inputs[0]?.buffer;
+      if (!buf) return;
+      let entries: Entry[];
+      try {
+        entries = await collectEntries(await openZipBuffer(buf));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/relative path|absolute path/i.test(msg)) {
+          throw new InputValidationError(
+            "This archive contains an unsafe entry path (path traversal or absolute) and was rejected",
+          );
+        }
+        throw new InputValidationError(
+          "Could not read the archive; it may be corrupt or not a valid .zip",
+        );
+      }
+      for (const e of entries) {
+        const name = e.fileName;
+        if (
+          name.startsWith("/") ||
+          name.startsWith("\\") ||
+          name.split(/[/\\]/).some((s) => s === "..")
+        ) {
+          throw new InputValidationError(
+            "This archive contains an unsafe entry path (path traversal or absolute) and was rejected",
+          );
+        }
+      }
+    },
     process: async () => {
       throw new Error("extract-zip is v2-only");
     },
