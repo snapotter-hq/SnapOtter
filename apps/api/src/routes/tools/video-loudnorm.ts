@@ -35,11 +35,15 @@ export function registerVideoLoudnorm(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, "media", outName);
 
+      // loudnorm runs internally at 192 kHz and emits at 192 kHz unless we
+      // resample back, so restore the source rate to avoid inflating the audio.
+      const sr = info.streams.find((s) => s.type === "audio")?.sampleRate ?? 48000;
+
       const args = [
         "-i",
         inPath,
         "-af",
-        "loudnorm=I=-16:TP=-1.5:LRA=11",
+        `loudnorm=I=-16:TP=-1.5:LRA=11,aresample=${sr}`,
         "-c:v",
         "copy",
         ...audioEncodeArgsForContainer(origExt),
