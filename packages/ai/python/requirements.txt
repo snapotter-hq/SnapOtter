@@ -1,4 +1,4 @@
-rembg[cpu]==2.0.62
+rembg[cpu]==2.0.75
 realesrgan==0.3.0
 paddleocr[doc-parser]>=3.4.0,<3.5.0
 paddlepaddle>=3.0.0,<3.1.0

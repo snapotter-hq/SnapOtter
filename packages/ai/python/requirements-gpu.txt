@@ -1,4 +1,4 @@
-rembg==2.0.62
+rembg==2.0.75
 realesrgan==0.3.0
 paddleocr==2.9.1
 paddlepaddle-gpu==3.0.0
