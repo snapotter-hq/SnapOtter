@@ -232,6 +232,7 @@ export function ToolPage() {
     const modalityDisplay = modalityInfo?.name ?? tool.modality;
     return {
       modality: modalityDisplay,
+      modalityTab: tool.modality === "file" ? "data" : tool.modality,
       toolName: getToolName(t, tool.id, tool.name),
     };
   }, [tool, t]);

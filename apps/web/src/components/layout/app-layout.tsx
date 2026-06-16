@@ -10,7 +10,7 @@ import { TopNav } from "./top-nav.js";
 
 interface AppLayoutProps {
   children?: React.ReactNode;
-  breadcrumb?: { modality?: string; toolName?: string };
+  breadcrumb?: { modality?: string; modalityTab?: string; toolName?: string };
   navVariant?: "light" | "dark";
 }
 

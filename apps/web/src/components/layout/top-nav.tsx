@@ -22,7 +22,7 @@ import { AvatarDropdown } from "./avatar-dropdown.js";
 
 interface TopNavProps {
   variant?: "light" | "dark";
-  breadcrumb?: { modality?: string; toolName?: string };
+  breadcrumb?: { modality?: string; modalityTab?: string; toolName?: string };
   onHelpClick: () => void;
   onSettingsClick: () => void;
 }
@@ -87,7 +87,13 @@ export function TopNav({
             <span className={cn("text-sm truncate", isDark ? "text-[#e0e0e0]" : "text-foreground")}>
               {breadcrumb.modality && (
                 <span className={isDark ? "text-[#aaa]" : "text-muted-foreground"}>
-                  {breadcrumb.modality}
+                  {breadcrumb.modalityTab ? (
+                    <Link to={`/?modality=${breadcrumb.modalityTab}`} className="hover:underline">
+                      {breadcrumb.modality}
+                    </Link>
+                  ) : (
+                    breadcrumb.modality
+                  )}
                   {" / "}
                 </span>
               )}
@@ -154,9 +160,23 @@ export function TopNav({
                   isDark ? "text-[#666]" : "text-muted-foreground/50",
                 )}
               />
-              <span className={cn("shrink-0", isDark ? "text-[#aaa]" : "text-muted-foreground")}>
-                {breadcrumb.modality}
-              </span>
+              {breadcrumb.modalityTab ? (
+                <Link
+                  to={`/?modality=${breadcrumb.modalityTab}`}
+                  className={cn(
+                    "shrink-0 hover:underline",
+                    isDark
+                      ? "text-[#aaa] hover:text-[#e0e0e0]"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {breadcrumb.modality}
+                </Link>
+              ) : (
+                <span className={cn("shrink-0", isDark ? "text-[#aaa]" : "text-muted-foreground")}>
+                  {breadcrumb.modality}
+                </span>
+              )}
             </>
           )}
           <ChevronRight

@@ -43,18 +43,32 @@ const MODALITY_TAB_ORDER = [
   { modalityId: "file", tabKey: "data", label: "Files" },
 ];
 
+const MODALITY_TABS = new Set<string>(["all", ...MODALITY_TAB_ORDER.map((m) => m.tabKey)]);
+
 export function HomePage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
   const { fetch: fetchSettings, disabledTools, experimentalEnabled, loaded } = useSettingsStore();
   const recentToolIds = useRecentTools();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   usePageTitle();
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  // Open a specific modality tab when arriving via a breadcrumb link
+  // (/?modality=<tabKey>), then clean the URL so refresh/back doesn't re-pin it.
+  useEffect(() => {
+    const m = new URLSearchParams(location.search).get("modality");
+    if (m && MODALITY_TABS.has(m)) {
+      setActiveTab(m);
+      navigate("/", { replace: true });
+    }
+  }, [location.search, navigate]);
 
   const tabs: TabDef[] = useMemo(
     () => [
