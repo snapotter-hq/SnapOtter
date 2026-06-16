@@ -95,7 +95,7 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
     const saml = getSamlInstance();
     const audit = auditFromRequest(request);
 
-    let profile;
+    let profile: Awaited<ReturnType<typeof saml.validatePostResponseAsync>>["profile"];
     try {
       const result = await saml.validatePostResponseAsync(request.body as Record<string, string>);
       profile = result.profile;

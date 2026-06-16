@@ -430,7 +430,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "File not found" });
       }
 
-      let stream;
+      let stream: Awaited<ReturnType<typeof streamStoredFile>>;
       try {
         stream = await streamStoredFile(file.storedName);
       } catch {
