@@ -66,6 +66,70 @@ describe("Sprite Sheet", () => {
     expect(meta.height).toBe(150 * 2);
   });
 
+  it("returns full coordinate map in resultPayload", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ columns: 2 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/sprite-sheet",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    // frames array
+    expect(Array.isArray(result.frames)).toBe(true);
+    expect(result.frames).toHaveLength(2);
+    expect(result.frames[0]).toMatchObject({ index: 0, left: 0, top: 0 });
+
+    // grid metadata
+    expect(result.cols).toBe(2);
+    expect(result.rows).toBe(1);
+    expect(result.cellWidth).toBe(200);
+    expect(result.cellHeight).toBe(150);
+    expect(result.canvasWidth).toBe(400);
+    expect(result.canvasHeight).toBe(150);
+  });
+
+  it("outputs webp when format is webp", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ columns: 2, format: "webp" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/sprite-sheet",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("webp");
+  });
+
   it("rejects single input", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },

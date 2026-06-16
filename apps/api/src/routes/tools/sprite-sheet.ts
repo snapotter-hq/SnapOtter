@@ -11,6 +11,8 @@ const settingsSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .default("#ffffff"),
+  format: z.enum(["png", "webp", "jpeg"]).default("png"),
+  quality: z.number().int().min(1).max(100).default(90),
 });
 
 function parseHex(hex: string) {
@@ -78,23 +80,47 @@ export function registerSpriteSheet(app: FastifyInstance) {
         frames.push({ index: i, left, top, width: cellW, height: cellH });
       }
 
-      const buffer = await sharp({
+      let pipeline = sharp({
         create: {
           width: canvasW,
           height: canvasH,
           channels: 4,
           background: { r: bg.r, g: bg.g, b: bg.b, alpha: 1 },
         },
-      })
-        .composite(composites)
-        .png()
-        .toBuffer();
+      }).composite(composites);
+
+      const fmt = settings.format;
+      let filename: string;
+      let contentType: string;
+      if (fmt === "webp") {
+        pipeline = pipeline.webp({ quality: settings.quality });
+        filename = "sprite.webp";
+        contentType = "image/webp";
+      } else if (fmt === "jpeg") {
+        pipeline = pipeline.jpeg({ quality: settings.quality });
+        filename = "sprite.jpg";
+        contentType = "image/jpeg";
+      } else {
+        pipeline = pipeline.png();
+        filename = "sprite.png";
+        contentType = "image/png";
+      }
+
+      const buffer = await pipeline.toBuffer();
 
       return {
         buffer,
-        filename: "sprite.png",
-        contentType: "image/png",
-        resultPayload: { frames },
+        filename,
+        contentType,
+        resultPayload: {
+          frames,
+          cols,
+          rows,
+          cellWidth: cellW,
+          cellHeight: cellH,
+          canvasWidth: canvasW,
+          canvasHeight: canvasH,
+        },
       };
     },
   });

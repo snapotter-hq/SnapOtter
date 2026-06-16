@@ -1,27 +1,40 @@
-import { Download } from "lucide-react";
+import { Check, ClipboardCopy, Download } from "lucide-react";
 import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
+
+type OutputFormat = "png" | "webp" | "jpeg";
+
+interface Frame {
+  index: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 export function SpriteSheetSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
+  const { processFiles, processing, error, downloadUrl, progress, resultPayload } =
     useToolProcessor("sprite-sheet");
 
   const [columns, setColumns] = useState(4);
   const [padding, setPadding] = useState(0);
   const [background, setBackground] = useState("#ffffff");
+  const [format, setFormat] = useState<OutputFormat>("png");
+  const [quality, setQuality] = useState(90);
+  const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
 
   const handleProcess = () => {
-    const settings = { columns, padding, background };
-    if (files.length > 1) {
-      processAllFiles(files, settings);
-    } else {
-      processFiles(files, settings);
-    }
+    const settings = { columns, padding, background, format, quality };
+    // sprite-sheet packs every image into ONE sheet, so all files go in a
+    // single request. It is a MULTI_FILE tool, so processFiles appends them
+    // all; processAllFiles would wrongly fan out to the per-file batch route.
+    processFiles(files, settings);
   };
 
   const hasFile = files.length > 0;
@@ -94,6 +107,47 @@ export function SpriteSheetSettings() {
         </div>
       </div>
 
+      {/* Format */}
+      <div>
+        <span className="text-xs text-muted-foreground">Format</span>
+        <div className="flex gap-1 mt-1">
+          {(["png", "webp", "jpeg"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFormat(f)}
+              className={`flex-1 text-xs py-1.5 rounded ${
+                format === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+              data-testid={`sprite-sheet-format-${f}`}
+            >
+              {f === "webp" ? "WebP" : f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Quality (webp/jpeg only) */}
+      {format !== "png" && (
+        <div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Quality</span>
+            <span className="text-xs font-mono text-foreground">{quality}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={quality}
+            onChange={(e) => setQuality(Number(e.target.value))}
+            className="w-full mt-1"
+            data-testid="sprite-sheet-quality"
+          />
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-500">{error}</p>}
 
       {processing ? (
@@ -127,6 +181,104 @@ export function SpriteSheetSettings() {
           {t.common.download}
         </a>
       )}
+
+      {/* Coordinate map output */}
+      {Array.isArray(resultPayload?.frames) && (
+        <SpriteOutput
+          payload={resultPayload}
+          format={format}
+          copiedExport={copiedExport}
+          setCopiedExport={setCopiedExport}
+        />
+      )}
     </form>
+  );
+}
+
+function SpriteOutput({
+  payload,
+  format,
+  copiedExport,
+  setCopiedExport,
+}: {
+  payload: Record<string, unknown>;
+  format: OutputFormat;
+  copiedExport: "css" | "json" | null;
+  setCopiedExport: (v: "css" | "json" | null) => void;
+}) {
+  const frames = payload.frames as Frame[];
+  const cols = payload.cols as number;
+  const rows = payload.rows as number;
+  const cellWidth = payload.cellWidth as number;
+  const cellHeight = payload.cellHeight as number;
+  const canvasWidth = payload.canvasWidth as number;
+  const canvasHeight = payload.canvasHeight as number;
+
+  const ext = format === "jpeg" ? "jpg" : format;
+
+  const copyCss = async () => {
+    const base = `.sprite {\n  background-image: url('sprite.${ext}');\n  background-repeat: no-repeat;\n  display: inline-block;\n}`;
+    const rules = frames
+      .map(
+        (f) =>
+          `.sprite-${f.index} {\n  width: ${f.width}px;\n  height: ${f.height}px;\n  background-position: -${f.left}px -${f.top}px;\n}`,
+      )
+      .join("\n");
+    const ok = await copyToClipboard(`${base}\n${rules}`);
+    if (ok) {
+      setCopiedExport("css");
+      setTimeout(() => setCopiedExport(null), 1500);
+    }
+  };
+
+  const copyJson = async () => {
+    const ok = await copyToClipboard(
+      JSON.stringify(
+        { frames, cols, rows, cellWidth, cellHeight, canvasWidth, canvasHeight },
+        null,
+        2,
+      ),
+    );
+    if (ok) {
+      setCopiedExport("json");
+      setTimeout(() => setCopiedExport(null), 1500);
+    }
+  };
+
+  return (
+    <div className="space-y-3 pt-2 border-t border-border" data-testid="sprite-sheet-output">
+      <p className="text-xs text-muted-foreground">
+        {cols} x {rows} grid · {cellWidth} x {cellHeight}px cells · {canvasWidth} x {canvasHeight}px
+        canvas
+      </p>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={copyCss}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
+          data-testid="sprite-sheet-copy-css"
+        >
+          {copiedExport === "css" ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <ClipboardCopy className="h-3 w-3" />
+          )}
+          Copy CSS
+        </button>
+        <button
+          type="button"
+          onClick={copyJson}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
+          data-testid="sprite-sheet-copy-json"
+        >
+          {copiedExport === "json" ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <ClipboardCopy className="h-3 w-3" />
+          )}
+          Copy JSON
+        </button>
+      </div>
+    </div>
   );
 }

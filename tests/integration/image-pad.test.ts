@@ -1,8 +1,8 @@
 /**
  * Integration tests for the image-pad tool (/api/v1/tools/image-pad).
  *
- * Covers aspect-ratio padding, color application, dimension math,
- * and schema validation.
+ * Covers aspect-ratio padding, color/transparent/blur backgrounds,
+ * custom ratios, dimension math, and schema validation.
  */
 
 import { readFileSync } from "node:fs";
@@ -164,5 +164,108 @@ describe("Image Pad", () => {
     // Default 1:1 on 200x150 -> 200x200
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(200);
+  });
+
+  it("transparent background outputs PNG with alpha 0 at corner", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ target: "1:1", background: "transparent" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-pad",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4);
+
+    // Corner pixel (0,0) is in the top padding area -- must be fully transparent
+    const { data } = await sharp(dlRes.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(0); // alpha of pixel (0,0)
+  });
+
+  it("blur background produces a valid padded image", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ target: "1:1", background: "blur" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-pad",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // 200x150 padded to 1:1 => 200x200
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(200);
+  });
+
+  it("custom ratio 21:9 produces correct dimensions", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ target: "custom", ratioW: 21, ratioH: 9 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image-pad",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    // 200x150 with 21:9: srcRatio (1.33) < targetRatio (2.33), expand width
+    // cw = round(150 * 21/9) = 350, ch = 150
+    expect(meta.width).toBe(350);
+    expect(meta.height).toBe(150);
   });
 });
