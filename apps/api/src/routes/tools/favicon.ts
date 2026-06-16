@@ -16,7 +16,21 @@ import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
-const settingsSchema = z.object({}).passthrough();
+const settingsSchema = z.object({
+  background: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
+  padding: z.number().int().min(0).max(40).default(0),
+  radius: z.number().int().min(0).max(50).default(0),
+  sizes: z.array(z.number().int()).optional(),
+  themeColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default("#ffffff"),
+});
+
+type FaviconSettings = z.infer<typeof settingsSchema>;
 
 const FAVICON_SIZES = [
   { name: "favicon-16x16.png", size: 16, format: "png" as const },
@@ -26,6 +40,38 @@ const FAVICON_SIZES = [
   { name: "android-chrome-192x192.png", size: 192, format: "png" as const },
   { name: "android-chrome-512x512.png", size: 512, format: "png" as const },
 ];
+
+/** Build a single icon at the given pixel size with styling applied. */
+async function buildIcon(source: Buffer, size: number, settings: FaviconSettings): Promise<Buffer> {
+  const inset = settings.padding > 0 ? Math.round((size * settings.padding) / 100) : 0;
+  const contentSize = Math.max(1, size - 2 * inset);
+
+  let pipeline = sharp(source).resize(contentSize, contentSize, { fit: "cover" });
+
+  if (settings.background) {
+    pipeline = pipeline.flatten({ background: settings.background });
+  }
+
+  if (inset > 0) {
+    pipeline = pipeline.extend({
+      top: inset,
+      bottom: inset,
+      left: inset,
+      right: inset,
+      background: settings.background || { r: 0, g: 0, b: 0, alpha: 0 },
+    });
+  }
+
+  if (settings.radius > 0) {
+    const rx = Math.round((size * settings.radius) / 100);
+    const mask = Buffer.from(
+      `<svg width="${size}" height="${size}"><rect x="0" y="0" width="${size}" height="${size}" rx="${rx}" ry="${rx}" fill="white"/></svg>`,
+    );
+    pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: "dest-in" }]);
+  }
+
+  return pipeline.png().toBuffer();
+}
 
 interface UploadedFile {
   buffer: Buffer;
@@ -135,6 +181,8 @@ export function registerFavicon(app: FastifyInstance) {
       });
     }
 
+    let settings: FaviconSettings = { padding: 0, radius: 0, themeColor: "#ffffff" };
+
     if (settingsRaw) {
       try {
         const parsed = JSON.parse(settingsRaw);
@@ -144,6 +192,7 @@ export function registerFavicon(app: FastifyInstance) {
             .status(400)
             .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
         }
+        settings = result.data;
       } catch {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
@@ -152,6 +201,9 @@ export function registerFavicon(app: FastifyInstance) {
     try {
       const jobId = randomUUID();
       const isSingleFile = decodedFiles.length === 1;
+      const filteredSizes = settings.sizes
+        ? FAVICON_SIZES.filter((s) => settings.sizes?.includes(s.size))
+        : FAVICON_SIZES;
 
       reply.hijack();
       reply.raw.writeHead(200, {
@@ -168,11 +220,8 @@ export function registerFavicon(app: FastifyInstance) {
         const stem = sanitizeFilename(file.filename).replace(/\.[^.]+$/, "");
         const prefix = isSingleFile ? "" : `${stem}/`;
 
-        for (const icon of FAVICON_SIZES) {
-          const buffer = await sharp(file.buffer)
-            .resize(icon.size, icon.size, { fit: "cover" })
-            .png()
-            .toBuffer();
+        for (const icon of filteredSizes) {
+          const buffer = await buildIcon(file.buffer, icon.size, settings);
           archive.append(buffer, { name: `${prefix}${icon.name}` });
         }
 
@@ -187,10 +236,7 @@ export function registerFavicon(app: FastifyInstance) {
           try {
             for (const sz of icoSizes) {
               const pngPath = join(tmpdir(), `favicon-${icoId}-${sz}.png`);
-              const buf = await sharp(file.buffer)
-                .resize(sz, sz, { fit: "cover" })
-                .png()
-                .toBuffer();
+              const buf = await buildIcon(file.buffer, sz, settings);
               await writeFile(pngPath, buf);
               icoPaths.push(pngPath);
             }
@@ -203,31 +249,44 @@ export function registerFavicon(app: FastifyInstance) {
             }
           }
         } else {
-          const ico32 = await sharp(file.buffer).resize(32, 32, { fit: "cover" }).png().toBuffer();
+          const ico32 = await buildIcon(file.buffer, 32, settings);
           archive.append(ico32, { name: `${prefix}favicon.ico` });
         }
 
+        const manifestIcons = filteredSizes
+          .filter((s) => s.size === 192 || s.size === 512)
+          .map((s) => ({
+            src: `/${s.name}`,
+            sizes: `${s.size}x${s.size}`,
+            type: "image/png",
+          }));
         const manifest = {
           name: stem,
           short_name: stem,
-          icons: [
-            { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
-            { src: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
-          ],
-          theme_color: "#ffffff",
-          background_color: "#ffffff",
+          icons: manifestIcons,
+          theme_color: settings.themeColor,
+          background_color: settings.themeColor,
           display: "standalone",
         };
         archive.append(JSON.stringify(manifest, null, 2), { name: `${prefix}manifest.json` });
 
-        const htmlSnippet = `<!-- Favicons -->
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.json">
-`;
-        archive.append(htmlSnippet, { name: `${prefix}favicon-snippet.html` });
+        const snippetLines = ["<!-- Favicons -->"];
+        for (const s of filteredSizes) {
+          if (s.name.startsWith("android-chrome")) continue;
+          if (s.name === "apple-touch-icon.png") {
+            snippetLines.push(
+              `<link rel="apple-touch-icon" sizes="${s.size}x${s.size}" href="/${s.name}">`,
+            );
+          } else {
+            snippetLines.push(
+              `<link rel="icon" type="image/png" sizes="${s.size}x${s.size}" href="/${s.name}">`,
+            );
+          }
+        }
+        snippetLines.push('<link rel="manifest" href="/manifest.json">');
+        archive.append(`${snippetLines.join("\n")}\n`, {
+          name: `${prefix}favicon-snippet.html`,
+        });
       }
 
       if (skippedFiles.length > 0) {

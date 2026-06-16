@@ -1,7 +1,7 @@
 /**
  * Integration tests for the lqip-placeholder tool (/api/v1/tools/lqip-placeholder).
  *
- * Covers LQIP generation, data URI prefix, output size, and schema validation.
+ * Covers LQIP generation, data URI prefix, strategy variants, output size, and schema validation.
  */
 
 import { readFileSync } from "node:fs";
@@ -27,7 +27,7 @@ afterAll(async () => {
 }, 10_000);
 
 describe("LQIP Placeholder", () => {
-  it("generates a placeholder with data URI", async () => {
+  it("generates a placeholder with default settings", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       { name: "settings", content: JSON.stringify({}) },
@@ -46,10 +46,35 @@ describe("LQIP Placeholder", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
-    expect(result.dataUri).toMatch(/^data:image\/webp;base64,/);
+    expect(result.dataUri).toMatch(/^data:image\//);
     expect(result.width).toBeGreaterThan(0);
     expect(result.height).toBeGreaterThan(0);
     expect(result.bytes).toBeGreaterThan(0);
+    expect(result.strategy).toBe("blur");
+    expect(result.html).toContain("<img");
+    expect(result.css).toContain("background-image");
+  });
+
+  it("generates a solid-color placeholder", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ strategy: "solid" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/lqip-placeholder",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.dataUri).toMatch(/^data:image\//);
+    expect(result.strategy).toBe("solid");
   });
 
   it("produces output under 5 KiB", async () => {
@@ -71,7 +96,6 @@ describe("LQIP Placeholder", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
 
-    // Download the output and verify size
     const dlRes = await app.inject({
       method: "GET",
       url: result.downloadUrl,

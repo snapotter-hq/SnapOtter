@@ -3,7 +3,30 @@ import sharp from "sharp";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
 
-const settingsSchema = z.object({});
+const settingsSchema = z
+  .object({
+    scale: z.enum(["linear", "log"]).default("linear"),
+  })
+  .passthrough();
+
+function medianFromBins(bins: Uint32Array, total: number): number {
+  const half = total / 2;
+  let cumulative = 0;
+  for (let i = 0; i < 256; i++) {
+    cumulative += bins[i];
+    if (cumulative >= half) return i;
+  }
+  return 255;
+}
+
+function stdevFromBins(bins: Uint32Array, mean: number, total: number): number {
+  let sumSqDiff = 0;
+  for (let i = 0; i < 256; i++) {
+    const diff = i - mean;
+    sumSqDiff += diff * diff * bins[i];
+  }
+  return Math.round(Math.sqrt(sumSqDiff / total) * 100) / 100;
+}
 
 export function registerHistogram(app: FastifyInstance) {
   createToolRoute(app, {
@@ -22,14 +45,16 @@ export function registerHistogram(app: FastifyInstance) {
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      // Build 256-bin histograms per channel in a single pass
+      // Build 256-bin histograms per channel + luminance in a single pass
       const rBins = new Uint32Array(256);
       const gBins = new Uint32Array(256);
       const bBins = new Uint32Array(256);
+      const lumBins = new Uint32Array(256);
 
       let rSum = 0;
       let gSum = 0;
       let bSum = 0;
+      let lumSum = 0;
       const pixelCount = data.length / 3;
 
       for (let i = 0; i < data.length; i += 3) {
@@ -42,9 +67,12 @@ export function registerHistogram(app: FastifyInstance) {
         rSum += r;
         gSum += g;
         bSum += b;
+        const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+        lumBins[lum]++;
+        lumSum += lum;
       }
 
-      // Find max bin value for normalization
+      // Find max bin value for normalization (RGB only for the PNG)
       let maxBin = 0;
       let rMax = 0;
       let gMax = 0;
@@ -57,6 +85,35 @@ export function registerHistogram(app: FastifyInstance) {
         if (gBins[i] > gMax) gMax = gBins[i];
         if (bBins[i] > bMax) bMax = bBins[i];
       }
+
+      // Per-channel statistics
+      const rMean = Math.round(rSum / pixelCount);
+      const gMean = Math.round(gSum / pixelCount);
+      const bMean = Math.round(bSum / pixelCount);
+      const lumMean = Math.round(lumSum / pixelCount);
+
+      const stats = {
+        r: {
+          mean: rMean,
+          median: medianFromBins(rBins, pixelCount),
+          stdev: stdevFromBins(rBins, rSum / pixelCount, pixelCount),
+        },
+        g: {
+          mean: gMean,
+          median: medianFromBins(gBins, pixelCount),
+          stdev: stdevFromBins(gBins, gSum / pixelCount, pixelCount),
+        },
+        b: {
+          mean: bMean,
+          median: medianFromBins(bBins, pixelCount),
+          stdev: stdevFromBins(bBins, bSum / pixelCount, pixelCount),
+        },
+        lum: {
+          mean: lumMean,
+          median: medianFromBins(lumBins, pixelCount),
+          stdev: stdevFromBins(lumBins, lumSum / pixelCount, pixelCount),
+        },
+      };
 
       // Render a 512x320 SVG with three semi-transparent polylines
       const svgW = 512;
@@ -92,16 +149,16 @@ export function registerHistogram(app: FastifyInstance) {
         filename: `${base}_histogram.png`,
         contentType: "image/png",
         resultPayload: {
-          mean: {
-            r: Math.round(rSum / pixelCount),
-            g: Math.round(gSum / pixelCount),
-            b: Math.round(bSum / pixelCount),
+          bins: {
+            r: Array.from(rBins),
+            g: Array.from(gBins),
+            b: Array.from(bBins),
+            lum: Array.from(lumBins),
           },
-          max: {
-            r: rMax,
-            g: gMax,
-            b: bMax,
-          },
+          stats,
+          // Backward-compat fields
+          mean: { r: rMean, g: gMean, b: bMean },
+          max: { r: rMax, g: gMax, b: bMax },
         },
       };
     },

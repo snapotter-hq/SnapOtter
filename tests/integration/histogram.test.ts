@@ -1,7 +1,8 @@
 /**
  * Integration tests for the histogram tool (/api/v1/tools/histogram).
  *
- * Covers PNG output, mean fields, and channel accuracy with a pure-red fixture.
+ * Covers PNG output, bins + stats payload, backward-compat mean/max fields,
+ * and channel accuracy with a pure-red fixture.
  */
 
 import { readFileSync } from "node:fs";
@@ -28,7 +29,7 @@ afterAll(async () => {
 }, 10_000);
 
 describe("Histogram", () => {
-  it("generates a PNG histogram with mean fields", async () => {
+  it("generates a PNG histogram with bins and stats", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       { name: "settings", content: JSON.stringify({}) },
@@ -47,6 +48,23 @@ describe("Histogram", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+
+    // Bins: four channels, each 256 entries
+    expect(result.bins).toBeDefined();
+    expect(result.bins.r).toHaveLength(256);
+    expect(result.bins.g).toHaveLength(256);
+    expect(result.bins.b).toHaveLength(256);
+    expect(result.bins.lum).toHaveLength(256);
+
+    // Stats: per-channel mean, median, stdev
+    expect(result.stats).toBeDefined();
+    for (const ch of ["r", "g", "b", "lum"]) {
+      expect(result.stats[ch].mean).toBeGreaterThanOrEqual(0);
+      expect(result.stats[ch].median).toBeGreaterThanOrEqual(0);
+      expect(typeof result.stats[ch].stdev).toBe("number");
+    }
+
+    // Backward-compat: mean and max still present
     expect(result.mean).toBeDefined();
     expect(result.mean.r).toBeGreaterThanOrEqual(0);
     expect(result.mean.g).toBeGreaterThanOrEqual(0);
@@ -66,7 +84,7 @@ describe("Histogram", () => {
     expect(dlRes.rawPayload[3]).toBe(0x47);
   });
 
-  it("pure-red fixture has mean.r > mean.g", async () => {
+  it("pure-red fixture has correct bins and stats", async () => {
     // Generate a pure red 10x10 PNG in-memory
     const redPng = await sharp({
       create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } },
@@ -91,6 +109,24 @@ describe("Histogram", () => {
 
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
+
+    // Red channel: all 100 pixels at bin 255
+    expect(result.bins.r[255]).toBe(100);
+    // Green and blue: all 100 pixels at bin 0
+    expect(result.bins.g[0]).toBe(100);
+    expect(result.bins.b[0]).toBe(100);
+
+    // Luminance for pure red: round(0.299 * 255) = 76
+    expect(result.bins.lum[76]).toBe(100);
+
+    // Stats for pure-red image
+    expect(result.stats.r.mean).toBe(255);
+    expect(result.stats.r.median).toBe(255);
+    expect(result.stats.r.stdev).toBe(0);
+    expect(result.stats.g.mean).toBe(0);
+    expect(result.stats.lum.mean).toBe(76);
+
+    // Backward compat
     expect(result.mean.r).toBeGreaterThan(result.mean.g);
   });
 });

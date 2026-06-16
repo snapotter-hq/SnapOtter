@@ -53,6 +53,9 @@ export function useToolProcessor(toolId: string) {
 
   const [progress, setProgress] = useState<ToolProgress>(IDLE_PROGRESS);
   const [warning, setWarning] = useState<string | null>(null);
+  // Extra fields the route spreads into the result envelope (e.g. histogram
+  // bins, lqip dataUri, AI detection counts). Null until a job completes.
+  const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -129,6 +132,7 @@ export function useToolProcessor(toolId: string) {
 
             const result = data.result as ProcessResult;
             setWarning(result.warning ?? null);
+            setResultPayload(result as unknown as Record<string, unknown>);
             const idx = useFileStore.getState().selectedIndex;
             useFileStore.getState().updateEntry(idx, {
               processedUrl: result.downloadUrl,
@@ -215,6 +219,7 @@ export function useToolProcessor(toolId: string) {
 
       setError(null);
       setWarning(null);
+      setResultPayload(null);
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: null,
         processedPreviewUrl: null,
@@ -288,6 +293,7 @@ export function useToolProcessor(toolId: string) {
 
               const result = data.result as ProcessResult;
               setWarning(result.warning ?? null);
+              setResultPayload(result as unknown as Record<string, unknown>);
               useFileStore.getState().updateEntry(capturedIndex, {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
@@ -403,6 +409,7 @@ export function useToolProcessor(toolId: string) {
           try {
             const result: ProcessResult = JSON.parse(xhr.responseText);
             setWarning(result.warning ?? null);
+            setResultPayload(result as unknown as Record<string, unknown>);
             useFileStore.getState().updateEntry(capturedIndex, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
@@ -643,5 +650,6 @@ export function useToolProcessor(toolId: string) {
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   };
 }

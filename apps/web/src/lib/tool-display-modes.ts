@@ -63,7 +63,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   pixelate: "live-preview",
   vignette: "live-preview",
 
-  "gif-webp": "live-preview",
+  "gif-webp": "before-after",
   histogram: "no-comparison",
   "lqip-placeholder": "no-comparison",
   "sprite-sheet": "no-comparison",

@@ -98,8 +98,8 @@ describe("Solid color image", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.colors.length).toBe(1);
-    // The quantized red should be close to #f00000 or #ff0000
-    expect(result.colors[0]).toMatch(/^#[ef][0f]0000$/);
+    // Median-cut averages all identical pixels, so solid red is #ff0000
+    expect(result.colors[0]).toBe("#ff0000");
   });
 });
 
@@ -376,8 +376,8 @@ describe("Solid white image", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.colors.length).toBe(1);
-    // Quantized white should be #f0f0f0 or #ffffff
-    expect(result.colors[0]).toMatch(/^#[ef][0f][ef][0f][ef][0f]$/);
+    // Median-cut averages all identical pixels, so solid white is #ffffff
+    expect(result.colors[0]).toBe("#ffffff");
   });
 });
 
@@ -741,5 +741,105 @@ describe("Cross-format WebP input", () => {
     const result = JSON.parse(res.body);
     expect(result.colors.length).toBeGreaterThan(0);
     expect(result.filename).toBe("chat.webp");
+  });
+});
+
+// ── Settings: custom count ──────────────────────────────────────
+describe("Settings: custom count", () => {
+  it("respects count setting and returns at most that many colors", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ count: 4 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(Array.isArray(result.colors)).toBe(true);
+    expect(result.colors.length).toBeGreaterThan(0);
+    expect(result.colors.length).toBeLessThanOrEqual(4);
+    expect(result.count).toBe(result.colors.length);
+  });
+});
+
+// ── Settings: RGB format ─────────────────────────────────────────
+describe("Settings: RGB format", () => {
+  it("returns rgb() strings when format is rgb", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ format: "rgb" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+    expect(result.colors[0]).toMatch(/^rgb\(/);
+    // hex array should always contain hex values regardless of format
+    expect(result.hex).toBeDefined();
+    expect(result.hex[0]).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+// ── Settings: HSL format ─────────────────────────────────────────
+describe("Settings: HSL format", () => {
+  it("returns hsl() strings when format is hsl", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ format: "hsl" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.colors.length).toBeGreaterThan(0);
+    expect(result.colors[0]).toMatch(/^hsl\(/);
+    expect(result.hex).toBeDefined();
+    expect(result.hex.length).toBe(result.colors.length);
+  });
+});
+
+// ── Response always includes hex array ──────────────────────────
+describe("Response shape: hex array", () => {
+  it("always returns hex array alongside colors", async () => {
+    const { body: payload, contentType } = makeFilePayload(PNG, "test.png", "image/png");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/color-palette",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.hex).toBeDefined();
+    expect(Array.isArray(result.hex)).toBe(true);
+    expect(result.hex.length).toBe(result.colors.length);
+    for (const h of result.hex) {
+      expect(h).toMatch(/^#[0-9a-f]{6}$/);
+    }
   });
 });

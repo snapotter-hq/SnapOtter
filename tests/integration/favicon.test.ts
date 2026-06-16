@@ -1045,4 +1045,85 @@ describe("favicon", () => {
     const totalSize = zip.getEntries().reduce((s, e) => s + (e.header.size || 0), 0);
     expect(totalSize).toBeGreaterThan(0);
   });
+
+  // ── Settings: radius + padding ──────────────────────────────────
+
+  it("accepts radius and padding settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ radius: 50, padding: 10 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/zip");
+
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toContain("favicon-32x32.png");
+    expect(entries).toContain("favicon.ico");
+    expect(entries).toContain("manifest.json");
+
+    // Verify the 32x32 icon is still exactly 32x32 after padding/radius
+    const entry32 = zip.getEntry("favicon-32x32.png");
+    expect(entry32).toBeDefined();
+    const meta = await sharp(entry32?.getData()).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+  });
+
+  // ── Settings: full combo with size filter + themeColor ──────────
+
+  it("respects sizes filter and themeColor in manifest", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "logo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          background: "#ff0000",
+          padding: 20,
+          radius: 25,
+          sizes: [16, 32, 512],
+          themeColor: "#336699",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/favicon",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/zip");
+
+    const zip = new AdmZip(Buffer.from(res.rawPayload));
+    const entries = zip.getEntries().map((e) => e.entryName);
+
+    // Only selected PNG sizes emitted
+    expect(entries).toContain("favicon-16x16.png");
+    expect(entries).toContain("favicon-32x32.png");
+    expect(entries).toContain("android-chrome-512x512.png");
+    expect(entries).not.toContain("favicon-48x48.png");
+    expect(entries).not.toContain("apple-touch-icon.png");
+    expect(entries).not.toContain("android-chrome-192x192.png");
+
+    // ICO, manifest, snippet always present
+    expect(entries).toContain("favicon.ico");
+    expect(entries).toContain("manifest.json");
+    expect(entries).toContain("favicon-snippet.html");
+
+    // themeColor reflected in manifest
+    const manifest = JSON.parse(zip.getEntry("manifest.json")?.getData().toString("utf-8"));
+    expect(manifest.theme_color).toBe("#336699");
+    expect(manifest.background_color).toBe("#336699");
+  });
 });

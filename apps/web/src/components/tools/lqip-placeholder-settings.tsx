@@ -1,21 +1,29 @@
-import { Download } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
+
+type Strategy = "blur" | "pixelate" | "solid";
+type Format = "webp" | "png" | "jpeg";
 
 export function LqipPlaceholderSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
+  const { processFiles, processAllFiles, processing, error, downloadUrl, progress, resultPayload } =
     useToolProcessor("lqip-placeholder");
 
   const [width, setWidth] = useState(16);
   const [blur, setBlur] = useState(2);
+  const [strategy, setStrategy] = useState<Strategy>("blur");
+  const [format, setFormat] = useState<Format>("webp");
+  const [quality, setQuality] = useState(50);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const handleProcess = () => {
-    const settings = { width, blur };
+    const settings = { width, blur, strategy, format, quality };
     if (files.length > 1) {
       processAllFiles(files, settings);
     } else {
@@ -31,8 +39,44 @@ export function LqipPlaceholderSettings() {
     if (canProcess) handleProcess();
   };
 
+  const handleCopy = async (text: string, label: string) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1500);
+    }
+  };
+
+  const dataUri = resultPayload?.dataUri as string | undefined;
+  const resultWidth = resultPayload?.width as number | undefined;
+  const resultHeight = resultPayload?.height as number | undefined;
+  const resultBytes = resultPayload?.bytes as number | undefined;
+  const resultHtml = resultPayload?.html as string | undefined;
+  const resultCss = resultPayload?.css as string | undefined;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Strategy */}
+      <div>
+        <span className="text-xs text-muted-foreground">Strategy</span>
+        <div className="flex gap-1 mt-1">
+          {(["blur", "pixelate", "solid"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStrategy(s)}
+              className={`flex-1 text-xs py-1.5 rounded ${
+                strategy === s
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Width */}
       <div>
         <div className="flex justify-between items-center">
@@ -52,28 +96,65 @@ export function LqipPlaceholderSettings() {
         />
       </div>
 
-      {/* Blur */}
-      <div>
-        <div className="flex justify-between items-center">
-          <label htmlFor="lqip-blur" className="text-xs text-muted-foreground">
-            {t.toolSettings["lqip-placeholder"].blur}
-          </label>
-          <span className="text-xs font-mono text-foreground">{blur}</span>
+      {/* Blur (only for blur strategy) */}
+      {strategy === "blur" && (
+        <div>
+          <div className="flex justify-between items-center">
+            <label htmlFor="lqip-blur" className="text-xs text-muted-foreground">
+              {t.toolSettings["lqip-placeholder"].blur}
+            </label>
+            <span className="text-xs font-mono text-foreground">{blur}</span>
+          </div>
+          <input
+            id="lqip-blur"
+            type="range"
+            min={0}
+            max={20}
+            value={blur}
+            onChange={(e) => setBlur(Number(e.target.value))}
+            className="w-full mt-1"
+          />
         </div>
-        <input
-          id="lqip-blur"
-          type="range"
-          min={0}
-          max={20}
-          value={blur}
-          onChange={(e) => setBlur(Number(e.target.value))}
-          className="w-full mt-1"
-        />
+      )}
+
+      {/* Format */}
+      <div>
+        <span className="text-xs text-muted-foreground">Format</span>
+        <div className="flex gap-1 mt-1">
+          {(["webp", "png", "jpeg"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFormat(f)}
+              className={`flex-1 text-xs py-1.5 rounded ${
+                format === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {f === "webp" ? "WebP" : f.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <p className="text-[10px] text-muted-foreground">
-        The base64 data URI will appear in the result envelope.
-      </p>
+      {/* Quality (only for webp/jpeg) */}
+      {format !== "png" && (
+        <div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Quality</span>
+            <span className="text-xs font-mono text-foreground">{quality}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={quality}
+            onChange={(e) => setQuality(Number(e.target.value))}
+            className="w-full mt-1"
+          />
+        </div>
+      )}
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -113,6 +194,86 @@ export function LqipPlaceholderSettings() {
           {t.common.download}
         </a>
       )}
+
+      {/* Output section */}
+      {dataUri && (
+        <div className="space-y-3 pt-2 border-t border-border">
+          {/* Preview + stats */}
+          <div className="flex items-start gap-3">
+            <img
+              src={dataUri}
+              alt="LQIP preview"
+              className="rounded border border-border"
+              style={{ width: 96, imageRendering: "auto" }}
+            />
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <p>
+                {resultWidth} x {resultHeight} px
+              </p>
+              <p>{resultBytes} bytes</p>
+            </div>
+          </div>
+
+          {/* Data URI */}
+          <CopyBlock
+            label="Data URI"
+            value={dataUri}
+            copied={copied === "dataUri"}
+            onCopy={() => handleCopy(dataUri, "dataUri")}
+          />
+
+          {/* HTML snippet */}
+          {resultHtml && (
+            <CopyBlock
+              label="HTML"
+              value={resultHtml}
+              copied={copied === "html"}
+              onCopy={() => handleCopy(resultHtml, "html")}
+            />
+          )}
+
+          {/* CSS snippet */}
+          {resultCss && (
+            <CopyBlock
+              label="CSS"
+              value={resultCss}
+              copied={copied === "css"}
+              onCopy={() => handleCopy(resultCss, "css")}
+            />
+          )}
+        </div>
+      )}
     </form>
+  );
+}
+
+function CopyBlock({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          Copy
+        </button>
+      </div>
+      <div className="p-2 rounded bg-muted text-xs font-mono text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+        {value}
+      </div>
+    </div>
   );
 }

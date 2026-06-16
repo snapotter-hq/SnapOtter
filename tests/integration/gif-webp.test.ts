@@ -15,6 +15,7 @@ const FIXTURES = join(__dirname, "..", "fixtures");
 const ANIMATED_GIF = readFileSync(join(FIXTURES, "animated.gif"));
 const ANIMATED_WEBP = readFileSync(join(FIXTURES, "animated.webp"));
 const STILL_PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
+const SIMPSONS_GIF = readFileSync(join(FIXTURES, "content", "animated-simpsons.gif"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -89,6 +90,66 @@ describe("GIF/WebP Converter", () => {
     });
     const meta = await sharp(dlRes.rawPayload, { animated: true }).metadata();
     expect(meta.pages).toBeGreaterThan(1);
+  });
+
+  it("applies resizePercent and produces a smaller WebP", async () => {
+    // Get original width for comparison
+    const origMeta = await sharp(SIMPSONS_GIF, { animated: true }).metadata();
+    const origWidth = origMeta.width ?? 1;
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "simpsons.gif",
+        contentType: "image/gif",
+        content: SIMPSONS_GIF,
+      },
+      { name: "settings", content: JSON.stringify({ resizePercent: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-webp",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload, { animated: true }).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.width).toBeLessThan(origWidth);
+  });
+
+  it("applies quality setting for GIF-to-WebP conversion", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: ANIMATED_GIF },
+      { name: "settings", content: JSON.stringify({ quality: 50, lossless: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/gif-webp",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
   });
 
   it("rejects PNG input with extension guard", async () => {
