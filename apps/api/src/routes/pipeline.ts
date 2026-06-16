@@ -8,7 +8,10 @@
  * POST   /api/v1/pipeline/batch    -- Batch pipeline execution (ZIP output)
  */
 import { randomUUID } from "node:crypto";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -20,17 +23,14 @@ import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { trackEvent } from "../lib/analytics.js";
-import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
-import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
-import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectStream, putObject } from "../lib/object-storage.js";
 import { resolveToolPool } from "../lib/pool.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { InputValidationError } from "../modality/contract.js";
+import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { getAuthUser, requireAuth } from "../plugins/auth.js";
 import { updateJobProgress, updateSingleFileProgress } from "./progress.js";
@@ -235,49 +235,30 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return reply.status(400).send({ error: "No image file provided" });
     }
 
-    // Validate the initial image
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      return reply.status(400).send({
-        error: `Invalid image: ${validation.reason}`,
+    // Determine input modality from the first pipeline step
+    let firstToolId: string | undefined;
+    try {
+      firstToolId = JSON.parse(pipelineRaw || "{}")?.steps?.[0]?.toolId;
+    } catch {
+      // Best-effort peek; authoritative parse follows below
+    }
+    const inModality = TOOLS.find((t) => t.id === firstToolId)?.modality ?? "image";
+    const scratchDir = await mkdtemp(join(tmpdir(), "pipeline-"));
+
+    try {
+      const prepared = await inputHandlerFor(inModality).prepare(fileBuffer, filename, {
+        scratchDir,
+        lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
       });
-    }
-
-    // Decode HEIC/HEIF input via system heif-dec
-    if (validation.format === "heif") {
-      try {
-        fileBuffer = await decodeHeic(fileBuffer);
-        const ext = filename.match(/\.[^.]+$/)?.[0];
-        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-      } catch (err) {
-        return reply.status(422).send({
-          error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-          details: err instanceof Error ? err.message : String(err),
-        });
+      fileBuffer = prepared.buffer;
+      filename = prepared.filename;
+    } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(err.statusCode).send({ error: err.message });
       }
-    }
-
-    // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-    if (needsCliDecode(validation.format)) {
-      try {
-        const fileExt = filename.split(".").pop()?.toLowerCase();
-        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        const ext = filename.match(/\.[^.]+$/)?.[0];
-        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-      } catch (err) {
-        return reply.status(422).send({
-          error: `Failed to decode ${validation.format} file`,
-          details: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    // Sanitize SVG input and normalize EXIF orientation
-    const isSvg = isSvgBuffer(fileBuffer);
-    if (isSvg) {
-      fileBuffer = sanitizeSvg(fileBuffer);
-    } else {
-      fileBuffer = await autoOrient(fileBuffer);
+      throw err;
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
     }
 
     // Parse and validate the pipeline definition
@@ -783,56 +764,35 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     });
 
     // Validate, decode, and upload each file; build per-file pipeline chains
+    const firstStepToolId = parsedSteps[0]?.resolvedToolId;
+    const inModality = TOOLS.find((t) => t.id === firstStepToolId)?.modality ?? "image";
     const perFileChildren: FlowJob[] = [];
     const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
     let flowChildIndex = 0;
+    const scratchDir = await mkdtemp(join(tmpdir(), "pipeline-batch-"));
 
     for (let fi = 0; fi < files.length; fi++) {
       const file = files[fi];
       let processBuffer = file.buffer;
       let processFilename = file.filename;
 
-      const fileValidation = await validateImageBuffer(processBuffer, processFilename);
-      if (!fileValidation.valid) {
-        preFailures.push({
-          originalIndex: fi,
-          filename: file.filename,
-          error: `Invalid image: ${fileValidation.reason}`,
+      try {
+        const prepared = await inputHandlerFor(inModality).prepare(processBuffer, processFilename, {
+          scratchDir,
+          lenient: getToolConfig(firstStepToolId ?? "")?.skipStructuralValidation,
         });
-        continue;
-      }
-
-      // Decode chain
-      if (fileValidation.format === "heif") {
-        try {
-          processBuffer = await decodeHeic(processBuffer);
-          const ext = processFilename.match(/\.[^.]+$/)?.[0];
-          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-        } catch {
+        processBuffer = prepared.buffer;
+        processFilename = prepared.filename;
+      } catch (err) {
+        if (err instanceof InputValidationError) {
           preFailures.push({
             originalIndex: fi,
             filename: file.filename,
-            error: "Failed to decode HEIC file",
+            error: err.message,
           });
           continue;
         }
-      }
-
-      if (needsCliDecode(fileValidation.format)) {
-        try {
-          const fileExt = processFilename.split(".").pop()?.toLowerCase();
-          processBuffer = await decodeToSharpCompat(processBuffer, fileValidation.format, fileExt);
-          const ext = processFilename.match(/\.[^.]+$/)?.[0];
-          if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-        } catch {
-          // Fall through -- tool might handle it
-        }
-      }
-
-      if (isSvgBuffer(processBuffer)) {
-        processBuffer = sanitizeSvg(processBuffer);
-      } else {
-        processBuffer = await autoOrient(processBuffer);
+        throw err;
       }
 
       // Upload decoded file
@@ -879,6 +839,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       perFileChildren.push(perFileTree);
       flowChildIndex++;
     }
+
+    await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
 
     // Record pre-failures in batch progress
     for (const pf of preFailures) {
