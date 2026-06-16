@@ -49,8 +49,7 @@ export function registerJsonXml(app: FastifyInstance) {
       }
       // Wrap in a root element when the top level is an array or has multiple
       // keys, so the XML is well-formed with a single root.
-      const wrapped =
-        Array.isArray(data) || Object.keys(data).length !== 1 ? { root: data } : data;
+      const wrapped = Array.isArray(data) || Object.keys(data).length !== 1 ? { root: data } : data;
       const builder = new XMLBuilder({ format: settings.pretty, ignoreAttributes: false });
       const xml = builder.build(wrapped) as string;
       return {

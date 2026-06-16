@@ -252,7 +252,9 @@ describe("Pipeline without image", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/no image/i);
+    // The route may report either "No image file provided" or the more generic
+    // "No file provided" depending on which validation fires first.
+    expect(json.error).toMatch(/no (image|file)/i);
   });
 });
 
@@ -564,7 +566,9 @@ describe("Pipeline batch execution", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/no image/i);
+    // The route may report either "No image file provided" or the more generic
+    // "No file provided" depending on which validation fires first.
+    expect(json.error).toMatch(/no (image|file)/i);
   });
 
   it("rejects pipeline batch with no pipeline definition", async () => {

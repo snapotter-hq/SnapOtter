@@ -80,9 +80,7 @@ export interface ToolRouteConfig<T> {
    * and validated settings; throw InputValidationError to reject with its
    * statusCode (default 400) before any job is enqueued (vs a worker 422).
    */
-  preValidate?: (ctx: {
-    inputs: { filename: string; buffer: Buffer }[];
-  }) => Promise<void> | void;
+  preValidate?: (ctx: { inputs: { filename: string; buffer: Buffer }[] }) => Promise<void> | void;
   /**
    * Per-position input kind overrides for mixed-input tools (e.g. video +
    * subtitle). Input i validates with kind inputKinds[Math.min(i, len-1)].
@@ -121,9 +119,7 @@ export interface AnyToolRouteConfig {
   toolId: string;
   maxInputs?: number;
   minInputs?: number;
-  preValidate?: (ctx: {
-    inputs: { filename: string; buffer: Buffer }[];
-  }) => Promise<void> | void;
+  preValidate?: (ctx: { inputs: { filename: string; buffer: Buffer }[] }) => Promise<void> | void;
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
