@@ -17,9 +17,9 @@ features:
   - title: 157 Tools, 5 Modalities
     details: "Image: resize, crop, compress, convert, watermark, collage, and more. Video: trim, crop, merge, compress, add subtitles. Audio: trim, normalize, convert, transcribe. PDF: merge, split, compress, watermark, OCR, redact. Data: CSV/JSON/XML conversion, ZIP archives, chart maker."
   - title: Local AI
-    details: 16 AI-powered tools - remove backgrounds, upscale, enhance images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), fix fake transparency, expand canvas with AI fill. All on your hardware, no internet required.
+    details: 19 AI-powered tools - remove backgrounds, upscale, enhance images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), fix fake transparency, expand canvas with AI fill. All on your hardware, no internet required.
   - title: Pipelines
-    details: Chain tools into reusable workflows with unlimited steps. Batch process unlimited images at once with a single request.
+    details: Chain tools into reusable workflows with unlimited steps. Batch process unlimited files at once with a single request.
   - title: REST API
     details: Every tool available via API with API key auth. Interactive docs at /api/docs, plus /llms.txt and /llms-full.txt for AI agents.
   - title: File Library

@@ -34,7 +34,8 @@ All configuration is done through environment variables. Every variable has a se
 | Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` or `s3`. Only local storage is currently implemented. |
-| `DB_PATH` | `./data/snapotter.db` | Path to the SQLite database file. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL connection string. |
+| `REDIS_URL` | `redis://redis:6379` | Redis connection string (used for BullMQ job queues). |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). |
 
@@ -91,15 +92,57 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=changeme
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
       - MAX_UPLOAD_SIZE_MB=200
       - CONCURRENT_JOBS=4
       - FILE_MAX_AGE_HOURS=12
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 ## Volumes
 
-The Docker container uses two volumes:
+The Docker Compose stack uses four volumes:
 
-- `/data` -- Persistent storage for the database and user files. Mount this to keep users, API keys, saved pipelines, and uploaded files across container restarts.
-- `/tmp/workspace` -- Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
+- `/data` (app) -- AI models, Python venv, and user files. Mount this to keep uploaded files and installed AI bundles across restarts.
+- `/tmp/workspace` (app) -- Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
+- `SnapOtter-pgdata` (postgres) -- PostgreSQL data directory. This holds all relational data (users, settings, pipelines, jobs, audit log). Back up via `pg_dump` or volume snapshot.
+- `SnapOtter-redisdata` (redis) -- Redis append-only file for durable job queues.

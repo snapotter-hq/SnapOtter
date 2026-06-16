@@ -10,7 +10,7 @@ How to set up a local development environment and contribute code to SnapOtter.
 
 - [Node.js](https://nodejs.org/) 22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
-- [Docker](https://www.docker.com/) (for container builds and AI features)
+- [Docker](https://www.docker.com/) (required for local Postgres + Redis, container builds, and AI features)
 - Git
 
 Python 3.10+ is only needed if you are working on the AI/ML sidecar (background removal, upscaling, OCR).
@@ -20,6 +20,7 @@ Python 3.10+ is only needed if you are working on the AI/ML sidecar (background 
 ```bash
 git clone https://github.com/snapotter-hq/snapotter.git
 cd snapotter
+docker compose -f docker-compose.dev.yml up -d   # start Postgres + Redis
 pnpm install
 pnpm dev
 ```
@@ -43,6 +44,8 @@ apps/
 packages/
   shared/           Constants, types, i18n strings
   image-engine/     Sharp-based image operations
+  media-engine/     FFmpeg spawn + progress parsing
+  doc-engine/       qpdf, LibreOffice, ghostscript wrappers
   ai/               Python sidecar bridge for ML models
 tests/
   unit/             Vitest unit tests
@@ -76,7 +79,13 @@ pnpm test:coverage      # tests with coverage report
 
 ## Database
 
-SQLite via Drizzle ORM. The database file lives at `./data/snapotter.db` by default.
+PostgreSQL 17 via Drizzle ORM (pg-core). Local dev requires Postgres and Redis running -- start them with:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+This gives you Postgres on port 5432 and Redis on port 6379. Then generate and apply migrations:
 
 ```bash
 cd apps/api
@@ -84,7 +93,7 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Schema is defined in `apps/api/src/db/schema.ts`. Tables: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles.
+Schema is defined in `apps/api/src/db/schema.ts`. Tables: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
 
 ## Adding a new tool
 

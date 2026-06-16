@@ -26,6 +26,13 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_PASSWORD=change-me-immediately
       - RATE_LIMIT_PER_MIN=100
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
     # --- Resource limits ---
     mem_limit: 6g            # Prevents runaway memory from crashing the host
@@ -61,9 +68,40 @@ services:
     shm_size: "2gb"          # Required for Python ML shared memory
     restart: unless-stopped
 
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   SnapOtter-data:
   SnapOtter-workspace:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 ### Why `no-new-privileges` Is Not Set
@@ -214,29 +252,51 @@ For resource sizing, see [Hardware Requirements](/guide/deployment#hardware-requ
 
 ## Backup and Recovery
 
-All persistent state lives in the `/data` volume:
+Persistent state is split across two volumes:
+
+| Volume | Contents | Critical? |
+|---|---|---|
+| `SnapOtter-pgdata` | PostgreSQL database (users, settings, pipelines, jobs, audit log) | Yes |
+| `/data` (app volume) | User-uploaded files, AI models, Python venv | Partially (see below) |
+
+Within the `/data` volume:
 
 | Path | Contents | Critical? |
 |---|---|---|
-| `/data/snapotter.db` | SQLite database (users, settings, pipelines, audit log) | Yes |
-| `/data/uploads/` | User-uploaded files (if file storage is enabled) | Yes |
+| `/data/uploads/`, `/data/outputs/` | User files and processing results | Yes |
 | `/data/ai/` | Downloaded AI model files | No (re-downloadable) |
 | `/data/venv/` | Python virtual environment | No (rebuilt on start) |
 
-SQLite uses WAL (Write-Ahead Logging) mode, which means the database is safe to snapshot while the container is running. A minimal backup strategy:
+### Database backup
+
+Use `pg_dump` to back up the database while the stack is running:
 
 ```bash
-# Copy the database while the container is running (WAL-safe)
-docker cp SnapOtter:/data/snapotter.db ./backup/snapotter.db
-docker cp SnapOtter:/data/snapotter.db-wal ./backup/snapotter.db-wal 2>/dev/null
-docker cp SnapOtter:/data/snapotter.db-shm ./backup/snapotter.db-shm 2>/dev/null
+# Dump the database
+docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
 
-# Or snapshot the entire volume
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-data.tar.gz -C /data .
+# Restore into a fresh database
+cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
 ```
 
-AI models total up to 14 GB across all bundles. Since they are re-downloadable, exclude `/data/ai/` and `/data/venv/` from backups to save space. Only the database and user uploads are critical.
+Alternatively, stop the stack and snapshot the `SnapOtter-pgdata` volume:
+
+```bash
+docker compose down
+docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
+  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+```
+
+### User files backup
+
+```bash
+# Snapshot the app data volume (excluding re-downloadable AI models)
+docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
+  alpine tar czf /backup/snapotter-files.tar.gz \
+    --exclude='ai' --exclude='venv' -C /data .
+```
+
+AI models total up to 14 GB across all bundles. Since they are re-downloadable, exclude `/data/ai/` and `/data/venv/` from backups to save space. Only the database and user files are critical.
 
 ## Compliance Artifacts
 

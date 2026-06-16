@@ -59,7 +59,7 @@ After acknowledging your report, we will keep you informed of our progress towar
 - **Image uploads**: Magic-byte verification against a known format table, null-byte buffer detection, configurable megapixel limit (`MAX_MEGAPIXELS`), configurable upload size limit (`MAX_UPLOAD_SIZE_MB`)
 - **SVG sanitization**: Strips DOCTYPE declarations (XXE prevention), removes `<script>` tags, `<foreignObject>` elements, event handlers, and blocks dangerous URI schemes (`javascript:`, `data:text/html`, `file:`, external URLs in `href`/`xlink:href`)
 - **API validation**: Zod schemas on tool routes and environment config; manual validation on auth routes
-- **Database queries**: Parameterized via Drizzle ORM (SQLite) — no raw string concatenation
+- **Database queries**: Parameterized via Drizzle ORM (PostgreSQL) — no raw string concatenation
 
 ### HTTP Security
 
@@ -93,7 +93,7 @@ The following headers are set on all responses:
 
 ### Audit Logging
 
-Security-relevant events are dual-written to structured stdout (for log aggregators) and to the SQLite database:
+Security-relevant events are dual-written to structured stdout (for log aggregators) and to the PostgreSQL database:
 
 `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`, `PASSWORD_CHANGED`, `PASSWORD_RESET`, `USER_CREATED`, `USER_UPDATED`, `USER_DELETED`, `API_KEY_CREATED`, `API_KEY_DELETED`, `ROLE_CREATED`, `ROLE_UPDATED`, `ROLE_DELETED`, `SETTINGS_UPDATED`, `FILE_UPLOADED`, `FILE_DELETED`
 

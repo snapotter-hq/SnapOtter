@@ -31,27 +31,55 @@
 - **21 languages:** English, Arabic, Chinese (Simplified & Traditional), Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
 - **Pipelines:** Chain tools into reusable workflows with unlimited steps. Import/export as JSON. Batch process unlimited files at once
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
-- **Single container:** One `docker run`, no Redis, no Postgres, no external services
+- **Self-hosted stack:** SnapOtter + Postgres 17 + Redis 8, run together with one `docker compose up`. No external SaaS dependencies
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
 - **Privacy first:** Your files never leave your network. SnapOtter asks once whether you'd like to share anonymous product analytics (which tools are used, errors encountered, never file data). Change anytime in Settings, or set `ANALYTICS_ENABLED=false` to disable completely
 
 ## Quick Start
 
+SnapOtter runs as a small Docker Compose stack (app + Postgres 17 + Redis 8). Save this as `compose.yaml`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    ports: ["1349:1349"]
+    environment:
+      DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - snapotter-data:/data
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    restart: unless-stopped
+  redis:
+    image: redis:8-alpine
+    volumes: ["snapotter-redisdata:/data"]
+    restart: unless-stopped
+volumes:
+  snapotter-data:
+  snapotter-pgdata:
+  snapotter-redisdata:
+```
+
+Then start the stack:
+
 ```bash
-docker run -d --name snapotter -p 1349:1349 -v snapotter-data:/data snapotter/snapotter:latest
+docker compose up -d
 ```
 
 <details>
 <summary><sub>Have an NVIDIA GPU? Click here for GPU acceleration.</sub></summary>
 <br>
 
-Add `--gpus all` for GPU-accelerated background removal, upscaling, and OCR:
-
-```bash
-docker run -d --name snapotter -p 1349:1349 --gpus all -v snapotter-data:/data snapotter/snapotter:latest
-```
-
-> Requires an NVIDIA GPU and [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU if no GPU is found. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for benchmarks and Docker Compose examples.
+Use the GPU Compose file for GPU-accelerated background removal, upscaling, transcription, and OCR. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
 
 </details>
 

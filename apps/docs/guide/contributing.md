@@ -60,6 +60,9 @@ If you are contributing on behalf of your employer and your employer retains IP 
 git clone https://github.com/<your-username>/snapotter.git
 cd snapotter
 
+# Start Postgres + Redis for local dev
+docker compose -f docker-compose.dev.yml up -d
+
 # Install dependencies
 pnpm install
 

@@ -1,12 +1,12 @@
 ---
-description: SQLite database schema, tables, migrations, and backup procedures for SnapOtter.
+description: PostgreSQL database schema, tables, migrations, and backup procedures for SnapOtter.
 ---
 
 # Database
 
-SnapOtter uses SQLite with [Drizzle ORM](https://orm.drizzle.team/) for data persistence. The schema is defined in `apps/api/src/db/schema.ts`.
+SnapOtter uses PostgreSQL 17 with [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) for data persistence. The schema is defined in `apps/api/src/db/schema.ts`.
 
-The database file lives at the path set by `DB_PATH` (defaults to `./data/snapotter.db`). In Docker, mount the `/data` volume to persist it across container restarts.
+The connection is configured via the `DATABASE_URL` environment variable (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, the Postgres container stores its data in the `SnapOtter-pgdata` named volume.
 
 ## Tables
 
@@ -16,13 +16,13 @@ Stores user accounts. Created automatically on first run from `DEFAULT_USERNAME`
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | integer | Primary key, auto-increment |
-| `username` | text | Unique, required |
-| `passwordHash` | text | scrypt hash |
-| `role` | text | `admin` or `user` |
-| `mustChangePassword` | integer | Boolean flag for forced password reset |
-| `createdAt` | text | ISO timestamp |
-| `updatedAt` | text | ISO timestamp |
+| `id` | uuid | Primary key |
+| `username` | varchar | Unique, required |
+| `passwordHash` | varchar | scrypt hash |
+| `role` | varchar | `admin`, `editor`, or `user` |
+| `mustChangePassword` | boolean | Forced password reset flag |
+| `createdAt` | timestamp | Creation time |
+| `updatedAt` | timestamp | Last update time |
 
 ### sessions
 
@@ -30,10 +30,10 @@ Active login sessions. Each row ties a session token to a user.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text | Primary key (session token) |
-| `userId` | integer | Foreign key to `users.id` |
-| `expiresAt` | text | ISO timestamp |
-| `createdAt` | text | ISO timestamp |
+| `id` | varchar | Primary key (session token) |
+| `userId` | uuid | Foreign key to `users.id` |
+| `expiresAt` | timestamp | Expiry time |
+| `createdAt` | timestamp | Creation time |
 
 ### teams
 
@@ -41,9 +41,9 @@ Groups for organizing users. Admins can assign users to teams.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | text UUID | Primary key |
-| `name` | text (unique, max 50 chars) | Team name |
-| `createdAt` | integer | Unix timestamp |
+| `id` | uuid | Primary key |
+| `name` | varchar (unique, max 50 chars) | Team name |
+| `createdAt` | timestamp | Creation time |
 
 ### api_keys
 
@@ -51,12 +51,12 @@ API keys for programmatic access. The raw key is shown once on creation; only th
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | integer | Primary key, auto-increment |
-| `userId` | integer | Foreign key to `users.id` |
-| `keyHash` | text | scrypt hash of the key |
-| `name` | text | User-provided label |
-| `createdAt` | text | ISO timestamp |
-| `lastUsedAt` | text | Updated on each authenticated request |
+| `id` | uuid | Primary key |
+| `userId` | uuid | Foreign key to `users.id` |
+| `keyHash` | varchar | scrypt hash of the key |
+| `name` | varchar | User-provided label |
+| `createdAt` | timestamp | Creation time |
+| `lastUsedAt` | timestamp | Updated on each authenticated request |
 
 Keys are prefixed with `si_` followed by 96 hex characters (48 random bytes).
 
@@ -66,11 +66,11 @@ Saved tool chains that users create in the UI.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | integer | Primary key, auto-increment |
-| `name` | text | Pipeline name |
-| `description` | text | Optional description |
-| `steps` | text | JSON array of `{ toolId, settings }` objects |
-| `createdAt` | text | ISO timestamp |
+| `id` | uuid | Primary key |
+| `name` | varchar | Pipeline name |
+| `description` | varchar | Optional description |
+| `steps` | jsonb | Array of `{ toolId, settings }` objects |
+| `createdAt` | timestamp | Creation time |
 
 ### user_files
 
@@ -78,18 +78,18 @@ Persistent file library with version chain tracking. Each processing step that s
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | text UUID | Primary key |
-| `userId` | text UUID | FK → users (CASCADE DELETE) |
-| `originalName` | text | Original upload filename |
-| `storedName` | text | Filename on disk |
-| `mimeType` | text | MIME type |
+| `id` | uuid | Primary key |
+| `userId` | uuid | FK to users (CASCADE DELETE) |
+| `originalName` | varchar | Original upload filename |
+| `storedName` | varchar | Filename on disk |
+| `mimeType` | varchar | MIME type |
 | `size` | integer | File size in bytes |
 | `width` | integer | Image width in px |
 | `height` | integer | Image height in px |
 | `version` | integer | Version number (1 = original) |
-| `parentId` | text UUID \| null | FK → user_files (parent version) |
-| `toolChain` | text (JSON array) | Tool IDs applied in order to produce this version |
-| `createdAt` | integer | Unix timestamp |
+| `parentId` | uuid or null | FK to user_files (parent version) |
+| `toolChain` | jsonb | Tool IDs applied in order to produce this version |
+| `createdAt` | timestamp | Creation time |
 
 ### jobs
 
@@ -97,16 +97,16 @@ Tracks processing jobs for progress reporting and cleanup.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text | Primary key (UUID) |
-| `type` | text | Tool or pipeline identifier |
-| `status` | text | `queued`, `processing`, `completed`, or `failed` |
-| `progress` | real | 0.0–1.0 fraction |
-| `inputFiles` | text | JSON array of input file paths |
-| `outputPath` | text | Path to the result file |
-| `settings` | text | JSON of the tool settings used |
-| `error` | text | Error message if failed |
-| `createdAt` | text | ISO timestamp |
-| `completedAt` | text | ISO timestamp |
+| `id` | uuid | Primary key |
+| `type` | varchar | Tool or pipeline identifier |
+| `status` | varchar | `queued`, `processing`, `completed`, or `failed` |
+| `progress` | real | 0.0-1.0 fraction |
+| `inputFiles` | jsonb | Array of input file paths |
+| `outputPath` | varchar | Path to the result file |
+| `settings` | jsonb | Tool settings used |
+| `error` | varchar | Error message if failed |
+| `createdAt` | timestamp | Creation time |
+| `completedAt` | timestamp | Completion time |
 
 ### settings
 
@@ -114,16 +114,69 @@ Key-value store for server-wide settings that admins can change from the UI.
 
 | Column | Type | Notes |
 |---|---|---|
-| `key` | text | Primary key |
-| `value` | text | Setting value |
-| `updatedAt` | text | ISO timestamp |
+| `key` | varchar | Primary key |
+| `value` | varchar | Setting value |
+| `updatedAt` | timestamp | Last update time |
+
+### roles
+
+Custom roles with granular permissions.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `name` | varchar | Unique role name |
+| `description` | varchar | Optional description |
+| `permissions` | jsonb | Array of permission strings |
+| `createdAt` | timestamp | Creation time |
+
+### audit_log
+
+Security-relevant action log.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `userId` | uuid | FK to users |
+| `action` | varchar | Action type |
+| `details` | jsonb | Action-specific data |
+| `createdAt` | timestamp | Action time |
 
 ## Migrations
 
-Drizzle handles schema migrations. The config is in `apps/api/drizzle.config.ts`. During development, run:
+Drizzle handles schema migrations. Migration files live in `apps/api/drizzle/`. During development:
 
 ```bash
-pnpm --filter @snapotter/api drizzle-kit push
+cd apps/api
+npx drizzle-kit generate   # generate a migration from schema changes
+npx drizzle-kit migrate    # apply pending migrations
 ```
 
-In production, the schema is applied automatically on startup.
+In production, pending migrations are applied automatically on startup.
+
+## Backup and restore
+
+The relational database lives in the Postgres container's `SnapOtter-pgdata` volume, not the app's `/data` volume.
+
+**Option 1: pg_dump (recommended)**
+
+```bash
+# Dump the database while the stack is running
+docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+
+# Restore into a fresh database
+cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+```
+
+**Option 2: Volume snapshot**
+
+```bash
+# Stop the stack, then snapshot the pgdata volume
+docker compose down
+docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
+  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+```
+
+### Migrating from 1.x (SQLite)
+
+If you are upgrading from SnapOtter 1.x, set `SQLITE_MIGRATE_PATH` to the path of your old `snapotter.db` file on first boot. The migration runs once and imports users, settings, pipelines, and files into Postgres. Remove the variable after migration succeeds.

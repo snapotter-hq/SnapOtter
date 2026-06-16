@@ -6,7 +6,7 @@ description: AI engine reference with all local ML tools. Background removal, up
 
 The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
 
-16 AI tool routes. All models run locally - no internet required after initial model download.
+19 AI tool routes. All models run locally - no internet required after initial model download.
 
 ## Architecture
 

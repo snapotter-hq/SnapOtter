@@ -48,21 +48,58 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   SnapOtter-data:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 See [Configuration](/guide/configuration) for all environment variables.
 
 ## Build from Source
 
-**Prerequisites:** Node.js 22+, pnpm 9+, Python 3.10+ (for AI features), Git.
+**Prerequisites:** Node.js 22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
 cd SnapOtter
+docker compose -f docker-compose.dev.yml up -d   # start Postgres + Redis
 pnpm install
 pnpm dev
 ```

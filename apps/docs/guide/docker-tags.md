@@ -4,7 +4,7 @@ description: SnapOtter Docker image tags, GPU benchmarks, version pinning, and m
 
 # Docker Image
 
-SnapOtter ships as a single Docker image that works on all platforms.
+SnapOtter ships as a Docker image that runs alongside PostgreSQL 17 and Redis 8 in a Compose stack. The app image works on all platforms.
 
 ## Quick start
 
@@ -56,6 +56,8 @@ GET /api/v1/admin/health
 
 ## Docker Compose
 
+The full Compose stack includes the app, PostgreSQL 17, and Redis 8. See [Deployment](/guide/deployment) for the complete `docker-compose.yml`. A minimal example:
+
 ```yaml
 services:
   SnapOtter:
@@ -65,6 +67,14 @@ services:
     volumes:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
+    environment:
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: json-file
@@ -72,22 +82,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 volumes:
   SnapOtter-data:
   SnapOtter-workspace:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
-For GPU acceleration via Docker Compose, add the deploy section:
+For GPU acceleration via Docker Compose, add the deploy section to the SnapOtter service:
 
 ```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
     deploy:
       resources:
         reservations:
@@ -95,11 +126,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    restart: unless-stopped
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
 ```
 
 ## Version pinning
