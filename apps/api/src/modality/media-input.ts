@@ -4,7 +4,6 @@ import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
 import { SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
-import { logger } from "../lib/logger.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
@@ -38,9 +37,10 @@ export class MediaInputHandler implements InputHandler {
       let info: Awaited<ReturnType<typeof probeMedia>>;
       try {
         info = await probeMedia(probePath);
-      } catch (err) {
-        // Keep the raw ffprobe failure in logs; never surface it to the client.
-        logger.warn({ err, kind: this.kind }, "media input probe failed");
+      } catch {
+        // ffprobe could not parse the upload. Surface a clean message; the raw
+        // tool error is intentionally not exposed to the client, and a bad
+        // upload is not a server fault worth logging from this low-level handler.
         throw new InputValidationError(
           `Unrecognized ${this.kind} file. It may be corrupt or in an unsupported format.`,
         );

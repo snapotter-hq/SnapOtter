@@ -124,6 +124,7 @@ vi.mock("@snapotter/doc-engine", () => ({
 vi.mock("../../../apps/api/src/lib/errors.js", () => ({
   formatZodErrors: (issues: Array<{ message: string }>) => issues.map((i) => i.message).join("; "),
   stripInternalPaths: (msg: string) => msg,
+  friendlyError: (msg: string) => msg,
 }));
 
 vi.mock("sharp", () => ({
