@@ -1,17 +1,55 @@
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import {
+  AudioLines,
+  CheckCircle2,
+  File as FileIcon,
+  FileText,
+  Film,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { FileEntry } from "@/stores/file-store";
+import type { FileEntry, PreviewKind } from "@/stores/file-store";
 
 const BROWSER_IMG_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"]);
 
-function thumbnailSrc(entry: FileEntry): string {
+/**
+ * A renderable <img> source for the thumbnail, or null when the entry has no
+ * image to show (e.g. audio/video/document originals). Processed previews and
+ * processed image outputs are always real images, so they win when present.
+ */
+function thumbnailImageSrc(entry: FileEntry): string | null {
   if (entry.processedPreviewUrl) return entry.processedPreviewUrl;
   if (entry.processedUrl) {
     if (entry.processedUrl.startsWith("blob:")) return entry.processedUrl;
     const ext = decodeURIComponent(entry.processedUrl).split(".").pop()?.toLowerCase() ?? "";
     if (BROWSER_IMG_EXTS.has(ext)) return entry.processedUrl;
   }
-  return entry.blobUrl;
+  // The original blob only renders as an image for image-modality files;
+  // pointing an <img> at an audio/video/pdf blob just shows a broken icon.
+  if (entry.previewKind === "image") return entry.blobUrl;
+  return null;
+}
+
+const PLACEHOLDER_ICON: Record<Exclude<PreviewKind, "image">, typeof FileIcon> = {
+  audio: AudioLines,
+  video: Film,
+  document: FileText,
+  none: FileIcon,
+};
+
+/** Icon + format label shown when a file has no image thumbnail. */
+function ThumbnailPlaceholder({ entry }: { entry: FileEntry }) {
+  const kind = entry.previewKind === "image" ? "none" : entry.previewKind;
+  const Icon = PLACEHOLDER_ICON[kind];
+  const ext = (entry.file.name.split(".").pop() ?? "").toUpperCase().slice(0, 4);
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-muted">
+      <Icon className="h-4 w-4 text-muted-foreground" />
+      {ext && (
+        <span className="text-[8px] font-semibold leading-none text-muted-foreground">{ext}</span>
+      )}
+    </div>
+  );
 }
 
 interface ThumbnailStripProps {
@@ -42,6 +80,7 @@ export function ThumbnailStrip({ entries, selectedIndex, onSelect }: ThumbnailSt
         const isSelected = i === selectedIndex;
         const isCompleted = entry.status === "completed";
         const isFailed = entry.status === "failed";
+        const imgSrc = thumbnailImageSrc(entry);
         return (
           <button
             key={entry.file.name}
@@ -60,13 +99,15 @@ export function ThumbnailStrip({ entries, selectedIndex, onSelect }: ThumbnailSt
               <div className="w-full h-full flex items-center justify-center bg-muted">
                 <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
               </div>
-            ) : (
+            ) : imgSrc ? (
               <img
-                src={thumbnailSrc(entry)}
+                src={imgSrc}
                 alt={entry.file.name}
                 className="w-full h-full object-cover"
                 draggable={false}
               />
+            ) : (
+              <ThumbnailPlaceholder entry={entry} />
             )}
             {isCompleted && (
               <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
