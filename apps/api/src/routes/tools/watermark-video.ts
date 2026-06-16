@@ -1,9 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { resolveEncoder, resolveFontFile } from "@snapotter/media-engine";
+import { resolveFontFile } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool, videoContentType } from "../../lib/media-tool.js";
+import {
+  runMediaTool,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -61,14 +65,7 @@ export function registerWatermarkVideo(app: FastifyInstance) {
         inPath,
         "-vf",
         vf,
-        "-c:v",
-        resolveEncoder("h264"),
-        "-crf",
-        "20",
-        "-preset",
-        "medium",
-        "-pix_fmt",
-        "yuv420p",
+        ...videoEncodeArgsForContainer(origExt),
         "-c:a",
         "copy",
         out,

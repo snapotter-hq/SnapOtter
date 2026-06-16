@@ -1,8 +1,13 @@
 import { basename, extname, join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
+import {
+  audioEncodeArgsForContainer,
+  runFfmpegWithProgress,
+  stageMediaInputs,
+  videoContentType,
+} from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -54,8 +59,7 @@ export function registerReplaceAudio(app: FastifyInstance) {
         "1:a:0",
         "-c:v",
         "copy",
-        "-c:a",
-        resolveEncoder("aac"),
+        ...audioEncodeArgsForContainer(ext),
         "-shortest",
         outPath,
       ];

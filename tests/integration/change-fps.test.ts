@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 const MP4 = readFileSync(join(__dirname, "..", "fixtures", "media", "tiny.mp4"));
+const WEBM = readFileSync(join(__dirname, "..", "fixtures", "media", "tiny.webm"));
 
 let testApp: TestApp;
 let adminToken: string;
@@ -20,9 +21,16 @@ afterAll(async () => {
   await testApp.cleanup();
 }, 10_000);
 
-async function runTool(settings: Record<string, unknown>) {
+async function runTool(
+  settings: Record<string, unknown>,
+  file: { filename: string; contentType: string; content: Buffer } = {
+    filename: "tiny.mp4",
+    contentType: "video/mp4",
+    content: MP4,
+  },
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+    { name: "file", filename: file.filename, contentType: file.contentType, content: file.content },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
@@ -60,5 +68,37 @@ describe.skipIf(!ffmpegAvailable())("change-fps (requires ffmpeg)", () => {
     ]);
     const fps = result.stdout.toString().trim();
     expect(fps).toBe("10/1");
+  }, 60_000);
+
+  it("changes fps on a webm input and keeps a webm-legal codec (regression: h264-in-webm exit 234)", async () => {
+    const res = await runTool(
+      { fps: 1 },
+      { filename: "tiny.webm", contentType: "video/webm", content: WEBM },
+    );
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBeGreaterThan(100);
+
+    // Output must be a valid webm with a webm-legal video codec (vp9/vp8/av1),
+    // never h264 -- which cannot be muxed into a webm container.
+    const tmpDir = mkdtempSync(join(tmpdir(), "fps-webm-test-"));
+    const probeFile = join(tmpDir, "out.webm");
+    writeFileSync(probeFile, dl.rawPayload);
+    const result = spawnSync("ffprobe", [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=codec_name",
+      "-of",
+      "csv=p=0",
+      probeFile,
+    ]);
+    const codec = result.stdout.toString().trim();
+    expect(["vp9", "vp8", "av1"]).toContain(codec);
   }, 60_000);
 });

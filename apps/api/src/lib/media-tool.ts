@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { probeMedia, runFfmpeg } from "@snapotter/media-engine";
+import { probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
 import type { ToolProcessCtxV2 } from "../routes/tool-factory.js";
 
 const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
@@ -13,6 +13,40 @@ const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
 /** Content type for a preserved-container video output; mp4 fallback. */
 export function videoContentType(ext: string): string {
   return EXT_VIDEO_CONTENT_TYPES[ext.toLowerCase()] || "video/mp4";
+}
+
+/**
+ * Video encode args valid for the given OUTPUT container extension.
+ * WebM accepts only VP8/VP9/AV1, OGV only Theora; everything else
+ * (mp4/mov/mkv/avi/ts) gets H.264. Hardcoding H.264 into a preserved
+ * non-mp4 container is a real bug: ffmpeg cannot mux H.264 into WebM and
+ * fails the header write ("Invalid argument", exit 234). Arg sets mirror
+ * the tested convert-video encoders.
+ */
+export function videoEncodeArgsForContainer(ext: string): string[] {
+  const lower = ext.toLowerCase();
+  if (lower === ".webm") {
+    return ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"];
+  }
+  if (lower === ".ogv" || lower === ".ogg") {
+    // Theora has no HW-accel path; use libtheora directly.
+    return ["-c:v", "libtheora", "-q:v", "7"];
+  }
+  return ["-c:v", resolveEncoder("h264"), "-crf", "20", "-preset", "medium", "-pix_fmt", "yuv420p"];
+}
+
+/**
+ * Audio encode args valid for the given OUTPUT container, for tools that
+ * must (re-)encode the audio stream (tempo/reverse/loudnorm/replace).
+ * WebM needs Opus, OGV needs Vorbis, everything else gets AAC. When the
+ * source audio stream is untouched and the container is preserved, use
+ * ["-c:a", "copy"] directly instead -- it is always valid there.
+ */
+export function audioEncodeArgsForContainer(ext: string): string[] {
+  const lower = ext.toLowerCase();
+  if (lower === ".webm") return ["-c:a", resolveEncoder("opus")];
+  if (lower === ".ogv" || lower === ".ogg") return ["-c:a", "libvorbis"];
+  return ["-c:a", resolveEncoder("aac")];
 }
 
 const EXT_AUDIO_CONTENT_TYPES: Record<string, string> = {

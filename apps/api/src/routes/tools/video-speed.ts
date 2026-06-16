@@ -1,12 +1,14 @@
 import { extname, join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  audioEncodeArgsForContainer,
   buildAtempoChain,
   runFfmpegWithProgress,
   stageMediaInputs,
   videoContentType,
+  videoEncodeArgsForContainer,
 } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -54,16 +56,8 @@ export function registerVideoSpeed(app: FastifyInstance) {
           "[v]",
           "-map",
           "[a]",
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
-          "-pix_fmt",
-          "yuv420p",
-          "-c:a",
-          resolveEncoder("aac"),
+          ...videoEncodeArgsForContainer(origExt),
+          ...audioEncodeArgsForContainer(origExt),
         ];
       } else {
         args = [
@@ -72,14 +66,7 @@ export function registerVideoSpeed(app: FastifyInstance) {
           "-vf",
           `setpts=PTS/${settings.factor}`,
           "-an",
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
-          "-pix_fmt",
-          "yuv420p",
+          ...videoEncodeArgsForContainer(origExt),
         ];
       }
 

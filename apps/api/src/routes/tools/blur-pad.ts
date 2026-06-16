@@ -1,8 +1,13 @@
 import { extname, join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
+import {
+  runFfmpegWithProgress,
+  stageMediaInputs,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const TARGETS = {
@@ -77,14 +82,7 @@ export function registerBlurPad(app: FastifyInstance) {
           "[v]",
           "-map",
           "0:a?",
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
-          "-pix_fmt",
-          "yuv420p",
+          ...videoEncodeArgsForContainer(origExt),
           "-c:a",
           "copy",
           outPath,

@@ -1,8 +1,13 @@
 import { extname, join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
+import {
+  runFfmpegWithProgress,
+  stageMediaInputs,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -47,14 +52,7 @@ export function registerCropVideo(app: FastifyInstance) {
           inPath,
           "-vf",
           `crop=${settings.width}:${settings.height}:${settings.x}:${settings.y}`,
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
-          "-pix_fmt",
-          "yuv420p",
+          ...videoEncodeArgsForContainer(origExt),
           "-c:a",
           "copy",
           outPath,

@@ -1,8 +1,11 @@
 import { extname } from "node:path";
-import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool, videoContentType } from "../../lib/media-tool.js";
+import {
+  runMediaTool,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -28,14 +31,7 @@ export function registerChangeFps(app: FastifyInstance) {
         inPath,
         "-vf",
         `fps=${settings.fps}`,
-        "-c:v",
-        resolveEncoder("h264"),
-        "-crf",
-        "20",
-        "-preset",
-        "medium",
-        "-pix_fmt",
-        "yuv420p",
+        ...videoEncodeArgsForContainer(origExt),
         "-c:a",
         "copy",
         out,

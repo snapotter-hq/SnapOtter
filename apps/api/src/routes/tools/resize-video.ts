@@ -1,8 +1,11 @@
 import { extname } from "node:path";
-import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool, videoContentType } from "../../lib/media-tool.js";
+import {
+  runMediaTool,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const PRESET_HEIGHTS: Record<string, number> = {
@@ -53,14 +56,7 @@ export function registerResizeVideo(app: FastifyInstance) {
         inPath,
         "-vf",
         `scale=${w}:${h}:flags=lanczos`,
-        "-c:v",
-        resolveEncoder("h264"),
-        "-crf",
-        "20",
-        "-preset",
-        "medium",
-        "-pix_fmt",
-        "yuv420p",
+        ...videoEncodeArgsForContainer(origExt),
         "-c:a",
         "copy",
         out,

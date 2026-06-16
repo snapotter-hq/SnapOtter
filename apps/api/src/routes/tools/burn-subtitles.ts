@@ -57,7 +57,7 @@ export function registerBurnSubtitles(app: FastifyInstance) {
           "-pix_fmt",
           "yuv420p",
           "-c:a",
-          "copy",
+          resolveEncoder("aac"),
           outPath,
         ],
         info.durationS,

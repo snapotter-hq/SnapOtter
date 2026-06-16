@@ -1,8 +1,12 @@
 import { extname } from "node:path";
-import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool, videoContentType } from "../../lib/media-tool.js";
+import {
+  audioEncodeArgsForContainer,
+  runMediaTool,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z
@@ -36,16 +40,8 @@ export function registerTrimVideo(app: FastifyInstance) {
             String(settings.startS),
             "-to",
             String(settings.endS),
-            "-c:v",
-            resolveEncoder("h264"),
-            "-crf",
-            "20",
-            "-preset",
-            "medium",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            resolveEncoder("aac"),
+            ...videoEncodeArgsForContainer(origExt),
+            ...audioEncodeArgsForContainer(origExt),
             out,
           ];
         }
