@@ -169,6 +169,13 @@ jobs:
   docker:
     name: Build (${{ matrix.platform }})
     needs: release
+    # PUBLISHING PAUSED (2026-06-17): building and pushing the app image to
+    # Docker Hub + GHCR is disabled while the app is still being stabilized.
+    # The scan, sbom, ai-bundles, and manifest jobs all `need` this job, so
+    # they are skipped too and nothing reaches either registry. The release,
+    # changelog, and source-archive (prebuilt) jobs still run.
+    # To resume publishing, delete the `if: ${{ false }}` line below.
+    if: ${{ false }}
     permissions:
       contents: read
       packages: write
