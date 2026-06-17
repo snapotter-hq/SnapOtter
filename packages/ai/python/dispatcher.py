@@ -112,6 +112,7 @@ TOOL_BUNDLE_MAP = {
     "face_landmarks": "face-detection",
     "red_eye_removal": "face-detection",
     "inpaint": "object-eraser-colorize",
+    "outpaint": "object-eraser-colorize",
     "colorize": "object-eraser-colorize",
     "upscale": "upscale-enhance",
     "enhance_faces": "upscale-enhance",

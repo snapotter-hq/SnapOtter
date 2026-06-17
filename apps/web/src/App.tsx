@@ -32,6 +32,9 @@ const EditorPage = lazy(() =>
   import("./pages/editor-page").then((m) => ({ default: m.EditorPage })),
 );
 const ToolPage = lazy(() => import("./pages/tool-page").then((m) => ({ default: m.ToolPage })));
+const NotFoundPage = lazy(() =>
+  import("./pages/not-found-page").then((m) => ({ default: m.NotFoundPage })),
+);
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -239,6 +242,7 @@ export function App() {
                   <Route path="/editor" element={<EditorPage />} />
                   <Route path="/:modality/:toolId" element={<ToolPage />} />
                   <Route path="/" element={<HomePage />} />
+                  <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </Suspense>
             </AuthGuard>

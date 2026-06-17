@@ -824,7 +824,7 @@ export function startWorkers(): void {
     });
 
     worker.on("error", (err) => {
-      console.error(`Worker error [${pool}]:`, err);
+      logger.error({ err, pool }, "Worker error");
     });
 
     workers.push(worker);
