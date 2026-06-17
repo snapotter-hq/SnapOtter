@@ -1,11 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
 
+/** Resolve the pandoc binary, honoring PANDOC_PATH for parity with the other doc-engine wrappers. */
+function pandocBin(): string {
+  return process.env.PANDOC_PATH || "pandoc";
+}
+
 let cachedAvailable: boolean | null = null;
 
 /** True when a pandoc binary is on PATH (gates local tests; the image installs it). */
 export function pandocAvailable(): boolean {
   if (cachedAvailable !== null) return cachedAvailable;
-  const r = spawnSync("pandoc", ["--version"], { stdio: "ignore" });
+  const r = spawnSync(pandocBin(), ["--version"], { stdio: "ignore" });
   cachedAvailable = r.status === 0;
   return cachedAvailable;
 }
@@ -15,7 +20,7 @@ let cachedSelfContainedArgs: string[] | null = null;
 
 function selfContainedArgs(): string[] {
   if (cachedSelfContainedArgs !== null) return cachedSelfContainedArgs;
-  const r = spawnSync("pandoc", ["--version"], {
+  const r = spawnSync(pandocBin(), ["--version"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   });
@@ -55,7 +60,7 @@ export function runPandoc(
     args.push(...opts.extraArgs);
   }
   return new Promise<void>((resolvePromise, reject) => {
-    const child = spawn("pandoc", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(pandocBin(), args, { stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
     let settled = false;
     const timer = setTimeout(() => {
