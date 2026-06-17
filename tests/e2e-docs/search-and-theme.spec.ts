@@ -32,16 +32,21 @@ test.describe("Theme Toggle", () => {
 
   test("clicking theme toggle changes appearance", async ({ page }) => {
     await page.goto("/guide/getting-started");
-    const initialClass = await page.locator("html").getAttribute("class");
+    const html = page.locator("html");
+    const initialClass = await html.getAttribute("class");
+    const wasDark = initialClass?.includes("dark") ?? false;
 
-    await page.evaluate(() => {
-      const btn = document.querySelector('button[role="switch"].VPSwitchAppearance');
-      if (btn) (btn as HTMLElement).click();
-    });
-    await page.waitForTimeout(500);
+    // Click the visible toggle inside our custom nav area (the hidden default
+    // VPNavBarAppearance is first in DOM order, so a bare querySelector would
+    // hit it instead). Playwright's click auto-waits for hydration.
+    await page.locator('.nav-bar-right button[role="switch"]').click();
 
-    const newClass = await page.locator("html").getAttribute("class");
-    expect(newClass).not.toBe(initialClass);
+    // Assert the dark class actually toggled
+    if (wasDark) {
+      await expect(html).not.toHaveClass(/dark/);
+    } else {
+      await expect(html).toHaveClass(/dark/);
+    }
   });
 });
 
