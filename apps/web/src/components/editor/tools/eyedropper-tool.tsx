@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { useCallback, useRef, useState } from "react";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SampleSize } from "../options/eyedropper-options";
+import { captureDocumentCanvas } from "../stage-capture";
 
 /**
  * Sample a single pixel or averaged region from a canvas context at (x, y).
@@ -64,23 +65,15 @@ export function useEyedropperTool({
   const canvasCache = useRef<HTMLCanvasElement | null>(null);
 
   /**
-   * Export the visible stage to a flat canvas for pixel sampling.
-   * Uses explicit viewport options to get a consistent unzoomed canvas,
-   * excluding zoom/pan transforms and device pixel ratio.
+   * Export the document to a flat canvas at document resolution for pixel
+   * sampling, ignoring the current zoom/pan transform.
    * Cached so repeated clicks during one drag don't re-export.
    */
   const getStageCanvas = useCallback((): HTMLCanvasElement | null => {
     const stage = stageRef.current;
     if (!stage) return null;
 
-    // Specify explicit viewport to exclude zoom/pan transforms
-    const canvas = stage.toCanvas({
-      pixelRatio: 1,
-      x: 0,
-      y: 0,
-      width: canvasSize.width,
-      height: canvasSize.height,
-    });
+    const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
     canvasCache.current = canvas;
     return canvas;
   }, [stageRef, canvasSize]);

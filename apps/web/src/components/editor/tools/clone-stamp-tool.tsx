@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
+import { captureDocumentCanvas } from "../stage-capture";
 
 interface StampState {
   objectId: string;
@@ -55,14 +56,8 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
 
       if (!cloneSource) return;
 
-      // Capture a snapshot of the current stage pixels
-      const stageCanvas = stage.toCanvas({
-        pixelRatio: 1,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      // Capture a snapshot of the document pixels at document resolution.
+      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
 
       const stageCtx = stageCanvas.getContext("2d");
       if (!stageCtx) return;

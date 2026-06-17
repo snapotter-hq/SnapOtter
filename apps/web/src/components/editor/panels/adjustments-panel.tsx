@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SliderRow } from "@/components/editor/common/slider-row";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { HistogramPanel } from "@/components/editor/panels/histogram-panel";
+import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { AdjustmentValues } from "@/types/editor";
@@ -1046,13 +1047,7 @@ export function AdjustmentsPanel() {
       const stage = editorStageRefHolder.current;
       if (!stage) return;
       try {
-        const canvas = stage.toCanvas({
-          pixelRatio: 1,
-          x: 0,
-          y: 0,
-          width: canvasSize.width,
-          height: canvasSize.height,
-        });
+        const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height);

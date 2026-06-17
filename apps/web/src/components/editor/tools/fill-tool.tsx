@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
+import { captureDocumentCanvas } from "../stage-capture";
 
 function colorDistance(
   r1: number,
@@ -160,14 +161,8 @@ export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
 
       if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
-      // Export the current stage to a canvas for pixel access
-      const stageCanvas = stage.toCanvas({
-        pixelRatio: 1,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      // Capture the document pixels at document resolution (ignoring zoom/pan).
+      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
 
       const ctx = stageCanvas.getContext("2d");
       if (!ctx) return;

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
+import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
@@ -96,32 +97,24 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const fmtOpt = FORMAT_OPTIONS.find((o) => o.value === settings.format);
     const previewMime = fmtOpt?.needsServerConvert ? "image/png" : getMimeType(settings.format);
 
-    const url = stage.toDataURL({
-      pixelRatio: scale,
-      mimeType: previewMime,
-      quality: settings.quality / 100,
-      x: 0,
-      y: 0,
-      width: canvasSize.width,
-      height: canvasSize.height,
-    });
+    const url = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, scale).toDataURL(
+      previewMime,
+      settings.quality / 100,
+    );
     setPreviewUrl(url);
 
     const pixelRatio = settings.width / canvasSize.width;
-    const fullUrl = stage.toDataURL({
+    const fullUrl = captureDocumentCanvas(
+      stage,
+      canvasSize.width,
+      canvasSize.height,
       pixelRatio,
-      mimeType: previewMime,
-      quality: settings.quality / 100,
-      x: 0,
-      y: 0,
-      width: canvasSize.width,
-      height: canvasSize.height,
-    });
+    ).toDataURL(previewMime, settings.quality / 100);
     fetch(fullUrl)
       .then((res) => res.blob())
       .then((blob) => setEstimatedSize(blob.size))
       .catch(() => setEstimatedSize(null));
-  }, [canvasSize, settings.format, settings.quality, settings.width, settings.height]);
+  }, [canvasSize, settings.format, settings.quality, settings.width]);
 
   // Generate preview thumbnail on format/transparency change
   useEffect(() => {
@@ -174,13 +167,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (formatOption?.needsServerConvert) {
       let stageCanvas: HTMLCanvasElement;
       if (!settings.transparent || settings.format === "jpeg") {
-        const raw = stage.toCanvas({
-          pixelRatio,
-          x: 0,
-          y: 0,
-          width: canvasSize.width,
-          height: canvasSize.height,
-        });
+        const raw = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
         const exportCanvas = document.createElement("canvas");
         exportCanvas.width = raw.width;
         exportCanvas.height = raw.height;
@@ -191,13 +178,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         ctx.drawImage(raw, 0, 0);
         stageCanvas = exportCanvas;
       } else {
-        stageCanvas = stage.toCanvas({
-          pixelRatio,
-          x: 0,
-          y: 0,
-          width: canvasSize.width,
-          height: canvasSize.height,
-        });
+        stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
       }
 
       stageCanvas.toBlob(async (blob) => {
@@ -235,13 +216,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
     if (!settings.transparent || settings.format === "jpeg") {
       // Create canvas with white background for non-transparent exports
-      const stageCanvas = stage.toCanvas({
+      const stageCanvas = captureDocumentCanvas(
+        stage,
+        canvasSize.width,
+        canvasSize.height,
         pixelRatio,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      );
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = stageCanvas.width;
       exportCanvas.height = stageCanvas.height;
@@ -255,15 +235,15 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         settings.format === "png" ? undefined : settings.quality / 100,
       );
     } else {
-      dataUrl = stage.toDataURL({
+      dataUrl = captureDocumentCanvas(
+        stage,
+        canvasSize.width,
+        canvasSize.height,
         pixelRatio,
-        mimeType: getMimeType(settings.format),
-        quality: settings.format === "png" ? undefined : settings.quality / 100,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      ).toDataURL(
+        getMimeType(settings.format),
+        settings.format === "png" ? undefined : settings.quality / 100,
+      );
     }
 
     const formatOpt = FORMAT_OPTIONS.find((f) => f.value === settings.format);
@@ -319,14 +299,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (!stage) return;
 
     const pixelRatio = settings.width / canvasSize.width;
-    const dataUrl = stage.toDataURL({
+    const dataUrl = captureDocumentCanvas(
+      stage,
+      canvasSize.width,
+      canvasSize.height,
       pixelRatio,
-      mimeType: "image/png",
-      x: 0,
-      y: 0,
-      width: canvasSize.width,
-      height: canvasSize.height,
-    });
+    ).toDataURL("image/png");
 
     try {
       const res = await fetch(dataUrl);

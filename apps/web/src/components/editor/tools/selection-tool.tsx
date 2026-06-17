@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Ellipse, Group, Line, Rect, Shape } from "react-konva";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, SelectionState } from "@/types/editor";
+import { captureDocumentCanvas } from "../stage-capture";
 
 type SelectionType = "rect" | "ellipse" | "lasso";
 
@@ -580,15 +581,8 @@ export function useSelectionTool(): SelectionToolApi {
 
   const magicWandSelect = useCallback(
     (stage: Konva.Stage, x: number, y: number, tolerance: number, contiguous: boolean) => {
-      // Use explicit viewport options to get a consistent unzoomed canvas,
-      // ignoring zoom/pan transforms and device pixel ratio
-      const canvas = stage.toCanvas({
-        pixelRatio: 1,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      // Capture the document at document resolution, ignoring zoom/pan.
+      const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       const imageData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);

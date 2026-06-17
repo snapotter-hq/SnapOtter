@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
+import { captureDocumentCanvas } from "../stage-capture";
 
 const DODGE_BURN_TOOLS = new Set<ToolType>(["dodge", "burn", "sponge"]);
 
@@ -112,14 +113,8 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
       if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
-      // Snapshot current stage pixels
-      const stageCanvas = stage.toCanvas({
-        pixelRatio: 1,
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
+      // Snapshot the document pixels at document resolution.
+      const stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
 
       const stageCtx = stageCanvas.getContext("2d");
       if (!stageCtx) return;
