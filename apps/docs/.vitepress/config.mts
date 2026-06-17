@@ -32,8 +32,12 @@ export default defineConfig({
     ["meta", { name: "twitter:image", content: "https://docs.snapotter.com/og-image.png" }],
   ],
 
-  transformHead({ pageData }) {
+  transformHead({ pageData, assets }) {
     const head: Array<[string, Record<string, string>]> = [];
+    const bricolage = assets.find((f) => /bricolage-grotesque-var\.[\w-]+\.woff2$/.test(f));
+    if (bricolage) {
+      head.push(["link", { rel: "preload", href: bricolage, as: "font", type: "font/woff2", crossorigin: "" }]);
+    }
     const canonicalUrl = `https://docs.snapotter.com/${pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "")}`;
     head.push(["meta", { property: "og:url", content: canonicalUrl }]);
     head.push(["meta", { property: "og:title", content: pageData.title }]);
