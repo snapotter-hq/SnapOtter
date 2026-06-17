@@ -17,7 +17,7 @@ services:
       # - "127.0.0.1:1349:1349"
       - "1349:1349"
     volumes:
-      - SnapOtter-data:/data           # Database, AI models, user files
+      - SnapOtter-data:/data           # AI models, user files
       - SnapOtter-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
       - AUTH_ENABLED=true
@@ -37,6 +37,11 @@ services:
       - MAX_USERS=${MAX_USERS:-0}
       - SESSION_DURATION_HOURS=${SESSION_DURATION_HOURS:-168}
       - TRUST_PROXY=${TRUST_PROXY:-true}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - REDIS_URL=redis://redis:6379
+      # 1.x upgrade: uncomment to import the old SQLite database on first boot;
+      # re-comment after the migration succeeds.
+      # - SQLITE_MIGRATE_PATH=/data/snapotter.db
       # OIDC Authentication (optional)
       # - EXTERNAL_URL=https://photos.example.com
       # - OIDC_ENABLED=false
@@ -61,6 +66,11 @@ services:
       # - COOKIE_SECRET_FILE=/run/secrets/cookie_secret
       # - SNAPOTTER_LICENSE_KEY_FILE=/run/secrets/license_key
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     # --- Security hardening ---
     mem_limit: 8g
     memswap_limit: 8g
@@ -100,6 +110,38 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: SnapOtter-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      # Set a strong password -- CHANGE THIS for any non-local deployment.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:8-alpine
+    container_name: SnapOtter-redis
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 # Uncomment to use Docker secrets (requires Docker Swarm or compose v2.23+):
 # secrets:
 #   snapotter_password:
@@ -110,3 +152,5 @@ services:
 volumes:
   SnapOtter-data:
   SnapOtter-workspace:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:

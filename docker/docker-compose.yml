@@ -16,7 +16,7 @@ services:
       # - "127.0.0.1:1349:1349"
       - "1349:1349"
     volumes:
-      - SnapOtter-data:/data           # Database, AI models, user files
+      - SnapOtter-data:/data           # AI models, user files
       - SnapOtter-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
       - AUTH_ENABLED=true
