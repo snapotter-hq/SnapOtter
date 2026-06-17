@@ -19,7 +19,7 @@ test.describe("Editor Selection Tools", () => {
     await selectTool(page, "move");
 
     // Options bar should show "move" label
-    const optionsBar = page.locator(".flex.items-center.h-10");
+    const optionsBar = page.locator('[data-testid="editor-options-bar"]');
     await expect(optionsBar.getByText("move", { exact: false })).toBeVisible();
   });
 
@@ -84,7 +84,7 @@ test.describe("Editor Selection Tools", () => {
   test("crop options show apply and cancel buttons", async ({ editorPage: page }) => {
     await selectTool(page, "crop");
 
-    await expect(page.locator("button[aria-label='Apply Crop']")).toBeVisible();
-    await expect(page.locator("button[aria-label='Cancel Crop']")).toBeVisible();
+    await expect(page.locator("button[aria-label='Apply crop']")).toBeVisible();
+    await expect(page.locator("button[aria-label='Cancel crop']")).toBeVisible();
   });
 });

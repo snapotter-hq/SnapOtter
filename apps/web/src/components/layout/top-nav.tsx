@@ -31,6 +31,7 @@ interface NavLinkItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
 }
 
 function useNavLinks(): NavLinkItem[] {
@@ -38,7 +39,7 @@ function useNavLinks(): NavLinkItem[] {
   return [
     { label: t.sidebar.tools, href: "/", icon: LayoutGrid },
     { label: t.sidebar.automate, href: "/automate", icon: Workflow },
-    { label: t.sidebar.editor, href: "/editor", icon: ImageEditIcon },
+    { label: t.sidebar.editor, href: "/editor", icon: ImageEditIcon, badge: "Beta" },
     { label: t.sidebar.files, href: "/files", icon: FolderOpen },
   ];
 }
@@ -211,6 +212,11 @@ export function TopNav({
                 )}
               >
                 {link.label}
+                {link.badge && (
+                  <span className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-primary/15 text-primary align-middle">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

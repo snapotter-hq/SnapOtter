@@ -126,7 +126,7 @@ export function LayersPanel() {
   // Active layer effects from objects
   const activeLayerObjects = objects.filter((o) => o.layerId === activeLayerId);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
-  const updateObject = useEditorStore((s) => s.updateObject);
+  const setObjectEffects = useEditorStore((s) => s.setObjectEffects);
 
   // Get the first selected object on the active layer for effects editing
   const selectedObject = activeLayerObjects.find((o) => selectedObjectIds.includes(o.id));
@@ -137,14 +137,12 @@ export function LayersPanel() {
       if (!selectedObject) return;
       const currentEffects = selectedObject.effects || {};
       const currentEffect = currentEffects[effectKey] || {};
-      updateObject(selectedObject.id, {
-        effects: {
-          ...currentEffects,
-          [effectKey]: { ...currentEffect, ...updates },
-        },
-      } as never);
+      setObjectEffects(selectedObject.id, {
+        ...currentEffects,
+        [effectKey]: { ...currentEffect, ...updates },
+      });
     },
-    [selectedObject, updateObject],
+    [selectedObject, setObjectEffects],
   );
 
   // Displayed layers: newest (highest index) first

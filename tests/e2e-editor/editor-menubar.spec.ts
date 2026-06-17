@@ -13,8 +13,8 @@ test.describe("Editor Menu Bar", () => {
 
   test("menu bar has correct height and styling", async ({ editorPage: page }) => {
     const bar = page.locator('[data-testid="editor-menu-bar"]');
-    await expect(bar).toHaveClass(/h-7/);
-    await expect(bar).toHaveClass(/bg-card/);
+    await expect(bar).toHaveClass(/h-8/);
+    await expect(bar).toHaveClass(/bg-background/);
   });
 
   test("File menu opens on click and shows items", async ({ editorPage: page }) => {

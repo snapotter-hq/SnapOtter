@@ -75,8 +75,8 @@ test.describe("Image Editor - Full GUI Test Suite", () => {
     await page.goto("/editor");
     await page.waitForTimeout(2000);
 
-    // Welcome screen visible
-    await expect(page.getByText("Image Editor")).toBeVisible();
+    // Welcome screen visible (the visible <h2>; an sr-only <h1> shares the text)
+    await expect(page.getByRole("heading", { level: 2, name: "Image Editor" })).toBeVisible();
     await expect(page.getByText("Open Image")).toBeVisible();
     await expect(page.getByText("New Document")).toBeVisible();
     await snap(page, "welcome-screen");

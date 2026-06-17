@@ -306,6 +306,8 @@ function ImageObject({
       y={a.y}
       width={a.width}
       height={a.height}
+      scaleX={a.scaleX ?? 1}
+      scaleY={a.scaleY ?? 1}
       rotation={a.rotation}
       opacity={a.opacity}
       draggable={draggable}
@@ -430,6 +432,8 @@ function CanvasObjectRenderer({
           y={a.y}
           width={a.width}
           height={a.height}
+          scaleX={a.scaleX ?? 1}
+          scaleY={a.scaleY ?? 1}
           fill={a.fill}
           stroke={a.stroke}
           strokeWidth={a.strokeWidth}
@@ -456,6 +460,8 @@ function CanvasObjectRenderer({
           y={a.y}
           radiusX={a.radiusX}
           radiusY={a.radiusY}
+          scaleX={a.scaleX ?? 1}
+          scaleY={a.scaleY ?? 1}
           fill={a.fill}
           stroke={a.stroke}
           strokeWidth={a.strokeWidth}
@@ -490,6 +496,8 @@ function CanvasObjectRenderer({
           letterSpacing={a.letterSpacing}
           width={a.width}
           height={a.height}
+          scaleX={a.scaleX ?? 1}
+          scaleY={a.scaleY ?? 1}
           rotation={a.rotation}
           opacity={a.opacity}
           draggable={draggable}
@@ -535,6 +543,8 @@ function CanvasObjectRenderer({
           y={a.y}
           sides={a.sides}
           radius={a.radius}
+          scaleX={a.scaleX ?? 1}
+          scaleY={a.scaleY ?? 1}
           fill={a.fill}
           stroke={a.stroke}
           strokeWidth={a.strokeWidth}
@@ -561,6 +571,8 @@ function CanvasObjectRenderer({
           numPoints={a.numPoints}
           innerRadius={a.innerRadius}
           outerRadius={a.outerRadius}
+          scaleX={a.scaleX ?? 1}
+          scaleY={a.scaleY ?? 1}
           fill={a.fill}
           stroke={a.stroke}
           strokeWidth={a.strokeWidth}

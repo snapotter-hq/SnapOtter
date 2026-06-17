@@ -49,7 +49,8 @@ test.describe("Editor Navigation", () => {
   });
 
   test("welcome screen shows when no image loaded", async ({ editorPage: page }) => {
-    await expect(page.getByText("Image Editor")).toBeVisible();
+    // The welcome heading is the visible <h2> (an sr-only <h1> shares the text).
+    await expect(page.getByRole("heading", { level: 2, name: "Image Editor" })).toBeVisible();
     await expect(page.getByText("Drop an image here to get started")).toBeVisible();
     await expect(page.getByText("Open Image")).toBeVisible();
     await expect(page.getByText("New Document")).toBeVisible();

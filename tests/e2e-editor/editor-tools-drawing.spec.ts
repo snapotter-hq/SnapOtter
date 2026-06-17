@@ -28,7 +28,7 @@ test.describe("Editor Drawing Tools", () => {
     await selectTool(page, "brush");
 
     // Options bar should display Size, Opacity, and Hardness labels
-    const optionsBar = page.locator(".flex.items-center.h-10");
+    const optionsBar = page.locator('[data-testid="editor-options-bar"]');
     await expect(optionsBar.getByText("Size")).toBeVisible();
     await expect(optionsBar.getByText("Opacity")).toBeVisible();
     await expect(optionsBar.getByText("Hardness")).toBeVisible();
@@ -85,7 +85,7 @@ test.describe("Editor Drawing Tools", () => {
   test("eraser options bar shows size and opacity", async ({ editorPage: page }) => {
     await selectTool(page, "eraser");
 
-    const optionsBar = page.locator(".flex.items-center.h-10");
+    const optionsBar = page.locator('[data-testid="editor-options-bar"]');
     await expect(optionsBar.getByText("Size")).toBeVisible();
     await expect(optionsBar.getByText("Opacity")).toBeVisible();
   });
@@ -100,7 +100,7 @@ test.describe("Editor Drawing Tools", () => {
   test("pencil options bar hides hardness", async ({ editorPage: page }) => {
     await selectTool(page, "pencil");
 
-    const optionsBar = page.locator(".flex.items-center.h-10");
+    const optionsBar = page.locator('[data-testid="editor-options-bar"]');
     await expect(optionsBar.getByText("Size")).toBeVisible();
     await expect(optionsBar.getByText("Opacity")).toBeVisible();
     // Pencil is always hard, so hardness should not appear
@@ -110,13 +110,10 @@ test.describe("Editor Drawing Tools", () => {
   test("shape fill color applies", async ({ editorPage: page }) => {
     await selectTool(page, "shape-rect");
 
-    // The fill color input should be visible in options bar
-    const fillLabel = page.locator("label").filter({ hasText: "Fill" });
-    await expect(fillLabel).toBeVisible();
-
-    // A color input for fill should be present
-    const fillColorInput = fillLabel.locator("input[type='color']");
-    await expect(fillColorInput).toBeVisible();
+    // The fill colour is chosen via the "Fill" color picker button in the
+    // options bar (a ShapeColorPicker, labelled "<label> color picker").
+    const fillPicker = page.locator("button[aria-label='Fill color picker']");
+    await expect(fillPicker).toBeVisible();
   });
 
   test("shape stroke width control is visible", async ({ editorPage: page }) => {

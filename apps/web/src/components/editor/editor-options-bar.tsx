@@ -83,7 +83,10 @@ export function EditorOptionsBar() {
   const foregroundColor = useEditorStore((s) => s.foregroundColor);
 
   return (
-    <div className="flex items-center h-9 px-3 bg-card border-b border-border gap-3 shrink-0 overflow-hidden">
+    <div
+      className="flex items-center h-9 px-3 bg-card border-b border-border gap-3 shrink-0 overflow-hidden"
+      data-testid="editor-options-bar"
+    >
       <span className="text-xs font-medium text-muted-foreground shrink-0">
         {activeTool
           .replace(/-/g, " ")

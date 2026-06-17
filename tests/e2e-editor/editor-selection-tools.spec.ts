@@ -60,18 +60,45 @@ test.describe("Editor Selection Tools", () => {
     await selectTool(page, "magic-wand");
     await page.waitForTimeout(300);
 
+    // Click a blank area to select it. Use the canvas centre: it always maps
+    // inside the document, whereas a corner can fall in the checkerboard
+    // padding around a centred document (out of bounds -> no selection).
     const canvas = page.locator("canvas").first();
-    const before = await canvas.screenshot();
-
-    // Click on a blank area to select it
     const box = await canvas.boundingBox();
     if (!box) throw new Error("Canvas not found");
-    await page.mouse.click(box.x + 50, box.y + 50);
-    await page.waitForTimeout(500);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
-    const after = await canvas.screenshot();
-    // The magic wand should create a selection (marching ants visible)
-    expect(Buffer.compare(before, after)).not.toBe(0);
+    // A selection renders as black+white dashed "marching ants" (Konva nodes
+    // with a dash and stroke #000000/#ffffff; a wand selection uses Shape
+    // nodes). The brush stroke is solid (no dash), so it is excluded. The wand
+    // flood-fill + outline render can take a moment on a large canvas, so poll.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const konva = (
+              window as unknown as {
+                Konva?: {
+                  stages: Array<{
+                    find(
+                      selector: string,
+                    ): Array<{ stroke(): string; dash(): number[] | undefined }>;
+                  }>;
+                };
+              }
+            ).Konva;
+            if (!konva?.stages?.length) return false;
+            const stage = konva.stages[0];
+            const isMarchingAnts = (node: { stroke(): string; dash(): number[] | undefined }) =>
+              (node.dash()?.length ?? 0) > 0 &&
+              (node.stroke() === "#000000" || node.stroke() === "#ffffff");
+            return ["Shape", "Rect", "Ellipse", "Line"].some((cls) =>
+              stage.find(cls).some(isMarchingAnts),
+            );
+          }),
+        { timeout: 12000 },
+      )
+      .toBe(true);
   });
 
   test("selection mode toggle (add/subtract) exists in options bar", async ({

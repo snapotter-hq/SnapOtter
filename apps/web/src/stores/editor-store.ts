@@ -675,6 +675,19 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         });
       },
 
+      // Layer effects (drop shadow, glows, etc.) live on the object's top-level
+      // `effects` field, NOT in `attrs`, so they need their own setter. Routing
+      // them through updateObject would nest them under `attrs.effects`, where
+      // nothing reads them, so the effect would silently never apply.
+      setObjectEffects: (id, effects) => {
+        set({
+          objects: get().objects.map((obj) => (obj.id === id ? { ...obj, effects } : obj)),
+          isDirty: true,
+          lastAction: "Layer Effect",
+          _historyVersion: get()._historyVersion + 1,
+        });
+      },
+
       removeObjects: (ids) => {
         const idSet = new Set(ids);
         set({

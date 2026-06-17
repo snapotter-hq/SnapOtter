@@ -89,8 +89,10 @@ test.describe("Editor Colors", () => {
     await page.waitForTimeout(300);
 
     const picker = page.locator("[data-testid='color-picker-popover']");
-    await expect(picker.getByText(/^hex$/i)).toBeVisible();
-    await expect(picker.getByText(/^rgb$/i)).toBeVisible();
-    await expect(picker.getByText(/^hsl$/i)).toBeVisible();
+    // Input-mode tabs are buttons; scope to the button role so the "HEX" input
+    // label (a separate <span>) does not collide with the "hex" tab.
+    await expect(picker.getByRole("button", { name: /^hex$/i })).toBeVisible();
+    await expect(picker.getByRole("button", { name: /^rgb$/i })).toBeVisible();
+    await expect(picker.getByRole("button", { name: /^hsl$/i })).toBeVisible();
   });
 });

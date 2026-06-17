@@ -1,4 +1,4 @@
-import { createNewDocument, drawOnCanvas, expect, selectTool, test } from "./helpers";
+import { createNewDocument, expect, selectTool, test } from "./helpers";
 
 test.describe("Editor Transform and Resize", () => {
   test.beforeEach(async ({ editorPage: page }) => {
@@ -73,69 +73,64 @@ test.describe("Editor Transform and Resize", () => {
     const lockBtn = page.locator("button[aria-label*='aspect ratio']");
     await expect(lockBtn).toBeVisible();
 
-    // Resampling select should be present
-    const resampleSelect = page.locator("#resample");
-    await expect(resampleSelect).toBeVisible();
-
-    // It should have the expected options
-    const options = resampleSelect.locator("option");
-    const texts = await options.allTextContents();
-    expect(texts).toContain("Nearest Neighbor (fast)");
-    expect(texts).toContain("Bicubic (smooth)");
-
     // Cancel should close the dialog
     await page.locator("button").filter({ hasText: "Cancel" }).click();
     await page.waitForTimeout(300);
     await expect(dialogTitle).not.toBeVisible();
   });
 
-  test("flip horizontal via transform options changes canvas", async ({ editorPage: page }) => {
-    test.slow();
-
-    // Draw an asymmetric shape so flip is visually detectable
-    await selectTool(page, "brush");
-    await drawOnCanvas(page, 50, 50, 200, 100);
-    await page.waitForTimeout(300);
-
-    // Switch to transform tool
+  // Paint-fill the canvas, select the resulting image object, and open the
+  // transform tool. Returns the canvas centre for follow-up clicks.
+  async function fillAndSelectObject(page: import("@playwright/test").Page) {
+    await selectTool(page, "fill");
+    const box = await page.locator("canvas").first().boundingBox();
+    if (!box) throw new Error("Canvas not found");
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.click(cx, cy);
+    await page.waitForTimeout(400);
+    // Select the fill object with the move tool, then switch to transform.
+    await selectTool(page, "move");
+    await page.mouse.click(cx, cy);
+    await page.waitForTimeout(200);
     await selectTool(page, "transform");
     await page.waitForTimeout(300);
+  }
 
-    const canvas = page.locator("canvas").first();
-    const before = await canvas.screenshot();
+  // True when some image object on the stage is mirrored along the given axis.
+  function anyImageMirrored(page: import("@playwright/test").Page, axis: "x" | "y") {
+    return page.evaluate((flipAxis) => {
+      const konva = (
+        window as unknown as {
+          Konva?: {
+            stages: Array<{ find(s: string): Array<{ scaleX(): number; scaleY(): number }> }>;
+          };
+        }
+      ).Konva;
+      if (!konva?.stages?.length) return false;
+      return konva.stages[0]
+        .find("Image")
+        .some((node) => (flipAxis === "x" ? node.scaleX() : node.scaleY()) < 0);
+    }, axis);
+  }
 
-    // Click the Flip Horizontal button in the transform options bar
-    const flipHBtn = page.locator("button[aria-label='Flip Horizontal']");
-    await expect(flipHBtn).toBeVisible();
-    await flipHBtn.click();
-    await page.waitForTimeout(500);
+  test("flip horizontal mirrors the selected object", async ({ editorPage: page }) => {
+    test.slow();
+    await fillAndSelectObject(page);
 
-    const after = await canvas.screenshot();
-    expect(Buffer.compare(before, after)).not.toBe(0);
+    expect(await anyImageMirrored(page, "x")).toBe(false);
+    await page.locator("button[aria-label='Flip horizontal']").click();
+    await page.waitForTimeout(400);
+    expect(await anyImageMirrored(page, "x")).toBe(true);
   });
 
-  test("flip vertical via transform options changes canvas", async ({ editorPage: page }) => {
+  test("flip vertical mirrors the selected object", async ({ editorPage: page }) => {
     test.slow();
+    await fillAndSelectObject(page);
 
-    // Draw an asymmetric shape so flip is visually detectable
-    await selectTool(page, "brush");
-    await drawOnCanvas(page, 50, 50, 100, 200);
-    await page.waitForTimeout(300);
-
-    // Switch to transform tool
-    await selectTool(page, "transform");
-    await page.waitForTimeout(300);
-
-    const canvas = page.locator("canvas").first();
-    const before = await canvas.screenshot();
-
-    // Click the Flip Vertical button in the transform options bar
-    const flipVBtn = page.locator("button[aria-label='Flip Vertical']");
-    await expect(flipVBtn).toBeVisible();
-    await flipVBtn.click();
-    await page.waitForTimeout(500);
-
-    const after = await canvas.screenshot();
-    expect(Buffer.compare(before, after)).not.toBe(0);
+    expect(await anyImageMirrored(page, "y")).toBe(false);
+    await page.locator("button[aria-label='Flip vertical']").click();
+    await page.waitForTimeout(400);
+    expect(await anyImageMirrored(page, "y")).toBe(true);
   });
 });

@@ -65,6 +65,8 @@ export interface RectAttrs {
   cornerRadius: number;
   dash?: number[];
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -78,6 +80,8 @@ export interface EllipseAttrs {
   strokeWidth: number;
   dash?: number[];
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -98,6 +102,8 @@ export interface TextAttrs {
   height?: number;
   wrap?: "word" | "char" | "none";
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -107,6 +113,8 @@ export interface ImageAttrs {
   width: number;
   height: number;
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
   src: string;
 }
@@ -120,6 +128,8 @@ export interface ArrowAttrs {
   pointerWidth: number;
   dash?: number[];
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -133,6 +143,8 @@ export interface PolygonAttrs {
   strokeWidth: number;
   dash?: number[];
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -147,6 +159,8 @@ export interface StarAttrs {
   strokeWidth: number;
   dash?: number[];
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
   opacity: number;
 }
 
@@ -402,6 +416,7 @@ export interface EditorState {
   // Objects
   addObject: (obj: CanvasObject) => void;
   updateObject: (id: string, attrs: Partial<CanvasObject["attrs"]>) => void;
+  setObjectEffects: (id: string, effects: ObjectEffects) => void;
   removeObjects: (ids: string[]) => void;
   setSelectedObjects: (ids: string[]) => void;
   bringToFront: (objectId: string) => void;

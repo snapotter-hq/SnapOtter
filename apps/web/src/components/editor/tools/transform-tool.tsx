@@ -16,6 +16,43 @@ export interface TransformValues {
 }
 
 // ---------------------------------------------------------------------------
+// Flip helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the attribute changes that flip an object in place along one axis.
+ *
+ * Points-based objects (brush/pencil strokes, lasso shapes) are mirrored by
+ * reflecting their points around their own bounding-box centre. Sized objects
+ * negate their scale and shift position to stay in place — the renderer applies
+ * `scaleX`/`scaleY`. Ellipses are positioned by their centre, so they need no
+ * position compensation.
+ */
+function computeFlip(attrs: Record<string, unknown>, axis: "x" | "y"): Record<string, unknown> {
+  if (Array.isArray(attrs.points)) {
+    const pts = attrs.points as number[];
+    const offset = axis === "x" ? 0 : 1;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let i = offset; i < pts.length; i += 2) {
+      min = Math.min(min, pts[i]);
+      max = Math.max(max, pts[i]);
+    }
+    const sum = min + max;
+    return { points: pts.map((v, i) => (i % 2 === offset ? sum - v : v)) };
+  }
+
+  const scaleKey = axis === "x" ? "scaleX" : "scaleY";
+  const posKey = axis === "x" ? "x" : "y";
+  const sizeKey = axis === "x" ? "width" : "height";
+  const scale = (attrs[scaleKey] as number) ?? 1;
+  const centred = attrs.radiusX !== undefined; // ellipses are centre-anchored
+  const size = (attrs[sizeKey] as number) ?? ((attrs.radiusX as number | undefined) ?? 0) * 2;
+  const pos = (attrs[posKey] as number) ?? 0;
+  return centred ? { [scaleKey]: -scale } : { [scaleKey]: -scale, [posKey]: pos + scale * size };
+}
+
+// ---------------------------------------------------------------------------
 // Hook: useTransformTool
 // ---------------------------------------------------------------------------
 
@@ -191,9 +228,8 @@ export function useTransformTool(): TransformToolApi {
     for (const id of selectedObjectIds) {
       const obj = objects.find((o) => o.id === id);
       if (!obj) continue;
-      const a = obj.attrs as unknown as Record<string, unknown>;
-      const currentScale = (a.scaleX as number) ?? 1;
-      updateObject(id, { scaleX: -currentScale } as Record<string, unknown>);
+      const update = computeFlip(obj.attrs as unknown as Record<string, unknown>, "x");
+      updateObject(id, update as Partial<typeof obj.attrs>);
     }
   }, [selectedObjectIds, objects, updateObject]);
 
@@ -201,9 +237,8 @@ export function useTransformTool(): TransformToolApi {
     for (const id of selectedObjectIds) {
       const obj = objects.find((o) => o.id === id);
       if (!obj) continue;
-      const a = obj.attrs as unknown as Record<string, unknown>;
-      const currentScale = (a.scaleY as number) ?? 1;
-      updateObject(id, { scaleY: -currentScale } as Record<string, unknown>);
+      const update = computeFlip(obj.attrs as unknown as Record<string, unknown>, "y");
+      updateObject(id, update as Partial<typeof obj.attrs>);
     }
   }, [selectedObjectIds, objects, updateObject]);
 

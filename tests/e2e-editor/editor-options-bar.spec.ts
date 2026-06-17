@@ -40,8 +40,8 @@ test.describe("Editor Options Bar", () => {
     await expect(page.locator("#transform-rotation")).toBeVisible();
 
     // Flip buttons should be visible
-    await expect(page.locator("button[aria-label='Flip Horizontal']")).toBeVisible();
-    await expect(page.locator("button[aria-label='Flip Vertical']")).toBeVisible();
+    await expect(page.locator("button[aria-label='Flip horizontal']")).toBeVisible();
+    await expect(page.locator("button[aria-label='Flip vertical']")).toBeVisible();
 
     // Aspect ratio lock button should be visible
     const lockBtn = page.locator("button[aria-label*='aspect ratio']");
@@ -51,7 +51,7 @@ test.describe("Editor Options Bar", () => {
   test("brush options show size, opacity, hardness", async ({ editorPage: page }) => {
     await selectTool(page, "brush");
 
-    const optionsBar = page.locator(".flex.items-center.h-10");
+    const optionsBar = page.locator('[data-testid="editor-options-bar"]');
 
     // Size, Opacity, and Hardness labels should be in the options bar
     await expect(optionsBar.getByText("Size")).toBeVisible();
