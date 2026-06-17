@@ -1,0 +1,23 @@
+/* Otter-orange brand override. AA note: #A85518 on white = ~5.2:1 (passes AA for text + buttons).
+   Vibrant #E07832 / #F09550 are decorative only (see DocsHome.vue), never under white text. */
+:root {
+  --vp-c-brand-1: #A85518;
+  --vp-c-brand-2: #8F4712;
+  --vp-c-brand-3: #A85518;
+  --vp-c-brand-soft: rgba(224, 120, 50, 0.14);
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-bg: #A85518;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-hover-bg: #8F4712;
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: #fff;
+  --vp-button-brand-active-bg: #7A3D10;
+}
+.dark {
+  --vp-c-brand-1: #F0A766;
+  --vp-c-brand-2: #F09550;
+  --vp-c-brand-3: #A85518;
+  --vp-c-brand-soft: rgba(240, 149, 80, 0.16);
+}

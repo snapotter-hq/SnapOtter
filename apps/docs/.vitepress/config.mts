@@ -15,7 +15,7 @@ export default defineConfig({
   sitemap: { hostname: "https://docs.snapotter.com" },
 
   head: [
-    ["meta", { name: "theme-color", content: "#3b82f6" }],
+    ["meta", { name: "theme-color", content: "#E07832" }],
     ["link", { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon.png" }],
     ["link", { rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
     ["link", { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }],
