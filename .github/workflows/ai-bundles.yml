@@ -104,6 +104,7 @@ jobs:
           mkdir -p /tmp/bundles
           docker run --rm --entrypoint bash \
             -v "$PWD/docker/build-bundle.sh:/build-bundle.sh:ro" \
+            -v "$PWD/docker/feature-manifest.json:/app/docker/feature-manifest.json:ro" \
             -v "/tmp/bundles:/output" \
             "ghcr.io/snapotter-hq/snapotter:${VERSION}" \
             /build-bundle.sh "${BUNDLE}" "${ARCH}" /output
@@ -127,8 +128,8 @@ jobs:
         with:
           path: /tmp/artifacts
 
-      - name: Install huggingface-hub
-        run: pip install huggingface-hub
+      - name: Install hf CLI
+        run: pip install -U "huggingface_hub[hf_xet]"
 
       - name: Organize and upload to HuggingFace
         env:
@@ -156,8 +157,10 @@ jobs:
           done
           echo ']}' >> manifest.json
 
-          huggingface-cli upload snapotter/feature-bundles \
+          # Interim: publish to the deepsafe account (the HF_TOKEN secret is deepsafe's).
+          # Switch back to snapotter/feature-bundles once that account is restored.
+          hf upload deepsafe/feature-bundles \
             "/tmp/upload/v${VERSION}" "v${VERSION}" \
-            --repo-type model --token "${HF_TOKEN}"
+            --repo-type model
 
-          echo "Published: https://huggingface.co/snapotter/feature-bundles/tree/main/v${VERSION}"
+          echo "Published: https://huggingface.co/deepsafe/feature-bundles/tree/main/v${VERSION}"
