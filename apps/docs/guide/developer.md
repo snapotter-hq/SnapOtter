@@ -76,7 +76,7 @@ pnpm test:coverage      # tests with coverage report
 
 ## Database
 
-SQLite via Drizzle ORM. The database file lives at `./data/snapotter.db` by default.
+Postgres 17 via Drizzle ORM (pg-core). Dev setup: `docker compose -f docker-compose.dev.yml up -d` starts Postgres on port 5432 and Redis on port 6379.
 
 ```bash
 cd apps/api

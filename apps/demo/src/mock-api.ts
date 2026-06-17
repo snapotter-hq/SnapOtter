@@ -150,7 +150,7 @@ function matchRoute(url: string, method: string): Response | null {
   }
 
   if (path === "/api/v1/health") {
-    return json({ status: "ok", version: "1.17.0" });
+    return json({ status: "ok", version: "2.0.0" });
   }
 
   if (path === "/api/v1/settings" && method === "GET") {

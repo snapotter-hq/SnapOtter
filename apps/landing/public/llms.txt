@@ -1,6 +1,6 @@
 # SnapOtter
 
-> Open-source, self-hostable file processing suite with 157 tools across 5 modalities (image, video, audio, document, data). Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
+> Open-source, self-hostable file manipulation suite with 157 tools across 5 modalities (image, video, audio, document, data). 3-container Docker Compose stack (app + Postgres 17 + Redis 8). Dual-licensed AGPLv3 / commercial.
 
 SnapOtter runs entirely on your own infrastructure. Files are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need. Supports GDPR, HIPAA, and CCPA compliance by architecture.
 
@@ -66,7 +66,7 @@ SAML SSO (Okta, Azure AD, Google Workspace, any OIDC), SCIM Provisioning, Multi-
 - Pipeline automation: chain tools sequentially
 - Full REST API with OpenAPI documentation
 - 21 languages supported
-- Docker: single container with Postgres + Redis bundled
+- Docker: 3-container Compose stack (app + Postgres 17 + Redis 8)
 - Kubernetes and bare metal deployment
 - ARM and x86 architectures
 - Layer-based image editor (Konva)

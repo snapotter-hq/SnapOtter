@@ -4,14 +4,14 @@ description: Deploy SnapOtter to production with Docker. Hardware requirements, 
 
 # Deployment
 
-SnapOtter ships as a single Docker container. The image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
+SnapOtter deploys as a 3-container Docker Compose stack (app + Postgres 17 + Redis 8). The app image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
 
 See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
 ## Quick Start (CPU)
 
 ```yaml
-# docker-compose.yml — Copy this file and run: docker compose up -d
+# docker-compose.yml -- Copy this file and run: docker compose up -d
 services:
   SnapOtter:
     image: snapotter/snapotter:latest    # or ghcr.io/snapotter-hq/snapotter:latest
@@ -19,13 +19,17 @@ services:
     ports:
       - "1349:1349"                # Web UI + API
     volumes:
-      - SnapOtter-data:/data           # Database, AI models, user files (PERSISTENT)
+      - SnapOtter-data:/data           # AI models, user files (PERSISTENT)
       - SnapOtter-workspace:/tmp/workspace  # Temp processing files (can be tmpfs)
     environment:
       # --- Authentication ---
       - AUTH_ENABLED=true          # Set to false to disable login entirely
       - DEFAULT_USERNAME=admin     # First-run admin username
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
+
+      # --- Database + Redis ---
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
 
       # --- Limits (0 = unlimited) ---
       # - MAX_UPLOAD_SIZE_MB=0     # Per-file upload limit in MB
@@ -40,6 +44,11 @@ services:
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
       interval: 30s
@@ -53,9 +62,42 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: SnapOtter-postgres
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter     # CHANGE THIS for any non-local deployment
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:8-alpine
+    container_name: SnapOtter-redis
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
-  SnapOtter-data:       # Named volume — Docker manages permissions automatically
+  SnapOtter-data:       # Named volume -- Docker manages permissions automatically
   SnapOtter-workspace:
+  SnapOtter-pgdata:     # Postgres data
+  SnapOtter-redisdata:  # Redis AOF data
 ```
 
 ```bash
@@ -71,7 +113,7 @@ The app is then available at `http://localhost:1349`.
 For NVIDIA GPU acceleration on AI tools (background removal, upscaling, face enhancement, OCR):
 
 ```yaml
-# docker-compose-gpu.yml — Requires: NVIDIA GPU + nvidia-container-toolkit
+# docker-compose-gpu.yml -- Requires: NVIDIA GPU + nvidia-container-toolkit
 # Install toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 services:
   SnapOtter:
@@ -86,7 +128,14 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
       interval: 30s
@@ -107,9 +156,42 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: SnapOtter-postgres
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - SnapOtter-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:8-alpine
+    container_name: SnapOtter-redis
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - SnapOtter-redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   SnapOtter-data:
   SnapOtter-workspace:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 ```bash
@@ -259,10 +341,12 @@ See the [complete format list](/guide/supported-formats) for details on every su
 
 ## Volumes
 
-| Mount | Purpose | Required? |
-|---|---|---|
-| `/data` | SQLite database, AI models, Python venv, user files | **Yes** — data loss without it |
-| `/tmp/workspace` | Temporary processing files (auto-cleaned) | Recommended |
+| Volume | Mount | Purpose | Required? |
+|---|---|---|---|
+| `SnapOtter-data` | `/data` (app) | AI models, Python venv, user files | **Yes** -- data loss without it |
+| `SnapOtter-pgdata` | `/var/lib/postgresql/data` (postgres) | PostgreSQL database | **Yes** -- data loss without it |
+| `SnapOtter-redisdata` | `/data` (redis) | Redis AOF persistence (job queues) | **Yes** -- jobs lost without it |
+| `SnapOtter-workspace` | `/tmp/workspace` (app) | Temp processing files (auto-cleaned) | Recommended |
 
 ### Bind mounts vs. named volumes
 
@@ -288,6 +372,8 @@ environment:
 | `AUTH_ENABLED` | `true` | Enable/disable login requirement |
 | `DEFAULT_USERNAME` | `admin` | Initial admin username |
 | `DEFAULT_PASSWORD` | `admin` | Initial admin password (forced change on first login) |
+| `DATABASE_URL` | `postgres://...@postgres:5432/snapotter` | PostgreSQL connection string |
+| `REDIS_URL` | `redis://redis:6379` | Redis connection string for BullMQ job queues |
 | `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Per-file upload limit |
 | `MAX_BATCH_SIZE` | `0` (unlimited) | Max files per batch request |
 | `RATE_LIMIT_PER_MIN` | `0` (disabled) | API requests per minute per IP |

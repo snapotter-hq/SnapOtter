@@ -1,21 +1,24 @@
 {
   "name": "snapotter",
-  "version": "1.17.2",
+  "version": "2.0.0",
   "private": true,
-  "description": "Self-hosted image processing suite with 50+ tools and local AI. Single Docker container, no external services.",
+  "description": "Self-hosted file manipulation suite with 157 tools and local AI across image, video, audio, PDF, and data.",
   "homepage": "https://snapotter.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/snapotter-hq/snapotter.git"
   },
   "keywords": [
-    "image-processing",
+    "file-processing",
+    "file-manipulation",
     "self-hosted",
     "docker",
     "ai",
+    "image-processing",
+    "video",
+    "audio",
+    "pdf",
     "background-removal",
-    "image-resize",
-    "image-compression",
     "ocr",
     "open-source"
   ],

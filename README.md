@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self Hosted Image Manipulator">
+  <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
 </p>
 
 <p align="center">
@@ -19,34 +19,64 @@
 
 ## Key Features
 
-- **53 image tools:** Resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, create GIFs, find duplicates, generate passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
+- **157 tools across 5 modalities:** Image, video, audio, PDF, and data. Resize/crop/convert/compress images, trim & transcode video, edit & convert audio, merge/split/compress/OCR PDFs, and convert CSV/JSON/XML/YAML and archives. Images alone support 55+ input formats (including 23 camera RAW formats) and many output formats
 - **Image editor:** Layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware
-- **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), expand canvas, fix transparency. All on your hardware, no internet required
+- **Local AI (19 tools):** Remove backgrounds, upscale, restore and colorize old photos, erase objects, blur and enhance faces, extract text (OCR and OCR-PDF), expand canvas, transcribe audio, and auto-generate subtitles. All on your hardware, no internet required
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
-- **20 languages:** Arabic, Chinese, Czech, Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
-- **Pipelines:** Chain tools into reusable workflows with unlimited steps. Import/export as JSON. Batch process unlimited images at once
+- **21 languages:** English, Arabic, Chinese (Simplified & Traditional), Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese (Brazil), Russian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
+- **Pipelines & batch:** Chain tools into reusable workflows (import/export as JSON) and batch-process many files at once
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
-- **Single container:** One `docker run`, no Redis, no Postgres, no external services
-- **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
-- **Privacy first:** Your images never leave your network. SnapOtter asks once whether you'd like to share anonymous product analytics (which tools are used, errors encountered, never file data). Change anytime in Settings, or set `ANALYTICS_ENABLED=false` to disable completely
+- **Self-hosted stack:** Runs as a small Docker Compose stack (app + Postgres + Redis). Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
+- **Privacy first:** Your files never leave your network. SnapOtter asks once whether you'd like to share anonymous product analytics (which tools are used, errors encountered, never file data). Change anytime in Settings, or set `ANALYTICS_ENABLED=false` to disable completely
 
 ## Quick Start
 
-```bash
-docker run -d --name snapotter -p 1349:1349 -v snapotter-data:/data snapotter/snapotter:latest
+SnapOtter runs as a small Docker Compose stack (app + Postgres 17 + Redis 8). Save this as `docker-compose.yml` and run `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    ports: ["1349:1349"]
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin            # change on first login
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    volumes: ["snapotter-data:/data"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment: { POSTGRES_USER: snapotter, POSTGRES_PASSWORD: snapotter, POSTGRES_DB: snapotter }
+    volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U snapotter"], interval: 10s, retries: 12 }
+    restart: unless-stopped
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes: ["snapotter-redisdata:/data"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, retries: 12 }
+    restart: unless-stopped
+volumes:
+  snapotter-data:
+  snapotter-pgdata:
+  snapotter-redisdata:
 ```
 
 <details>
 <summary><sub>Have an NVIDIA GPU? Click here for GPU acceleration.</sub></summary>
 <br>
 
-Add `--gpus all` for GPU-accelerated background removal, upscaling, and OCR:
+For GPU-accelerated background removal, upscaling, and OCR, use the GPU Compose file (it adds NVIDIA GPU reservations to the `snapotter` service):
 
 ```bash
-docker run -d --name snapotter -p 1349:1349 --gpus all -v snapotter-data:/data snapotter/snapotter:latest
+docker compose -f docker-compose-gpu.yml up -d
 ```
 
-> Requires an NVIDIA GPU and [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU if no GPU is found. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for benchmarks and Docker Compose examples.
+> Requires an NVIDIA GPU and [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU if no GPU is found. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the full GPU example and benchmarks.
 
 </details>
 
@@ -59,7 +89,7 @@ docker run -d --name snapotter -p 1349:1349 --gpus all -v snapotter-data:/data s
 
 You will be asked to change your password on first login.
 
-For Docker Compose, persistent storage, and other setup options, see the [Getting Started Guide](https://docs.snapotter.com/guide/getting-started). For GPU acceleration and tag details, see [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
+For persistent storage, secrets, OIDC/SSO, upgrading from 1.x, and other setup options, see the [Getting Started Guide](https://docs.snapotter.com/guide/getting-started). For GPU acceleration and tag details, see [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
 
 ## Documentation
 

@@ -4,6 +4,6 @@
     <tspan>Snap</tspan><tspan fill="#3b82f6">Otter</tspan>
   </text>
   <text x="220" y="140" font-family="Inter, system-ui, sans-serif" font-size="18" fill="#94a3b8">
-    Self-hosted image processing suite
+    Self-hosted file manipulation suite
   </text>
 </svg>

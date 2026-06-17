@@ -34,7 +34,7 @@ All configuration is done through environment variables. Every variable has a se
 | Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` or `s3`. Only local storage is currently implemented. |
-| `DB_PATH` | `./data/snapotter.db` | Path to the SQLite database file. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). |
 
@@ -101,5 +101,5 @@ services:
 
 The Docker container uses two volumes:
 
-- `/data` -- Persistent storage for the SQLite database and user files. Mount this to keep users, API keys, saved pipelines, and uploaded images across container restarts.
-- `/tmp/workspace` -- Temporary storage for images being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
+- `/data` -- Persistent storage for user files, AI models, and Python venv. Mount this to keep uploaded files and AI bundles across container restarts.
+- `/tmp/workspace` -- Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.

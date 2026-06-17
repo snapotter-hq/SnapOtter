@@ -4,7 +4,7 @@ description: Security hardening guide for SnapOtter. Container security, network
 
 # Security & Hardening
 
-SnapOtter processes images entirely on your infrastructure. No telemetry, no external API calls, no phone-home behavior. Images never leave the container.
+SnapOtter processes files entirely on your infrastructure. No telemetry, no external API calls, no phone-home behavior. Files never leave your network.
 
 The container runs as a dedicated non-root user (`snapotter`) with all Linux capabilities dropped except the minimum required set. For the full vulnerability disclosure policy and security architecture, see [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) on GitHub.
 
@@ -78,7 +78,7 @@ If you use Kubernetes or Docker's `--user` flag to run as non-root directly (byp
 
 ## Network Isolation
 
-During normal operation, the container makes **zero outbound network connections**. All image processing happens locally using bundled libraries.
+During normal operation, the container makes **zero outbound network connections**. All file processing happens locally using bundled libraries.
 
 ```
 Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
@@ -218,25 +218,34 @@ All persistent state lives in the `/data` volume:
 
 | Path | Contents | Critical? |
 |---|---|---|
-| `/data/snapotter.db` | SQLite database (users, settings, pipelines, audit log) | Yes |
+| Postgres volume | Database (users, settings, pipelines, audit log) | Yes |
 | `/data/uploads/` | User-uploaded files (if file storage is enabled) | Yes |
 | `/data/ai/` | Downloaded AI model files | No (re-downloadable) |
 | `/data/venv/` | Python virtual environment | No (rebuilt on start) |
 
-SQLite uses WAL (Write-Ahead Logging) mode, which means the database is safe to snapshot while the container is running. A minimal backup strategy:
+Postgres supports online backups via `pg_dump`. A minimal backup strategy:
 
 ```bash
-# Copy the database while the container is running (WAL-safe)
-docker cp SnapOtter:/data/snapotter.db ./backup/snapotter.db
-docker cp SnapOtter:/data/snapotter.db-wal ./backup/snapotter.db-wal 2>/dev/null
-docker cp SnapOtter:/data/snapotter.db-shm ./backup/snapotter.db-shm 2>/dev/null
+# Dump the database while the stack is running
+docker compose exec -T postgres pg_dump -U snapotter snapotter > backup.sql
 
-# Or snapshot the entire volume
+# Archive the /data volume (user files, AI models)
 docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
   alpine tar czf /backup/snapotter-data.tar.gz -C /data .
 ```
 
-AI models total up to 14 GB across all bundles. Since they are re-downloadable, exclude `/data/ai/` and `/data/venv/` from backups to save space. Only the database and user uploads are critical.
+To restore:
+
+```bash
+# Restore the database
+cat backup.sql | docker compose exec -T postgres psql -U snapotter snapotter
+
+# Restore the /data volume
+docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
+  alpine sh -c "cd /data && tar xzf /backup/snapotter-data.tar.gz"
+```
+
+AI models total up to 14 GB across all bundles. Since they are re-downloadable, you can exclude `/data/ai/` and `/data/venv/` from `/data` volume backups to save space. The database dump and `/data/uploads/` are the critical items.
 
 ## Compliance Artifacts
 
@@ -260,13 +269,13 @@ Download the SBOM from the release and scan it with your preferred tool:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.0.0-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.0.0-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.0.0
 ```
 
 ::: info

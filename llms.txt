@@ -1,114 +1,97 @@
 # SnapOtter
 
-Open-source, self-hostable image manipulation suite with 53 tools. Single Docker container, no external services required. Dual-licensed AGPLv3 and commercial.
+Open-source, self-hostable file manipulation suite with 157 tools across 5 modalities (image, video, audio, PDF, and data) plus a layer-based image editor. Self-hosted as a small Docker Compose stack (app + Postgres 17 + Redis 8), no external SaaS dependencies. Dual-licensed AGPLv3 and commercial.
 
-All image processing happens locally. Images never leave your infrastructure. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats.
+All processing happens on your own infrastructure -- files never leave your network. Image tools support 55+ input formats (including 23 camera RAW formats); video and audio run through a bundled static FFmpeg; PDFs and office documents use qpdf, pdfcpu, Ghostscript, and LibreOffice. Local AI features (background removal, upscaling, OCR, transcription, and more) download on demand and run on your hardware, GPU-optional.
 
-## Quick Start (Docker)
+## Quick Start (Docker Compose)
 
-docker run -d --name snapotter -p 1349:1349 -v snapotter-data:/data snapotter/snapotter:latest
+SnapOtter runs as three containers: the app, Postgres 17, and Redis 8. Save this as docker-compose.yml and run `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    ports: ["1349:1349"]
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin            # change on first login
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://redis:6379
+    volumes: ["snapotter-data:/data"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment: { POSTGRES_USER: snapotter, POSTGRES_PASSWORD: snapotter, POSTGRES_DB: snapotter }
+    volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U snapotter"], interval: 10s, retries: 12 }
+    restart: unless-stopped
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes: ["snapotter-redisdata:/data"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, retries: 12 }
+    restart: unless-stopped
+volumes:
+  snapotter-data:
+  snapotter-pgdata:
+  snapotter-redisdata:
+```
 
 Default credentials: admin / admin (must change on first login).
-Add --gpus all for NVIDIA GPU acceleration on AI tools.
+GPU acceleration: use docker-compose-gpu.yml (NVIDIA Container Toolkit required; falls back to CPU).
 Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
+Upgrading from 1.x (SQLite): set SQLITE_MIGRATE_PATH=/data/snapotter.db on first boot to import the old database.
 
-## Tools by Category
+## Tools by Modality
 
-### Essentials
-- resize: Resize by pixels, percentage, or social media presets
-- crop: Freeform crop, aspect ratio presets, shape crop
-- rotate: Rotate, flip, and straighten images
-- convert: Convert between image formats
-- compress: Reduce file size by quality or target size
+157 tools total. Full catalog at https://snapotter.com/tools and via the API. Highlights:
 
-### Optimization
-- optimize-for-web: Smart format selection and quality tuning for web delivery
-- strip-metadata: Remove EXIF, GPS, and camera info for privacy
-- edit-metadata: View and edit EXIF, IPTC, and XMP fields
-- bulk-rename: Pattern-based batch renaming with variables
-- image-to-pdf: Combine images into multi-page PDFs
-- favicon: Generate all favicon and app icon sizes from one image
+### Image (64 tools)
+resize, crop, rotate, convert, compress, optimize-for-web, strip-metadata, adjust-colors, sharpening, watermark-text, watermark-image, collage, beautify, meme-generator, vectorize, favicon, color-palette, find-duplicates, qr-generate, barcode-read, html-to-image, image-to-pdf, and more.
 
-### Adjustments
-- adjust-colors: Brightness, contrast, saturation, temperature, and effects
-- sharpening: Adaptive, unsharp mask, and high-pass sharpening
-- replace-color: Swap colors with tolerance control or invert
-- color-blindness: Simulate 8 types of color vision deficiency
+### Video (29 tools)
+convert-video, compress-video, trim-video, resize-video, crop-video, rotate-video, video-speed, change-fps, stabilize-video, mute-video, video-to-gif, watermark-video, video-color, aspect-pad, and more.
 
-### AI Tools (local ML, no cloud APIs)
-- remove-background: AI background removal (rembg)
-- upscale: 2x/4x AI super-resolution (RealESRGAN)
-- erase-object: AI inpainting to remove unwanted objects (LaMa)
-- ocr: Extract text from images (PaddleOCR, 80+ languages)
-- blur-faces: AI face detection with blur for GDPR compliance
-- smart-crop: Subject-aware and face-centered cropping
-- image-enhancement: One-click auto-fix for exposure, contrast, color
-- enhance-faces: AI face restoration for blurry or low-res portraits
-- colorize: Convert B&W photos to full color with AI
-- noise-removal: AI denoising for ISO noise, JPEG artifacts, grain
-- red-eye-removal: Automatic red-eye detection and correction
-- restore-photo: AI repair of scratches, tears, and damage
-- passport-photo: Compliant passport/ID photos for 30+ countries
-- content-aware-resize: Seam carving that preserves subjects
-- ai-canvas-expand: Outpainting to extend image borders with AI
-- transparency-fixer: Fix PNGs with fake transparent backgrounds
+### Audio (17 tools)
+convert-audio, trim-audio, merge-audio, split-audio, volume-adjust, normalize-audio, fade-audio, audio-speed, pitch-shift, audio-channels, silence-removal, noise-reduction, ringtone-maker, waveform-image, and more.
 
-### Watermark and Overlay
-- watermark-text: Add text watermarks with tiling and opacity
-- watermark-image: Overlay logos with position and opacity control
-- text-overlay: Add styled text, captions, and titles
-- compose: Layer and composite multiple images with blending
-- meme-generator: Create memes with custom text and templates
+### PDF & documents (37 tools)
+merge-pdf, split-pdf, compress-pdf, rotate-pdf, protect-pdf, unlock-pdf, organize-pdf, extract-pages, remove-pages, repair-pdf, linearize-pdf, word-to-pdf, excel-to-pdf, convert-presentation, convert-document, pdf-to-image, and more.
 
-### Utilities
-- info: View dimensions, EXIF, GPS, color space, file details
-- compare: Side-by-side image comparison with slider overlay
-- find-duplicates: Perceptual hashing for near-duplicate detection
-- color-palette: Extract dominant colors as hex/RGB values
-- qr-generate: Custom QR codes with colors, logos, and patterns
-- html-to-image: Capture webpages as high-quality images
-- barcode-read: Decode QR, Code 128, EAN-13 and more from images
-- image-to-base64: Generate data URIs for HTML/CSS embedding
+### Data (10 tools)
+csv-excel, csv-json, json-xml, yaml-json, xml-to-csv, split-csv, merge-csvs, chart-maker, create-zip, extract-zip.
 
-### Layout and Composition
-- collage: 25+ grid templates for photo collages
-- stitch: Join images side by side, stacked, or in grids
-- split: Cut images into grid tiles for Instagram and print
-- border: Add borders, rounded corners, and drop shadows
-- beautify: Screenshot mockups with device frames and backgrounds
-
-### Format and Conversion
-- svg-to-raster: Convert SVG to PNG/JPEG/WebP at custom scale/DPI
-- vectorize: Trace raster images to SVG vector paths
-- gif-tools: Resize, optimize, reverse, extract GIF frames
-- pdf-to-image: Convert PDF pages to images at custom DPI
+### Local AI (19 tools, on-demand model bundles)
+remove-background (rembg), upscale (RealESRGAN), erase-object (LaMa), ocr and ocr-pdf (PaddleOCR, 80+ languages), blur-faces, smart-crop, enhance-faces, colorize, noise-removal, red-eye-removal, restore-photo, passport-photo, transparency-fixer, ai-canvas-expand (outpainting), background-replace, blur-background, transcribe-audio and auto-subtitles (faster-whisper). Models download on demand; CPU or NVIDIA GPU.
 
 ## REST API
 
 Base URL: http://localhost:1349/api/v1
-Interactive docs: http://localhost:1349/api/docs (Swagger UI)
+Interactive docs: http://localhost:1349/api/docs (Scalar UI)
 Machine-readable spec: http://localhost:1349/api/docs/json (OpenAPI 3.1)
-OpenAPI YAML: http://localhost:1349/api/v1/openapi.yaml
-LLM-optimized spec: http://localhost:1349/llms.txt (generated from OpenAPI at runtime)
+LLM-optimized API spec: http://localhost:1349/llms.txt (generated from OpenAPI at runtime)
 Full plain-text API docs: http://localhost:1349/llms-full.txt
 
-Authentication methods:
+Authentication:
 - Session cookie (browser login)
 - Bearer token: Authorization: Bearer si_<key> (API keys are prefixed si_)
 
-API keys support scoped permissions that intersect with user role permissions.
+Role-based access with 3 built-in roles (admin, editor, user) and 17 granular permissions, plus custom roles. API keys support scoped permissions that intersect with the user's role permissions.
 
 Processing a file:
   POST /api/v1/tools/:toolId
   Content-Type: multipart/form-data
   Body: file (binary), settings (JSON string)
-  Response: { jobId, downloadUrl, originalSize, processedSize }
-
-AI tools return 202 Accepted and stream progress via SSE:
+  Fast tools respond 200 { jobId, downloadUrl, originalSize, processedSize }.
+  Long-running and AI tools respond 202 { jobId, async: true } and stream progress via SSE:
   GET /api/v1/jobs/:jobId/progress (EventSource)
 
 Pipelines (chained tool workflows):
-  POST /api/v1/pipeline/execute (run a pipeline on uploaded files)
+  POST /api/v1/pipeline/execute
   POST /api/v1/pipeline/save
   GET /api/v1/pipeline/list
   DELETE /api/v1/pipeline/:id
@@ -118,20 +101,21 @@ Batch processing: POST /api/v1/tools/:toolId/batch (multiple files in, ZIP archi
 
 ## Tech Stack
 
-Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand
-Backend: Fastify 5, Sharp (image processing), SQLite via Drizzle ORM
-AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, MediaPipe, LaMa)
+Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand, Konva (image editor)
+Backend: Fastify 5, Sharp (images), Postgres 17 via Drizzle ORM, Redis 8 + BullMQ (durable job queues)
+Media & docs: static FFmpeg (video/audio), qpdf, pdfcpu, Ghostscript, LibreOffice, pandoc, WeasyPrint (PDF & documents)
+AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, faster-whisper, MediaPipe, LaMa) via on-demand bundle install
 Auth: Session-based with OIDC/SSO support (Google, GitHub, Okta, any OIDC provider)
 Languages: 21 locales with RTL support
 
 ## Key Features
 
+- 157 tools across image, video, audio, PDF, and data, plus a layer-based image editor
 - Pipelines: chain tools into reusable workflows, import/export as JSON
-- Batch processing: process hundreds of files at once
-- Image editor: layer-based editor with brushes, shapes, filters, curves
-- OIDC/SSO: Google, GitHub, Okta, or any OpenID Connect provider
-- Role-based access: admin, editor, user roles with 14 granular permissions
-- Custom roles and API key scoping
+- Batch processing: process many files at once, download as a ZIP
+- Local AI: background removal, upscaling, OCR, transcription, colorization, restoration -- all on your hardware
+- OIDC/SSO and role-based access (admin, editor, user) with 17 granular permissions, custom roles, and API key scoping
+- Self-hosted: 3-container Docker Compose stack, multi-arch (AMD64/ARM64), GPU-optional
 
 ## Links
 

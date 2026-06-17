@@ -97,7 +97,7 @@ const howToJsonLd = {
       "@type": "HowToStep",
       position: 1,
       name: "Deploy SnapOtter",
-      text: "Run SnapOtter with a single Docker command: docker run -p 1349:1349 snapotter/snapotter",
+      text: "Run SnapOtter with Docker Compose: docker compose up -d",
     },
     {
       "@type": "HowToStep",
@@ -308,7 +308,7 @@ const allJsonLd = [
               <p class="mt-2 text-sm leading-relaxed text-muted">
                 {isAiTool
                   ? `Unlike cloud AI services, SnapOtter's ${tool.name} runs the ML model directly on your server. Your files are processed locally with no data sent to external APIs. No per-file fees, no rate limits, no privacy concerns. Deploy once with Docker and use it as much as you need.`
-                  : `SnapOtter runs entirely on your own infrastructure. Files processed with ${tool.name} are never uploaded to third-party servers. Deploy a single Docker container and process files with full privacy, no watermarks, and no usage limits. Open source under AGPL-3.0.`}
+                  : `SnapOtter runs entirely on your own infrastructure. Files processed with ${tool.name} are never uploaded to third-party servers. Deploy the Docker Compose stack and process files with full privacy, no watermarks, and no usage limits. Open source under AGPL-3.0.`}
               </p>
             </div>
           </div>

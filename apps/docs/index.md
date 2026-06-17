@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "SnapOtter"
-  text: "Self-Hosted Image Toolkit"
-  tagline: 50+ tools. Resize, compress, convert, remove backgrounds, upscale, OCR, and more. One Docker container, fully offline.
+  text: "Self-Hosted File Manipulation Suite"
+  tagline: 157 tools across image, video, audio, PDF, and data. Docker Compose stack, fully offline, GPU-optional.
   actions:
     - theme: brand
       text: Get started
@@ -14,12 +14,12 @@ hero:
       link: /api/rest
 
 features:
-  - title: 53 Image Tools
-    details: Resize, crop, compress, convert, watermark, color adjust, vectorize, create GIFs, build collages, generate passport photos, find duplicates, and more.
+  - title: 157 Tools, 5 Modalities
+    details: Image, video, audio, PDF, and data processing. Resize, convert, compress, watermark, trim, merge, transcribe, OCR, and much more.
   - title: Local AI
-    details: 16 AI-powered tools - remove backgrounds, upscale, enhance images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), fix fake transparency, expand canvas with AI fill. All on your hardware, no internet required.
+    details: 19 AI-powered tools - remove backgrounds, upscale, enhance images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR), transcribe audio, fix fake transparency, expand canvas with AI fill. All on your hardware, no internet required.
   - title: Pipelines
-    details: Chain tools into reusable workflows with unlimited steps. Batch process unlimited images at once with a single request.
+    details: Chain tools into reusable workflows with unlimited steps. Batch process unlimited files at once with a single request.
   - title: REST API
     details: Every tool available via API with API key auth. Interactive docs at /api/docs, plus /llms.txt and /llms-full.txt for AI agents.
   - title: File Library
@@ -31,7 +31,7 @@ features:
 <div class="quick-start-banner">
 
 ```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
+docker compose up -d    # app + Postgres 17 + Redis 8
 ```
 
 </div>

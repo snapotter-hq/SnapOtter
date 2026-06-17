@@ -11,9 +11,11 @@ test.describe("Docs Homepage", () => {
 
   test("hero renders site name and tagline", async ({ page }) => {
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
-    await expect(page.getByText("A Self Hosted Image Manipulator")).toBeVisible();
+    await expect(page.getByText("Self-Hosted File Manipulation Suite")).toBeVisible();
     await expect(
-      page.getByText("50+ tools. Local AI. No cloud. Your images never leave your home."),
+      page.getByText(
+        "157 tools across image, video, audio, PDF, and data. Docker Compose stack, fully offline, GPU-optional.",
+      ),
     ).toBeVisible();
   });
 
@@ -29,7 +31,7 @@ test.describe("Docs Homepage", () => {
 
   test("features section renders all 6 feature cards", async ({ page }) => {
     const features = [
-      "53 Image Tools",
+      "157 Tools, 5 Modalities",
       "Local AI",
       "Pipelines",
       "REST API",
@@ -42,7 +44,7 @@ test.describe("Docs Homepage", () => {
   });
 
   test("Docker quick-start code block is visible", async ({ page }) => {
-    await expect(page.getByText("docker run", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("docker compose", { exact: false }).first()).toBeVisible();
   });
 });
 

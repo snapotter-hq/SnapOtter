@@ -4,7 +4,7 @@ description: Monorepo structure, app and package architecture, request lifecycle
 
 # Architecture
 
-SnapOtter is a monorepo managed with pnpm workspaces and Turborepo. Everything ships as a single Docker container.
+SnapOtter is a monorepo managed with pnpm workspaces and Turborepo. Everything ships as a Docker Compose stack (app + Postgres 17 + Redis 8).
 
 ## Project structure
 
@@ -47,12 +47,12 @@ Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), an
 
 ### API (`apps/api`)
 
-A Fastify v5 server exposing 53 tool routes (37 standard image operations + 16 AI-powered) that handles:
+A Fastify v5 server exposing 157 tool routes (19 AI-powered) across image, video, audio, PDF, and data that handles:
 - File uploads, temporary workspace management, and persistent file storage
 - User file library with version chains (`user_files` table) -- each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
 - Tool execution (routes each tool request to the image engine or AI bridge)
 - Pipeline orchestration (chaining multiple tools sequentially)
-- Batch processing with concurrency control via p-queue
+- Batch processing with concurrency control via BullMQ
 - User authentication, RBAC (admin/user roles with a full permission set), API key management, and rate limiting
 - Teams management -- admin-only CRUD; users are assigned to a team via the `team` field on their profile
 - Runtime settings -- a key-value store in the `settings` table that controls `disabledTools`, `enableExperimentalTools`, `loginAttemptLimit`, and other operational knobs without redeploying
@@ -60,7 +60,7 @@ A Fastify v5 server exposing 53 tool routes (37 standard image operations + 16 A
 - Swagger/OpenAPI documentation at `/api/docs`
 - Serving the built frontend as a SPA in production
 
-Key dependencies: Fastify, Drizzle ORM, better-sqlite3, Sharp, Piscina (worker thread pool), Zod for validation.
+Key dependencies: Fastify, Drizzle ORM (pg-core), node-postgres, Sharp, BullMQ, Zod for validation.
 
 The server handles graceful shutdown on SIGTERM/SIGINT: it drains HTTP connections, stops the worker pool, shuts down the Python dispatcher, and closes the database.
 
@@ -78,17 +78,17 @@ This VitePress site. Deployed to Cloudflare Pages automatically on push to `main
 
 ## How a request flows
 
-1. The user picks a tool in the web UI and uploads an image.
+1. The user picks a tool in the web UI and uploads a file.
 2. The frontend sends a multipart POST to `/api/v1/tools/:toolId` with the file and settings.
 3. The API route validates the input with Zod, then dispatches processing.
-4. For standard tools, the request is offloaded to a Piscina worker thread pool so Sharp operations don't block the main event loop. The worker auto-orients the image based on EXIF metadata, runs the tool's process function, and returns the result. If the worker pool is unavailable, processing falls back to the main thread.
+4. For standard tools, the request is enqueued to a BullMQ worker on the appropriate pool (image, media, docs, or ai). The worker auto-orients images based on EXIF metadata, runs the tool's process function, and writes the result to object storage.
 5. For AI tools, the TypeScript bridge sends a request to the persistent Python dispatcher (or spawns a fresh subprocess as fallback), waits for it to finish, and reads the output file.
-6. Job progress is persisted to the `jobs` SQLite table so state survives container restarts. Real-time updates are delivered via SSE at `/api/v1/jobs/:jobId/progress`.
-7. The API returns a `jobId` and `downloadUrl`. The user downloads the processed image from `/api/v1/download/:jobId/:filename`.
+6. Job progress is persisted to the `jobs` Postgres table so state survives container restarts. Real-time updates are delivered via SSE at `/api/v1/jobs/:jobId/progress`.
+7. The API returns a `jobId` and `downloadUrl`. The user downloads the processed file from `/api/v1/download/:jobId/:filename`.
 
 For pipelines, the API feeds the output of each step as input to the next, running them sequentially.
 
-For batch processing, the API uses p-queue with a configurable concurrency limit (`CONCURRENT_JOBS`) and returns a ZIP file with all processed images.
+For batch processing, the API uses BullMQ with a configurable concurrency limit and returns a ZIP file with all processed files.
 
 ## Resource footprint
 
@@ -96,14 +96,14 @@ SnapOtter is designed for low idle memory use. Nothing is preloaded or kept warm
 
 ### At idle
 
-Only the Node.js/Fastify process is running. Typical idle RAM is **~100-150 MB** (Node.js process + SQLite connection). No Python process, no worker threads, no model weights in memory.
+The Node.js/Fastify process, Postgres, and Redis are running. Typical idle RAM is **~200-300 MB** (Node.js + Postgres + Redis). No Python process, no model weights in memory.
 
 ### What starts, and when
 
 | Component | Starts when | Memory while active |
 |-----------|-------------|---------------------|
 | Fastify server | Container start | ~100-150 MB |
-| Piscina worker threads | First standard tool request | Spawned on demand, terminated after **30 s idle** |
+| BullMQ workers | First tool request | In-process workers, one per pool (image, media, ai, docs, system) |
 | Python dispatcher | First AI tool request | Python interpreter + pre-imported libraries (PIL, NumPy, MediaPipe, rembg) - no model weights |
 | AI model weights | During the specific tool's request | Loaded from disk, freed when the request finishes |
 
