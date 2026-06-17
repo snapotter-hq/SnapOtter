@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 const command = "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
 
 const selfLinks = [
@@ -30,8 +30,12 @@ const shared = [
   { label: "llms.txt", sub: "AI-friendly docs", href: "/llms.txt" },
 ];
 
+import { ref } from "vue";
+const copyLabel = ref("Copy");
 function copyCommand() {
   navigator.clipboard?.writeText(command);
+  copyLabel.value = "Copied!";
+  setTimeout(() => { copyLabel.value = "Copy"; }, 1500);
 }
 </script>
 
@@ -46,7 +50,7 @@ function copyCommand() {
       </p>
       <div class="cmd">
         <code>$ {{ command }}</code>
-        <button class="copy" type="button" aria-label="Copy command" @click="copyCommand">Copy</button>
+        <button class="copy" type="button" aria-label="Copy command" @click="copyCommand">{{ copyLabel }}</button>
       </div>
       <p class="hero-meta">
         <a href="/guide/getting-started">Full install guide</a> ·
@@ -158,6 +162,8 @@ function copyCommand() {
 :root.dark .door.self .door-links li { border-color: #3A2C20; }
 :root.dark .chip-count { color: #F0A766; }
 :root.dark .hero-meta a, :root.dark .eyebrow { color: #F0A766; }
+:root.dark .door.self .door-sub { color: #C9BCAE; }
+:root.dark .door.self .door-links a:hover { color: #F09550; }
 :root.dark .door.self .door-cta { background: #A85518; }
 
 @media (max-width: 840px) {
