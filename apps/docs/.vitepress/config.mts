@@ -16,6 +16,7 @@ export default defineConfig({
 
   head: [
     ["meta", { name: "theme-color", content: "#E07832" }],
+    ["link", { rel: "preload", href: "/fonts/bricolage-grotesque-var.woff2", as: "font", type: "font/woff2", crossorigin: "" }],
     ["link", { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon.png" }],
     ["link", { rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
     ["link", { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }],
@@ -32,12 +33,8 @@ export default defineConfig({
     ["meta", { name: "twitter:image", content: "https://docs.snapotter.com/og-image.png" }],
   ],
 
-  transformHead({ pageData, assets }) {
+  transformHead({ pageData }) {
     const head: Array<[string, Record<string, string>]> = [];
-    const bricolage = assets.find((f) => /bricolage-grotesque-var\.[\w-]+\.woff2$/.test(f));
-    if (bricolage) {
-      head.push(["link", { rel: "preload", href: bricolage, as: "font", type: "font/woff2", crossorigin: "" }]);
-    }
     const canonicalUrl = `https://docs.snapotter.com/${pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "")}`;
     head.push(["meta", { property: "og:url", content: canonicalUrl }]);
     head.push(["meta", { property: "og:title", content: pageData.title }]);
