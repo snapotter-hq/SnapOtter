@@ -1,39 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Docs Search", () => {
+test.describe("docs search (Pagefind)", () => {
   test("search button is visible", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await expect(searchButton.first()).toBeVisible();
+    await page.goto("/");
+    await expect(page.locator(".blog-search").first()).toBeVisible();
   });
 
-  test("clicking search opens search dialog", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await searchButton.first().click();
-    await expect(
-      page.locator(".VPLocalSearchBox, .DocSearch-Modal, [role='dialog']").first(),
-    ).toBeVisible();
+  test("clicking search opens the dialog with an input", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".blog-search").first().click();
+    await expect(page.locator('input[placeholder="Search Docs"]')).toBeVisible();
   });
 
-  test("typing in search shows results", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await searchButton.first().click();
-    const searchInput = page
-      .locator(".VPLocalSearchBox input, .DocSearch-Input, [role='dialog'] input")
-      .first();
-    await searchInput.fill("docker");
-    const results = page.locator(
-      ".VPLocalSearchBox .result, .DocSearch-Hits, [role='dialog'] .result, [role='listbox'] [role='option']",
-    );
-    await expect(results.first()).toBeVisible({ timeout: 5000 });
+  test("typing a query shows results", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".blog-search").first().click();
+    const input = page.locator('input[placeholder="Search Docs"]');
+    await input.fill("docker");
+    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10000 });
   });
 });
 

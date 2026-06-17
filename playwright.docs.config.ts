@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const DOCS_PORT = 5173;
+const DOCS_PORT = 4173;
 
 export default defineConfig({
   testDir: "./tests/e2e-docs",
@@ -22,9 +22,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm --filter @snapotter/docs docs:dev",
+    command:
+      "pnpm --filter @snapotter/docs docs:build && pnpm --filter @snapotter/docs docs:preview",
     port: DOCS_PORT,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 120_000,
   },
 });
