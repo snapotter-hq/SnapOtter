@@ -34,6 +34,23 @@ setup("authenticate", async ({ page }) => {
   await page.waitForURL((url) => url.pathname === "/", { timeout: 30_000 }).catch(() => {});
   await page.waitForLoadState("load");
 
+  // Fail fast on a misconfigured/stale e2e server. A correctly-configured e2e
+  // API (SKIP_MUST_CHANGE_PASSWORD=true, fresh per-run DB) lands the admin on
+  // "/". If we end up on /change-password or /login instead, the server on
+  // :13490 is almost certainly a stale reused process (e.g. a leftover
+  // `pnpm dev` without the e2e env, or a server bound to a mutated DB) that
+  // playwright's `reuseExistingServer` picked up. Without this guard that state
+  // silently poisons every loggedInPage test with cascading change-password
+  // redirects, so surface it loudly with the fix.
+  const landedPath = new URL(page.url()).pathname;
+  if (landedPath !== "/") {
+    throw new Error(
+      `Auth setup landed on "${landedPath}" instead of "/". The e2e API on :13490 is likely a ` +
+        `stale/misconfigured server reused by playwright. Kill any process on the e2e ports and re-run:\n` +
+        `  lsof -ti :13490 :2349 | xargs kill -9`,
+    );
+  }
+
   // Save storage state (includes localStorage with the token)
   await page.context().storageState({ path: authFile });
 });

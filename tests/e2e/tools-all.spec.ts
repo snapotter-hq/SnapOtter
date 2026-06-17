@@ -19,7 +19,7 @@ test.describe("All tool pages render", () => {
     test(`${tool.name} (/${tool.id}) renders its UI shell`, async ({ loggedInPage: page }) => {
       expect(displayMode, `tool "${tool.id}" missing from tool-display-modes.ts`).toBeTruthy();
 
-      await page.goto(`/${tool.id}`);
+      await page.goto(`/${tool.modality}/${tool.id}`);
 
       // Tool name should be visible (header renders the shared TOOLS name)
       await expect(page.getByText(tool.name, { exact: false }).first()).toBeVisible();
@@ -39,14 +39,14 @@ test.describe("All tool pages render", () => {
       if (NO_DROPZONE_MODES.has(displayMode)) {
         // Custom-input tools (meme-generator, qr-generate, collage, html-to-image,
         // pdf-to-image) render their own input UI; just require the settings panel.
-        await expect(page.getByText("Settings").first()).toBeVisible();
+        await expect(page.locator(".settings-container").first()).toBeVisible();
         return;
       }
 
       // Standard dropzone tools
       await expect(page.getByText("Upload from computer")).toBeVisible();
       await expect(page.getByText("Files").first()).toBeVisible();
-      await expect(page.getByText("Settings").first()).toBeVisible();
+      await expect(page.locator(".settings-container").first()).toBeVisible();
     });
   }
 });
@@ -69,7 +69,8 @@ test.describe("Tool pages accept file upload", () => {
 
   for (const toolId of REPRESENTATIVE_TOOLS) {
     test(`${toolId} accepts file upload`, async ({ loggedInPage: page }) => {
-      await page.goto(`/${toolId}`);
+      const tool = TOOLS.find((t) => t.id === toolId);
+      await page.goto(`/${tool?.modality ?? "image"}/${toolId}`);
       await uploadTestImage(page);
 
       // After upload, dropzone should be replaced with image viewer
@@ -82,7 +83,7 @@ test.describe("Tool pages accept file upload", () => {
 
 test.describe("Tool not found", () => {
   test("nonexistent tool shows error", async ({ loggedInPage: page }) => {
-    await page.goto("/nonexistent-tool-xyz");
+    await page.goto("/image/nonexistent-tool-xyz");
     await expect(page.getByText(/not found/i)).toBeVisible();
   });
 });

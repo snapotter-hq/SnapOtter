@@ -1,53 +1,57 @@
-import { expect, openSettings, test } from "./helpers";
+import { expect, test } from "./helpers";
 
 test.describe("Navigation", () => {
-  test("sidebar Tools link goes to home", async ({ loggedInPage: page }) => {
+  test("nav Tools link goes to home", async ({ loggedInPage: page }) => {
     await page.goto("/automate");
-    await page.locator("aside").getByText("Tools").click();
+    // Top-nav link: top-nav.tsx useNavLinks() -> { label: t.sidebar.tools, href: "/" }
+    await page.getByRole("link", { name: "Tools" }).click();
     await expect(page).toHaveURL("/");
   });
 
-  test("sidebar Grid link goes to fullscreen view", async ({ loggedInPage: page }) => {
-    // Click the Grid link in the sidebar (links to /fullscreen)
-    const gridLink = page.locator("aside").getByText("Grid");
-    // If "Grid" text isn't directly visible (collapsed sidebar), try the link
-    if (await gridLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await gridLink.click();
-    } else {
-      // Fallback: navigate via the href directly
-      await page.locator('aside a[href="/fullscreen"]').click();
-    }
-    await expect(page).toHaveURL("/fullscreen");
+  test("nav Files link goes to files page", async ({ loggedInPage: page }) => {
+    // Top-nav link: top-nav.tsx useNavLinks() -> { label: t.sidebar.files, href: "/files" }.
+    // Scope to the nav landmark so a stray "Files" link elsewhere can't make this strict-mode ambiguous.
+    await page.getByRole("navigation").getByRole("link", { name: "Files" }).first().click();
+    await expect(page).toHaveURL("/files");
   });
 
-  test("sidebar Automate link goes to automate page", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Automate").click();
+  test("nav Automate link goes to automate page", async ({ loggedInPage: page }) => {
+    // Top-nav link: top-nav.tsx useNavLinks() -> { label: t.sidebar.automate, href: "/automate" }
+    await page.getByRole("link", { name: "Automate" }).click();
     await expect(page).toHaveURL("/automate");
   });
 
-  test("sidebar Settings button opens settings dialog", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    // Settings dialog should appear with section headings
+  test("Settings button opens settings dialog", async ({ loggedInPage: page }) => {
+    // Settings is accessed via avatar dropdown (avatar-dropdown.tsx).
+    // The avatar button has aria-label={username}; the logged-in user is "admin".
+    await page.getByRole("button", { name: "admin" }).click();
+    // Then click Settings inside the dropdown (avatar-dropdown.tsx line 82-97, text = t.common.settings)
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
+    // Settings dialog should appear with section headings (settings-dialog.tsx line 422, 85)
     await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Security" })).toBeVisible();
   });
 
-  test("fullscreen grid page renders tool cards", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+  test("home page renders tool cards", async ({ loggedInPage: page }) => {
+    // Home page (/) is the tool grid with modality tabs (home-page.tsx AllTabContent)
+    await page.goto("/");
 
-    // Should show category headers
+    // Should show category headers (home-page.tsx line 405-407, getCategoryName())
     await expect(page.getByText("Essentials")).toBeVisible();
     await expect(page.getByText("Optimization")).toBeVisible();
     await expect(page.getByText("Adjustments")).toBeVisible();
 
-    // Should show tools (use heading-level locators to avoid matching descriptions)
+    // Should show tools (tool-card.tsx renders <Link> with tool name text)
     await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^Compress/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^Convert/ }).first()).toBeVisible();
   });
 
-  test("fullscreen grid has search functionality", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+  test("home page has search functionality", async ({ loggedInPage: page }) => {
+    // Home page search: home-page.tsx HomeSearchBar with data-search-input,
+    // placeholder from t.homePage.searchPlaceholder = "Search {count} tools..."
+    await page.goto("/");
 
     const searchInput = page.getByPlaceholder(/search/i);
     await expect(searchInput).toBeVisible();
@@ -57,28 +61,31 @@ test.describe("Navigation", () => {
     await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
   });
 
-  test("clicking a tool in fullscreen grid navigates to tool page", async ({
-    loggedInPage: page,
-  }) => {
-    await page.goto("/fullscreen");
+  test("clicking a tool on home page navigates to tool page", async ({ loggedInPage: page }) => {
+    // Routes are /:modality/:toolId (App.tsx line 243).
+    // Resize route = /image/resize (constants.ts: route "/resize" + modality "image",
+    // post-processed at line 1793 with MODALITY_URL_SLUG prefix).
+    await page.goto("/");
 
     // Click on Resize tool
     await page
       .getByRole("link", { name: /resize/i })
       .first()
       .click();
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
   });
 
-  test("automate page shows pipeline templates", async ({ loggedInPage: page }) => {
+  test("automate page shows pipeline builder", async ({ loggedInPage: page }) => {
     await page.goto("/automate");
 
-    // Should show pipeline builder
-    await expect(page.getByText(/pipeline|automation|workflow/i).first()).toBeVisible();
+    // Should show pipeline builder heading (automate-page.tsx line 802-804,
+    // t.automate.pipelineBuilder = "Pipeline Builder")
+    await expect(page.getByText(/pipeline/i).first()).toBeVisible();
   });
 
-  test("tool panel shows categories on home page", async ({ loggedInPage: page }) => {
-    // The tool panel should show categorized tools
+  test("home page shows categories", async ({ loggedInPage: page }) => {
+    // The home page shows categorized tools (home-page.tsx AllTabContent,
+    // category headers via getCategoryName(), en.ts categories.essentials = "Essentials")
     await expect(page.getByText("Essentials").first()).toBeVisible();
   });
 });

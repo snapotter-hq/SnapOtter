@@ -88,7 +88,7 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17-alpine
@@ -128,7 +128,9 @@ jobs:
       - name: Run smoke specs
         run: pnpm playwright test tests/e2e/smoke.spec.ts tests/e2e/tools-all.spec.ts tests/e2e/navigation.spec.ts tests/e2e/home-page.spec.ts --project=chromium
         env:
-          PW_WORKERS: "1"
+          # 2 workers (config's recommended max) so the 196-spec smoke set finishes
+          # well within the timeout; 1 worker previously ran past the 15-min cap.
+          PW_WORKERS: "2"
       - name: Upload report on failure
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
