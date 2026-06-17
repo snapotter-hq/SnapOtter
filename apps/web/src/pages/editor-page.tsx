@@ -177,7 +177,10 @@ export function EditorPage() {
         <EditorToolbar />
         {/* Vertical ruler along the left edge */}
         {rulersVisible && <VerticalRuler />}
-        <div className="relative flex-1 overflow-hidden bg-muted/30">
+        {/* `flex` is required so the canvas child's `flex-1` fills this area;
+            without it the canvas collapses to the Stage's content height,
+            leaving a dead region below (issue #258). */}
+        <div className="relative flex flex-1 overflow-hidden bg-muted/30">
           <EditorCanvas
             onCanvasResize={() => setShowCanvasResize(true)}
             onImageResize={() => setShowImageResize(true)}

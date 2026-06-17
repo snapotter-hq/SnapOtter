@@ -70,4 +70,29 @@ test.describe("Editor Rulers and Guides", () => {
     // Ruler should stretch to fill the available height
     expect(box?.height).toBeGreaterThan(100);
   });
+
+  test("rulers render a themed background, not solid black (issue #258)", async ({
+    editorPage: page,
+  }) => {
+    // Canvas 2D `fillStyle` cannot read CSS `var(--...)` colors; the regression
+    // left the default black fill in place and painted the rulers as solid
+    // black bars. Verify both rulers paint a light (card) background instead.
+    await page.keyboard.press("Control+r");
+    await page.waitForTimeout(500);
+
+    for (const selector of ["canvas.cursor-col-resize", "canvas.cursor-row-resize"]) {
+      const ruler = page.locator(selector);
+      await expect(ruler).toBeVisible();
+      const pixel = await ruler.evaluate((cv: HTMLCanvasElement) => {
+        const ctx = cv.getContext("2d", { willReadFrequently: true });
+        const d = ctx?.getImageData(Math.floor(cv.width / 2), Math.floor(cv.height / 2), 1, 1).data;
+        return d ? [d[0], d[1], d[2], d[3]] : null;
+      });
+      expect(pixel).not.toBeNull();
+      // Not the default-black fill the bug produced...
+      expect(pixel).not.toEqual([0, 0, 0, 255]);
+      // ...and unmistakably a light background (white card sums to 765).
+      expect((pixel?.[0] ?? 0) + (pixel?.[1] ?? 0) + (pixel?.[2] ?? 0)).toBeGreaterThan(300);
+    }
+  });
 });

@@ -7,9 +7,21 @@ import { useEditorStore } from "@/stores/editor-store";
 // ---------------------------------------------------------------------------
 
 const RULER_SIZE = 20; // px
-const TICK_COLOR = "var(--color-muted-foreground)";
-const BG_COLOR = "var(--color-card)";
-const TEXT_COLOR = "var(--color-muted-foreground)";
+
+// Canvas 2D `fillStyle`/`strokeStyle` do NOT understand CSS custom properties:
+// assigning `var(--color-card)` is invalid and silently leaves the previous
+// style in place (black by default), which painted the rulers as solid black
+// bars (issue #258). Resolve the theme tokens to concrete colors from the
+// element's computed style at draw time so the rulers stay correct in both
+// light and dark themes.
+function resolveRulerColors(el: HTMLElement): { bg: string; tick: string } {
+  const styles = getComputedStyle(el);
+  const read = (prop: string, fallback: string) => styles.getPropertyValue(prop).trim() || fallback;
+  return {
+    bg: read("--color-card", "#ffffff"),
+    tick: read("--color-muted-foreground", "#6b6560"),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: pick tick spacing based on zoom level
@@ -43,6 +55,7 @@ export function HorizontalRuler() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const { bg, tick } = resolveRulerColors(canvas);
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
     const h = RULER_SIZE;
@@ -51,7 +64,7 @@ export function HorizontalRuler() {
     ctx.scale(dpr, dpr);
 
     // Background
-    ctx.fillStyle = BG_COLOR;
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
     const { major, minor } = getTickInterval(zoom);
@@ -59,8 +72,8 @@ export function HorizontalRuler() {
     const endPx = (w - panOffset.x) / zoom;
     const startTick = Math.floor(startPx / minor) * minor;
 
-    ctx.strokeStyle = TICK_COLOR;
-    ctx.fillStyle = TEXT_COLOR;
+    ctx.strokeStyle = tick;
+    ctx.fillStyle = tick;
     ctx.font = "9px sans-serif";
     ctx.textBaseline = "top";
 
@@ -83,7 +96,7 @@ export function HorizontalRuler() {
     }
 
     // Bottom border
-    ctx.strokeStyle = TICK_COLOR;
+    ctx.strokeStyle = tick;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(0, h - 0.5);
@@ -155,6 +168,7 @@ export function VerticalRuler() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const { bg, tick } = resolveRulerColors(canvas);
     const dpr = window.devicePixelRatio || 1;
     const w = RULER_SIZE;
     const h = canvas.clientHeight;
@@ -162,7 +176,7 @@ export function VerticalRuler() {
     canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = BG_COLOR;
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
     const { major, minor } = getTickInterval(zoom);
@@ -170,8 +184,8 @@ export function VerticalRuler() {
     const endPx = (h - panOffset.y) / zoom;
     const startTick = Math.floor(startPx / minor) * minor;
 
-    ctx.strokeStyle = TICK_COLOR;
-    ctx.fillStyle = TEXT_COLOR;
+    ctx.strokeStyle = tick;
+    ctx.fillStyle = tick;
     ctx.font = "9px sans-serif";
 
     for (let t = startTick; t <= endPx + minor; t += minor) {
@@ -198,7 +212,7 @@ export function VerticalRuler() {
     }
 
     // Right border
-    ctx.strokeStyle = TICK_COLOR;
+    ctx.strokeStyle = tick;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(w - 0.5, 0);
