@@ -1,5 +1,6 @@
 import { defineConfig } from "vitepress";
 import llmstxt from "vitepress-plugin-llms";
+import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
 
 export default defineConfig({
@@ -48,6 +49,7 @@ export default defineConfig({
 
   vite: {
     plugins: [
+      pagefindPlugin(),
       llmstxt({
         domain: "https://docs.snapotter.com",
         customLLMsTxtTemplate: `# {title}
@@ -354,10 +356,6 @@ export default defineConfig({
         items: [{ text: "Changelog", link: "/changelog" }],
       },
     ],
-
-    search: {
-      provider: "local",
-    },
 
     footer: {
       message:
