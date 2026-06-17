@@ -206,7 +206,13 @@
           "realesrgan==0.3.0",
           "mediapipe>=0.10.21"
         ],
-        "arm64": ["lpips", "basicsr==1.4.2", "realesrgan==0.3.0", "mediapipe>=0.10.18"]
+        "arm64": [
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
+          "lpips",
+          "basicsr==1.4.2",
+          "realesrgan==0.3.0",
+          "mediapipe>=0.10.18"
+        ]
       },
       "pipFlags": {
         "codeformer-pip==0.0.4": "--no-deps",
@@ -267,6 +273,13 @@
           "minSize": 60000000
         }
       ],
+      "patches": [
+        {
+          "file": "basicsr/data/degradations.py",
+          "search": "from torchvision.transforms.functional_tensor import rgb_to_grayscale",
+          "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
+        }
+      ],
       "enablesTools": ["upscale", "enhance-faces", "noise-removal"]
     },
     "photo-restoration": {
@@ -298,6 +311,7 @@
           "realesrgan==0.3.0"
         ],
         "arm64": [
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
           "onnxruntime==1.20.1",
           "mediapipe>=0.10.18",
           "lpips",
@@ -362,6 +376,13 @@
           "url": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
           "path": "scunet/scunet_color_real_psnr.pth",
           "minSize": 3000000
+        }
+      ],
+      "patches": [
+        {
+          "file": "basicsr/data/degradations.py",
+          "search": "from torchvision.transforms.functional_tensor import rgb_to_grayscale",
+          "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
         }
       ],
       "enablesTools": ["restore-photo"]
