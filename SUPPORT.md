@@ -13,7 +13,9 @@
 | Problem | Where to report |
 |---------|----------------|
 | Bug (something is broken) | [GitHub Issues](https://github.com/snapotter-hq/snapotter/issues/new?template=bug_report.yml) |
-| Feature request | [GitHub Issues](https://github.com/snapotter-hq/snapotter/issues/new?template=feature_request.yml) |
+| Feature request or idea | [GitHub Discussions](https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas) |
+| Wrong or missing translation | [GitHub Issues](https://github.com/snapotter-hq/snapotter/issues/new?template=translation.yml) |
+| Documentation problem | [GitHub Issues](https://github.com/snapotter-hq/snapotter/issues/new?template=documentation.yml) |
 | Security vulnerability | [Private advisory](https://github.com/snapotter-hq/snapotter/security/advisories/new) (never a public issue) |
 
 ## Before Opening an Issue

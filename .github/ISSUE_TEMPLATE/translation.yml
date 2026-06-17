@@ -1,0 +1,92 @@
+name: Translation Issue
+description: Report a wrong, missing, or awkward translation
+title: "[Translation] "
+labels: ["translation", "area: i18n"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve SnapOtter's translations. If you'd like to fix it yourself, translation PRs are welcome too (the locale files live in packages/shared/src/i18n/).
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+
+  - type: dropdown
+    id: locale
+    attributes:
+      label: Language
+      options:
+        - English (en)
+        - Arabic (ar)
+        - Chinese, Simplified (zh-CN)
+        - Chinese, Traditional (zh-TW)
+        - Dutch (nl)
+        - French (fr)
+        - German (de)
+        - Hindi (hi)
+        - Indonesian (id)
+        - Italian (it)
+        - Japanese (ja)
+        - Korean (ko)
+        - Polish (pl)
+        - Portuguese, Brazil (pt-BR)
+        - Russian (ru)
+        - Spanish (es)
+        - Swedish (sv)
+        - Thai (th)
+        - Turkish (tr)
+        - Ukrainian (uk)
+        - Vietnamese (vi)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue type
+      options:
+        - Incorrect translation
+        - Awkward or unnatural wording
+        - Untranslated (still shows English)
+        - Text is cut off or overflows
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Where does it appear?
+      description: The string key if you know it, otherwise where you saw it in the UI.
+      placeholder: "e.g. tools.resize.title, or the Resize tool settings panel"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current text
+      description: What does it say now? Paste the English fallback if it's untranslated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested text
+      description: What should it say instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: willing-to-fix
+    attributes:
+      label: Would you like to submit a PR?
+      options:
+        - "No, just reporting"
+        - "Yes, I'd like to submit a PR"

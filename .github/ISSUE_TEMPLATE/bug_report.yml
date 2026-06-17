@@ -1,7 +1,13 @@
 name: Bug Report
 description: Something isn't working as expected
+title: "[Bug] "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more detail you give, especially how you run SnapOtter and how to reproduce it, the faster we can help.
+
   - type: checkboxes
     id: checklist
     attributes:
@@ -9,17 +15,26 @@ body:
       options:
         - label: I searched existing issues and didn't find a duplicate
           required: true
-        - label: I'm running the latest version of SnapOtter
-          required: true
+        - label: I've tried the latest version to confirm it isn't already fixed
+          required: false
 
   - type: textarea
-    id: description
+    id: what-happened
     attributes:
-      label: Description
-      description: What happened, and what did you expect to happen?
+      label: What happened?
+      description: Describe the actual behavior you saw.
       placeholder: |
-        When I try to resize an image, the output is blank.
-        I expected the resized image to be returned normally.
+        When I resize an image, the downloaded file is 0 bytes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+      placeholder: |
+        The resized image downloads normally.
     validations:
       required: true
 
@@ -27,41 +42,90 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: How can we reproduce this?
+      description: How can we reproduce this? Number each step.
       placeholder: |
         1. Upload a PNG image
-        2. Select "Resize" tool
+        2. Select the "Resize" tool
         3. Set width to 500
         4. Click "Process"
         5. Downloaded file is 0 bytes
     validations:
       required: true
 
-  - type: textarea
-    id: docker-setup
+  - type: dropdown
+    id: area
     attributes:
-      label: Docker setup
-      description: Paste your `docker run` command or `docker-compose.yml` (remove any sensitive values). If running from source, write "running from source via pnpm dev".
-      render: shell
+      label: Affected area
+      description: Which part of SnapOtter does this involve?
+      options:
+        - Image tools
+        - Video tools
+        - Audio tools
+        - PDF tools
+        - Data tools
+        - Image editor
+        - Pipelines / automation
+        - File library
+        - Account / login
+        - Installation / Docker / startup
+        - Other / not sure
     validations:
       required: true
 
   - type: input
-    id: image-tag
+    id: tool
     attributes:
-      label: Image tag
-      description: Which Docker image tag are you using?
-      placeholder: "e.g. latest, 1.17.1"
+      label: Specific tool
+      description: If this is about one tool, which one? Leave blank if it isn't tool-specific.
+      placeholder: "e.g. resize, background-remover, pdf-merge"
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How are you running SnapOtter?
+      options:
+        - Docker Compose
+        - Running from source (pnpm dev)
+        - Other (describe in deployment details)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Image tag, release version, or git commit. Running from source? Paste the commit hash.
+      placeholder: "e.g. latest, 2.0.0, or a1b2c3d"
+    validations:
+      required: true
+
+  - type: textarea
+    id: deployment
+    attributes:
+      label: Deployment details
+      description: "Your compose file or run command, with secrets redacted. Write N/A if running from source. Strongly recommended for Docker issues."
+      render: shell
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Host architecture
+      options:
+        - AMD64 (Intel/AMD)
+        - ARM64 (Apple Silicon, Raspberry Pi)
     validations:
       required: true
 
   - type: dropdown
-    id: platform
+    id: host-os
     attributes:
-      label: Platform
+      label: Host OS
       options:
-        - AMD64 (Intel/AMD)
-        - ARM64 (Apple Silicon, Raspberry Pi)
+        - Linux (native)
+        - macOS (Docker Desktop)
+        - Windows (Docker Desktop)
+        - Windows (WSL2)
+        - Other / running from source
     validations:
       required: true
 
@@ -69,13 +133,14 @@ body:
     id: browser
     attributes:
       label: Browser
+      description: Only if the bug is in the web UI.
       placeholder: "e.g. Chrome 130, Firefox 133, Safari 18"
 
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: Paste any relevant container logs (`docker logs <container>`).
+      description: "Relevant logs, secrets redacted. For Compose: docker compose logs app (or postgres / redis)."
       render: shell
 
   - type: textarea
@@ -90,5 +155,5 @@ body:
       label: Would you like to contribute a fix?
       description: If yes, we can assign this issue to you. See CONTRIBUTING.md for the PR process.
       options:
-        - "Yes, I'd like to submit a PR"
         - "No, just reporting"
+        - "Yes, I'd like to submit a PR"

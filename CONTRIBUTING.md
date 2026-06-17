@@ -7,7 +7,9 @@ Thanks for your interest in contributing. This guide covers how to participate, 
 ### Issues (no setup required)
 
 - **Bug reports** - Something broken? Open a [bug report](https://github.com/snapotter-hq/snapotter/issues/new?template=bug_report.yml) with reproduction steps.
-- **Feature requests** - Have an idea? Open a [feature request](https://github.com/snapotter-hq/snapotter/issues/new?template=feature_request.yml) describing the problem it solves.
+- **Feature requests** - Have an idea? Start a [discussion](https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas) so the community can weigh in and upvote it.
+- **Translation issues** - Spot a wrong or missing translation? Open a [translation issue](https://github.com/snapotter-hq/snapotter/issues/new?template=translation.yml).
+- **Documentation issues** - Something off in the docs? Open a [documentation issue](https://github.com/snapotter-hq/snapotter/issues/new?template=documentation.yml).
 
 ### Code (requires CLA)
 
@@ -19,15 +21,15 @@ We accept pull requests for:
 | New translations | Open a PR directly (see [Translation Guide](https://docs.snapotter.com/guide/translations)) |
 | Documentation improvements | Open a PR directly |
 | Test coverage improvements | Open a PR directly |
-| New tools or features | Open an issue first, wait for a maintainer to add the `approved` label before writing code |
-| Refactors or architecture changes | Open an issue first, wait for a maintainer to add the `approved` label before writing code |
+| New tools or features | Start a [discussion](https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas) first; a maintainer converts approved ideas into a tracked issue before you write code |
+| Refactors or architecture changes | Start a [discussion](https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas) first and wait for maintainer sign-off before writing code |
 
 ### What We Will Not Accept
 
 - Changes to CI/CD workflows, release config, or linter/compiler config
 - PRs without a signed [Contributor License Agreement](#contributor-license-agreement)
 - PRs over 400 lines of change (break large work into smaller PRs)
-- Features that were not discussed and approved in an issue first
+- Features that were not discussed and approved first
 - Changes to `packages/ai/` without prior discussion
 
 ## Contributor License Agreement

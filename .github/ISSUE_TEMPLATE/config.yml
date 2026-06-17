@@ -1,11 +1,14 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Feature request or idea
+    url: https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas
+    about: Suggest a new tool or improvement and let the community upvote it.
+  - name: Questions and help
+    url: https://discord.gg/hr3s7HPUsr
+    about: Ask questions, get setup help, and chat with the community.
   - name: Documentation
     url: https://docs.snapotter.com/
     about: Check the docs for setup guides, configuration, and API reference.
-  - name: Discord
-    url: https://discord.gg/hr3s7HPUsr
-    about: Ask questions, get help, and chat with the community.
   - name: Security vulnerability
     url: https://github.com/snapotter-hq/snapotter/security/advisories/new
     about: Report security issues privately through GitHub Security Advisories.

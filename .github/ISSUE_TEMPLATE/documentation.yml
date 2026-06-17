@@ -1,0 +1,61 @@
+name: Documentation Issue
+description: Report wrong, missing, or unclear documentation
+title: "[Docs] "
+labels: ["documentation", "area: docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the docs. For small fixes, a direct PR to apps/docs/ is welcome too.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue type
+      options:
+        - Incorrect or outdated
+        - Missing / not documented
+        - Unclear or confusing
+        - Broken link or example
+        - Typo or formatting
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: Link to the docs page. If it's missing, link the closest page to where it belongs.
+      placeholder: "e.g. https://docs.snapotter.com/guide/configuration"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong?
+      description: Describe what's incorrect, missing, or confusing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: If you have a correction or wording suggestion, share it here.
+
+  - type: dropdown
+    id: willing-to-fix
+    attributes:
+      label: Would you like to submit a PR?
+      options:
+        - "No, just reporting"
+        - "Yes, I'd like to submit a PR"
