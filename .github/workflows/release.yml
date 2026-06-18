@@ -380,6 +380,14 @@ jobs:
     name: AI Bundles
     needs: [release, docker]
     if: needs.release.outputs.new_version
+    # The top-level `permissions: {}` default means this reusable-workflow call
+    # grants no token scopes by default. ai-bundles.yml's jobs declare
+    # `contents: read` / `packages: read`, and GitHub rejects a called workflow
+    # requesting scopes the caller never granted -- failing at startup before any
+    # job runs. Grant them here so the call passes startup validation.
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/ai-bundles.yml
     with:
       version: ${{ needs.release.outputs.new_version }}
