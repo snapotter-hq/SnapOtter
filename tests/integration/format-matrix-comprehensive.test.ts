@@ -27,8 +27,10 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
+
+vi.setConfig({ testTimeout: 60_000 });
 
 const FORMATS_DIR = join(__dirname, "..", "fixtures", "formats");
 
