@@ -279,7 +279,9 @@ for model in models:
             print(f"  [{model_id}] Done ({size:,} bytes)")
         else:
             from rembg import new_session
-            new_session(session_name)
+            # Force CPU-only provider: onnxruntime-gpu segfaults trying to load
+            # TensorRT libs that aren't present in build containers (no GPU).
+            new_session(session_name, providers=["CPUExecutionProvider"])
             print(f"  [{model_id}] Done")
 
     else:

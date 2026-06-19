@@ -8,7 +8,7 @@ SnapOtter processes files across five modalities: image, video, audio, document,
 
 ## Image Formats
 
-SnapOtter supports 55+ image formats for input and 14 formats for output.
+SnapOtter supports 55+ image formats for input and 13 formats for output.
 
 ## Input Formats
 
@@ -101,7 +101,7 @@ SnapOtter supports 55+ image formats for input and 14 formats for output.
 | PAM | .pam | Sharp (native) | Arbitrary map |
 | PFM | .pfm | Sharp (native) | Float map |
 
-## Output Formats (14)
+## Output Formats (13)
 
 | Format | Encoder | Quality Control | Available In |
 |--------|---------|----------------|-------------|

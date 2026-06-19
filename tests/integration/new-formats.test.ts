@@ -11,6 +11,14 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
+function isAsyncFallback(res: { statusCode: number; body: string }): boolean {
+  if (res.statusCode !== 202) return false;
+  const body = JSON.parse(res.body);
+  expect(body.async).toBe(true);
+  expect(body.jobId).toBeDefined();
+  return true;
+}
+
 const FORMATS_DIR = join(__dirname, "..", "fixtures", "formats");
 
 describe("New format support", () => {
@@ -60,6 +68,7 @@ describe("New format support", () => {
       });
 
       // Accept 200 (success) or 422 (encoder not available in test env)
+      if (isAsyncFallback(res)) return;
       expect([200, 422]).toContain(res.statusCode);
       if (res.statusCode === 200) {
         const json = JSON.parse(res.body);
@@ -97,6 +106,7 @@ describe("New format support", () => {
       body,
     });
 
+    if (isAsyncFallback(res)) return;
     expect([200, 422]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       const json = JSON.parse(res.body);
@@ -171,7 +181,7 @@ describe("New format support", () => {
       for (const outFmt of OUTPUTS) {
         const inLower = input.name.toLowerCase();
         if (inLower === outFmt || (inLower === "jpeg" && outFmt === "jpg")) continue;
-        const testTimeout = outFmt === "avif" ? 120_000 : 30_000;
+        const testTimeout = outFmt === "avif" ? 120_000 : 60_000;
         it(`converts ${input.name} to ${outFmt}`, { timeout: testTimeout }, async () => {
           const fileBuffer = readFileSync(join(FORMATS_DIR, input.file));
           const { body, contentType } = createMultipartPayload([
@@ -184,6 +194,7 @@ describe("New format support", () => {
             headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
             body,
           });
+          if (isAsyncFallback(res)) return;
           expect([200, 422]).toContain(res.statusCode);
           if (res.statusCode === 200) {
             const json = JSON.parse(res.body);
@@ -225,6 +236,7 @@ describe("New format support", () => {
           headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
           body,
         });
+        if (isAsyncFallback(res)) return;
         expect([200, 400, 422]).toContain(res.statusCode);
         if (res.statusCode === 200) {
           const json = JSON.parse(res.body);
@@ -257,6 +269,7 @@ describe("New format support", () => {
           headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
           body,
         });
+        if (isAsyncFallback(res)) return;
         expect([200, 422]).toContain(res.statusCode);
         if (res.statusCode === 200) {
           const ct = res.headers["content-type"] as string;

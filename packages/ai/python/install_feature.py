@@ -335,7 +335,7 @@ def main() -> None:
             )
     else:
         # Remote mode: download from HuggingFace
-        bundle_repo = manifest.get("bundleRepo", "snapotter/feature-bundles")
+        bundle_repo = manifest.get("bundleRepo", "deepsafe/feature-bundles")
         url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
 
         # Disk space check

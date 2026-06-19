@@ -8,8 +8,8 @@ test.describe("Smoke tests", () => {
     await expect(page.getByLabel("Username")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
     await expect(page.getByRole("button", { name: /login/i })).toBeVisible();
-    // Right panel marketing text
-    await expect(page.getByText("Your images. Stay yours.")).toBeVisible();
+    // Right panel marketing text (en.ts auth.heroTitle)
+    await expect(page.getByText("Your files. Stay yours.")).toBeVisible();
   });
 
   test("can log in with admin credentials", async ({ page }) => {
@@ -64,21 +64,23 @@ test.describe("Smoke tests", () => {
   test("home page loads after login", async ({ loggedInPage: page }) => {
     await expect(page).toHaveURL("/");
 
-    // The dropzone should be visible
-    await expect(page.getByText("Upload from computer")).toBeVisible();
-    await expect(page.getByText("Drop your images here")).toBeVisible();
+    // The home page shows a tool grid with modality tabs (home-page.tsx). Tab
+    // buttons render label + count span, so match on the label prefix.
+    await expect(page.getByRole("button", { name: /^All/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Image/ }).first()).toBeVisible();
   });
 
-  test("sidebar is visible on desktop", async ({ loggedInPage: page }) => {
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+  test("top nav is visible on desktop", async ({ loggedInPage: page }) => {
+    // 2.0 uses a top nav bar (top-nav.tsx) instead of an aside sidebar
+    const nav = page.getByRole("navigation", { name: "Navigation" });
+    await expect(nav).toBeVisible();
 
-    // Check sidebar labels
-    await expect(sidebar.getByText("Tools")).toBeVisible();
-    await expect(sidebar.getByText("Grid")).toBeVisible();
-    await expect(sidebar.getByText("Automate")).toBeVisible();
-    await expect(sidebar.getByText("Files")).toBeVisible();
-    await expect(sidebar.getByText("Help")).toBeVisible();
-    await expect(sidebar.getByText("Settings")).toBeVisible();
+    // Check nav links (top-nav.tsx useNavLinks: Tools, Automate, Editor, Files)
+    await expect(nav.getByText("Tools")).toBeVisible();
+    await expect(nav.getByText("Automate")).toBeVisible();
+    await expect(nav.getByText("Editor")).toBeVisible();
+    await expect(nav.getByText("Files")).toBeVisible();
+    // Help is an icon-only button with aria-label (top-nav.tsx:244)
+    await expect(page.getByRole("button", { name: "Help" })).toBeVisible();
   });
 });

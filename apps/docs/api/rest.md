@@ -102,8 +102,9 @@ curl -X POST http://localhost:1349/api/v1/tools/<toolId>/batch \
 
 - Upload is `multipart/form-data`.
 - `settings` is a JSON string with tool-specific options.
-- Response is the processed file directly (or a ZIP for batch).
-- Progress is tracked via SSE (see [Progress Tracking](#progress-tracking)).
+- **Fast tools** (200) return JSON: `{"jobId":"...","downloadUrl":"/api/v1/download/<jobId>/<filename>","originalSize":1234,"processedSize":567}`. Fetch the processed file from `downloadUrl`.
+- **Long-running tools** (202) return JSON: `{"jobId":"...","async":true}`. Connect to SSE for progress, then download when complete (see [Progress Tracking](#progress-tracking)).
+- **Batch** returns a ZIP archive streamed directly (with `X-Job-Id` header).
 
 ## Tools Reference
 
@@ -163,6 +164,7 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `transparency-fixer` | PNG Transparency Fixer | BiRefNet HR-matting | `defringe` (0-100), `outputFormat` (png/webp) |
 | `background-replace` | Background Replace | rembg (BiRefNet) | `backgroundType` (color/gradient), `color` (hex), `gradientColor1`, `gradientColor2`, `gradientAngle`, `feather` (0-20), `format` (png/webp) |
 | `blur-background` | Blur Background | rembg (BiRefNet) | `intensity` (1-100), `feather` (0-20), `format` (png/webp) |
+| `ai-canvas-expand` | AI Canvas Expand | LaMa (outpainting) | `extendTop`, `extendRight`, `extendBottom`, `extendLeft` (px), `tier` (fast/balanced/high), `format`, `quality` |
 
 ### Watermark & Overlay
 
@@ -435,7 +437,7 @@ Each step's output is the next step's input. Unlimited steps per pipeline by def
 Long-running jobs (AI tools, batch, pipelines) emit real-time progress via Server-Sent Events:
 
 ```bash
-# Connect to the SSE stream (jobId returned in X-Job-Id response header)
+# Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
 curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
   -H "Authorization: Bearer <token>"
 ```
@@ -505,7 +507,7 @@ Custom role management with granular permissions.
 | `PUT` | `/api/v1/roles/:id` | Admin (`users:manage`) | Update a custom role (cannot modify built-in roles) |
 | `DELETE` | `/api/v1/roles/:id` | Admin (`users:manage`) | Delete a custom role (cannot delete built-in roles; affected users revert to `user` role) |
 
-Available permissions: `tools:use`, `files:own`, `files:all`, `apikeys:own`, `apikeys:all`, `pipelines:own`, `pipelines:all`, `settings:read`, `settings:write`, `users:manage`, `teams:manage`, `features:manage`, `system:health`, `audit:read`.
+Available permissions (17): `tools:use`, `files:own`, `files:all`, `apikeys:own`, `apikeys:all`, `pipelines:own`, `pipelines:all`, `settings:read`, `settings:write`, `users:manage`, `teams:manage`, `features:manage`, `system:health`, `audit:read`, `compliance:manage`, `webhooks:manage`, `security:manage`.
 
 ## Audit Log
 
