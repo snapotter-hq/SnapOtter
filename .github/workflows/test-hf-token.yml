@@ -1,0 +1,43 @@
+name: Test HF Token
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Install hf CLI
+        run: pip install -U "huggingface_hub[hf_xet]"
+
+      - name: Upload test file to deepsafe
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "snapotter-hf-token-test-$(date -u +%Y%m%dT%H%M%S)" > /tmp/token-test.txt
+          hf upload deepsafe/feature-bundles /tmp/token-test.txt .ci-token-test/token-test.txt \
+            --repo-type model
+          echo "UPLOAD_OK"
+          hf download deepsafe/feature-bundles .ci-token-test/token-test.txt \
+            --repo-type model --local-dir /tmp/verify
+          cat /tmp/verify/.ci-token-test/token-test.txt
+          echo "DOWNLOAD_OK"
+
+      - name: Cleanup test file
+        if: always()
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python3 -c "
+from huggingface_hub import HfApi
+api = HfApi()
+try:
+    api.delete_file('.ci-token-test/token-test.txt', repo_id='deepsafe/feature-bundles', repo_type='model')
+    print('CLEANUP_OK')
+except Exception as e:
+    print(f'cleanup skipped: {e}')
+"
