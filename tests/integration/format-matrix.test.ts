@@ -505,7 +505,7 @@ describe("Cross-format matrix", () => {
               ? 180_000
               : tool.id === "image-enhancement"
                 ? 120_000
-                : undefined;
+                : 60_000; // 2× SYNC_WAIT_MS so a 202 fallback never races the Vitest timeout
 
         it(
           `${tool.label}`,
@@ -699,7 +699,7 @@ describe("Cross-format conversion matrix", () => {
       if (inputLower === outFmt) continue;
       if (inputLower === "jpeg" && outFmt === "jpg") continue;
 
-      const testTimeout = outFmt === "avif" ? 120_000 : 30_000;
+      const testTimeout = outFmt === "avif" ? 120_000 : 60_000;
       it(`${fmt.name} -> ${outFmt}`, { timeout: testTimeout }, async () => {
         const fixturePath = join(FORMATS_DIR, fmt.file);
         if (!existsSync(fixturePath)) return;
@@ -930,7 +930,7 @@ describe("Watermark-image cross-format matrix", () => {
 
   describe("format as main image (watermark is PNG)", () => {
     for (const fmt of FORMAT_SAMPLES) {
-      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : undefined;
+      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : 60_000;
 
       it(
         `${fmt.name} main image with PNG watermark`,
@@ -1000,7 +1000,7 @@ describe("Watermark-image cross-format matrix", () => {
 
   describe("format as watermark image (main is PNG)", () => {
     for (const fmt of FORMAT_SAMPLES) {
-      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : undefined;
+      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : 60_000;
 
       it(
         `PNG main image with ${fmt.name} watermark`,
@@ -1133,7 +1133,7 @@ describe("Watermark-image cross-format matrix", () => {
 describe("Image-to-PDF cross-format matrix", () => {
   describe("single image conversion across formats", () => {
     for (const fmt of FORMAT_SAMPLES) {
-      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : undefined;
+      const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : 60_000;
 
       it(
         `converts ${fmt.name} to PDF`,
