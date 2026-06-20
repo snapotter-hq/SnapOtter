@@ -49,7 +49,7 @@ describe.skipIf(!ffmpegAvailable())("convert-audio (requires ffmpeg)", () => {
   }, 60_000);
 
   it("converts mp3 to ogg and returns 200", async () => {
-    // Use mp3 fixture (44100 Hz) because libvorbis rejects the 8 kHz wav
+    // mp3 fixture (44100 Hz); the 8 kHz wav -> ogg case is the regression test below.
     const res = await runTool({ format: "ogg" }, MP3, "tiny.mp3");
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
@@ -62,5 +62,18 @@ describe.skipIf(!ffmpegAvailable())("convert-audio (requires ffmpeg)", () => {
     expect(dl.rawPayload.length).toBeGreaterThan(100);
     const outName = envelope.downloadUrl.split("/").pop() as string;
     expect(outName.endsWith(".ogg")).toBe(true);
+  }, 60_000);
+
+  it("converts 8 kHz wav to ogg (regression: libvorbis low samplerate)", async () => {
+    // tiny.wav is 8 kHz; a fixed bitrate (-b:a) made libvorbis "encoder setup failed".
+    // The ogg path now uses -q:a (quality VBR), which adapts to the sample rate.
+    const res = await runTool({ format: "ogg" }, WAV, "tiny.wav");
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBeGreaterThan(100);
+    expect((envelope.downloadUrl.split("/").pop() as string).endsWith(".ogg")).toBe(true);
   }, 60_000);
 });

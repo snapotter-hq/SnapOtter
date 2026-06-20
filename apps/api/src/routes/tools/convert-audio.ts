@@ -43,17 +43,13 @@ export function registerConvertAudio(app: FastifyInstance) {
             ];
           case "wav":
             return ["-i", inPath, "-vn", "-c:a", "pcm_s16le", out];
-          case "ogg":
-            return [
-              "-i",
-              inPath,
-              "-vn",
-              "-c:a",
-              "libvorbis",
-              "-b:a",
-              `${settings.bitrateKbps}k`,
-              out,
-            ];
+          case "ogg": {
+            // libvorbis ABR (-b:a) fails with "encoder setup failed" when the bitrate is
+            // too high for the source sample rate (e.g. 8 kHz). Use quality VBR (-q:a),
+            // which adapts to the rate. Map bitrate -> quality (~bitrate/32: 192k -> q6).
+            const quality = (settings.bitrateKbps / 32).toFixed(1);
+            return ["-i", inPath, "-vn", "-c:a", "libvorbis", "-q:a", quality, out];
+          }
           case "flac":
             return ["-i", inPath, "-vn", "-c:a", "flac", out];
           case "m4a":

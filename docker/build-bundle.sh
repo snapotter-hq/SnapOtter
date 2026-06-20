@@ -361,6 +361,15 @@ model_ids = [m["id"] for m in bundle.get("models", [])]
 
 py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+# Uncompressed bundle size: BUILD_DIR holds site-packages + models at this point.
+# Surfaces the real extractedSize for docker/feature-manifest.json (used by the
+# disk-space pre-check in install_feature.py); several manifest entries were 0 before.
+extracted_size = sum(
+    os.path.getsize(os.path.join(root, name))
+    for root, _dirs, files in os.walk(os.environ["BUILD_DIR"])
+    for name in files
+)
+
 bundle_meta = {
     "bundleId": bundle_id,
     "version": manifest["imageVersion"],
@@ -368,6 +377,7 @@ bundle_meta = {
     "imageVersion": manifest["imageVersion"],
     "pythonVersion": py_ver,
     "models": model_ids,
+    "extractedSize": extracted_size,
 }
 
 out_path = os.path.join(os.environ["BUILD_DIR"], "bundle.json")
