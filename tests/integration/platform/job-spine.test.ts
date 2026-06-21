@@ -10,7 +10,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { requestCancel } from "../../../apps/api/src/jobs/cancel.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
+import {
+  closeQueueEvents,
+  enqueueToolJob,
+  waitForJob,
+  warmQueueEvents,
+} from "../../../apps/api/src/jobs/enqueue.js";
 import { bullPrefix, type ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
@@ -173,4 +178,44 @@ describe("Job spine", () => {
     expect(parsed.error).toBe("Canceled");
     expect(parsed.jobId).toBe(jobId);
   });
+});
+
+describe("QueueEvents warm-up (sync-wait flake guard)", () => {
+  it("warmQueueEvents() resolves for all pools and is idempotent", async () => {
+    // First call connects every pool's consumer; the second reuses the cached,
+    // already-ready consumers and must still resolve.
+    await expect(warmQueueEvents()).resolves.toBeUndefined();
+    await expect(warmQueueEvents()).resolves.toBeUndefined();
+  });
+
+  it("a warmed consumer captures a fast job's completion on the first sync-wait", async () => {
+    // Drop the cached consumers to mimic a cold fork, then warm *before*
+    // enqueueing so every consumer is positioned at the events-stream tail up
+    // front. This is the exact invariant that prevents the csv-json 30s flake:
+    // without the warm, a consumer created lazily inside the first waitForJob()
+    // can miss a fast job's `completed` event and block for the whole window.
+    await closeQueueEvents();
+    await warmQueueEvents();
+
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/warm.png`;
+    await putObject(inputRef, Buffer.from("warm-test"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "spine-echo",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "warm.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // A warmed consumer observes the completion promptly; a regression (cold or
+    // missed event) would null out only when this window expires.
+    const result = await waitForJob("image", jobId, 10_000);
+    expect(result).not.toBeNull();
+    expect(result!.outputRefs.length).toBeGreaterThan(0);
+  }, 20_000);
 });

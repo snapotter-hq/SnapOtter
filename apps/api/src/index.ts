@@ -13,7 +13,7 @@ import { closeDb, db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { closeRedis, pingRedis } from "./jobs/connection.js";
-import { closeFlowProducer, closeQueueEvents } from "./jobs/enqueue.js";
+import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
@@ -595,6 +595,14 @@ if (await shouldRunStartupCleanup()) {
 
 // Start BullMQ worker pools (after route registration so the tool registry is full)
 startWorkers();
+
+// Warm the per-pool QueueEvents consumers so the first synchronous tool request
+// after boot does not pay the lazy-connect cost (and cannot miss a fast job's
+// completion event). Non-blocking: a slow/unreachable Redis must not stall boot;
+// the consumers fall back to lazy creation on first use if this has not finished.
+void warmQueueEvents().catch((err) => {
+  app.log.warn({ err }, "QueueEvents warm-up failed; consumers will connect lazily");
+});
 
 // Start
 try {
