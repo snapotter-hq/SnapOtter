@@ -51,6 +51,7 @@
     "fastify": "^5.8.5",
     "fflate": "^0.8.3",
     "ioredis": "^5.11.1",
+    "ipaddr.js": "^2.3.0",
     "js-yaml": "^4.2.0",
     "mupdf": "^1.27.0",
     "openid-client": "^6.8.4",

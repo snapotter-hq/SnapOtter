@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
 import { isIP } from "node:net";
+import ipaddr from "ipaddr.js";
 
 function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split(".").map(Number);
@@ -20,34 +21,52 @@ function isPrivateIPv4(ip: string): boolean {
   return false;
 }
 
+// IPv6 ranges that must never be reachable via outbound fetch, matched
+// numerically by bit-prefix. Textual prefix matching is unreliable because the
+// WHATWG URL parser canonicalizes IPv6 literals in ways string checks miss
+// (e.g. ::ffff:127.0.0.1 -> ::ffff:7f00:1, ::127.0.0.1 -> ::7f00:1), and a
+// CIDR like fe80::/10 spans fe80 through febf, not just literals "fe80:".
+const BLOCKED_IPV6_CIDRS: ReturnType<typeof ipaddr.parseCIDR>[] = [
+  "::1/128", // loopback
+  "::/128", // unspecified
+  "fe80::/10", // link-local
+  "fc00::/7", // unique local (fc00::/8 and fd00::/8)
+  "fec0::/10", // site-local (deprecated, still routed on some networks)
+  "2001:db8::/32", // documentation
+  "2001::/32", // Teredo tunneling
+  "2002::/16", // 6to4 (can encapsulate private IPv4)
+  "64:ff9b::/96", // NAT64 well-known prefix (maps to IPv4)
+  "100::/64", // discard-only
+  "ff00::/8", // multicast
+].map((cidr) => ipaddr.parseCIDR(cidr));
+
 function isPrivateIPv6(ip: string): boolean {
-  const normalized = ip.replace(/^\[|]$/g, "").toLowerCase();
-  if (normalized === "::1") return true;
-  if (normalized === "::") return true;
-  if (normalized.startsWith("fe80:")) return true;
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  if (normalized.startsWith("2001:db8:")) return true;
-  // 6to4 addresses can encapsulate private IPv4 addresses
-  if (normalized.startsWith("2002:")) return true;
-  // NAT64 prefix maps to IPv4 -- block to prevent SSRF via IPv4-mapped addresses
-  if (normalized.startsWith("64:ff9b:")) return true;
-  if (normalized.includes("::ffff:")) {
-    const v4 = normalized.split("::ffff:")[1];
-    if (v4) {
-      if (v4.includes(".")) {
-        if (isPrivateIPv4(v4)) return true;
-      } else {
-        const m = v4.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-        if (m) {
-          const hi = parseInt(m[1], 16);
-          const lo = parseInt(m[2], 16);
-          const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-          if (isPrivateIPv4(dotted)) return true;
-        }
-      }
-    }
+  const bare = ip.replace(/^\[|]$/g, "");
+  let addr: ReturnType<typeof ipaddr.parse>;
+  try {
+    addr = ipaddr.parse(bare);
+  } catch {
+    // Not a parseable numeric address -- fail closed (treat as unsafe). Callers
+    // only reach this with validated IP literals or resolved addresses, so this
+    // is purely defensive.
+    return true;
   }
-  return false;
+  // ipaddr also parses bare IPv4; defer those to the dedicated classifier.
+  if (addr.kind() === "ipv4") return isPrivateIPv4(addr.toString());
+
+  // IPv4-mapped (::ffff:0:0/96) and the deprecated IPv4-compatible (::/96) form
+  // both embed an IPv4 address in the final four bytes. Reuse the full IPv4
+  // classifier so the embedded address is held to the same private/reserved
+  // ranges (loopback, RFC1918, link-local metadata, CG-NAT, etc.).
+  const bytes = addr.toByteArray(); // 16 bytes, network order
+  const first80Zero = bytes.slice(0, 10).every((b) => b === 0);
+  const isMapped = first80Zero && bytes[10] === 0xff && bytes[11] === 0xff;
+  const isCompatible = first80Zero && bytes[10] === 0 && bytes[11] === 0;
+  if (isMapped || isCompatible) {
+    if (isPrivateIPv4(`${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`)) return true;
+  }
+
+  return BLOCKED_IPV6_CIDRS.some((cidr) => addr.match(cidr));
 }
 
 export function isPrivateIp(ip: string): boolean {
