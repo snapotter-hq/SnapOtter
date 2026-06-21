@@ -110,12 +110,14 @@
       "@babel/core": ">=7.29.6",
       "@opentelemetry/core": ">=2.8.0",
       "js-yaml": ">=4.2.0",
-      "gray-matter>js-yaml": "^3.14.1",
       "qs": ">=6.15.2",
       "uuid": ">=11.1.1",
       "yaml": ">=2.8.3",
       "dompurify": ">=3.4.11",
       "nanoid@4": ">=5.0.9"
+    },
+    "patchedDependencies": {
+      "gray-matter@4.0.3": "patches/gray-matter@4.0.3.patch"
     }
   },
   "dependencies": {
