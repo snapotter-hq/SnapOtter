@@ -350,7 +350,7 @@ describe("useMemeStore", () => {
       fetchMock.mockReturnValue(okJson(result));
       await useMemeStore.getState().generateMeme();
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/v1/tools/meme-generator",
+        "/api/v1/tools/image/meme-generator",
         expect.objectContaining({
           method: "POST",
           body: expect.any(String),
@@ -371,7 +371,7 @@ describe("useMemeStore", () => {
       fetchMock.mockReturnValue(okJson(result));
       await useMemeStore.getState().generateMeme();
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/v1/tools/meme-generator",
+        "/api/v1/tools/image/meme-generator",
         expect.objectContaining({
           method: "POST",
           body: expect.any(FormData),

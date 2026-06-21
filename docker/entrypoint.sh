@@ -104,6 +104,18 @@ if [ -n "${DATABASE_URL:-}" ]; then
   echo "Postgres is reachable."
 fi
 
+print_security_warnings() {
+  if [ "${DEFAULT_PASSWORD}" = "admin" ]; then
+    printf '  \033[33mWARNING:%b Default admin password is still "admin". Change it for any non-local deployment.\n' '\033[0m' >&2
+  fi
+  if echo "${DATABASE_URL:-}" | grep -q "snapotter:snapotter@"; then
+    printf '  \033[33mWARNING:%b Default Postgres credentials in use. Set POSTGRES_PASSWORD for production.\n' '\033[0m' >&2
+  fi
+  if echo "${REDIS_URL:-}" | grep -q ":snapotter@"; then
+    printf '  \033[33mWARNING:%b Default Redis password in use. Set REDIS_PASSWORD for production.\n' '\033[0m' >&2
+  fi
+}
+
 print_banner() {
   RST='\033[0m'
   printf '\n'
@@ -114,6 +126,7 @@ print_banner() {
   printf '  \033[33m➜%b  Login  \033[1m%s%b / \033[1m[CHANGE ON FIRST LOGIN]%b\n' "$RST" "${DEFAULT_USERNAME}" "$RST" "$RST"
   printf '  \033[36m➜%b  Docs   \033[2mhttps://docs.snapotter.com%b\n' "$RST" "$RST"
   printf '\n'
+  print_security_warnings
 }
 
 # Fix ownership of mounted volumes so the non-root snapotter user can write.

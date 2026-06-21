@@ -98,7 +98,7 @@ test.describe("Batch color-blindness simulation", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ simulationType: "deuteranomaly" }) }],
     );
-    const res = await request.post("/api/v1/tools/color-blindness/batch", {
+    const res = await request.post("/api/v1/tools/image/color-blindness/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -114,7 +114,7 @@ test.describe("Batch color-blindness simulation", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ simulationType: "protanopia" }) }],
     );
-    const res = await request.post("/api/v1/tools/color-blindness/batch", {
+    const res = await request.post("/api/v1/tools/image/color-blindness/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -145,7 +145,7 @@ test.describe("Batch edit-metadata", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/edit-metadata/batch", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -176,7 +176,7 @@ test.describe("Batch beautify", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/beautify/batch", {
+    const res = await request.post("/api/v1/tools/image/beautify/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -205,7 +205,7 @@ test.describe("Batch beautify", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/beautify/batch", {
+    const res = await request.post("/api/v1/tools/image/beautify/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -225,7 +225,7 @@ test.describe("Batch vectorize", () => {
       ],
       [{ name: "settings", value: JSON.stringify({}) }],
     );
-    const res = await request.post("/api/v1/tools/vectorize/batch", {
+    const res = await request.post("/api/v1/tools/image/vectorize/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -259,7 +259,7 @@ test.describe("Batch replace-color (5+ images)", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/replace-color/batch", {
+    const res = await request.post("/api/v1/tools/image/replace-color/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -280,7 +280,7 @@ test.describe("Batch favicon", () => {
       ],
       [{ name: "settings", value: JSON.stringify({}) }],
     );
-    const res = await request.post("/api/v1/tools/favicon/batch", {
+    const res = await request.post("/api/v1/tools/image/favicon/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -311,7 +311,7 @@ test.describe("Batch image-enhancement (5+ images)", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ preset: "auto" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-enhancement/batch", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -334,7 +334,7 @@ test.describe("Batch svg-to-raster", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "png", width: 256 }) }],
     );
-    const res = await request.post("/api/v1/tools/svg-to-raster/batch", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -357,7 +357,7 @@ test.describe("Batch convert HEIC to web formats", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "jpg", quality: 85 }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -388,7 +388,7 @@ test.describe("Batch meme-generator", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/meme-generator/batch", {
+    const res = await request.post("/api/v1/tools/image/meme-generator/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -422,7 +422,7 @@ test.describe("Batch resize large set", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ width: 64, height: 64, fit: "cover" }) }],
     );
-    const res = await request.post("/api/v1/tools/resize/batch", {
+    const res = await request.post("/api/v1/tools/image/resize/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -441,7 +441,7 @@ test.describe("Auth failure", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ width: 100, fit: "contain" }) }],
     );
-    const res = await request.post("/api/v1/tools/resize/batch", {
+    const res = await request.post("/api/v1/tools/image/resize/batch", {
       headers: { "Content-Type": contentType },
       data: reqBody,
     });
@@ -456,7 +456,7 @@ test.describe("Auth failure", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "webp" }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { "Content-Type": contentType },
       data: reqBody,
     });

@@ -22,5 +22,5 @@ Allow: /
 User-agent: cohere-ai
 Allow: /
 
-Sitemap: https://snapotter.com/sitemap.xml
+Sitemap: https://snapotter.com/sitemap-index.xml
 Sitemap: https://docs.snapotter.com/sitemap.xml

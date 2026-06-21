@@ -66,7 +66,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     set({ capturing: true, error: null, resultUrl: null, resultSize: null });
 
     try {
-      const res = await fetch("/api/v1/tools/html-to-image", {
+      const res = await fetch("/api/v1/tools/image/html-to-image", {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

@@ -1,0 +1,270 @@
+{
+  "_comment": "Known axe a11y violations. Keyed by pageKey:ruleId. This baseline lets CI catch NEW regressions without failing on documented existing debt. Regenerate by running the a11y spec with A11Y_UPDATE_BASELINE=1.",
+  "violations": {
+    "home-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 11
+    },
+    "home-en:heading-order": {
+      "impact": "moderate",
+      "description": "Ensure the order of headings is semantically correct",
+      "count": 1
+    },
+    "image-resize-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "video-convert-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "audio-convert-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "document-pdf-to-image-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "data-csv-excel-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "editor-en:aria-required-children": {
+      "impact": "critical",
+      "description": "Ensure elements with an ARIA role that require child roles contain them",
+      "count": 1
+    },
+    "editor-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "editor-en:label": {
+      "impact": "critical",
+      "description": "Ensure every form element has a label",
+      "count": 1
+    },
+    "editor-en:nested-interactive": {
+      "impact": "serious",
+      "description": "Ensure interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
+      "count": 1
+    },
+    "editor-en:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "editor-en:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "login-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 4
+    },
+    "login-en:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "login-en:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "home-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 9
+    },
+    "home-ar:heading-order": {
+      "impact": "moderate",
+      "description": "Ensure the order of headings is semantically correct",
+      "count": 1
+    },
+    "image-resize-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 1
+    },
+    "editor-ar:aria-required-children": {
+      "impact": "critical",
+      "description": "Ensure elements with an ARIA role that require child roles contain them",
+      "count": 1
+    },
+    "editor-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "editor-ar:label": {
+      "impact": "critical",
+      "description": "Ensure every form element has a label",
+      "count": 1
+    },
+    "editor-ar:nested-interactive": {
+      "impact": "serious",
+      "description": "Ensure interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
+      "count": 1
+    },
+    "editor-ar:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "editor-ar:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "login-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "login-ar:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "login-ar:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "mobile-home-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 7
+    },
+    "mobile-home-en:heading-order": {
+      "impact": "moderate",
+      "description": "Ensure the order of headings is semantically correct",
+      "count": 1
+    },
+    "mobile-image-resize-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "mobile-image-resize-en:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-video-convert-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "mobile-video-convert-en:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-audio-convert-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "mobile-audio-convert-en:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-document-pdf-to-image-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "mobile-document-pdf-to-image-en:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-data-csv-excel-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 2
+    },
+    "mobile-data-csv-excel-en:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-editor-en:page-has-heading-one": {
+      "impact": "moderate",
+      "description": "Ensure that the page, or at least one of its frames contains a level-one heading",
+      "count": 1
+    },
+    "mobile-editor-en:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "mobile-editor-en:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "mobile-login-en:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 1
+    },
+    "mobile-login-en:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "mobile-login-en:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    },
+    "mobile-home-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 8
+    },
+    "mobile-home-ar:heading-order": {
+      "impact": "moderate",
+      "description": "Ensure the order of headings is semantically correct",
+      "count": 1
+    },
+    "mobile-image-resize-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 1
+    },
+    "mobile-image-resize-ar:link-name": {
+      "impact": "serious",
+      "description": "Ensure links have discernible text",
+      "count": 1
+    },
+    "mobile-login-ar:color-contrast": {
+      "impact": "serious",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "count": 1
+    },
+    "mobile-login-ar:region": {
+      "impact": "moderate",
+      "description": "Ensure all page content is contained by landmarks",
+      "count": 1
+    },
+    "mobile-login-ar:skip-link": {
+      "impact": "moderate",
+      "description": "Ensure all skip links have a focusable target",
+      "count": 1
+    }
+  }
+}

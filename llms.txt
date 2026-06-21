@@ -216,7 +216,7 @@ Authentication methods:
 API keys support scoped permissions that intersect with user role permissions.
 
 Processing a file:
-  POST /api/v1/tools/:toolId
+  POST /api/v1/tools/:section/:toolId
   Content-Type: multipart/form-data
   Body: file (binary), settings (JSON string)
   Response: { jobId, downloadUrl, originalSize, processedSize }
@@ -231,7 +231,7 @@ Pipelines (chained tool workflows):
   DELETE /api/v1/pipeline/:id
   POST /api/v1/pipeline/batch
 
-Batch processing: POST /api/v1/tools/:toolId/batch (multiple files in, ZIP archive out).
+Batch processing: POST /api/v1/tools/:section/:toolId/batch (multiple files in, ZIP archive out).
 
 ## Tech Stack
 

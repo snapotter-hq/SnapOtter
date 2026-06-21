@@ -37,7 +37,7 @@ function localPath(key: string): string {
   return p;
 }
 
-function useS3(): boolean {
+function isS3Enabled(): boolean {
   return env.STORAGE_MODE === "s3";
 }
 
@@ -102,7 +102,7 @@ export async function assertLocalCapacity(): Promise<void> {
 
 export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.putGenericObject(key, data);
     return;
@@ -129,7 +129,7 @@ export async function putObjectStream(
       yield chunk;
     }
   };
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.putGenericObjectStream(key, counter(source));
     return written;
@@ -151,7 +151,7 @@ export async function getObjectStream(
   range?: { start: number; end?: number },
 ): Promise<Readable> {
   assertValidKey(key);
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getGenericObjectStream(key, range);
   }
@@ -166,7 +166,7 @@ export async function getObjectBuffer(key: string): Promise<Buffer> {
 
 export async function getObjectSize(key: string): Promise<number> {
   assertValidKey(key);
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getGenericObjectSize(key);
   }
@@ -184,7 +184,7 @@ export async function objectExists(key: string): Promise<boolean> {
 
 export async function deleteObject(key: string): Promise<void> {
   assertValidKey(key);
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteGenericObject(key);
     return;
@@ -196,7 +196,7 @@ export async function deletePrefix(prefix: string): Promise<void> {
   if (!/^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/?$/.test(prefix)) {
     throw new Error(`Invalid prefix: ${prefix}`);
   }
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteGenericPrefix(prefix);
     return;
@@ -208,7 +208,7 @@ export async function listObjects(prefix: string): Promise<ObjectInfo[]> {
   if (!/^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/?$/.test(prefix) || prefix.includes("..")) {
     throw new Error(`Invalid prefix: ${prefix}`);
   }
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.listGenericObjects(prefix);
   }
@@ -233,7 +233,7 @@ export async function listObjects(prefix: string): Promise<ObjectInfo[]> {
 // Lists the top-level job directories under a prefix with their mtime so the
 // TTL sweeper can expire whole jobs. S3 derives them from key listings.
 export async function listJobDirs(prefix: "uploads" | "outputs"): Promise<ObjectInfo[]> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.listGenericJobDirs(prefix);
   }

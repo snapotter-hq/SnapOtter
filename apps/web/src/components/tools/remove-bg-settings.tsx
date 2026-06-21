@@ -828,7 +828,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       }
 
       const headers = formatHeaders();
-      const response = await fetch("/api/v1/tools/remove-background/effects", {
+      const response = await fetch("/api/v1/tools/image/remove-background/effects", {
         method: "POST",
         headers,
         body: formData,

@@ -77,7 +77,7 @@ echo "  Base entries: $(wc -l < /tmp/base-packages.txt)"
 # ── Step 2: Install packages ─────────────────────────────────────────────
 echo "=== Installing packages ==="
 python3 << 'PYINSTALL'
-import json, subprocess, sys, os
+import json, shlex, subprocess, sys, os
 
 with open("/app/docker/feature-manifest.json") as f:
     manifest = json.load(f)
@@ -104,7 +104,7 @@ for pkg_string in packages:
     # pkg_string may contain embedded flags (e.g. --index-url), so pass as-is
     cmd = f"{sys.executable} -m pip install --no-cache-dir {extra_flags} {pkg_string}".strip()
     print(f"  > {cmd}", flush=True)
-    result = subprocess.run(cmd, shell=True)
+    result = subprocess.run(shlex.split(cmd))
     if result.returncode != 0:
         print(f"ERROR: pip install failed for: {pkg_string}", file=sys.stderr)
         sys.exit(1)
@@ -115,7 +115,7 @@ PYINSTALL
 # ── Step 3: Post-install fixups ───────────────────────────────────────────
 echo "=== Running post-install fixups ==="
 python3 << 'PYPOST'
-import json, subprocess, sys, os
+import json, shlex, subprocess, sys, os
 
 with open("/app/docker/feature-manifest.json") as f:
     manifest = json.load(f)
@@ -130,7 +130,7 @@ if not post_install:
 for pkg in post_install:
     cmd = f"{sys.executable} -m pip install --no-cache-dir --force-reinstall {pkg}"
     print(f"  > {cmd}", flush=True)
-    result = subprocess.run(cmd, shell=True)
+    result = subprocess.run(shlex.split(cmd))
     if result.returncode != 0:
         print(f"ERROR: post-install fixup failed for: {pkg}", file=sys.stderr)
         sys.exit(1)
@@ -141,7 +141,7 @@ PYPOST
 # ── Step 4: Re-pin base packages ─────────────────────────────────────────
 echo "=== Re-pinning base packages ==="
 python3 << 'PYREPIN'
-import json, subprocess, sys
+import json, shlex, subprocess, sys
 
 with open("/app/docker/feature-manifest.json") as f:
     manifest = json.load(f)
@@ -154,13 +154,46 @@ if not base_packages:
 pkgs = " ".join(base_packages)
 cmd = f"{sys.executable} -m pip install --no-cache-dir --force-reinstall {pkgs}"
 print(f"  > {cmd}", flush=True)
-result = subprocess.run(cmd, shell=True)
+result = subprocess.run(shlex.split(cmd))
 if result.returncode != 0:
     print("ERROR: base package re-pin failed", file=sys.stderr)
     sys.exit(1)
 
 print("  Base packages re-pinned")
 PYREPIN
+
+# ── Step 4.5: Apply source patches ───────────────────────────────────────
+echo "=== Applying source patches ==="
+python3 << 'PYPATCH'
+import json, os, site, sys
+
+with open("/app/docker/feature-manifest.json") as f:
+    manifest = json.load(f)
+
+bundle = manifest["bundles"][os.environ["BUNDLE_ID"]]
+patches = bundle.get("patches", [])
+
+if not patches:
+    print("  No patches")
+    sys.exit(0)
+
+site_packages = site.getsitepackages()[0]
+for patch in patches:
+    target = os.path.join(site_packages, patch["file"])
+    if not os.path.exists(target):
+        print(f"  WARNING: patch target not found: {patch['file']}", file=sys.stderr)
+        continue
+    with open(target, "r") as fh:
+        content = fh.read()
+    if patch["search"] not in content:
+        print(f"  WARNING: search text not found in {patch['file']} (already patched?)", file=sys.stderr)
+        continue
+    with open(target, "w") as fh:
+        fh.write(content.replace(patch["search"], patch["replace"]))
+    print(f"  Patched {patch['file']}")
+
+print("  Source patches applied")
+PYPATCH
 
 # ── Step 5: Download models ──────────────────────────────────────────────
 echo "=== Downloading models ==="
@@ -245,8 +278,10 @@ for model in models:
             size = os.path.getsize(dest)
             print(f"  [{model_id}] Done ({size:,} bytes)")
         else:
-            from rembg.sessions import new_session
-            new_session(session_name)
+            from rembg import new_session
+            # Force CPU-only provider: onnxruntime-gpu segfaults trying to load
+            # TensorRT libs that aren't present in build containers (no GPU).
+            new_session(session_name, providers=["CPUExecutionProvider"])
             print(f"  [{model_id}] Done")
 
     else:
@@ -326,6 +361,15 @@ model_ids = [m["id"] for m in bundle.get("models", [])]
 
 py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+# Uncompressed bundle size: BUILD_DIR holds site-packages + models at this point.
+# Surfaces the real extractedSize for docker/feature-manifest.json (used by the
+# disk-space pre-check in install_feature.py); several manifest entries were 0 before.
+extracted_size = sum(
+    os.path.getsize(os.path.join(root, name))
+    for root, _dirs, files in os.walk(os.environ["BUILD_DIR"])
+    for name in files
+)
+
 bundle_meta = {
     "bundleId": bundle_id,
     "version": manifest["imageVersion"],
@@ -333,6 +377,7 @@ bundle_meta = {
     "imageVersion": manifest["imageVersion"],
     "pythonVersion": py_ver,
     "models": model_ids,
+    "extractedSize": extracted_size,
 }
 
 out_path = os.path.join(os.environ["BUILD_DIR"], "bundle.json")

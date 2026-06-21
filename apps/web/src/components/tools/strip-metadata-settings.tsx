@@ -250,7 +250,7 @@ export function StripMetadataSettings() {
       try {
         const formData = new FormData();
         formData.append("file", currentFile);
-        const res = await fetch("/api/v1/tools/strip-metadata/inspect", {
+        const res = await fetch("/api/v1/tools/image/strip-metadata/inspect", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

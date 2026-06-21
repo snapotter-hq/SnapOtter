@@ -13,13 +13,14 @@ import { closeDb, db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { closeRedis, pingRedis } from "./jobs/connection.js";
-import { closeFlowProducer, closeQueueEvents } from "./jobs/enqueue.js";
+import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
+import { stripInternalPaths } from "./lib/errors.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
@@ -229,8 +230,8 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
     request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
   }
   reply.status(statusCode).send({
-    error: statusCode >= 500 ? "Internal server error" : error.message,
-    ...(statusCode < 500 && { details: error.message }),
+    error: statusCode >= 500 ? "Internal server error" : stripInternalPaths(error.message),
+    ...(statusCode < 500 && { details: stripInternalPaths(error.message) }),
   });
 });
 
@@ -238,7 +239,9 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
 await app.register(cors, {
   origin: env.CORS_ORIGIN
     ? env.CORS_ORIGIN.split(",").map((s) => s.trim())
-    : process.env.NODE_ENV !== "production",
+    : process.env.NODE_ENV === "production"
+      ? false
+      : [/^http:\/\/localhost:\d+$/],
 });
 
 // Security headers -- applied in all environments. HSTS is ignored over plain
@@ -286,6 +289,7 @@ await app.register(rateLimit, {
 // Block TRACE method (returns 401 instead of 405 without this)
 app.addHook("onRequest", async (request, reply) => {
   if (request.method === "TRACE") {
+    reply.header("Allow", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD");
     return reply.status(405).send({ error: "Method not allowed" });
   }
 });
@@ -562,6 +566,7 @@ app.get("/api/v1/readyz", async (_request, reply) => {
 // Cancel a job (authenticated)
 app.post(
   "/api/v1/jobs/:jobId/cancel",
+  { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
   async (
     request: import("fastify").FastifyRequest<{ Params: { jobId: string } }>,
     reply: import("fastify").FastifyReply,
@@ -590,6 +595,14 @@ if (await shouldRunStartupCleanup()) {
 
 // Start BullMQ worker pools (after route registration so the tool registry is full)
 startWorkers();
+
+// Warm the per-pool QueueEvents consumers so the first synchronous tool request
+// after boot does not pay the lazy-connect cost (and cannot miss a fast job's
+// completion event). Non-blocking: a slow/unreachable Redis must not stall boot;
+// the consumers fall back to lazy creation on first use if this has not finished.
+void warmQueueEvents().catch((err) => {
+  app.log.warn({ err }, "QueueEvents warm-up failed; consumers will connect lazily");
+});
 
 // Start
 try {

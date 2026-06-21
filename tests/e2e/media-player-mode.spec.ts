@@ -1,7 +1,7 @@
 import path from "node:path";
 import { expect, test, waitForProcessing } from "./helpers";
 
-const MP4_FIXTURE = path.join(process.cwd(), "tests", "fixtures", "media", "tiny.mp4");
+const MP4_FIXTURE = path.join(process.cwd(), "tests", "fixtures", "video", "formats", "tiny.mp4");
 
 test.describe("Media-player display mode (mute-video)", () => {
   test("uploads a video, mutes it, and shows the media player with processed result", async ({

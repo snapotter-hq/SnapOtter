@@ -28,7 +28,7 @@ const settingsSchema = z.object({
  * Returns JSON with extracted text rather than an image.
  */
 export function registerOcr(app: FastifyInstance) {
-  app.post("/api/v1/tools/ocr", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/v1/tools/image/ocr", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "ocr";
     if (!isToolInstalled(toolId)) {
       const bundle = getBundleForTool(toolId);

@@ -106,32 +106,37 @@ function getDirSize(dirPath: string): number {
 
 export async function registerFeatureRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/features - List feature bundles and their statuses
-  app.get("/api/v1/features", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
-    if (!user) return;
+  app.get(
+    "/api/v1/features",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
 
-    // In non-Docker environments, all bundles are available natively
-    if (!isDockerEnvironment()) {
-      const bundles = Object.values(FEATURE_BUNDLES).map((bundle) => ({
-        id: bundle.id,
-        name: bundle.name,
-        description: bundle.description,
-        status: "installed" as const,
-        installedVersion: null,
-        estimatedSize: bundle.estimatedSize,
-        enablesTools: bundle.enablesTools,
-        progress: null,
-        error: null,
-      }));
-      return reply.send({ bundles });
-    }
+      // In non-Docker environments, all bundles are available natively
+      if (!isDockerEnvironment()) {
+        const bundles = Object.values(FEATURE_BUNDLES).map((bundle) => ({
+          id: bundle.id,
+          name: bundle.name,
+          description: bundle.description,
+          status: "installed" as const,
+          installedVersion: null,
+          estimatedSize: bundle.estimatedSize,
+          enablesTools: bundle.enablesTools,
+          progress: null,
+          error: null,
+        }));
+        return reply.send({ bundles });
+      }
 
-    return reply.send({ bundles: getFeatureStates() });
-  });
+      return reply.send({ bundles: getFeatureStates() });
+    },
+  );
 
   // POST /api/v1/admin/features/:bundleId/install - Install a feature bundle
   app.post(
     "/api/v1/admin/features/:bundleId/install",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;
@@ -283,6 +288,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   // POST /api/v1/admin/features/:bundleId/uninstall - Uninstall a feature bundle
   app.post(
     "/api/v1/admin/features/:bundleId/uninstall",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;

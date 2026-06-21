@@ -12,9 +12,26 @@ function decodeNumericEntities(input: string): string {
 }
 
 /**
+ * Apply removal regexes repeatedly until the string stops changing, so that
+ * nested or overlapping dangerous tags (e.g. `<scr<script>ipt>`) cannot survive
+ * a single pass.
+ */
+function stripUntilStable(input: string, ...patterns: RegExp[]): string {
+  let prev: string;
+  let out = input;
+  do {
+    prev = out;
+    for (const pattern of patterns) out = out.replace(pattern, "");
+  } while (out !== prev);
+  return out;
+}
+
+/**
  * Sanitize an SVG buffer to prevent XXE, SSRF, and script injection.
  * Throws if the SVG exceeds the maximum allowed size.
  */
+const MAX_SVG_ELEMENTS = 5_000;
+
 export function sanitizeSvg(buffer: Buffer): Buffer {
   const maxSvgSize = env.MAX_SVG_SIZE_MB > 0 ? env.MAX_SVG_SIZE_MB * 1024 * 1024 : Infinity;
   if (buffer.length > maxSvgSize) {
@@ -25,6 +42,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // ── Pre-processing: strip CDATA sections and decode numeric entities ──
   // CDATA sections can hide script content from regex-based checks.
   svg = svg.replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "");
+
+  const elementCount = (svg.match(/<[a-zA-Z][^>]*\/?>/g) || []).length;
+  if (elementCount > MAX_SVG_ELEMENTS) {
+    throw new Error(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
+  }
   // Decode numeric entities so obfuscated URIs (e.g. &#106;avascript:) are visible.
   svg = decodeNumericEntities(svg);
 
@@ -42,28 +64,23 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // Remove XML processing instructions except <?xml version...?>
   svg = svg.replace(/<\?(?!xml\s)[^?]*\?>/gi, "");
   // Remove XInclude elements and namespace declarations
-  svg = svg.replace(/<[^>]*xi:include[^>]*\/?>/gi, "");
+  svg = stripUntilStable(svg, /<[^>]*\bxi:include\b[^>]*\/?>/gi);
   svg = svg.replace(/xmlns:xi\s*=\s*["'][^"']*["']/gi, "");
 
   // ── Strip dangerous elements ──
-  // Remove script tags (including nested inside <svg>)
-  svg = svg.replace(/<script[\s\S]*?<\/script>/gi, "");
-  svg = svg.replace(/<script[^>]*\/>/gi, "");
-  // Remove foreignObject elements (can embed arbitrary HTML)
-  svg = svg.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
-  svg = svg.replace(/<foreignObject[^>]*\/>/gi, "");
-  // Remove iframe elements (non-SVG, can load external content)
-  svg = svg.replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
-  svg = svg.replace(/<iframe[^>]*\/>/gi, "");
-  // Remove embed elements (non-SVG, can load external content)
-  svg = svg.replace(/<embed[\s\S]*?<\/embed>/gi, "");
-  svg = svg.replace(/<embed[^>]*\/>/gi, "");
-  // Remove <set> elements (can inject attributes/URIs at runtime)
-  svg = svg.replace(/<set[\s\S]*?<\/set>/gi, "");
-  svg = svg.replace(/<set\b[^>]*\/>/gi, "");
-  // Remove <animate> elements (can inject attributes/URIs at runtime)
-  svg = svg.replace(/<animate[\s\S]*?<\/animate>/gi, "");
-  svg = svg.replace(/<animate\b[^>]*\/>/gi, "");
+  // For each dangerous element remove the paired form (with a whitespace-tolerant
+  // end tag, e.g. `</script >`), the self-closing form, and any residual open or
+  // close tag -- repeating until stable so nested or overlapping tags cannot
+  // survive a single pass (foreignObject/iframe/embed can embed HTML; set/animate
+  // can inject attributes/URIs at runtime).
+  for (const tag of ["script", "foreignObject", "iframe", "embed", "set", "animate"]) {
+    svg = stripUntilStable(
+      svg,
+      new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"),
+      new RegExp(`<${tag}\\b[^>]*>`, "gi"),
+      new RegExp(`<\\/${tag}\\s*>`, "gi"),
+    );
+  }
 
   // Remove event handlers (onload, onclick, onerror, etc.)
   // Replace both the attribute name and its value to prevent residual payloads.

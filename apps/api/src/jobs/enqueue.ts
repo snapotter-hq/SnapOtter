@@ -12,7 +12,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
-import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
+import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 
 // ── QueueEvents (one per pool, lazy) ────────────────────────────
 
@@ -33,6 +33,23 @@ export async function closeQueueEvents(): Promise<void> {
   const promises = [...queueEventsMap.values()].map((qe) => qe.close());
   await Promise.all(promises);
   queueEventsMap.clear();
+}
+
+/**
+ * Eagerly create and connect the QueueEvents consumer for every pool.
+ *
+ * A QueueEvents consumer reads the Redis events stream from "$" (the tail at
+ * the moment its run loop starts). If it is created lazily *inside* the first
+ * waitForJob() call, a fast job can publish its `completed:<id>` event before
+ * the brand-new consumer positions itself at the tail -- the event is then
+ * never delivered and waitUntilFinished() blocks for the full sync-wait window
+ * (SYNC_WAIT_MS). Warming every consumer at spine startup, before any job is
+ * enqueued, positions them at the tail up front so no completion event is ever
+ * missed and the first sync request is as fast as every later one. Idempotent:
+ * getQueueEvents caches one consumer per pool.
+ */
+export async function warmQueueEvents(): Promise<void> {
+  await Promise.all(POOLS.map((pool) => getQueueEvents(pool).waitUntilReady()));
 }
 
 // ── FlowProducer (lazy singleton, used by Task 9) ───────────────

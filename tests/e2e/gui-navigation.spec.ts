@@ -899,19 +899,19 @@ test.describe("Routing Edge Cases", () => {
   }) => {
     await page.goto("/brightness-contrast");
 
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
   });
 
   test("legacy /saturation redirects to /adjust-colors", async ({ loggedInPage: page }) => {
     await page.goto("/saturation");
 
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
   });
 
   test("legacy /color-channels redirects to /adjust-colors", async ({ loggedInPage: page }) => {
     await page.goto("/color-channels");
 
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
   });
 
   test("/privacy renders the privacy policy page", async ({ loggedInPage: page }) => {
@@ -947,7 +947,7 @@ test.describe("Routing Edge Cases", () => {
   test("legacy /color-effects redirects to /adjust-colors", async ({ loggedInPage: page }) => {
     await page.goto("/color-effects");
 
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
   });
 
   test("/login when already logged in redirects to /", async ({ loggedInPage: page }) => {
@@ -1446,13 +1446,13 @@ test.describe("Routing - Additional Edge Cases", () => {
     loggedInPage: page,
   }) => {
     await page.goto("/brightness-contrast");
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
 
     await page.goto("/fullscreen");
     await expect(page).toHaveURL("/fullscreen");
 
     await page.goBack();
-    await expect(page).toHaveURL("/adjust-colors");
+    await expect(page).toHaveURL("/image/adjust-colors");
   });
 });
 

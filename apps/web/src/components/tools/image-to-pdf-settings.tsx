@@ -236,7 +236,7 @@ export function ImageToPdfSettings() {
       cleanup();
     };
 
-    xhr.open("POST", "/api/v1/tools/image-to-pdf");
+    xhr.open("POST", "/api/v1/tools/image/image-to-pdf");
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

@@ -1,5 +1,5 @@
 import type { Tool } from "@snapotter/shared";
-import { MODALITIES, PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { PYTHON_SIDECAR_TOOLS, SECTIONS, TOOL_BUNDLE_MAP, toolSection } from "@snapotter/shared";
 import { Clock, Download, FileImage, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -15,8 +15,8 @@ interface ToolCardProps {
   showModalityBadge?: boolean;
 }
 
-const MODALITY_COLOR_MAP: Record<string, string> = Object.fromEntries(
-  MODALITIES.map((m) => [m.id, m.color]),
+const SECTION_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  SECTIONS.map((s) => [s.id, s.color]),
 );
 
 export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolCardProps) {
@@ -38,17 +38,18 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
     return bundle?.status === "installed" ? "installed" : "not_installed";
   }, [isAiTool, tool.id, bundles, installing, queued]);
 
-  const modalityColor = MODALITY_COLOR_MAP[tool.modality] ?? "#6B7280";
+  const section = toolSection(tool);
+  const sectionColor = SECTION_COLOR_MAP[section] ?? "#6B7280";
 
-  const modalityBadge = showModalityBadge ? (
+  const sectionBadge = showModalityBadge ? (
     <span
       className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
       style={{
-        backgroundColor: `${modalityColor}20`,
-        color: modalityColor,
+        backgroundColor: `${sectionColor}20`,
+        color: sectionColor,
       }}
     >
-      {MODALITIES.find((m) => m.id === tool.modality)?.name ?? tool.modality}
+      {SECTIONS.find((s) => s.id === section)?.name ?? section}
     </span>
   ) : null;
 
@@ -76,7 +77,7 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
       >
         <div
           className="p-2 rounded-lg shrink-0 mt-0.5"
-          style={{ backgroundColor: `${modalityColor}12`, color: modalityColor }}
+          style={{ backgroundColor: `${sectionColor}12`, color: sectionColor }}
         >
           <IconComponent className="h-5 w-5" />
         </div>
@@ -85,7 +86,7 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
             <span className="text-sm font-medium text-foreground">
               {getToolName(t, tool.id, tool.name)}
             </span>
-            {modalityBadge}
+            {sectionBadge}
             {tool.experimental && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 font-medium">
                 {t.common.experimental}
@@ -114,7 +115,7 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
       <span className="text-sm font-medium text-foreground">
         {getToolName(t, tool.id, tool.name)}
       </span>
-      {modalityBadge}
+      {sectionBadge}
       {tool.experimental && (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 font-medium">
           {t.common.experimental}

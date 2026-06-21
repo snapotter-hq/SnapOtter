@@ -89,13 +89,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Resize ───────────────────────────────────────────────────
-  test("POST /api/v1/tools/resize processes image", async () => {
+  test("POST /api/v1/tools/image/resize processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({ width: 50, height: 50, fit: "contain" }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -107,13 +107,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Compress ─────────────────────────────────────────────────
-  test("POST /api/v1/tools/compress processes image", async () => {
+  test("POST /api/v1/tools/image/compress processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({ quality: 50 }));
 
-    const res = await fetch(`${API}/api/v1/tools/compress`, {
+    const res = await fetch(`${API}/api/v1/tools/image/compress`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -124,13 +124,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Convert ──────────────────────────────────────────────────
-  test("POST /api/v1/tools/convert processes image", async () => {
+  test("POST /api/v1/tools/image/convert processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({ format: "webp" }));
 
-    const res = await fetch(`${API}/api/v1/tools/convert`, {
+    const res = await fetch(`${API}/api/v1/tools/image/convert`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -141,13 +141,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Info ─────────────────────────────────────────────────────
-  test("POST /api/v1/tools/info returns metadata", async () => {
+  test("POST /api/v1/tools/image/info returns metadata", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({}));
 
-    const res = await fetch(`${API}/api/v1/tools/info`, {
+    const res = await fetch(`${API}/api/v1/tools/image/info`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -156,8 +156,8 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: QR Generate (JSON body, not FormData) ────────────────────
-  test("POST /api/v1/tools/qr-generate creates QR code", async () => {
-    const res = await fetch(`${API}/api/v1/tools/qr-generate`, {
+  test("POST /api/v1/tools/image/qr-generate creates QR code", async () => {
+    const res = await fetch(`${API}/api/v1/tools/image/qr-generate`, {
       method: "POST",
       headers: {
         ...authHeaders(token),
@@ -171,13 +171,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Rotate ───────────────────────────────────────────────────
-  test("POST /api/v1/tools/rotate processes image", async () => {
+  test("POST /api/v1/tools/image/rotate processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({ angle: 90 }));
 
-    const res = await fetch(`${API}/api/v1/tools/rotate`, {
+    const res = await fetch(`${API}/api/v1/tools/image/rotate`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -188,13 +188,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Strip Metadata ───────────────────────────────────────────
-  test("POST /api/v1/tools/strip-metadata processes image", async () => {
+  test("POST /api/v1/tools/image/strip-metadata processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({}));
 
-    const res = await fetch(`${API}/api/v1/tools/strip-metadata`, {
+    const res = await fetch(`${API}/api/v1/tools/image/strip-metadata`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -205,13 +205,13 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Tool: Border ───────────────────────────────────────────────────
-  test("POST /api/v1/tools/border processes image", async () => {
+  test("POST /api/v1/tools/image/border processes image", async () => {
     const { blob } = readTestImage();
     const formData = new FormData();
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({ borderWidth: 10, borderColor: "#ff0000" }));
 
-    const res = await fetch(`${API}/api/v1/tools/border`, {
+    const res = await fetch(`${API}/api/v1/tools/image/border`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -225,11 +225,11 @@ test.describe("API Endpoints", () => {
   });
 
   // ── Missing file returns error ─────────────────────────────────────
-  test("POST /api/v1/tools/resize without file returns 400", async () => {
+  test("POST /api/v1/tools/image/resize without file returns 400", async () => {
     const formData = new FormData();
     formData.append("settings", JSON.stringify({ width: 50 }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -244,7 +244,7 @@ test.describe("API Endpoints", () => {
     formData.append("file", blob, "test.png");
     formData.append("settings", JSON.stringify({}));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       body: formData,
     });

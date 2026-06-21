@@ -1,3 +1,4 @@
+import { authFile } from "../../playwright.config";
 import { expect, openSettings, test } from "./helpers";
 
 test.describe("Settings Dialog", () => {
@@ -48,7 +49,7 @@ test.describe("Settings Dialog", () => {
   test.skip("API Keys section has generate button", async ({ browser }) => {
     // Use a fresh context to avoid dialog state from previous tests
     const context = await browser.newContext({
-      storageState: "test-results/.auth/user.json",
+      storageState: authFile,
     });
     const page = await context.newPage();
     await page.goto("/");

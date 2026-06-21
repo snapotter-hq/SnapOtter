@@ -98,46 +98,49 @@ const settingsSchema = z.object({
 
 export function registerGifTools(app: FastifyInstance) {
   // ── Metadata endpoint ───────────────────────────────────────────
-  app.post("/api/v1/tools/gif-tools/info", async (request: FastifyRequest, reply: FastifyReply) => {
-    let fileBuffer: Buffer | null = null;
+  app.post(
+    "/api/v1/tools/image/gif-tools/info",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      let fileBuffer: Buffer | null = null;
 
-    try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk);
+            }
+            fileBuffer = Buffer.concat(chunks);
           }
-          fileBuffer = Buffer.concat(chunks);
         }
+      } catch {
+        return reply.status(400).send({ error: "Failed to parse request" });
       }
-    } catch {
-      return reply.status(400).send({ error: "Failed to parse request" });
-    }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return reply.status(400).send({ error: "No file provided" });
-    }
+      if (!fileBuffer || fileBuffer.length === 0) {
+        return reply.status(400).send({ error: "No file provided" });
+      }
 
-    try {
-      const meta = await sharp(fileBuffer).metadata();
-      const pages = meta.pages ?? 1;
-      const delay = meta.delay ?? Array(pages).fill(100);
+      try {
+        const meta = await sharp(fileBuffer).metadata();
+        const pages = meta.pages ?? 1;
+        const delay = meta.delay ?? Array(pages).fill(100);
 
-      return reply.send({
-        width: meta.width ?? 0,
-        height: meta.pageHeight ?? meta.height ?? 0,
-        pages,
-        delay,
-        loop: meta.loop ?? 0,
-        fileSize: fileBuffer.length,
-        duration: delay.reduce((sum: number, d: number) => sum + d, 0),
-      });
-    } catch {
-      return reply.status(422).send({ error: "Could not read image metadata" });
-    }
-  });
+        return reply.send({
+          width: meta.width ?? 0,
+          height: meta.pageHeight ?? meta.height ?? 0,
+          pages,
+          delay,
+          loop: meta.loop ?? 0,
+          fileSize: fileBuffer.length,
+          duration: delay.reduce((sum: number, d: number) => sum + d, 0),
+        });
+      } catch {
+        return reply.status(422).send({ error: "Could not read image metadata" });
+      }
+    },
+  );
 
   // ── Processing endpoint ─────────────────────────────────────────
   createToolRoute(app, {

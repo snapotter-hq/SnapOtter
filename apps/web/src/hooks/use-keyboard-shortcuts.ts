@@ -1,3 +1,4 @@
+import { TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "./use-theme";
@@ -8,6 +9,9 @@ import { useTheme } from "./use-theme";
 function isMac(): boolean {
   return typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 }
+
+/** A tool's section-prefixed page route (e.g. "/image/resize"), or "/" if unknown. */
+const routeOf = (id: string): string => TOOLS.find((t) => t.id === id)?.route ?? "/";
 
 interface ShortcutDef {
   /** Keys: "mod" = Cmd on Mac, Ctrl on others. Plus key names separated by "+" */
@@ -95,26 +99,38 @@ export function useKeyboardShortcuts() {
       { keys: "mod+shift+d", description: "Toggle theme", action: toggleTheme },
       { keys: "mod+enter", description: "Process file", action: triggerProcess },
       { keys: "mod+s", description: "Download result", action: triggerDownload },
-      { keys: "mod+alt+1", description: "Go to Resize", action: () => navigate("/resize") },
-      { keys: "mod+alt+2", description: "Go to Crop", action: () => navigate("/crop") },
-      { keys: "mod+alt+3", description: "Go to Compress", action: () => navigate("/compress") },
-      { keys: "mod+alt+4", description: "Go to Convert", action: () => navigate("/convert") },
+      { keys: "mod+alt+1", description: "Go to Resize", action: () => navigate(routeOf("resize")) },
+      { keys: "mod+alt+2", description: "Go to Crop", action: () => navigate(routeOf("crop")) },
+      {
+        keys: "mod+alt+3",
+        description: "Go to Compress",
+        action: () => navigate(routeOf("compress")),
+      },
+      {
+        keys: "mod+alt+4",
+        description: "Go to Convert",
+        action: () => navigate(routeOf("convert")),
+      },
       {
         keys: "mod+alt+5",
         description: "Go to Remove Background",
-        action: () => navigate("/remove-background"),
+        action: () => navigate(routeOf("remove-background")),
       },
       {
         keys: "mod+alt+6",
         description: "Go to Watermark Text",
-        action: () => navigate("/watermark-text"),
+        action: () => navigate(routeOf("watermark-text")),
       },
       {
         keys: "mod+alt+7",
         description: "Go to Strip Metadata",
-        action: () => navigate("/strip-metadata"),
+        action: () => navigate(routeOf("strip-metadata")),
       },
-      { keys: "mod+alt+8", description: "Go to Image Info", action: () => navigate("/info") },
+      {
+        keys: "mod+alt+8",
+        description: "Go to Image Info",
+        action: () => navigate(routeOf("info")),
+      },
     ];
 
     // Shortcuts that should work even when focused on an input/textarea

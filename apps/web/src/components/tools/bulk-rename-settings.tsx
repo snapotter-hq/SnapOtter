@@ -25,7 +25,7 @@ export function BulkRenameSettings() {
       }
       formData.append("settings", JSON.stringify({ pattern, startIndex }));
 
-      const res = await fetch("/api/v1/tools/bulk-rename", {
+      const res = await fetch("/api/v1/tools/image/bulk-rename", {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

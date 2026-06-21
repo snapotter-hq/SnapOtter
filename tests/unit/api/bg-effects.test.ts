@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
@@ -9,8 +8,6 @@ import {
   compositeOnImage,
   createGradientBackground,
 } from "../../../apps/api/src/lib/bg-effects.js";
-
-const _FIXTURES = join(__dirname, "../../fixtures");
 
 async function createTestImage(
   width: number,

@@ -1,7 +1,14 @@
 import path from "node:path";
 import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
-const FIXTURE_PNG = path.join(process.cwd(), "tests", "fixtures", "test-200x150.png");
+const FIXTURE_PNG = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "image",
+  "valid",
+  "test-200x150.png",
+);
 
 // ---------------------------------------------------------------------------
 // GUI E2E: Utility Tools

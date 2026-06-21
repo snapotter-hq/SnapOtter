@@ -166,7 +166,7 @@ describe("IP allowlist", () => {
     });
 
     it("does NOT exempt regular API paths", () => {
-      expect(isExemptPath("/api/v1/tools/crop")).toBe(false);
+      expect(isExemptPath("/api/v1/tools/image/crop")).toBe(false);
       expect(isExemptPath("/api/v1/settings")).toBe(false);
       expect(isExemptPath("/api/auth/login")).toBe(false);
     });

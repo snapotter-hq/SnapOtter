@@ -256,7 +256,14 @@ test.describe("GUI Essential Tools", () => {
     }) => {
       await page.goto("/crop");
 
-      const portraitPath = path.join(process.cwd(), "tests", "fixtures", "test-portrait-tall.png");
+      const portraitPath = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "edge",
+        "test-portrait-tall.png",
+      );
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;

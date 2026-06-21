@@ -197,7 +197,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
       await page.goto("/compare");
 
       // Set second image via file input
-      const testFixture = path.join(process.cwd(), "tests", "fixtures", "test-200x150.png");
+      const testFixture = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "valid",
+        "test-200x150.png",
+      );
       await page.locator("#compare-second-image").setInputFiles(testFixture);
       await page.waitForTimeout(300);
 
@@ -216,7 +223,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
       await page.goto("/compare");
       await uploadTestImage(page);
 
-      const testFixture = path.join(process.cwd(), "tests", "fixtures", "test-200x150.png");
+      const testFixture = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "valid",
+        "test-200x150.png",
+      );
       await page.locator("#compare-second-image").setInputFiles(testFixture);
       await page.waitForTimeout(300);
 
@@ -227,7 +241,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
       await page.goto("/compare");
       await uploadTestImage(page);
 
-      const testFixture = path.join(process.cwd(), "tests", "fixtures", "test-200x150.png");
+      const testFixture = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "valid",
+        "test-200x150.png",
+      );
       await page.locator("#compare-second-image").setInputFiles(testFixture);
       await page.waitForTimeout(300);
 
@@ -241,7 +262,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
       await page.goto("/compare");
       await uploadTestImage(page);
 
-      const testFixture = path.join(process.cwd(), "tests", "fixtures", "test-200x150.png");
+      const testFixture = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "valid",
+        "test-200x150.png",
+      );
       await page.locator("#compare-second-image").setInputFiles(testFixture);
       await page.waitForTimeout(300);
 

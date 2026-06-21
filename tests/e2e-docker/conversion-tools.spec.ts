@@ -78,7 +78,7 @@ const HEIC_200x150 = fixture("test-200x150.heic");
 
 test.describe("SVG to Raster", () => {
   test("convert SVG to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -92,7 +92,7 @@ test.describe("SVG to Raster", () => {
   });
 
   test("convert SVG to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -105,7 +105,7 @@ test.describe("SVG to Raster", () => {
   });
 
   test("convert SVG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -119,7 +119,7 @@ test.describe("SVG to Raster", () => {
 
   test("convert complex SVG from fixtures", async ({ request }) => {
     const svgLogo = contentFixture("svg-logo.svg");
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "logo.svg", mimeType: "image/svg+xml", buffer: svgLogo },
@@ -133,7 +133,7 @@ test.describe("SVG to Raster", () => {
 
   test("convert large format SVG fixture", async ({ request }) => {
     const svgSample = formatFixture("sample.svg");
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.svg", mimeType: "image/svg+xml", buffer: svgSample },
@@ -150,7 +150,7 @@ test.describe("SVG to Raster", () => {
 
 test.describe("Vectorize", () => {
   test("vectorize PNG to SVG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -164,7 +164,7 @@ test.describe("Vectorize", () => {
   });
 
   test("vectorize JPEG to SVG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -177,7 +177,7 @@ test.describe("Vectorize", () => {
   });
 
   test("vectorized output is an SVG file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -194,7 +194,7 @@ test.describe("Vectorize", () => {
 
 test.describe("GIF Tools", () => {
   test("process animated GIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/gif-tools", {
+    const res = await request.post("/api/v1/tools/image/gif-tools", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "animated.gif", mimeType: "image/gif", buffer: ANIMATED_GIF },
@@ -215,7 +215,7 @@ test.describe("GIF Tools", () => {
 
   test("process GIF from formats fixture", async ({ request }) => {
     const gifSample = formatFixture("sample.gif");
-    const res = await request.post("/api/v1/tools/gif-tools", {
+    const res = await request.post("/api/v1/tools/image/gif-tools", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: gifSample },
@@ -233,7 +233,7 @@ test.describe("GIF Tools", () => {
 
   test("process animated Simpsons GIF", async ({ request }) => {
     const animGif = contentFixture("animated-simpsons.gif");
-    const res = await request.post("/api/v1/tools/gif-tools", {
+    const res = await request.post("/api/v1/tools/image/gif-tools", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "animated-simpsons.gif", mimeType: "image/gif", buffer: animGif },
@@ -254,7 +254,7 @@ test.describe("GIF Tools", () => {
 
 test.describe("PDF to Image", () => {
   test("convert first page of PDF to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -268,7 +268,7 @@ test.describe("PDF to Image", () => {
   });
 
   test("convert all pages of PDF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -281,7 +281,7 @@ test.describe("PDF to Image", () => {
   });
 
   test("convert PDF to JPEG format", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -294,7 +294,7 @@ test.describe("PDF to Image", () => {
   });
 
   test("convert specific page range", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -307,7 +307,7 @@ test.describe("PDF to Image", () => {
   });
 
   test("convert PDF to WebP format", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -318,7 +318,7 @@ test.describe("PDF to Image", () => {
   });
 
   test("reject out-of-range page number", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/pdf-to-image", {
+    const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.pdf", mimeType: "application/pdf", buffer: PDF_3PAGE },
@@ -340,7 +340,7 @@ test.describe("Image to PDF", () => {
       [{ name: "file", filename: "test.jpg", contentType: "image/jpeg", buffer: jpg }],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -360,7 +360,7 @@ test.describe("Image to PDF", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -375,7 +375,7 @@ test.describe("Image to PDF", () => {
 
 test.describe("Image to Base64", () => {
   test("encode PNG to base64", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -398,7 +398,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode JPEG to base64", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -412,7 +412,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode with output format conversion", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -426,7 +426,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode with maxWidth constraint", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -439,7 +439,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("base64 overhead percent is calculated", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -458,7 +458,7 @@ test.describe("Image to Base64", () => {
 
 test.describe("Favicon", () => {
   test("generate favicon from PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -479,7 +479,7 @@ test.describe("Favicon", () => {
   });
 
   test("generate favicon from JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -491,7 +491,7 @@ test.describe("Favicon", () => {
 
   test("generate favicon from SVG", async ({ request }) => {
     const svgLogo = contentFixture("svg-logo.svg");
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "logo.svg", mimeType: "image/svg+xml", buffer: svgLogo },
@@ -509,7 +509,7 @@ test.describe("Convert format matrix", () => {
 
   for (const targetFormat of formats) {
     test(`PNG to ${targetFormat}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/convert", {
+      const res = await request.post("/api/v1/tools/image/convert", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -524,7 +524,7 @@ test.describe("Convert format matrix", () => {
   }
 
   test("HEIC to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -537,7 +537,7 @@ test.describe("Convert format matrix", () => {
   });
 
   test("HEIC to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -551,7 +551,7 @@ test.describe("Convert format matrix", () => {
 
   test("WebP to PNG", async ({ request }) => {
     const webp = fixture("test-50x50.webp");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -565,7 +565,7 @@ test.describe("Convert format matrix", () => {
 
   test("BMP to PNG", async ({ request }) => {
     const bmp = formatFixture("sample.bmp");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.bmp", mimeType: "image/bmp", buffer: bmp },
@@ -586,7 +586,7 @@ test.describe("Convert format matrix", () => {
 
 test.describe("Auth failure", () => {
   test("gif-tools without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/gif-tools", {
+    const res = await request.post("/api/v1/tools/image/gif-tools", {
       multipart: {
         file: { name: "animated.gif", mimeType: "image/gif", buffer: ANIMATED_GIF },
         settings: JSON.stringify({}),
@@ -596,7 +596,7 @@ test.describe("Auth failure", () => {
   });
 
   test("image-to-base64 without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({}),
@@ -610,7 +610,7 @@ test.describe("Auth failure", () => {
       [{ name: "file", filename: "test.jpg", contentType: "image/jpeg", buffer: JPG_100x100 }],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { "Content-Type": contentType },
       data: body,
     });

@@ -68,7 +68,7 @@ const BROWSER_PREVIEWABLE = new Set([
 export function registerEditMetadata(app: FastifyInstance) {
   // Inspect endpoint - returns parsed metadata via ExifTool
   app.post(
-    "/api/v1/tools/edit-metadata/inspect",
+    "/api/v1/tools/image/edit-metadata/inspect",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
@@ -109,107 +109,110 @@ export function registerEditMetadata(app: FastifyInstance) {
   );
 
   // Edit endpoint - writes metadata in-place using ExifTool (no pixel re-encoding)
-  app.post("/api/v1/tools/edit-metadata", async (request: FastifyRequest, reply: FastifyReply) => {
-    let fileBuffer: Buffer | null = null;
-    let filename = "image";
-    let settingsRaw: string | null = null;
+  app.post(
+    "/api/v1/tools/image/edit-metadata",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      let fileBuffer: Buffer | null = null;
+      let filename = "image";
+      let settingsRaw: string | null = null;
 
-    try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk);
+            }
+            fileBuffer = Buffer.concat(chunks);
+            filename = sanitizeFilename(part.filename ?? "image");
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
           }
-          fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "image");
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
         }
-      }
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return reply.status(400).send({ error: "No image file provided" });
-    }
-
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-    }
-
-    // Parse and validate settings
-    let settings: Settings;
-    try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
+      } catch (err) {
         return reply.status(400).send({
-          error: "Invalid settings",
-          details: formatZodErrors(result.error.issues),
+          error: "Failed to parse multipart request",
+          details: err instanceof Error ? err.message : String(err),
         });
       }
-      settings = result.data;
-    } catch {
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
 
-    try {
-      // Build ExifTool arguments from settings
-      const tags = buildTagArgs(settings as EditMetadataSettings);
-
-      // If no changes requested, return the original buffer
-      let outputBuffer: Buffer;
-      if (tags.length === 0) {
-        outputBuffer = fileBuffer;
-      } else {
-        outputBuffer = await writeMetadata(fileBuffer, filename, tags);
+      if (!fileBuffer || fileBuffer.length === 0) {
+        return reply.status(400).send({ error: "No image file provided" });
       }
 
-      // Determine content type from validated format
-      const contentType = MIME_BY_FORMAT[validation.format] ?? "image/jpeg";
+      const validation = await validateImageBuffer(fileBuffer, filename);
+      if (!validation.valid) {
+        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+      }
 
-      // Save output to object storage
-      const jobId = randomUUID();
-      await putObject(`outputs/${jobId}/${filename}`, outputBuffer);
-
-      // Generate preview for non-browser-previewable formats (HEIF, TIFF)
-      let previewUrl: string | undefined;
-      if (!BROWSER_PREVIEWABLE.has(contentType)) {
-        try {
-          let previewInput = outputBuffer;
-          if (contentType === "image/heif" || contentType === "image/heic") {
-            previewInput = await decodeHeic(outputBuffer);
-          }
-          const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-          await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-        } catch {
-          // Non-fatal - frontend shows fallback
+      // Parse and validate settings
+      let settings: Settings;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: formatZodErrors(result.error.issues),
+          });
         }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
-      return reply.send({
-        jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
-        previewUrl,
-        originalSize: fileBuffer.length,
-        processedSize: outputBuffer.length,
-      });
-    } catch (err) {
-      request.log.error({ err, toolId: "edit-metadata" }, "Metadata edit failed");
-      return reply.status(422).send({
-        error: "Metadata edit failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
-  });
+      try {
+        // Build ExifTool arguments from settings
+        const tags = buildTagArgs(settings as EditMetadataSettings);
+
+        // If no changes requested, return the original buffer
+        let outputBuffer: Buffer;
+        if (tags.length === 0) {
+          outputBuffer = fileBuffer;
+        } else {
+          outputBuffer = await writeMetadata(fileBuffer, filename, tags);
+        }
+
+        // Determine content type from validated format
+        const contentType = MIME_BY_FORMAT[validation.format] ?? "image/jpeg";
+
+        // Save output to object storage
+        const jobId = randomUUID();
+        await putObject(`outputs/${jobId}/${filename}`, outputBuffer);
+
+        // Generate preview for non-browser-previewable formats (HEIF, TIFF)
+        let previewUrl: string | undefined;
+        if (!BROWSER_PREVIEWABLE.has(contentType)) {
+          try {
+            let previewInput = outputBuffer;
+            if (contentType === "image/heif" || contentType === "image/heic") {
+              previewInput = await decodeHeic(outputBuffer);
+            }
+            const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
+            await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
+            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+          } catch {
+            // Non-fatal - frontend shows fallback
+          }
+        }
+
+        return reply.send({
+          jobId,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+          previewUrl,
+          originalSize: fileBuffer.length,
+          processedSize: outputBuffer.length,
+        });
+      } catch (err) {
+        request.log.error({ err, toolId: "edit-metadata" }, "Metadata edit failed");
+        return reply.status(422).send({
+          error: "Metadata edit failed",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    },
+  );
 
   // Register in pipeline/batch registry
   registerToolProcessFn({

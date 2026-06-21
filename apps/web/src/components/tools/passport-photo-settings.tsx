@@ -436,7 +436,7 @@ export function PassportPhotoSettings() {
         formData.append("settings", JSON.stringify({}));
 
         const headers = formatHeaders();
-        const response = await fetch("/api/v1/tools/passport-photo/analyze", {
+        const response = await fetch("/api/v1/tools/image/passport-photo/analyze", {
           method: "POST",
           headers,
           body: formData,
@@ -505,7 +505,7 @@ export function PassportPhotoSettings() {
         imageHeight: analyzeResult.imageHeight,
       };
 
-      const response = await fetch("/api/v1/tools/passport-photo/generate", {
+      const response = await fetch("/api/v1/tools/image/passport-photo/generate", {
         method: "POST",
         headers,
         body: JSON.stringify(body),

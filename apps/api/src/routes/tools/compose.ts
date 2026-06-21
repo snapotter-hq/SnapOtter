@@ -52,7 +52,7 @@ const settingsSchema = z.object({
 });
 
 export function registerCompose(app: FastifyInstance) {
-  app.post("/api/v1/tools/compose", async (request, reply) => {
+  app.post("/api/v1/tools/image/compose", async (request, reply) => {
     let baseBuffer: Buffer | null = null;
     let overlayBuffer: Buffer | null = null;
     let filename = "image";

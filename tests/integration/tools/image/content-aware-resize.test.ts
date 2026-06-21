@@ -1,0 +1,655 @@
+/**
+ * Integration tests for the content-aware resize (seam carving via caire) API endpoint.
+ *
+ * This tool uses the caire Go binary. In environments where caire is not
+ * installed the route will return 422. Tests gracefully handle both scenarios
+ * while still verifying route existence and input validation.
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { fixtures, readFixture } from "../../../fixtures/index.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  loginAsAdmin,
+  type TestApp,
+} from "../../test-server.js";
+
+const PNG_200x150 = readFixture(fixtures.image.base.png200);
+const HEIC = readFixture(fixtures.image.base.heic200);
+const JPG = readFixture(fixtures.image.base.jpg100);
+
+let testApp: TestApp;
+let app: TestApp["app"];
+let adminToken: string;
+
+beforeAll(async () => {
+  testApp = await buildTestApp();
+  app = testApp.app;
+  adminToken = await loginAsAdmin(app);
+}, 30_000);
+
+afterAll(async () => {
+  await testApp.cleanup();
+}, 10_000);
+
+describe("Content-Aware Resize", () => {
+  it("route exists and responds to POST", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: 150, height: 120, protectFaces: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // 200 = caire available, 422 = caire not found
+    expect([200, 422]).toContain(res.statusCode);
+  }, 60_000);
+
+  it("rejects requests without a file", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({ width: 150 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects requests without width, height, or square", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const resBody = JSON.parse(res.body);
+    expect(resBody.error).toContain("width, height, or square");
+  });
+
+  it("processes with only width specified", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // Accept 200 (caire available) or 422 (caire not available)
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.width).toBe(150);
+    }
+  }, 60_000);
+
+  it("processes with only height specified", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ height: 120, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.height).toBe(120);
+    }
+  }, 60_000);
+
+  it("supports enlargement via seam insertion", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 300, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // 200 = caire enlarged successfully, 422 = caire not available
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.width).toBe(300);
+    }
+  }, 60_000);
+
+  it("accepts blurRadius and sobelThreshold options", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          width: 150,
+          protectFaces: false,
+          blurRadius: 6,
+          sobelThreshold: 4,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.width).toBe(150);
+    }
+  }, 60_000);
+
+  it("supports square mode", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ square: true, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      // Square mode produces equal width and height
+      expect(resBody.width).toBe(resBody.height);
+    }
+  }, 60_000);
+
+  it("rejects invalid blurRadius", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: 150, blurRadius: 50 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects invalid sobelThreshold", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: 150, sobelThreshold: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects invalid settings JSON", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: "not-json{{{" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/json/i);
+  });
+
+  it("rejects invalid image data", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      { name: "settings", content: JSON.stringify({ width: 150 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid image/i);
+  });
+
+  it(
+    "handles HEIC input (decodes before processing)",
+    { timeout: 120_000 },
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.heic", contentType: "image/heic", content: HEIC },
+        { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      // HEIC decode or caire may not be available
+      expect([200, 422]).toContain(res.statusCode);
+
+      if (res.statusCode === 200) {
+        const resBody = JSON.parse(res.body);
+        expect(resBody.downloadUrl).toBeDefined();
+      }
+    },
+    60_000,
+  );
+
+  it("processes both width and height simultaneously", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ width: 120, height: 100, protectFaces: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+      expect(resBody.width).toBe(120);
+      expect(resBody.height).toBe(100);
+    }
+  }, 60_000);
+
+  it("returns expected response fields on success", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody).toHaveProperty("jobId");
+      expect(resBody).toHaveProperty("downloadUrl");
+      expect(resBody).toHaveProperty("originalSize");
+      expect(resBody).toHaveProperty("processedSize");
+      expect(resBody).toHaveProperty("width");
+      expect(resBody).toHaveProperty("height");
+      expect(resBody.originalSize).toBeGreaterThan(0);
+      expect(resBody.processedSize).toBeGreaterThan(0);
+    }
+  }, 60_000);
+
+  it("returns 400 when file is empty", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "settings", content: JSON.stringify({ width: 150 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no image/i);
+  });
+
+  it("processes JPEG input", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ width: 80, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      expect(resBody.downloadUrl).toBeDefined();
+    }
+  }, 60_000);
+
+  it("downloads output and verifies it is a valid image", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 180, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+
+    if (res.statusCode === 200) {
+      const resBody = JSON.parse(res.body);
+      const dlRes = await app.inject({
+        method: "GET",
+        url: resBody.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(dlRes.statusCode).toBe(200);
+      expect(dlRes.rawPayload.length).toBeGreaterThan(0);
+    }
+  }, 60_000);
+
+  it("processes with default blurRadius and sobelThreshold", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 160 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+  }, 60_000);
+
+  it("processes a 1x1 pixel image", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const TINY = readFixture(fixtures.image.edge.px1);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      { name: "settings", content: JSON.stringify({ square: true, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // 1x1 may fail if caire can't shrink further, or succeed
+    expect([200, 422]).toContain(res.statusCode);
+  }, 60_000);
+
+  it("processes a large stress image", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const LARGE = readFixture(fixtures.image.stressLarge);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ width: 400, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+  }, 120_000);
+
+  it("processes WebP input", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const WEBP = readFixture(fixtures.image.base.webp50);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ width: 40, protectFaces: false }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+  }, 60_000);
+
+  it("rejects width of 0", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ width: 0 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects negative height", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify({ height: -50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("handles square mode with width also specified", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "settings",
+        content: JSON.stringify({ square: true, width: 100, protectFaces: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([200, 422]).toContain(res.statusCode);
+  }, 60_000);
+
+  it("rejects request without settings field", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    // No settings means no width/height/square => 400
+    expect(res.statusCode).toBe(400);
+  });
+});

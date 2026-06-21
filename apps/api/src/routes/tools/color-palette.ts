@@ -151,7 +151,7 @@ function extractColors(
 }
 
 export function registerColorPalette(app: FastifyInstance) {
-  app.post("/api/v1/tools/color-palette", async (request, reply) => {
+  app.post("/api/v1/tools/image/color-palette", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let rawSettings: string | undefined;

@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -9,13 +8,12 @@ const require = createRequire(
 const sharp = require("sharp") as typeof import("sharp").default;
 
 import { saturation } from "@snapotter/image-engine";
-
-const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 let png200x150: Buffer;
 
 beforeAll(() => {
-  png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
+  png200x150 = readFixture(fixtures.image.base.png200);
 });
 
 async function getMeta(img: sharp.Sharp) {
@@ -97,7 +95,7 @@ describe("saturation", () => {
   });
 
   it("works with JPEG input", async () => {
-    const jpg = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
+    const jpg = readFixture(fixtures.image.base.jpg100);
     const img = sharp(jpg);
     const result = await saturation(img, { value: 25 });
     const meta = await getMeta(result);

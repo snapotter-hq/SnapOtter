@@ -117,7 +117,7 @@ pnpm dev
 | **Video** | 29 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize |
 | **Audio** | 17 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker |
 | **PDF / Document** | 37 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **Data** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| **Files** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipelines
 
@@ -139,7 +139,7 @@ Every file you process can be saved to your **Files** library. SnapOtter tracks 
 Every tool is accessible via HTTP:
 
 ```bash
-curl -X POST http://localhost:1349/api/v1/tools/resize \
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -H "Authorization: Bearer si_<your-api-key>" \
   -F "file=@photo.jpg" \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'

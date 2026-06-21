@@ -108,7 +108,9 @@ async function main() {
       formData.append("file", new File([imageBlob], "test.webp", { type: "image/webp" }));
       formData.append("settings", JSON.stringify(tool.settings));
 
-      const res = await fetch(`${BASE}/api/v1/tools/${tool.path}`, {
+      // All GPU tools are image-modality; section prefix hardcoded
+      // (cannot import apiToolPath from @snapotter/shared in plain .mjs).
+      const res = await fetch(`${BASE}/api/v1/tools/image/${tool.path}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,

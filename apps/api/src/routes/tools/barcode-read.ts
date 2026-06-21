@@ -79,189 +79,192 @@ function buildOverlaySvg(
  * Read barcodes (all 1D + 2D types) from uploaded images using zxing-wasm.
  */
 export function registerBarcodeRead(app: FastifyInstance) {
-  app.post("/api/v1/tools/barcode-read", async (request: FastifyRequest, reply: FastifyReply) => {
-    let fileBuffer: Buffer | null = null;
-    let filename = "image";
-    let settingsRaw: string | null = null;
+  app.post(
+    "/api/v1/tools/image/barcode-read",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      let fileBuffer: Buffer | null = null;
+      let filename = "image";
+      let settingsRaw: string | null = null;
 
-    // --- Parse multipart ---
-    try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
+      // --- Parse multipart ---
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk);
+            }
+            fileBuffer = Buffer.concat(chunks);
+            filename = sanitizeFilename(part.filename ?? "image");
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
           }
-          fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "image");
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
         }
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to parse multipart request",
+          details: err instanceof Error ? err.message : String(err),
+        });
       }
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
-    }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return reply.status(400).send({ error: "No image file provided" });
-    }
-
-    // --- Validate ---
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      return reply.status(400).send({
-        error: `Invalid image: ${validation.reason}`,
-      });
-    }
-
-    // Parse and validate settings
-    let settings: z.infer<typeof settingsSchema>;
-    try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
-        return reply
-          .status(400)
-          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+      if (!fileBuffer || fileBuffer.length === 0) {
+        return reply.status(400).send({ error: "No image file provided" });
       }
-      settings = result.data;
-    } catch {
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
 
-    try {
-      const tryHarder = settings.tryHarder;
+      // --- Validate ---
+      const validation = await validateImageBuffer(fileBuffer, filename);
+      if (!validation.valid) {
+        return reply.status(400).send({
+          error: `Invalid image: ${validation.reason}`,
+        });
+      }
 
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
+      // Parse and validate settings
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
         }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
-      if (needsCliDecode(validation.format)) {
-        try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch {
+
+      try {
+        const tryHarder = settings.tryHarder;
+
+        if (validation.format === "heif") {
           try {
-            await sharp(fileBuffer).metadata();
+            fileBuffer = await decodeHeic(fileBuffer);
           } catch (err) {
             return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
+              error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
               details: err instanceof Error ? err.message : String(err),
             });
           }
         }
-      }
-      if (validation.format === "svg") {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
+        if (needsCliDecode(validation.format)) {
+          try {
+            const fileExt = filename.split(".").pop()?.toLowerCase();
+            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
+          } catch {
+            try {
+              await sharp(fileBuffer).metadata();
+            } catch (err) {
+              return reply.status(422).send({
+                error: `Failed to decode ${validation.format.toUpperCase()} file`,
+                details: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+        }
+        if (validation.format === "svg") {
+          try {
+            fileBuffer = decompressSvgz(fileBuffer);
+            fileBuffer = sanitizeSvg(fileBuffer);
+          } catch (err) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+        }
+        fileBuffer = await autoOrient(fileBuffer);
+
+        // Convert to raw RGBA pixel data
+        const image = sharp(fileBuffer);
+        const metadata = await image.metadata();
+        const width = metadata.width ?? 0;
+        const height = metadata.height ?? 0;
+
+        if (width === 0 || height === 0) {
+          return reply.status(422).send({
+            error: "Could not determine image dimensions",
           });
         }
-      }
-      fileBuffer = await autoOrient(fileBuffer);
 
-      // Convert to raw RGBA pixel data
-      const image = sharp(fileBuffer);
-      const metadata = await image.metadata();
-      const width = metadata.width ?? 0;
-      const height = metadata.height ?? 0;
+        const rawData = await image.ensureAlpha().raw().toBuffer();
 
-      if (width === 0 || height === 0) {
-        return reply.status(422).send({
-          error: "Could not determine image dimensions",
+        // --- Detect barcodes via zxing-wasm ---
+        const imageData = {
+          data: new Uint8ClampedArray(rawData.buffer, rawData.byteOffset, rawData.length),
+          width,
+          height,
+        } as ImageData;
+
+        const results = await readBarcodes(imageData, {
+          tryHarder,
+          maxNumberOfSymbols: 255,
         });
-      }
 
-      const rawData = await image.ensureAlpha().raw().toBuffer();
+        const validResults = results.filter((r) => r.isValid);
 
-      // --- Detect barcodes via zxing-wasm ---
-      const imageData = {
-        data: new Uint8ClampedArray(rawData.buffer, rawData.byteOffset, rawData.length),
-        width,
-        height,
-      } as ImageData;
-
-      const results = await readBarcodes(imageData, {
-        tryHarder,
-        maxNumberOfSymbols: 255,
-      });
-
-      const validResults = results.filter((r) => r.isValid);
-
-      // Map to the response shape
-      const barcodes = validResults.map((r) => ({
-        type: r.format,
-        text: r.text,
-        position: {
-          topLeft: { x: r.position.topLeft.x, y: r.position.topLeft.y },
-          topRight: { x: r.position.topRight.x, y: r.position.topRight.y },
-          bottomLeft: {
-            x: r.position.bottomLeft.x,
-            y: r.position.bottomLeft.y,
+        // Map to the response shape
+        const barcodes = validResults.map((r) => ({
+          type: r.format,
+          text: r.text,
+          position: {
+            topLeft: { x: r.position.topLeft.x, y: r.position.topLeft.y },
+            topRight: { x: r.position.topRight.x, y: r.position.topRight.y },
+            bottomLeft: {
+              x: r.position.bottomLeft.x,
+              y: r.position.bottomLeft.y,
+            },
+            bottomRight: {
+              x: r.position.bottomRight.x,
+              y: r.position.bottomRight.y,
+            },
           },
-          bottomRight: {
-            x: r.position.bottomRight.x,
-            y: r.position.bottomRight.y,
-          },
-        },
-      }));
+        }));
 
-      // No barcodes found - return early
-      if (barcodes.length === 0) {
+        // No barcodes found - return early
+        if (barcodes.length === 0) {
+          return reply.send({
+            filename,
+            barcodes: [],
+            annotatedUrl: null,
+            previewUrl: null,
+          });
+        }
+
+        // --- Generate annotated image ---
+        const jobId = randomUUID();
+
+        // Save original input
+        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
+
+        // Build SVG overlay with bounding boxes
+        const overlaySvg = buildOverlaySvg(width, height, barcodes);
+
+        const stem = filename.replace(/\.[^.]+$/, "");
+        const outputFilename = `annotated-${stem}.png`;
+
+        const annotatedBuffer = await sharp(fileBuffer)
+          .composite([{ input: Buffer.from(overlaySvg), top: 0, left: 0 }])
+          .png()
+          .toBuffer();
+
+        await putObject(`outputs/${jobId}/${outputFilename}`, annotatedBuffer);
+
+        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+
         return reply.send({
           filename,
-          barcodes: [],
-          annotatedUrl: null,
-          previewUrl: null,
+          barcodes,
+          annotatedUrl: downloadUrl,
+          previewUrl: downloadUrl,
+        });
+      } catch (err) {
+        request.log.error({ err, toolId: "barcode-read" }, "Barcode read failed");
+        return reply.status(422).send({
+          error: "Barcode reading failed",
+          details: err instanceof Error ? err.message : "Unknown error",
         });
       }
-
-      // --- Generate annotated image ---
-      const jobId = randomUUID();
-
-      // Save original input
-      await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
-
-      // Build SVG overlay with bounding boxes
-      const overlaySvg = buildOverlaySvg(width, height, barcodes);
-
-      const stem = filename.replace(/\.[^.]+$/, "");
-      const outputFilename = `annotated-${stem}.png`;
-
-      const annotatedBuffer = await sharp(fileBuffer)
-        .composite([{ input: Buffer.from(overlaySvg), top: 0, left: 0 }])
-        .png()
-        .toBuffer();
-
-      await putObject(`outputs/${jobId}/${outputFilename}`, annotatedBuffer);
-
-      const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
-
-      return reply.send({
-        filename,
-        barcodes,
-        annotatedUrl: downloadUrl,
-        previewUrl: downloadUrl,
-      });
-    } catch (err) {
-      request.log.error({ err, toolId: "barcode-read" }, "Barcode read failed");
-      return reply.status(422).send({
-        error: "Barcode reading failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
-  });
+    },
+  );
 }

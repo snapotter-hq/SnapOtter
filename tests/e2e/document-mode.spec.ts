@@ -1,7 +1,14 @@
 import path from "node:path";
 import { expect, test, waitForProcessing } from "./helpers";
 
-const PDF_FIXTURE = path.join(process.cwd(), "tests", "fixtures", "test-3page.pdf");
+const PDF_FIXTURE = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "document",
+  "valid",
+  "test-3page.pdf",
+);
 
 test.describe("Document display mode (rotate-pdf)", () => {
   test("uploads a PDF, rotates it, and shows the document canvas with processed result", async ({

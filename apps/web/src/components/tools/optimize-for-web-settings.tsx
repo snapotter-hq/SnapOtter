@@ -100,7 +100,7 @@ export function OptimizeForWebSettings() {
     formData.append("file", file);
     formData.append("settings", JSON.stringify(buildSettings()));
 
-    fetch("/api/v1/tools/optimize-for-web/preview", {
+    fetch("/api/v1/tools/image/optimize-for-web/preview", {
       method: "POST",
       headers: formatHeaders(),
       body: formData,

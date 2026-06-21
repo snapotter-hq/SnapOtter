@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates the hostile-input fixtures in tests/fixtures/hostile/.
+ * Generates the hostile-input fixtures in tests/fixtures/image/hostile/.
  *
  * Deterministic on purpose: re-running produces byte-identical files so the
  * committed fixtures never churn. No dependencies (the bomb PNG is built by
@@ -14,11 +14,11 @@ import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outDir = join(root, "tests", "fixtures", "hostile");
+const outDir = join(root, "tests", "fixtures", "image", "hostile");
 mkdirSync(outDir, { recursive: true });
 
 // --- 1. truncated.jpg: a real JPEG cut off at 40% ---------------------------
-const realJpeg = readFileSync(join(root, "tests", "fixtures", "sample-photo.jpg"));
+const realJpeg = readFileSync(join(root, "tests", "fixtures", "image", "valid", "sample-photo.jpg"));
 writeFileSync(
   join(outDir, "truncated.jpg"),
   realJpeg.subarray(0, Math.floor(realJpeg.length * 0.4)),
@@ -38,7 +38,7 @@ for (let i = 0; i < garbage.length; i++) {
 writeFileSync(join(outDir, "garbage.jpg"), garbage);
 
 // --- 4. png-bytes.jpg: valid PNG content with a lying .jpg extension --------
-const realPng = readFileSync(join(root, "tests", "fixtures", "test-200x150.png"));
+const realPng = readFileSync(join(root, "tests", "fixtures", "image", "valid", "test-200x150.png"));
 writeFileSync(join(outDir, "png-bytes.jpg"), realPng);
 
 // --- 5. bomb-50000x50000.png: tiny file whose header claims 2,500 megapixels

@@ -93,7 +93,7 @@ function ocrOneFile(
       es.close();
       reject(new Error("Network error"));
     };
-    xhr.open("POST", "/api/v1/tools/ocr");
+    xhr.open("POST", "/api/v1/tools/image/ocr");
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }

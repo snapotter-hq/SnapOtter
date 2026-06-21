@@ -54,7 +54,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       try {
         await refreshBundles();
         const updated = get().bundles.find((b) => b.id === bundleId);
-        if (!updated || updated.status !== "installing") {
+        if (updated?.status !== "installing") {
           clearInterval(pollRefs[bundleId]);
           delete pollRefs[bundleId];
 

@@ -170,94 +170,94 @@ log "=== TIER 1: Core Tool Benchmarks ==="
 for run in 1 2 3; do
   log "--- Run $run of 3 ---"
 
-  bench_tool "core" "resize" "small-r${run}" "$S" '{"width":100,"fit":"cover"}'
-  bench_tool "core" "resize" "large-r${run}" "$L" '{"width":800,"fit":"cover"}'
+  bench_tool "core" "image/resize" "small-r${run}" "$S" '{"width":100,"fit":"cover"}'
+  bench_tool "core" "image/resize" "large-r${run}" "$L" '{"width":800,"fit":"cover"}'
 
-  bench_tool "core" "crop" "small-r${run}" "$S" '{"left":10,"top":10,"width":100,"height":100}'
-  bench_tool "core" "crop" "large-r${run}" "$L" '{"left":10,"top":10,"width":100,"height":100}'
+  bench_tool "core" "image/crop" "small-r${run}" "$S" '{"left":10,"top":10,"width":100,"height":100}'
+  bench_tool "core" "image/crop" "large-r${run}" "$L" '{"left":10,"top":10,"width":100,"height":100}'
 
-  bench_tool "core" "rotate" "small-r${run}" "$S" '{"angle":90}'
-  bench_tool "core" "rotate" "large-r${run}" "$L" '{"angle":90}'
+  bench_tool "core" "image/rotate" "small-r${run}" "$S" '{"angle":90}'
+  bench_tool "core" "image/rotate" "large-r${run}" "$L" '{"angle":90}'
 
-  bench_tool "core" "convert" "jpg-webp-small-r${run}" "$J" '{"format":"webp","quality":80}'
-  bench_tool "core" "convert" "jpg-webp-large-r${run}" "$L" '{"format":"webp","quality":80}'
-  bench_tool "core" "convert" "jpg-avif-small-r${run}" "$J" '{"format":"avif","quality":50}'
-  bench_tool "core" "convert" "jpg-avif-large-r${run}" "$L" '{"format":"avif","quality":50}'
+  bench_tool "core" "image/convert" "jpg-webp-small-r${run}" "$J" '{"format":"webp","quality":80}'
+  bench_tool "core" "image/convert" "jpg-webp-large-r${run}" "$L" '{"format":"webp","quality":80}'
+  bench_tool "core" "image/convert" "jpg-avif-small-r${run}" "$J" '{"format":"avif","quality":50}'
+  bench_tool "core" "image/convert" "jpg-avif-large-r${run}" "$L" '{"format":"avif","quality":50}'
 
-  bench_tool "core" "compress" "quality-small-r${run}" "$S" '{"mode":"quality","quality":60}'
-  bench_tool "core" "compress" "quality-large-r${run}" "$L" '{"mode":"quality","quality":60}'
-  bench_tool "core" "compress" "targetSize-large-r${run}" "$L" '{"mode":"targetSize","targetSizeKb":500}'
+  bench_tool "core" "image/compress" "quality-small-r${run}" "$S" '{"mode":"quality","quality":60}'
+  bench_tool "core" "image/compress" "quality-large-r${run}" "$L" '{"mode":"quality","quality":60}'
+  bench_tool "core" "image/compress" "targetSize-large-r${run}" "$L" '{"mode":"targetSize","targetSizeKb":500}'
 
-  bench_tool "core" "strip-metadata" "small-r${run}" "$EXIF" '{"stripAll":true}'
-  bench_tool "core" "strip-metadata" "large-r${run}" "$L" '{"stripAll":true}'
+  bench_tool "core" "image/strip-metadata" "small-r${run}" "$EXIF" '{"stripAll":true}'
+  bench_tool "core" "image/strip-metadata" "large-r${run}" "$L" '{"stripAll":true}'
 
-  bench_tool "core" "edit-metadata" "small-r${run}" "$EXIF" '{"title":"Bench","clearGps":true}'
-  bench_tool "core" "edit-metadata" "large-r${run}" "$L" '{"title":"Bench","clearGps":true}'
+  bench_tool "core" "image/edit-metadata" "small-r${run}" "$EXIF" '{"title":"Bench","clearGps":true}'
+  bench_tool "core" "image/edit-metadata" "large-r${run}" "$L" '{"title":"Bench","clearGps":true}'
 
-  bench_tool "core" "color-adjustments" "small-r${run}" "$S" '{"brightness":20,"contrast":10,"effect":"grayscale"}'
-  bench_tool "core" "color-adjustments" "large-r${run}" "$L" '{"brightness":20,"contrast":10,"effect":"grayscale"}'
+  bench_tool "core" "image/adjust-colors" "small-r${run}" "$S" '{"brightness":20,"contrast":10,"effect":"grayscale"}'
+  bench_tool "core" "image/adjust-colors" "large-r${run}" "$L" '{"brightness":20,"contrast":10,"effect":"grayscale"}'
 
-  bench_tool "core" "sharpening" "small-r${run}" "$S" '{"method":"adaptive","sigma":1.5}'
-  bench_tool "core" "sharpening" "large-r${run}" "$L" '{"method":"adaptive","sigma":1.5}'
+  bench_tool "core" "image/sharpening" "small-r${run}" "$S" '{"method":"adaptive","sigma":1.5}'
+  bench_tool "core" "image/sharpening" "large-r${run}" "$L" '{"method":"adaptive","sigma":1.5}'
 
-  bench_tool "core" "watermark-text" "small-r${run}" "$S" '{"text":"BENCHMARK","position":"tiled"}'
-  bench_tool "core" "watermark-text" "large-r${run}" "$L" '{"text":"BENCHMARK","position":"tiled"}'
+  bench_tool "core" "image/watermark-text" "small-r${run}" "$S" '{"text":"BENCHMARK","position":"tiled"}'
+  bench_tool "core" "image/watermark-text" "large-r${run}" "$L" '{"text":"BENCHMARK","position":"tiled"}'
 
-  bench_tool_multifile "core" "compose" "small-r${run}" '{"blendMode":"overlay"}' "$S" "$J"
-  bench_tool_multifile "core" "compose" "large-r${run}" '{"blendMode":"overlay"}' "$L" "$P"
+  bench_tool_multifile "core" "image/compose" "small-r${run}" '{"blendMode":"overlay"}' "$S" "$J"
+  bench_tool_multifile "core" "image/compose" "large-r${run}" '{"blendMode":"overlay"}' "$L" "$P"
 
-  bench_tool_multifile "core" "collage" "4img-small-r${run}" '{"templateId":"4-grid"}' "$S" "$J" "${F}/test-50x50.webp" "${F}/test-100x100.svg"
-  bench_tool_multifile "core" "collage" "4img-large-r${run}" '{"templateId":"4-grid"}' "$L" "$P" "$BW" "${F}/content/watermark.jpg"
+  bench_tool_multifile "core" "image/collage" "4img-small-r${run}" '{"templateId":"4-grid"}' "$S" "$J" "${F}/test-50x50.webp" "${F}/test-100x100.svg"
+  bench_tool_multifile "core" "image/collage" "4img-large-r${run}" '{"templateId":"4-grid"}' "$L" "$P" "$BW" "${F}/content/watermark.jpg"
 
-  bench_tool_multifile "core" "stitch" "3img-small-r${run}" '{"direction":"horizontal"}' "$S" "$J" "${F}/test-50x50.webp"
-  bench_tool_multifile "core" "stitch" "3img-large-r${run}" '{"direction":"horizontal"}' "$L" "$P" "$BW"
+  bench_tool_multifile "core" "image/stitch" "3img-small-r${run}" '{"direction":"horizontal"}' "$S" "$J" "${F}/test-50x50.webp"
+  bench_tool_multifile "core" "image/stitch" "3img-large-r${run}" '{"direction":"horizontal"}' "$L" "$P" "$BW"
 
-  bench_tool "core" "split" "small-r${run}" "$S" '{"columns":2,"rows":2}'
-  bench_tool "core" "split" "large-r${run}" "$L" '{"columns":2,"rows":2}'
+  bench_tool "core" "image/split" "small-r${run}" "$S" '{"columns":2,"rows":2}'
+  bench_tool "core" "image/split" "large-r${run}" "$L" '{"columns":2,"rows":2}'
 
-  bench_tool "core" "border" "small-r${run}" "$S" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
-  bench_tool "core" "border" "large-r${run}" "$L" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
+  bench_tool "core" "image/border" "small-r${run}" "$S" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
+  bench_tool "core" "image/border" "large-r${run}" "$L" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
 
-  bench_tool "core" "svg-to-raster" "small-r${run}" "${F}/test-100x100.svg" '{"width":2000,"dpi":300}'
+  bench_tool "core" "image/svg-to-raster" "small-r${run}" "${F}/test-100x100.svg" '{"width":2000,"dpi":300}'
 
-  bench_tool "core" "vectorize" "small-r${run}" "$S" '{"colorMode":"color"}'
-  bench_tool "core" "vectorize" "large-r${run}" "$P" '{"colorMode":"color"}'
+  bench_tool "core" "image/vectorize" "small-r${run}" "$S" '{"colorMode":"color"}'
+  bench_tool "core" "image/vectorize" "large-r${run}" "$P" '{"colorMode":"color"}'
 
-  bench_tool "core" "gif-tools" "optimize-r${run}" "$GIF" '{"mode":"optimize","colors":64}'
+  bench_tool "core" "image/gif-tools" "optimize-r${run}" "$GIF" '{"mode":"optimize","colors":64}'
 
-  bench_tool "core" "pdf-to-image" "r${run}" "$PDF" '{"format":"png","dpi":300}'
+  bench_tool "core" "pdf/pdf-to-image" "r${run}" "$PDF" '{"format":"png","dpi":300}'
 
-  bench_tool "core" "optimize-for-web" "large-r${run}" "$L" '{"format":"webp","quality":80,"maxWidth":1920}'
+  bench_tool "core" "image/optimize-for-web" "large-r${run}" "$L" '{"format":"webp","quality":80,"maxWidth":1920}'
 
-  bench_tool "core" "favicon" "small-r${run}" "$S" ''
-  bench_tool "core" "favicon" "large-r${run}" "$P" ''
+  bench_tool "core" "image/favicon" "small-r${run}" "$S" ''
+  bench_tool "core" "image/favicon" "large-r${run}" "$P" ''
 
-  bench_tool_multifile "core" "image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' "$S" "$J" "${F}/test-50x50.webp"
+  bench_tool_multifile "core" "image/image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' "$S" "$J" "${F}/test-50x50.webp"
 
-  bench_tool "core" "replace-color" "small-r${run}" "$S" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
-  bench_tool "core" "replace-color" "large-r${run}" "$L" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
+  bench_tool "core" "image/replace-color" "small-r${run}" "$S" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
+  bench_tool "core" "image/replace-color" "large-r${run}" "$L" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
 
-  bench_tool "core" "info" "small-r${run}" "$S" ''
-  bench_tool "core" "info" "large-r${run}" "$L" ''
+  bench_tool "core" "image/info" "small-r${run}" "$S" ''
+  bench_tool "core" "image/info" "large-r${run}" "$L" ''
 
-  bench_tool_multifile "core" "compare" "small-r${run}" '' "$S" "$S"
-  bench_tool_multifile "core" "compare" "large-r${run}" '' "$L" "$L"
+  bench_tool_multifile "core" "image/compare" "small-r${run}" '' "$S" "$S"
+  bench_tool_multifile "core" "image/compare" "large-r${run}" '' "$L" "$L"
 
-  bench_tool_multifile "core" "find-duplicates" "5img-r${run}" '{"threshold":5}' "$S" "$J" "${F}/test-50x50.webp" "$S" "$J"
+  bench_tool_multifile "core" "image/find-duplicates" "5img-r${run}" '{"threshold":5}' "$S" "$J" "${F}/test-50x50.webp" "$S" "$J"
 
-  bench_tool "core" "color-palette" "small-r${run}" "$P" ''
-  bench_tool "core" "color-palette" "large-r${run}" "$L" ''
+  bench_tool "core" "image/color-palette" "small-r${run}" "$P" ''
+  bench_tool "core" "image/color-palette" "large-r${run}" "$L" ''
 
-  bench_tool "core" "barcode-read" "r${run}" "$BARCODE" '{"tryHarder":true}'
+  bench_tool "core" "image/barcode-read" "r${run}" "$BARCODE" '{"tryHarder":true}'
 
-  bench_tool "core" "image-to-base64" "small-r${run}" "$S" '{"outputFormat":"webp"}'
-  bench_tool "core" "image-to-base64" "large-r${run}" "$L" '{"outputFormat":"webp"}'
+  bench_tool "core" "image/image-to-base64" "small-r${run}" "$S" '{"outputFormat":"webp"}'
+  bench_tool "core" "image/image-to-base64" "large-r${run}" "$L" '{"outputFormat":"webp"}'
 
-  bench_tool "core" "content-aware-resize" "small-r${run}" "$S" '{"width":100}'
-  bench_tool "core" "content-aware-resize" "large-r${run}" "$L" '{"width":100}'
+  bench_tool "core" "image/content-aware-resize" "small-r${run}" "$S" '{"width":100}'
+  bench_tool "core" "image/content-aware-resize" "large-r${run}" "$L" '{"width":100}'
 
-  bench_tool "core" "image-enhancement" "small-r${run}" "$S" '{"mode":"auto","intensity":50}'
-  bench_tool "core" "image-enhancement" "large-r${run}" "$L" '{"mode":"auto","intensity":50}'
+  bench_tool "core" "image/image-enhancement" "small-r${run}" "$S" '{"mode":"auto","intensity":50}'
+  bench_tool "core" "image/image-enhancement" "large-r${run}" "$L" '{"mode":"auto","intensity":50}'
 done
 
 log "=== TIER 5: Format Decode Benchmarks ==="
@@ -265,7 +265,7 @@ log "=== TIER 5: Format Decode Benchmarks ==="
 for fmt_file in "${F}/formats/"*; do
   fname=$(basename "$fmt_file")
   for run in 1 2 3; do
-    bench_tool "format" "resize" "fmt-${fname}-r${run}" "$fmt_file" '{"width":200}'
+    bench_tool "format" "image/resize" "fmt-${fname}-r${run}" "$fmt_file" '{"width":200}'
   done
 done
 
@@ -277,7 +277,7 @@ for concurrency in 1 3 5 10 20; do
 
   for i in $(seq 1 "$concurrency"); do
     (
-      result=$(curl -s -X POST "${BASE_URL}/api/v1/tools/resize" \
+      result=$(curl -s -X POST "${BASE_URL}/api/v1/tools/image/resize" \
         -H "Authorization: Bearer ${TOKEN}" \
         -F "file=@${L}" \
         -F 'settings={"width":800}' \
@@ -323,7 +323,7 @@ cid=$(get_container_id)
 mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 
 for i in $(seq 1 50); do
-  bench_tool "sustained" "resize" "seq-${i}" "$L" '{"width":800}'
+  bench_tool "sustained" "image/resize" "seq-${i}" "$L" '{"width":800}'
 done
 
 mem_end=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
@@ -339,7 +339,7 @@ for batch_size in 3 5 10; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$S")
   done
-  bench_tool_multifile "batch" "resize" "small-b${batch_size}" '{"width":100}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize" "small-b${batch_size}" '{"width":100}' "${files[@]}"
 done
 
 for batch_size in 3 5; do
@@ -347,15 +347,15 @@ for batch_size in 3 5; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$L")
   done
-  bench_tool_multifile "batch" "resize" "large-b${batch_size}" '{"width":800}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize" "large-b${batch_size}" '{"width":800}' "${files[@]}"
 done
 
-bench_tool_multifile "batch" "convert" "mixed-5" '{"format":"webp","quality":80}' \
+bench_tool_multifile "batch" "image/convert" "mixed-5" '{"format":"webp","quality":80}' \
   "$J" "$S" "${F}/test-50x50.webp" "${F}/test-200x150.heic" "${F}/formats/sample.avif"
 
 log "=== TIER 4: Pipeline Benchmarks ==="
 
-bench_tool "pipeline" "resize" "1step" "$L" '{"width":800}'
+bench_tool "pipeline" "image/resize" "1step" "$L" '{"width":800}'
 
 log "=== Container Cold Start ==="
 # Record current time as baseline

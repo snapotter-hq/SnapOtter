@@ -66,7 +66,7 @@ registerAiJobHandler("colorize", async (input, data, ctx) => {
  * with OpenCV DNN fallback.
  */
 export function registerColorize(app: FastifyInstance) {
-  app.post("/api/v1/tools/colorize", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/v1/tools/image/colorize", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "colorize";
     if (!isToolInstalled(toolId)) {
       const bundle = getBundleForTool(toolId);

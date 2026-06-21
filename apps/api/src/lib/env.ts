@@ -32,7 +32,7 @@ const envSchema = z
     MAX_BATCH_SIZE: z.coerce.number().default(0),
     CONCURRENT_JOBS: z.coerce.number().default(0),
     MAX_MEGAPIXELS: z.coerce.number().default(0),
-    RATE_LIMIT_PER_MIN: z.coerce.number().default(1000),
+    RATE_LIMIT_PER_MIN: z.coerce.number().default(300),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
     SQLITE_MIGRATE_PATH: z.string().default(""),
     FILES_STORAGE_PATH: z.string().default("./data/files"),
@@ -46,6 +46,7 @@ const envSchema = z
     MAX_WORKER_THREADS: z.coerce.number().default(0),
     PROCESSING_TIMEOUT_S: z.coerce.number().default(0),
     MAX_PIPELINE_STEPS: z.coerce.number().default(20),
+    MAX_PIPELINE_STEP_PIXELS: z.coerce.number().default(67_108_864),
     MAX_CANVAS_PIXELS: z.coerce.number().default(0),
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
@@ -57,7 +58,7 @@ const envSchema = z
     MAX_VIDEO_BITRATE_KBPS: z.coerce.number().default(0),
     LIBREOFFICE_TIMEOUT_S: z.coerce.number().default(120),
     SESSION_DURATION_HOURS: z.coerce.number().default(168),
-    LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(30),
+    LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(10),
     TRUST_PROXY: z.string().default("false"),
     OIDC_ENABLED: z
       .enum(["true", "false"])

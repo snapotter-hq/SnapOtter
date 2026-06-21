@@ -77,7 +77,7 @@ const WEBP_50x50 = fixture("test-50x50.webp");
 
 test.describe("Info", () => {
   test("returns metadata for PNG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -97,7 +97,7 @@ test.describe("Info", () => {
   });
 
   test("returns metadata for JPEG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -112,7 +112,7 @@ test.describe("Info", () => {
   });
 
   test("returns EXIF info for JPEG with metadata", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test-with-exif.jpg", mimeType: "image/jpeg", buffer: JPG_WITH_EXIF },
@@ -126,7 +126,7 @@ test.describe("Info", () => {
   });
 
   test("returns metadata for HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -141,7 +141,7 @@ test.describe("Info", () => {
   });
 
   test("returns histogram data", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -162,7 +162,7 @@ test.describe("Info", () => {
   });
 
   test("returns metadata for WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -178,7 +178,7 @@ test.describe("Info", () => {
 
   test("returns metadata for BMP from formats fixture", async ({ request }) => {
     const bmp = formatFixture("sample.bmp");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.bmp", mimeType: "image/bmp", buffer: bmp },
@@ -195,7 +195,7 @@ test.describe("Info", () => {
   });
 
   test("rejects request with no file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {},
     });
@@ -214,7 +214,7 @@ test.describe("Compare", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -233,7 +233,7 @@ test.describe("Compare", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -250,7 +250,7 @@ test.describe("Compare", () => {
       [{ name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 }],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -272,7 +272,7 @@ test.describe("Find Duplicates", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -299,7 +299,7 @@ test.describe("Find Duplicates", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -319,7 +319,7 @@ test.describe("Find Duplicates", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -336,7 +336,7 @@ test.describe("Find Duplicates", () => {
 
 test.describe("Color Palette", () => {
   test("extract colors from PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -357,7 +357,7 @@ test.describe("Color Palette", () => {
   });
 
   test("extract colors from JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -372,7 +372,7 @@ test.describe("Color Palette", () => {
 
   test("extract colors from sample JPEG has diverse palette", async ({ request }) => {
     const sample = formatFixture("sample.jpg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: sample },
@@ -386,7 +386,7 @@ test.describe("Color Palette", () => {
   });
 
   test("extract colors from HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -402,7 +402,7 @@ test.describe("Color Palette", () => {
 
 test.describe("QR Generate", () => {
   test("generate QR code from URL", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "https://snapotter.app",
@@ -416,7 +416,7 @@ test.describe("QR Generate", () => {
   });
 
   test("generate QR code with custom colors", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "Hello World",
@@ -431,7 +431,7 @@ test.describe("QR Generate", () => {
   });
 
   test("generate QR code with high error correction", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "https://github.com/snapotter/snapotter",
@@ -445,7 +445,7 @@ test.describe("QR Generate", () => {
   });
 
   test("generate QR code with minimum size", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "test",
@@ -458,7 +458,7 @@ test.describe("QR Generate", () => {
   });
 
   test("reject empty text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "",
@@ -471,7 +471,7 @@ test.describe("QR Generate", () => {
   });
 
   test("reject size below minimum", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "test",
@@ -487,7 +487,7 @@ test.describe("QR Generate", () => {
 test.describe("Barcode Read", () => {
   test("read QR code from generated image (round-trip)", async ({ request }) => {
     // Generate a QR code first, then read it back
-    const genRes = await request.post("/api/v1/tools/qr-generate", {
+    const genRes = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: { text: "https://example.com/test", size: 400 },
     });
@@ -502,7 +502,7 @@ test.describe("Barcode Read", () => {
     const qrBuffer = Buffer.from(await dlRes.body());
 
     // Now read it with barcode-read
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "qr.png", mimeType: "image/png", buffer: qrBuffer },
@@ -521,7 +521,7 @@ test.describe("Barcode Read", () => {
 
   test("read barcode from barcode fixture", async ({ request }) => {
     const barcodeImage = contentFixture("barcode.avif");
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "barcode.avif", mimeType: "image/avif", buffer: barcodeImage },
@@ -540,7 +540,7 @@ test.describe("Barcode Read", () => {
   });
 
   test("return empty array for image with no barcodes", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -557,7 +557,7 @@ test.describe("Barcode Read", () => {
 
   test("annotated image URL returned when barcodes found", async ({ request }) => {
     const qrImage = contentFixture("qr-code.avif");
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "qr-code.avif", mimeType: "image/avif", buffer: qrImage },
@@ -591,7 +591,7 @@ test.describe("Bulk Rename", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pattern: "image-{{index}}" }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -623,7 +623,7 @@ test.describe("Bulk Rename", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -635,7 +635,7 @@ test.describe("Bulk Rename", () => {
       [],
       [{ name: "settings", value: JSON.stringify({ pattern: "test-{{index}}" }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -649,7 +649,7 @@ test.describe("Bulk Rename", () => {
 
 test.describe("Image to Base64", () => {
   test("encode PNG to base64 returns data URI", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -670,7 +670,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode JPEG to base64", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -684,7 +684,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode with maxWidth constraint", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -697,7 +697,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode with output format conversion", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -710,7 +710,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("encode HEIC image to base64", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -724,7 +724,7 @@ test.describe("Image to Base64", () => {
   });
 
   test("overhead percent is calculated", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -743,7 +743,7 @@ test.describe("Image to Base64", () => {
 test.describe("QR Read", () => {
   test("read QR code from content fixture", async ({ request }) => {
     const qrImage = contentFixture("qr-code.avif");
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "qr-code.avif", mimeType: "image/avif", buffer: qrImage },
@@ -770,7 +770,7 @@ test.describe("Compare — additional", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -789,7 +789,7 @@ test.describe("Compare — additional", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -813,7 +813,7 @@ test.describe("Find Duplicates — additional", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -833,7 +833,7 @@ test.describe("Find Duplicates — additional", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -847,7 +847,7 @@ test.describe("Find Duplicates — additional", () => {
 
 test.describe("QR Generate — output verification", () => {
   test("QR code image can be downloaded", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "https://test.snapotter.app/verify",
@@ -870,7 +870,7 @@ test.describe("QR Generate — output verification", () => {
   test("QR code with all error correction levels", async ({ request }) => {
     const levels = ["L", "M", "Q", "H"] as const;
     for (const errorCorrection of levels) {
-      const res = await request.post("/api/v1/tools/qr-generate", {
+      const res = await request.post("/api/v1/tools/image/qr-generate", {
         headers: { Authorization: `Bearer ${token}` },
         data: {
           text: `EC-${errorCorrection}`,
@@ -889,7 +889,7 @@ test.describe("QR Generate — output verification", () => {
 
 test.describe("Color Palette — additional", () => {
   test("extract colors from WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -903,7 +903,7 @@ test.describe("Color Palette — additional", () => {
 
   test("color palette on content image has rich palette", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.jpg", mimeType: "image/jpeg", buffer: portrait },
@@ -935,7 +935,7 @@ test.describe("Find Duplicates -- large set", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -966,7 +966,7 @@ test.describe("Find Duplicates -- large set", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -991,7 +991,7 @@ test.describe("Find Duplicates -- large set", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -1009,7 +1009,7 @@ test.describe("Find Duplicates -- large set", () => {
 test.describe("Color Palette -- count variations", () => {
   test("extract palette from monochrome-like image", async ({ request }) => {
     const portraitBw = contentFixture("portrait-bw.jpeg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "bw.jpeg", mimeType: "image/jpeg", buffer: portraitBw },
@@ -1026,7 +1026,7 @@ test.describe("Color Palette -- count variations", () => {
 
   test("extract palette from colorful content image", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "colorful.jpg", mimeType: "image/jpeg", buffer: portrait },
@@ -1041,7 +1041,7 @@ test.describe("Color Palette -- count variations", () => {
 
   test("extract palette from large stress image", async ({ request }) => {
     const large = contentFixture("stress-large.jpg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "large.jpg", mimeType: "image/jpeg", buffer: large },
@@ -1063,7 +1063,7 @@ test.describe("QR Generate -- EC levels round-trip", () => {
   for (const ec of ecLevels) {
     test(`generate QR with EC=${ec} and verify via barcode-read`, async ({ request }) => {
       const testText = `EC-${ec}-round-trip`;
-      const genRes = await request.post("/api/v1/tools/qr-generate", {
+      const genRes = await request.post("/api/v1/tools/image/qr-generate", {
         headers: { Authorization: `Bearer ${token}` },
         data: { text: testText, size: 400, errorCorrection: ec },
       });
@@ -1080,7 +1080,7 @@ test.describe("QR Generate -- EC levels round-trip", () => {
       expect(qrBuffer.length).toBeGreaterThan(0);
 
       // Read it back
-      const readRes = await request.post("/api/v1/tools/barcode-read", {
+      const readRes = await request.post("/api/v1/tools/image/barcode-read", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "qr.png", mimeType: "image/png", buffer: qrBuffer },
@@ -1103,7 +1103,7 @@ test.describe("QR Generate -- size variations", () => {
 
   for (const size of sizes) {
     test(`generate QR code at size=${size}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/qr-generate", {
+      const res = await request.post("/api/v1/tools/image/qr-generate", {
         headers: { Authorization: `Bearer ${token}` },
         data: { text: `size-${size}`, size },
       });
@@ -1119,7 +1119,7 @@ test.describe("QR Generate -- size variations", () => {
 
 test.describe("Barcode Read -- no barcode scenarios", () => {
   test("return empty for WebP with no barcode", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -1133,7 +1133,7 @@ test.describe("Barcode Read -- no barcode scenarios", () => {
   });
 
   test("return empty for HEIC with no barcode", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -1151,7 +1151,7 @@ test.describe("Barcode Read -- no barcode scenarios", () => {
 
 test.describe("Image to Base64 -- data URI verification", () => {
   test("data URI starts with correct MIME prefix for PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1169,7 +1169,7 @@ test.describe("Image to Base64 -- data URI verification", () => {
   });
 
   test("data URI starts with correct MIME prefix for JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -1184,7 +1184,7 @@ test.describe("Image to Base64 -- data URI verification", () => {
   });
 
   test("data URI with format conversion has correct prefix", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1199,7 +1199,7 @@ test.describe("Image to Base64 -- data URI verification", () => {
   });
 
   test("base64 output with maxWidth and maxHeight", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1227,7 +1227,7 @@ test.describe("Bulk Rename -- ZIP verification", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pattern: "renamed-{{index}}" }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -1268,7 +1268,7 @@ test.describe("Bulk Rename -- ZIP verification", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -1281,7 +1281,7 @@ test.describe("Bulk Rename -- ZIP verification", () => {
 test.describe("Info -- detailed metadata", () => {
   test("info returns density and color space for JPEG", async ({ request }) => {
     const sample = contentFixture("portrait-color.jpg");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.jpg", mimeType: "image/jpeg", buffer: sample },
@@ -1299,7 +1299,7 @@ test.describe("Info -- detailed metadata", () => {
 
   test("info returns correct format for AVIF", async ({ request }) => {
     const avif = readFileSync(join(FORMATS, "sample.avif"));
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -1313,7 +1313,7 @@ test.describe("Info -- detailed metadata", () => {
 
   test("info returns correct format for TIFF", async ({ request }) => {
     const tiff = readFileSync(join(FORMATS, "sample.tiff"));
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: tiff },
@@ -1331,7 +1331,7 @@ test.describe("Info -- detailed metadata", () => {
 
 test.describe("Auth failure", () => {
   test("info without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
       },
@@ -1340,14 +1340,14 @@ test.describe("Auth failure", () => {
   });
 
   test("qr-generate without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       data: { text: "https://snapotter.app", size: 512 },
     });
     expect(res.status()).toBe(401);
   });
 
   test("color-palette without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
       },
@@ -1363,7 +1363,7 @@ test.describe("Auth failure", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -1378,7 +1378,7 @@ test.describe("Auth failure", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/find-duplicates", {
+    const res = await request.post("/api/v1/tools/image/find-duplicates", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -1386,7 +1386,7 @@ test.describe("Auth failure", () => {
   });
 
   test("barcode-read without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/barcode-read", {
+    const res = await request.post("/api/v1/tools/image/barcode-read", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({}),
@@ -1396,7 +1396,7 @@ test.describe("Auth failure", () => {
   });
 
   test("image-to-base64 without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({}),

@@ -151,7 +151,7 @@ export function Dropzone({
       setUrlError(t.dropzone.urlFetchFailed);
     }
     setUrlLoading(false);
-  }, [urlInput, importSingleUrl, onUrlImport, checkFile, acceptDescription]);
+  }, [urlInput, importSingleUrl, onUrlImport, checkFile, acceptDescription, t]);
 
   const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();

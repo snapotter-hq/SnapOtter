@@ -23,10 +23,10 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-      - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
-      - name: Regenerate baselines
-        run: pnpm playwright test --project=chromium-visual --update-snapshots
+      - name: Install Playwright browsers (chromium + webkit for device projects)
+        run: pnpm playwright install --with-deps chromium webkit
+      - name: Regenerate baselines (desktop + device projects)
+        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium --update-snapshots
         env:
           PW_WORKERS: "2"
       - name: Open PR with refreshed baselines

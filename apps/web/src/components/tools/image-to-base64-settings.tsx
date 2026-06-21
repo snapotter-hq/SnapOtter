@@ -45,7 +45,7 @@ export function ImageToBase64Settings() {
         formData.append("files", file);
         formData.append("settings", settings);
 
-        const res = await fetch("/api/v1/tools/image-to-base64", {
+        const res = await fetch("/api/v1/tools/image/image-to-base64", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

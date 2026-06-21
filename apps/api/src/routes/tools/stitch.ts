@@ -44,7 +44,7 @@ interface PreparedImage {
 }
 
 export function registerStitch(app: FastifyInstance) {
-  app.post("/api/v1/tools/stitch", async (request, reply) => {
+  app.post("/api/v1/tools/image/stitch", async (request, reply) => {
     const files: Array<{ buffer: Buffer; filename: string }> = [];
     let settingsRaw: string | null = null;
 

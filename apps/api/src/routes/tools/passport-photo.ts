@@ -131,7 +131,7 @@ async function generatePrintSheet(
 export function registerPassportPhoto(app: FastifyInstance) {
   // ── Phase 1: Analyze (face landmarks + bg removal) ────────────────
   app.post(
-    "/api/v1/tools/passport-photo/analyze",
+    "/api/v1/tools/image/passport-photo/analyze",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "passport-photo";
       if (!isToolInstalled(toolId)) {
@@ -310,7 +310,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
   // ── Base route: return 501 so generic callers don't get 404 ──────
   app.post(
-    "/api/v1/tools/passport-photo",
+    "/api/v1/tools/image/passport-photo",
     async (_request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "passport-photo";
       if (!isToolInstalled(toolId)) {
@@ -324,14 +324,14 @@ export function registerPassportPhoto(app: FastifyInstance) {
         });
       }
       return reply.status(400).send({
-        error: "Use /api/v1/tools/passport-photo/analyze or /generate",
+        error: "Use /api/v1/tools/image/passport-photo/analyze or /generate",
       });
     },
   );
 
   // ── Phase 2: Generate (crop + resize + tile) ─────────────────────
   app.post(
-    "/api/v1/tools/passport-photo/generate",
+    "/api/v1/tools/image/passport-photo/generate",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = generateSettingsSchema.safeParse(request.body);
       if (!parseResult.success) {

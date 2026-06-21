@@ -97,7 +97,7 @@ async function flattenAlpha(buf: Buffer): Promise<Buffer> {
 }
 
 export function registerImageToPdf(app: FastifyInstance) {
-  app.post("/api/v1/tools/image-to-pdf", async (request, reply) => {
+  app.post("/api/v1/tools/image/image-to-pdf", async (request, reply) => {
     const files: Array<{ buffer: Buffer; filename: string }> = [];
     let settingsRaw: string | null = null;
 

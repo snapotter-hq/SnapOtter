@@ -106,7 +106,11 @@ export class MediaInputHandler implements InputHandler {
       throw new InputValidationError("Not a valid subtitle file (.srt, .vtt, .ass)");
     }
     const text = new TextDecoder("utf-8", { fatal: false }).decode(raw);
-    const looksLikeSubtitle = /-->/.test(text) || /\[Script Info\]/i.test(text);
+    // Detect the SRT/VTT cue timecode arrow (e.g. "00:00:01,000 --> 00:00:04,000")
+    // by requiring the surrounding timestamp, not a bare "-->" (which also matches
+    // non-subtitle text and tripped CodeQL's HTML-comment heuristic).
+    const looksLikeSubtitle =
+      /\d{1,2}:\d{2}(?::\d{2})?[.,]\d{3}\s*-->/.test(text) || /\[Script Info\]/i.test(text);
     if (!looksLikeSubtitle) {
       throw new InputValidationError("Not a valid subtitle file (.srt, .vtt, .ass)");
     }

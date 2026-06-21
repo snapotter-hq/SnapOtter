@@ -46,7 +46,7 @@ test.describe("Blur Faces - HEIC fix and no-face warning", () => {
     });
     const { token } = await loginRes.json();
 
-    const response = await request.post("/api/v1/tools/blur-faces", {
+    const response = await request.post("/api/v1/tools/image/blur-faces", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: {

@@ -1,0 +1,428 @@
+{
+  "assets": [
+    {
+      "path": "audio/valid/audio-with-tags.mp3",
+      "sourceUrl": "gen-synthetic-content.mjs (ffmpeg 440Hz sine + ID3 tags)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "69103f0acb5b347e9a72618b531da0c1702d9bfbc5aee852b256634300ec50fb",
+      "bytes": 11684
+    },
+    {
+      "path": "audio/valid/media-30s.wav",
+      "sourceUrl": "gen-synthetic-content.mjs (ffmpeg 440Hz sine PCM, 30s)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "e77501db91d7d1dd6c9006a2e9b559767072e724c60fefddea6ddd3298ac809a",
+      "bytes": 2646078
+    },
+    {
+      "path": "audio/valid/speech-10s.wav",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), 16kHz mono PCM",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "7be6bb102d39699ab6eaf3361a05d8c37f636551dd6527101b7b59ef7ae48efb",
+      "bytes": 213346
+    },
+    {
+      "path": "audio/valid/speech.aac",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to AAC ADTS",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "d3126934729aa997ae77528c0f32b393ee06e5435bf544f2b16c905269209248",
+      "bytes": 68336
+    },
+    {
+      "path": "audio/valid/speech.flac",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to FLAC",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "2aa38548cd52093be747fde14f88129e63c22dd489d0b4a5c9f98fc488ea5872",
+      "bytes": 142669
+    },
+    {
+      "path": "audio/valid/speech.m4a",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to M4A",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "a952060a2a4e061062d8efbfb170ce0623143db54b5e3e15d80fd2b3a0401b49",
+      "bytes": 68824
+    },
+    {
+      "path": "audio/valid/speech.ogg",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to Ogg Vorbis",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "d4ef00c1311bac6215b7ab2aedf05d096922cecb3859d208ebeb77f24c027524",
+      "bytes": 39607
+    },
+    {
+      "path": "audio/valid/speech.opus",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to Opus",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "fcc32c30c77f95a18ef8947ec05c0778347012e5d77bd73bbc520337f83667ea",
+      "bytes": 63103
+    },
+    {
+      "path": "document/valid/alt-2page.pdf",
+      "sourceUrl": "gen-synthetic-content.mjs",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "be8a827f8c4afee32b2c5d4339f039e3c24887284f220c3bf849210095899e75",
+      "bytes": 854
+    },
+    {
+      "path": "document/valid/encrypted.pdf",
+      "sourceUrl": "generate-test-fixtures.mjs (qpdf AES-256 encryption of test-3page.pdf)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "fd34ac2a0a5149eb0906dab62950d479e38e78e21aa161737b65c2c493e763bb",
+      "bytes": 3069
+    },
+    {
+      "path": "document/valid/multipage-6.pdf",
+      "sourceUrl": "gen-synthetic-content.mjs",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "ef047cf125592eaa857f0f1f1d1001d7575dfcf03af5f7c20038050178fa4160",
+      "bytes": 1913
+    },
+    {
+      "path": "document/valid/ocr-scanned.pdf",
+      "sourceUrl": "Unknown; added in babca4cf/d8cf979d. Scanned PDF, content unverifiable.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "28d33f9f30a450943d59489345bf475b42ca0f73deffeb883df1d117d97e5d90",
+      "bytes": 1049673
+    },
+    {
+      "path": "document/valid/test-3page.pdf",
+      "sourceUrl": "Project-generated minimal 3-page PDF test fixture",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "d3caf5c109f742a3c7e1980f88c1bef3fc5c7f57d4cc08e3322ef471c19bcdb7",
+      "bytes": 2201
+    },
+    {
+      "path": "image/valid/animated-simpsons.gif",
+      "sourceUrl": "gen-synthetic-content.mjs (ffmpeg testsrc, replaces copyrighted Simpsons clip)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "738a6c04c1744c32bd9889372a4754dcb2d7af84586a33c9aa67e09ada8bdeb8",
+      "bytes": 193823
+    },
+    {
+      "path": "image/valid/animated.gif",
+      "sourceUrl": "Project-generated minimal animated GIF (2-frame, tiny)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "96842e54f8aa6b34ef4923c6fe76c013aadcab4018da410008dc42eee3f2b545",
+      "bytes": 615
+    },
+    {
+      "path": "image/valid/animated.webp",
+      "sourceUrl": "Project-generated minimal animated WebP (tiny)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "1cdbbc5423fa24eb0162beb90f454cfd75fec599563ecf9897a6fca05c8a9015",
+      "bytes": 392
+    },
+    {
+      "path": "image/valid/barcode.avif",
+      "sourceUrl": "gen-synthetic-content.mjs (Code 128B via Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "aa850fa40da9180bf493702d999e674f75942b1dbcf78f1d8c453ee6a096f375",
+      "bytes": 2631
+    },
+    {
+      "path": "image/valid/barcode.png",
+      "sourceUrl": "gen-synthetic-content.mjs (Code 128B via Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "84fafbaba2c80c347ef774530fe7def02e5555691e613a633867a7ef94fbdc6d",
+      "bytes": 5980
+    },
+    {
+      "path": "image/valid/cross-format-chat.webp",
+      "sourceUrl": "generated (mock chat UI, Sharp SVG render)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "f45457826da776b4a7986eddd98dc0993295134e4f960a00d78c627f11c26dad",
+      "bytes": 11538
+    },
+    {
+      "path": "image/valid/motorcycle.heif",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). HEIF photo, content unverifiable.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "90f3ae39a6ea1355f148712cd013f71111b2d74451ca07bcf8442489b0d1995e",
+      "bytes": 224154
+    },
+    {
+      "path": "image/valid/multi-face.webp",
+      "sourceUrl": "gen-synthetic-content.mjs (Sharp oval grid, replaces Shutterstock #199321457)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "58a3e4acf5d9d12612a05e19098f5ed7d122789721828a30dc01d1eecf2754c8",
+      "bytes": 5194
+    },
+    {
+      "path": "image/valid/ocr-chat.jpeg",
+      "sourceUrl": "generated (mock chat UI, Sharp SVG render)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "41602713616187b97ba64fb0ce97f2ac06bfbef193690f757d622e6d624e87a7",
+      "bytes": 20462
+    },
+    {
+      "path": "image/valid/ocr-clean.png",
+      "sourceUrl": "gen-synthetic-content.mjs (Sharp SVG text render)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "b75f19fae28ac01cf9126299a68917a3d60668b831156d9600a8b4a403f9e43d",
+      "bytes": 8187
+    },
+    {
+      "path": "image/valid/ocr-japanese.png",
+      "sourceUrl": "gen-synthetic-content.mjs (Sharp SVG Japanese text render)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "0203ea5fabc9a6965103d64136b17fb8abe33f6def99b8da97cf47c2091ec639",
+      "bytes": 25932
+    },
+    {
+      "path": "image/valid/portrait-bw.jpeg",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). B&W portrait, unverifiable origin.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "0ca77a23c1af40d107f4f34eef048adef98f8b36c475723c6fe921ed3dec81bc",
+      "bytes": 2731390
+    },
+    {
+      "path": "image/valid/portrait-color-dup.jpg",
+      "sourceUrl": "Identical to portrait-color.jpg (deliberate duplicate for dedup tests).",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "908893cc7c816e977f84af59237a1af29bab6e3ed801879cbe992f698161397e",
+      "bytes": 89084
+    },
+    {
+      "path": "image/valid/portrait-color.jpg",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). Portrait photo, likely AI-generated, unverifiable.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "908893cc7c816e977f84af59237a1af29bab6e3ed801879cbe992f698161397e",
+      "bytes": 89084
+    },
+    {
+      "path": "image/valid/portrait-headshot.heic",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). HEIC portrait, unverifiable origin.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "1f59692ec10d5372e69ebc789c53ebe752f665ff87ede4d15817ce512e769732",
+      "bytes": 1489644
+    },
+    {
+      "path": "image/valid/portrait-isolated.png",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). Portrait with bg removed, same subject as portrait-color.jpg.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "8d53453a5adaecfc3b6db83e85f732cbe67adc42e7c719d4c3ae8eb7777e0a8f",
+      "bytes": 80745
+    },
+    {
+      "path": "image/valid/qr-code.avif",
+      "sourceUrl": "gen-synthetic-content.mjs (qrcode lib + Sharp AVIF)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "93c8268e6fe3e8a16f3c1cc028885e6b4a90887f27a2fe4525e4a928703fcdb3",
+      "bytes": 1924
+    },
+    {
+      "path": "image/valid/qr-code.png",
+      "sourceUrl": "gen-synthetic-content.mjs (qrcode lib, encodes https://snapotter.com)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "97506d778ea20d9a42b303071f280b4f31109fcff7af00bd9e284436a0e51155",
+      "bytes": 2191
+    },
+    {
+      "path": "image/valid/qr-code.svg",
+      "sourceUrl": "gen-synthetic-content.mjs (qrcode lib SVG output)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "bd3128ae46d994fa5dda1345a93f17782b1d906e871b9f318e6fd0d032cc9f50",
+      "bytes": 1255
+    },
+    {
+      "path": "image/valid/red-eye.jpg",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). Canon EOS 400D DIGITAL EXIF from 2007, red-eye portrait.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "04a993def90ffb471cbb0b4bbe46bd2aa9a2d344a9ab7ad187dc22f5feca23ed",
+      "bytes": 368937
+    },
+    {
+      "path": "image/valid/sample-photo.jpg",
+      "sourceUrl": "Project-generated sample JPEG photo (used as hostile-fixture source)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "4eda0de1008fd816d1412f7380a2eec96b3bfecec1bf787ea21771b33a74c6af",
+      "bytes": 129438
+    },
+    {
+      "path": "image/valid/stress-large.jpg",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). Samsung Galaxy S24 Ultra photo (EXIF 2026-04-11), Muay Thai event.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "53610a10526e1a4f42036a08091cbe8a79781f4522915f98f423cab14f6bca10",
+      "bytes": 6678906
+    },
+    {
+      "path": "image/valid/svg-logo.svg",
+      "sourceUrl": "gen-synthetic-content.mjs (geometric test SVG, replaces ConvertICO brand logo)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "dae7668c0db8688e93cd7d6fedfd7f7121c3bfa563eee19e4492bc0dbfc73a0b",
+      "bytes": 1426
+    },
+    {
+      "path": "image/valid/test-100x100.jpg",
+      "sourceUrl": "Project-generated minimal 100x100 JPEG test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "4749f4af300d0bdcee870efdb9299125a132c4770dc2aaa885d194fe58c31758",
+      "bytes": 342
+    },
+    {
+      "path": "image/valid/test-100x100.svg",
+      "sourceUrl": "Project-generated minimal 100x100 SVG test fixture",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "fb5616fc72722429294f4f23c76c8bac56bb0b2e4a4dac163d78703cd71269da",
+      "bytes": 195
+    },
+    {
+      "path": "image/valid/test-200x150.heic",
+      "sourceUrl": "Project-generated minimal 200x150 HEIC test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "5566100fbb0da3892ed14cbacf59c66b67e7c1279bd068145bd0abda2e97e66d",
+      "bytes": 782
+    },
+    {
+      "path": "image/valid/test-200x150.png",
+      "sourceUrl": "Project-generated minimal 200x150 PNG test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "a645232af22f8ffa0685cda619d25eefa8baf2fd9efe09c88f5a7825901232f8",
+      "bytes": 544
+    },
+    {
+      "path": "image/valid/test-50x50.webp",
+      "sourceUrl": "Project-generated minimal 50x50 WebP test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "aa6de3f8a94a0715707fb6966a7c63b52ba1ae11faf2fc2e9be9fa3171647857",
+      "bytes": 128
+    },
+    {
+      "path": "image/valid/test-portrait.heic",
+      "sourceUrl": "Project-generated minimal portrait HEIC test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "5566100fbb0da3892ed14cbacf59c66b67e7c1279bd068145bd0abda2e97e66d",
+      "bytes": 782
+    },
+    {
+      "path": "image/valid/test-portrait.jpg",
+      "sourceUrl": "Project-generated minimal portrait JPEG test fixture (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "4749f4af300d0bdcee870efdb9299125a132c4770dc2aaa885d194fe58c31758",
+      "bytes": 342
+    },
+    {
+      "path": "image/valid/test-scene.png",
+      "sourceUrl": "Project-generated scene PNG test fixture (Sharp SVG render)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "0ec225bdcf444a305c2a5d0394e65d9a7e4119e3904f003f21c86dd4390ba8e4",
+      "bytes": 5496
+    },
+    {
+      "path": "image/valid/test-with-exif.jpg",
+      "sourceUrl": "Project-generated JPEG with synthetic EXIF GPS/camera data (Sharp)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "6074b156e1c1d281fcbf43f28785adcbaed9c84234b6c98c7df16198193613ab",
+      "bytes": 758
+    },
+    {
+      "path": "image/valid/watermark.jpg",
+      "sourceUrl": "Unknown; added in babca4cf (test coverage expansion). Landscape photo with text watermark overlay.",
+      "license": "UNVERIFIED-REVIEW",
+      "toolsServed": [],
+      "sha256": "b8ddbceea01513f4a9ac6b0903b8071d8466ae88a8d5ef6fd84c33644ce22a4d",
+      "bytes": 87064
+    },
+    {
+      "path": "video/valid/hero.avi",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, transcoded to AVI",
+      "license": "CC-BY",
+      "toolsServed": [],
+      "sha256": "c56b0e01e4408846c3d040034b85aeeade17a25534771c7f5712e0e0dc5e45cc",
+      "bytes": 681052
+    },
+    {
+      "path": "video/valid/hero.mkv",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, transcoded to MKV",
+      "license": "CC-BY",
+      "toolsServed": [],
+      "sha256": "41b5d042000446882a3ae562ab262b62ffab8702ba9097424e344d603ae034fe",
+      "bytes": 241665
+    },
+    {
+      "path": "video/valid/hero.mov",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, transcoded to MOV",
+      "license": "CC-BY",
+      "toolsServed": [],
+      "sha256": "24e2107d9c642bd8c06f1c8ccbb52c9bf8aa177405c1eb274216289d5ed32d75",
+      "bytes": 244646
+    },
+    {
+      "path": "video/valid/hero.webm",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, transcoded to WebM",
+      "license": "CC-BY",
+      "toolsServed": [],
+      "sha256": "14435ede8e4e2cb7eca91a788647771ca051b04cf1c6ca58b1ad50dec6b5be1f",
+      "bytes": 226183
+    },
+    {
+      "path": "video/valid/media-30s.mp4",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, 8s segment at 30s, 480x270",
+      "license": "CC-BY",
+      "toolsServed": [],
+      "sha256": "6ad37435eeb01cc694b918f8588255fead60eb01f2a06ca0dc904070064e9136",
+      "bytes": 247284
+    },
+    {
+      "path": "video/valid/speech-10s.mp4",
+      "sourceUrl": "macOS say TTS (locally generated, Samantha voice), converted to AAC MP4",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "2f8d3a93f01645af5b14859366d8d0aa59c10e79fca23bf56ab94cc8634bfe50",
+      "bytes": 92269
+    },
+    {
+      "path": "video/valid/video-with-meta.mp4",
+      "sourceUrl": "gen-synthetic-content.mjs (ffmpeg color frame, 64x64, 1s)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "f8ad87da046cd641995e86067130976a65ae99c26a8277d41ac5aadd66b08fe4",
+      "bytes": 2001
+    }
+  ]
+}

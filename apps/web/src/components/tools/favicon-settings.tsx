@@ -156,7 +156,7 @@ export function FaviconSettings() {
       cleanup();
     };
 
-    xhr.open("POST", "/api/v1/tools/favicon");
+    xhr.open("POST", "/api/v1/tools/image/favicon");
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

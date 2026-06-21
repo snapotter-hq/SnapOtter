@@ -1,7 +1,6 @@
 import { Download, Loader2 } from "lucide-react";
 import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import {
   COLLAGE_TEMPLATES,
@@ -38,7 +37,6 @@ const BG_PRESETS = [
 ];
 
 export function CollageSettings() {
-  const { t } = useTranslation();
   const store = useCollageStore();
   const {
     images,
@@ -106,7 +104,7 @@ export function CollageSettings() {
         jobId: string;
       }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/v1/tools/collage");
+        xhr.open("POST", "/api/v1/tools/image/collage");
 
         const headers = formatHeaders();
         headers.forEach((value, key) => {

@@ -1,4 +1,4 @@
-import { TOOLS } from "@snapotter/shared";
+import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getRegisteredToolIds, getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "./test-server.js";
@@ -96,11 +96,11 @@ describe("tool route drift", () => {
     }
   });
 
-  it("every TOOLS entry answers on POST /api/v1/tools/:toolId (no dead routes)", async () => {
+  it("every TOOLS entry answers on POST /api/v1/tools/:section/:toolId (no dead routes)", async () => {
     for (const tool of TOOLS) {
       const res = await testApp.app.inject({
         method: "POST",
-        url: `/api/v1/tools/${tool.id}`,
+        url: apiToolPath(tool.id),
         headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
         payload: {},
       });

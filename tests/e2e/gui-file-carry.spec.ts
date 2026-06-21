@@ -26,7 +26,7 @@ test.describe("Cross-tool file carrying", () => {
       .click();
 
     // Should navigate to /resize
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
 
     // The file should be carried - dropzone should NOT be visible
     await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
@@ -51,7 +51,7 @@ test.describe("Cross-tool file carrying", () => {
       .click();
 
     // Should navigate to /compress
-    await expect(page).toHaveURL("/compress");
+    await expect(page).toHaveURL("/image/compress");
 
     // The file should be carried - dropzone should NOT be visible
     await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
@@ -64,7 +64,7 @@ test.describe("Cross-tool file carrying", () => {
     loggedInPage: page,
   }) => {
     // Go to resize and upload a file
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Confirm the file is loaded
@@ -72,7 +72,7 @@ test.describe("Cross-tool file carrying", () => {
     await expect(page.getByText("Upload from computer")).not.toBeVisible();
 
     // Navigate to compress via direct URL (simulates sidebar navigation)
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // The file should NOT be carried - dropzone should appear
@@ -88,7 +88,7 @@ test.describe("Cross-tool file carrying", () => {
     loggedInPage: page,
   }) => {
     // Go to resize and upload a file
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Confirm the file is loaded on resize
@@ -100,7 +100,7 @@ test.describe("Cross-tool file carrying", () => {
     await page.waitForURL("/");
 
     // Now navigate to a different tool via URL (simulating a fresh tool visit)
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
     // No stale download links should be present from the previous tool
@@ -115,7 +115,7 @@ test.describe("Cross-tool file carrying", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Upload a file on resize
@@ -145,7 +145,7 @@ test.describe("Cross-tool file carrying", () => {
       .getByRole("button", { name: /resize/i })
       .first()
       .click();
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
 
     // File should be carried from home via Quick Action
     await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
@@ -157,7 +157,7 @@ test.describe("Cross-tool file carrying", () => {
     await page.waitForURL("/");
 
     // Navigate to compress directly (not via Quick Action)
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // No processed state should leak between tool pages

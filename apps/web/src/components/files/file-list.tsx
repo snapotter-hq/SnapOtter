@@ -1,6 +1,5 @@
 import { Download, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
 import { getFileDownloadUrl } from "@/lib/api";
 import { format } from "@/lib/format";
@@ -22,7 +21,6 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
     setSearchQuery,
   } = useFilesPageStore();
 
-  const navigate = useNavigate();
   const [inputValue, setInputValue] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);

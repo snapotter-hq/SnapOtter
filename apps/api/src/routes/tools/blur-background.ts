@@ -80,7 +80,7 @@ registerAiJobHandler("blur-background", async (input, data, ctx) => {
 
 export function registerBlurBackground(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/blur-background",
+    "/api/v1/tools/image/blur-background",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "blur-background";
       if (!isToolInstalled(toolId)) {

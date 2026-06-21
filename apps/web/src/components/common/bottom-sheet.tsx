@@ -45,7 +45,7 @@ export function BottomSheet({
   }, [onClose]);
 
   const bind = useDrag(
-    ({ movement: [, my], last, cancel }) => {
+    ({ movement: [, my], last }) => {
       // Only allow downward dragging
       if (my < 0) {
         setTranslateY(0);

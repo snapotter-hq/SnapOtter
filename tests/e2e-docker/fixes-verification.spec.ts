@@ -33,7 +33,7 @@ async function waitForProcessingDone(page: Page, timeoutMs = 120_000): Promise<v
 test.describe("Error message formatting", () => {
   test("tool validation error shows readable message, not [object Object]", async ({ request }) => {
     // Send a malformed request directly to trigger a validation error
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       multipart: {
         file: {
           name: "test.jpg",
@@ -421,7 +421,7 @@ test.describe("Container health", () => {
 
   test("error responses have string details, not objects", async ({ request }) => {
     const formData = new URLSearchParams();
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       data: formData.toString(),
     });

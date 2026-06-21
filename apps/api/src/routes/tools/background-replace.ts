@@ -110,7 +110,7 @@ registerAiJobHandler("background-replace", async (input, data, ctx) => {
 
 export function registerBackgroundReplace(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/background-replace",
+    "/api/v1/tools/image/background-replace",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "background-replace";
       if (!isToolInstalled(toolId)) {

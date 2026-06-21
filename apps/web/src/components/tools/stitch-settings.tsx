@@ -63,7 +63,7 @@ export function StitchSettings() {
         processedSize: number;
       }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/v1/tools/stitch");
+        xhr.open("POST", "/api/v1/tools/image/stitch");
 
         const headers = formatHeaders();
         headers.forEach((value, key) => {

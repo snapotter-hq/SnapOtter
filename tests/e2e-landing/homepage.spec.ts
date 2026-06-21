@@ -40,7 +40,7 @@ test.describe("Landing Homepage", () => {
   });
 
   test("hero modality cards render", async ({ page }) => {
-    const cards = ["Image Tools", "Video Tools", "Audio Tools", "PDF & Documents", "Data & Files"];
+    const cards = ["Image Tools", "Video Tools", "Audio Tools", "PDF & Documents", "File Tools"];
     for (const card of cards) {
       await expect(page.getByText(card, { exact: true }).first()).toBeVisible();
     }

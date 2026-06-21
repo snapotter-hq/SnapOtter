@@ -1,39 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Docs Search", () => {
+test.describe("docs search (Pagefind)", () => {
   test("search button is visible", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await expect(searchButton.first()).toBeVisible();
+    await page.goto("/");
+    await expect(page.locator(".blog-search").first()).toBeVisible();
   });
 
-  test("clicking search opens search dialog", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await searchButton.first().click();
-    await expect(
-      page.locator(".VPLocalSearchBox, .DocSearch-Modal, [role='dialog']").first(),
-    ).toBeVisible();
+  test("clicking search opens the dialog with an input", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".blog-search").first().click();
+    await expect(page.locator('input[placeholder="Search Docs"]')).toBeVisible();
   });
 
-  test("typing in search shows results", async ({ page }) => {
-    await page.goto("/guide/getting-started");
-    const searchButton = page.locator(
-      ".VPNavBarSearch button, .DocSearch-Button, button[aria-label*='Search'], .VPNavBarSearchButton button",
-    );
-    await searchButton.first().click();
-    const searchInput = page
-      .locator(".VPLocalSearchBox input, .DocSearch-Input, [role='dialog'] input")
-      .first();
-    await searchInput.fill("docker");
-    const results = page.locator(
-      ".VPLocalSearchBox .result, .DocSearch-Hits, [role='dialog'] .result, [role='listbox'] [role='option']",
-    );
-    await expect(results.first()).toBeVisible({ timeout: 5000 });
+  test("typing a query shows results", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".blog-search").first().click();
+    const input = page.locator('input[placeholder="Search Docs"]');
+    await input.fill("docker");
+    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -48,16 +32,21 @@ test.describe("Theme Toggle", () => {
 
   test("clicking theme toggle changes appearance", async ({ page }) => {
     await page.goto("/guide/getting-started");
-    const initialClass = await page.locator("html").getAttribute("class");
+    const html = page.locator("html");
+    const initialClass = await html.getAttribute("class");
+    const wasDark = initialClass?.includes("dark") ?? false;
 
-    await page.evaluate(() => {
-      const btn = document.querySelector('button[role="switch"].VPSwitchAppearance');
-      if (btn) (btn as HTMLElement).click();
-    });
-    await page.waitForTimeout(500);
+    // Click the visible toggle inside our custom nav area (the hidden default
+    // VPNavBarAppearance is first in DOM order, so a bare querySelector would
+    // hit it instead). Playwright's click auto-waits for hydration.
+    await page.locator('.nav-bar-right button[role="switch"]').click();
 
-    const newClass = await page.locator("html").getAttribute("class");
-    expect(newClass).not.toBe(initialClass);
+    // Assert the dark class actually toggled
+    if (wasDark) {
+      await expect(html).not.toHaveClass(/dark/);
+    } else {
+      await expect(html).toHaveClass(/dark/);
+    }
   });
 });
 

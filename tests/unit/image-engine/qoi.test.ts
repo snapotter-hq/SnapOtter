@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { qoiDecode, qoiEncode } from "@snapotter/image-engine";
 import { describe, expect, it } from "vitest";
-
-const FORMATS_DIR = path.resolve(__dirname, "../../fixtures/formats");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 describe("QOI codec", () => {
   it("round-trips RGBA pixel data", () => {
@@ -157,7 +155,7 @@ describe("QOI codec", () => {
   });
 
   it("decodes real fixture with correct header", () => {
-    const data = readFileSync(path.join(FORMATS_DIR, "sample.qoi"));
+    const data = readFixture(fixtures.image.formats("qoi"));
     const { header } = qoiDecode(new Uint8Array(data));
     expect(header.width).toBe(10);
     expect(header.height).toBe(10);
@@ -165,7 +163,7 @@ describe("QOI codec", () => {
   });
 
   it("re-encodes real fixture with matching pixels", () => {
-    const data = readFileSync(path.join(FORMATS_DIR, "sample.qoi"));
+    const data = readFixture(fixtures.image.formats("qoi"));
     const { header, pixels } = qoiDecode(new Uint8Array(data));
     const reEncoded = qoiEncode(pixels, header.width, header.height, 4);
     const { pixels: reDecoded } = qoiDecode(reEncoded);

@@ -98,7 +98,7 @@ async function vectorizeBuffer(
 }
 
 export function registerVectorize(app: FastifyInstance) {
-  app.post("/api/v1/tools/vectorize", async (request, reply) => {
+  app.post("/api/v1/tools/image/vectorize", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "output";
     let settingsRaw: string | null = null;

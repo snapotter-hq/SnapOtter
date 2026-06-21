@@ -110,7 +110,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
   });
 
   app.post(
-    "/api/v1/tools/image-enhancement/analyze",
+    "/api/v1/tools/image/image-enhancement/analyze",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";

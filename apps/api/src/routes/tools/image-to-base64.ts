@@ -54,7 +54,7 @@ function detectMimeType(format: string): string {
 
 export function registerImageToBase64(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/image-to-base64",
+    "/api/v1/tools/image/image-to-base64",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const files: Array<{ buffer: Buffer; filename: string }> = [];
       let settings = {};

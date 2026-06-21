@@ -217,7 +217,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
     },
   });
 
-  app.post("/api/v1/tools/meme-generator", async (request, reply) => {
+  app.post("/api/v1/tools/image/meme-generator", async (request, reply) => {
     const contentTypeHeader = request.headers["content-type"] ?? "";
     const isMultipart = contentTypeHeader.includes("multipart/form-data");
 

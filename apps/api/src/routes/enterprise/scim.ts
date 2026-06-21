@@ -305,84 +305,91 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // ── User Operations ────────────────────────────────────────────
 
   // POST /api/v1/scim/v2/Users -- create user
-  app.post("/api/v1/scim/v2/Users", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!(await scimAuth(request, reply))) return;
-    if (!(await requireScimFeature(reply))) return;
+  app.post(
+    "/api/v1/scim/v2/Users",
+    {
+      config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!(await scimAuth(request, reply))) return;
+      if (!(await requireScimFeature(reply))) return;
 
-    const body = request.body as Record<string, unknown>;
-    const userName = body.userName as string | undefined;
-    const externalId = body.externalId as string | undefined;
-    const active = body.active !== false; // default true
-    const emails = body.emails as Array<{ value: string; primary?: boolean }> | undefined;
-    if (!userName) {
-      return reply.status(400).send(scimError(400, "userName is required"));
-    }
+      const body = request.body as Record<string, unknown>;
+      const userName = body.userName as string | undefined;
+      const externalId = body.externalId as string | undefined;
+      const active = body.active !== false; // default true
+      const emails = body.emails as Array<{ value: string; primary?: boolean }> | undefined;
+      if (!userName) {
+        return reply.status(400).send(scimError(400, "userName is required"));
+      }
 
-    // Check for duplicate username
-    const [existing] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.username, userName));
+      // Check for duplicate username
+      const [existing] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, userName));
 
-    if (existing) {
-      return reply.status(409).send(scimError(409, "User already exists"));
-    }
+      if (existing) {
+        return reply.status(409).send(scimError(409, "User already exists"));
+      }
 
-    const id = randomUUID();
-    const email = emails?.find((e) => e.primary)?.value ?? emails?.[0]?.value ?? null;
+      const id = randomUUID();
+      const email = emails?.find((e) => e.primary)?.value ?? emails?.[0]?.value ?? null;
 
-    // Resolve default team
-    const [defaultTeam] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.name, "Default"));
-    const teamId = defaultTeam?.id ?? "default-team-00000000";
+      // Resolve default team
+      const [defaultTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, "Default"));
+      const teamId = defaultTeam?.id ?? "default-team-00000000";
 
-    const now = new Date();
-    await db.insert(schema.users).values({
-      id,
-      username: userName,
-      email,
-      externalId: externalId ?? null,
-      role: active ? "user" : "disabled",
-      team: teamId,
-      authProvider: "scim",
-      mustChangePassword: false,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await auditLog(
-      request.log,
-      "SCIM_USER_PROVISIONED",
-      {
-        userId: id,
+      const now = new Date();
+      await db.insert(schema.users).values({
+        id,
         username: userName,
-        externalId,
-      },
-      request.ip,
-      request.id,
-    );
+        email,
+        externalId: externalId ?? null,
+        role: active ? "user" : "disabled",
+        team: teamId,
+        authProvider: "scim",
+        mustChangePassword: false,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    const user = {
-      id,
-      username: userName,
-      email,
-      externalId: externalId ?? null,
-      role: active ? "user" : "disabled",
-      team: teamId,
-      legalHold: false,
-      passwordHash: null,
-      createdAt: now,
-      updatedAt: now,
-    };
+      await auditLog(
+        request.log,
+        "SCIM_USER_PROVISIONED",
+        {
+          userId: id,
+          username: userName,
+          externalId,
+        },
+        request.ip,
+        request.id,
+      );
 
-    return reply.status(201).send(toScimUser(user, defaultTeam?.name));
-  });
+      const user = {
+        id,
+        username: userName,
+        email,
+        externalId: externalId ?? null,
+        role: active ? "user" : "disabled",
+        team: teamId,
+        legalHold: false,
+        passwordHash: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      return reply.status(201).send(toScimUser(user, defaultTeam?.name));
+    },
+  );
 
   // GET /api/v1/scim/v2/Users/:id -- get user
   app.get(
     "/api/v1/scim/v2/Users/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -406,6 +413,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/scim/v2/Users -- list users with filter
   app.get(
     "/api/v1/scim/v2/Users",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (
       request: FastifyRequest<{
         Querystring: { filter?: string; startIndex?: string; count?: string };
@@ -477,6 +485,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // PUT /api/v1/scim/v2/Users/:id -- replace user
   app.put(
     "/api/v1/scim/v2/Users/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -555,6 +564,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // PATCH /api/v1/scim/v2/Users/:id -- partial update
   app.patch(
     "/api/v1/scim/v2/Users/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -661,6 +671,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /api/v1/scim/v2/Users/:id -- deactivate user (soft delete)
   app.delete(
     "/api/v1/scim/v2/Users/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -706,74 +717,81 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // ── Group Operations ───────────────────────────────────────────
 
   // POST /api/v1/scim/v2/Groups -- create team
-  app.post("/api/v1/scim/v2/Groups", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!(await scimAuth(request, reply))) return;
-    if (!(await requireScimFeature(reply))) return;
+  app.post(
+    "/api/v1/scim/v2/Groups",
+    {
+      config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!(await scimAuth(request, reply))) return;
+      if (!(await requireScimFeature(reply))) return;
 
-    const body = request.body as Record<string, unknown>;
-    const displayName = body.displayName as string | undefined;
-    const members = body.members as Array<{ value: string }> | undefined;
+      const body = request.body as Record<string, unknown>;
+      const displayName = body.displayName as string | undefined;
+      const members = body.members as Array<{ value: string }> | undefined;
 
-    if (!displayName) {
-      return reply.status(400).send(scimError(400, "displayName is required"));
-    }
-
-    // Check for duplicate team name
-    const [existing] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.name, displayName));
-
-    if (existing) {
-      return reply.status(409).send(scimError(409, "Group already exists"));
-    }
-
-    const id = randomUUID();
-    const now = new Date();
-
-    await db.insert(schema.teams).values({
-      id,
-      name: displayName,
-      createdAt: now,
-    });
-
-    // Assign members to the team
-    if (members && members.length > 0) {
-      for (const member of members) {
-        await db
-          .update(schema.users)
-          .set({ team: id, updatedAt: new Date() })
-          .where(eq(schema.users.id, member.value));
+      if (!displayName) {
+        return reply.status(400).send(scimError(400, "displayName is required"));
       }
-    }
 
-    // Fetch actual members
-    const teamMembers = await db
-      .select({ id: schema.users.id, username: schema.users.username })
-      .from(schema.users)
-      .where(eq(schema.users.team, id));
+      // Check for duplicate team name
+      const [existing] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, displayName));
 
-    await auditLog(
-      request.log,
-      "SCIM_GROUP_SYNCED",
-      {
-        teamId: id,
-        teamName: displayName,
-        action: "created",
-        memberCount: teamMembers.length,
-      },
-      request.ip,
-      request.id,
-    );
+      if (existing) {
+        return reply.status(409).send(scimError(409, "Group already exists"));
+      }
 
-    return reply
-      .status(201)
-      .send(toScimGroup({ id, name: displayName, createdAt: now }, teamMembers));
-  });
+      const id = randomUUID();
+      const now = new Date();
+
+      await db.insert(schema.teams).values({
+        id,
+        name: displayName,
+        createdAt: now,
+      });
+
+      // Assign members to the team
+      if (members && members.length > 0) {
+        for (const member of members) {
+          await db
+            .update(schema.users)
+            .set({ team: id, updatedAt: new Date() })
+            .where(eq(schema.users.id, member.value));
+        }
+      }
+
+      // Fetch actual members
+      const teamMembers = await db
+        .select({ id: schema.users.id, username: schema.users.username })
+        .from(schema.users)
+        .where(eq(schema.users.team, id));
+
+      await auditLog(
+        request.log,
+        "SCIM_GROUP_SYNCED",
+        {
+          teamId: id,
+          teamName: displayName,
+          action: "created",
+          memberCount: teamMembers.length,
+        },
+        request.ip,
+        request.id,
+      );
+
+      return reply
+        .status(201)
+        .send(toScimGroup({ id, name: displayName, createdAt: now }, teamMembers));
+    },
+  );
 
   // GET /api/v1/scim/v2/Groups/:id -- get team
   app.get(
     "/api/v1/scim/v2/Groups/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -797,6 +815,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/scim/v2/Groups -- list teams
   app.get(
     "/api/v1/scim/v2/Groups",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (
       request: FastifyRequest<{
         Querystring: { filter?: string; startIndex?: string; count?: string };
@@ -862,6 +881,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // PUT /api/v1/scim/v2/Groups/:id -- replace team
   app.put(
     "/api/v1/scim/v2/Groups/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -939,6 +959,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // PATCH /api/v1/scim/v2/Groups/:id -- update members
   app.patch(
     "/api/v1/scim/v2/Groups/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
@@ -1048,6 +1069,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /api/v1/scim/v2/Groups/:id -- delete team
   app.delete(
     "/api/v1/scim/v2/Groups/:id",
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;

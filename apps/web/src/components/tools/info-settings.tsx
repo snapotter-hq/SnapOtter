@@ -63,7 +63,7 @@ export function InfoSettings() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch("/api/v1/tools/info", {
+        const res = await fetch("/api/v1/tools/image/info", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

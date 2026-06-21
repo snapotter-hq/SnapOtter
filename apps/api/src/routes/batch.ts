@@ -1,7 +1,7 @@
 /**
  * Batch processing route.
  *
- * POST /api/v1/tools/:toolId/batch
+ * POST /api/v1/tools/:section/:toolId/batch
  *
  * Accepts multipart with multiple files + settings JSON.
  * Each file is enqueued as a batch-child BullMQ job; a batch-finalize
@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import { getBundleForTool, TOOL_BUNDLE_MAP, TOOLS, toolSection } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -56,10 +56,17 @@ function injectTraceContextIntoFlow(node: FlowJob): void {
 
 export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
   app.post(
-    "/api/v1/tools/:toolId/batch",
+    "/api/v1/tools/:section/:toolId/batch",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
-    async (request: FastifyRequest<{ Params: { toolId: string } }>, reply: FastifyReply) => {
-      const { toolId } = request.params;
+    async (
+      request: FastifyRequest<{ Params: { section: string; toolId: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { section, toolId } = request.params;
+      const tool = TOOLS.find((t) => t.id === toolId);
+      if (!tool || toolSection(tool) !== section) {
+        return reply.status(404).send({ error: "Not found", code: "NOT_FOUND" });
+      }
 
       // Batch processing (especially with AI) can take tens of minutes.
       // Disable the Node.js HTTP socket timeout so the connection is not
@@ -182,7 +189,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
       // Resolve the tool's modality so non-image files (audio/video/document)
       // validate through their own handler instead of the image validator.
-      const modality = TOOLS.find((t) => t.id === toolId)?.modality ?? "image";
+      const modality = tool.modality;
       const batchScratch = join(tmpdir(), "snapotter-scratch", `batch-${parentId}`);
       await mkdir(batchScratch, { recursive: true });
 
@@ -456,7 +463,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       // Append results from object storage in original upload order
       try {
         for (const entry of successEntries) {
-          const stream = await getObjectStream(entry.outputRef!);
+          if (!entry.outputRef) continue;
+          const stream = await getObjectStream(entry.outputRef);
           archive.append(stream, { name: entry.filename });
         }
 

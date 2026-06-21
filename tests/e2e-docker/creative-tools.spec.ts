@@ -105,7 +105,7 @@ test.describe("Collage", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/collage", {
+    const res = await request.post("/api/v1/tools/image/collage", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -133,7 +133,7 @@ test.describe("Collage", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/collage", {
+    const res = await request.post("/api/v1/tools/image/collage", {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": contentType,
@@ -157,7 +157,7 @@ test.describe("Stitch", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ direction: "horizontal", gap: 0 }) }],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -175,7 +175,7 @@ test.describe("Stitch", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ direction: "vertical", gap: 0 }) }],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -201,7 +201,7 @@ test.describe("Stitch", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -219,7 +219,7 @@ test.describe("Stitch", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ direction: "grid", gridColumns: 2 }) }],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -233,7 +233,7 @@ test.describe("Stitch", () => {
       [{ name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 }],
       [{ name: "settings", value: JSON.stringify({ direction: "horizontal" }) }],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -247,7 +247,7 @@ test.describe("Stitch", () => {
 
 test.describe("Split", () => {
   test("split image into 2x2 tiles via API", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/split", {
+    const res = await request.post("/api/v1/tools/image/split", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -263,7 +263,7 @@ test.describe("Split", () => {
   });
 
   test("split image into 3x3 tiles via API", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/split", {
+    const res = await request.post("/api/v1/tools/image/split", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -283,7 +283,7 @@ test.describe("Split", () => {
 
 test.describe("Border", () => {
   test("add solid color border", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/border", {
+    const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -298,7 +298,7 @@ test.describe("Border", () => {
   });
 
   test("add thin border", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/border", {
+    const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -311,7 +311,7 @@ test.describe("Border", () => {
   });
 
   test("add wide white border", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/border", {
+    const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -340,7 +340,7 @@ test.describe("Compose", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 10, y: 10, opacity: 80 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -355,7 +355,7 @@ test.describe("Compose", () => {
 
 test.describe("Watermark Text", () => {
   test("add center watermark", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -375,7 +375,7 @@ test.describe("Watermark Text", () => {
   });
 
   test("add tiled watermark", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -396,7 +396,7 @@ test.describe("Watermark Text", () => {
   test("add corner watermark positions", async ({ request }) => {
     const positions = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
     for (const position of positions) {
-      const res = await request.post("/api/v1/tools/watermark-text", {
+      const res = await request.post("/api/v1/tools/image/watermark-text", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -416,7 +416,7 @@ test.describe("Watermark Text", () => {
   });
 
   test("add rotated watermark", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -457,7 +457,7 @@ test.describe("Watermark Image", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -472,7 +472,7 @@ test.describe("Watermark Image", () => {
 
 test.describe("Text Overlay", () => {
   test("add text overlay at center", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -491,7 +491,7 @@ test.describe("Text Overlay", () => {
   });
 
   test("add text overlay at top", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -509,7 +509,7 @@ test.describe("Text Overlay", () => {
   });
 
   test("add text overlay at bottom with background box", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -529,7 +529,7 @@ test.describe("Text Overlay", () => {
   });
 
   test("add text overlay with shadow", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -552,7 +552,7 @@ test.describe("Text Overlay", () => {
 
 test.describe("Content-Aware Resize", () => {
   test("content-aware resize to smaller width", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -572,7 +572,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("content-aware resize JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -606,7 +606,7 @@ test.describe("Auth failure", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/collage", {
+    const res = await request.post("/api/v1/tools/image/collage", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -621,7 +621,7 @@ test.describe("Auth failure", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ direction: "horizontal" }) }],
     );
-    const res = await request.post("/api/v1/tools/stitch", {
+    const res = await request.post("/api/v1/tools/image/stitch", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -629,7 +629,7 @@ test.describe("Auth failure", () => {
   });
 
   test("text-overlay without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({

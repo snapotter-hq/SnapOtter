@@ -35,7 +35,7 @@ export function WatermarkImageSettings() {
         formData.append("watermark", watermarkFile);
         formData.append("settings", settingsJson);
 
-        const res = await fetch("/api/v1/tools/watermark-image", {
+        const res = await fetch("/api/v1/tools/image/watermark-image", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
@@ -70,7 +70,7 @@ export function WatermarkImageSettings() {
             formData.append("watermark", watermarkFile);
             formData.append("settings", settingsJson);
 
-            const res = await fetch("/api/v1/tools/watermark-image", {
+            const res = await fetch("/api/v1/tools/image/watermark-image", {
               method: "POST",
               headers: formatHeaders(),
               body: formData,

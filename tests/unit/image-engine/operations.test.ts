@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -37,8 +36,7 @@ import {
   sharpenAdvanced,
   stripMetadata,
 } from "@snapotter/image-engine";
-
-const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // Helper to get metadata from a sharp pipeline result
 async function getMeta(img: sharp.Sharp) {
@@ -58,11 +56,11 @@ let webp50x50: Buffer;
 let jpgWithExif: Buffer;
 
 beforeAll(() => {
-  png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
-  png1x1 = readFileSync(path.join(FIXTURES_DIR, "test-1x1.png"));
-  jpg100x100 = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
-  webp50x50 = readFileSync(path.join(FIXTURES_DIR, "test-50x50.webp"));
-  jpgWithExif = readFileSync(path.join(FIXTURES_DIR, "test-with-exif.jpg"));
+  png200x150 = readFixture(fixtures.image.base.png200);
+  png1x1 = readFixture(fixtures.image.edge.px1);
+  jpg100x100 = readFixture(fixtures.image.base.jpg100);
+  webp50x50 = readFixture(fixtures.image.base.webp50);
+  jpgWithExif = readFixture(fixtures.image.exifGps);
 });
 
 // ---------------------------------------------------------------------------
@@ -736,7 +734,7 @@ describe("compress", () => {
   });
 
   it("falls back to PNG for SVG input (NO_ENCODER format)", async () => {
-    const svgBuf = readFileSync(path.join(FIXTURES_DIR, "formats/sample.svg"));
+    const svgBuf = readFixture(fixtures.image.formats("svg"));
     const img = sharp(svgBuf);
     const result = await compress(img, { quality: 80 });
     const meta = await getMeta(result);
@@ -2254,7 +2252,7 @@ describe("optimizeForWeb", () => {
   // -- Quality impact --
 
   it("lower quality produces smaller file for webp", async () => {
-    const buf = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
+    const buf = readFixture(fixtures.image.base.jpg100);
     const bufHigh = await (
       await optimizeForWeb(sharp(buf), { format: "webp", quality: 95 })
     ).toBuffer();

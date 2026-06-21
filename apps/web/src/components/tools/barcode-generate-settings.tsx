@@ -36,7 +36,7 @@ export function BarcodeGenerateSettings() {
     setResultUrl(null);
 
     try {
-      const res = await fetch("/api/v1/tools/barcode-generate", {
+      const res = await fetch("/api/v1/tools/image/barcode-generate", {
         method: "POST",
         headers: {
           ...formatHeaders(),

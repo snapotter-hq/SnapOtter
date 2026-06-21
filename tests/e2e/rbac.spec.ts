@@ -1,4 +1,5 @@
 import { test as base, expect } from "@playwright/test";
+import { authFile } from "../../playwright.config";
 import { login, openSettings } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
@@ -103,7 +104,7 @@ async function cleanupTestUser(adminToken: string): Promise<void> {
 
 base.describe("RBAC - Admin sees all tabs", () => {
   base.use({
-    storageState: "test-results/.auth/user.json",
+    storageState: authFile,
   });
 
   base.test("admin sees all settings tabs", async ({ page }) => {

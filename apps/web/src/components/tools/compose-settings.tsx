@@ -30,7 +30,7 @@ export function ComposeSettings() {
       formData.append("overlay", overlayFile);
       formData.append("settings", JSON.stringify({ x, y, opacity, blendMode }));
 
-      const res = await fetch("/api/v1/tools/compose", {
+      const res = await fetch("/api/v1/tools/image/compose", {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

@@ -1,5 +1,5 @@
 import type { Tool } from "@snapotter/shared";
-import { CATEGORIES, MODALITIES, TOOLS } from "@snapotter/shared";
+import { CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import { ChevronDown, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -20,9 +20,9 @@ interface TabDef {
   label: string;
 }
 
-const COLLAPSE_STORAGE_KEY = "snapotter-collapsed-modalities";
+const COLLAPSE_STORAGE_KEY = "snapotter-collapsed-sections";
 
-function getCollapsedModalities(): Set<string> {
+function getCollapsedSections(): Set<string> {
   try {
     const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
@@ -31,19 +31,11 @@ function getCollapsedModalities(): Set<string> {
   }
 }
 
-function saveCollapsedModalities(collapsed: Set<string>) {
+function saveCollapsedSections(collapsed: Set<string>) {
   localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsed]));
 }
 
-const MODALITY_TAB_ORDER = [
-  { modalityId: "image", tabKey: "image", label: "Image" },
-  { modalityId: "video", tabKey: "video", label: "Video" },
-  { modalityId: "audio", tabKey: "audio", label: "Audio" },
-  { modalityId: "document", tabKey: "document", label: "PDF" },
-  { modalityId: "file", tabKey: "data", label: "Data" },
-];
-
-const MODALITY_TABS = new Set<string>(["all", ...MODALITY_TAB_ORDER.map((m) => m.tabKey)]);
+const SECTION_TABS = new Set<string>(["all", ...SECTIONS.map((s) => s.id)]);
 
 export function HomePage() {
   const { t } = useTranslation();
@@ -60,12 +52,12 @@ export function HomePage() {
     fetchSettings();
   }, [fetchSettings]);
 
-  // Open a specific modality tab when arriving via a breadcrumb link
-  // (/?modality=<tabKey>), then clean the URL so refresh/back doesn't re-pin it.
+  // Open a specific section tab when arriving via a breadcrumb link
+  // (/?section=<sectionId>), then clean the URL so refresh/back doesn't re-pin it.
   useEffect(() => {
-    const m = new URLSearchParams(location.search).get("modality");
-    if (m && MODALITY_TABS.has(m)) {
-      setActiveTab(m);
+    const s = new URLSearchParams(location.search).get("section");
+    if (s && SECTION_TABS.has(s)) {
+      setActiveTab(s);
       navigate("/", { replace: true });
     }
   }, [location.search, navigate]);
@@ -73,11 +65,10 @@ export function HomePage() {
   const tabs: TabDef[] = useMemo(
     () => [
       { key: "all", label: t.homePage.all },
-      { key: "image", label: "Image" },
-      { key: "video", label: "Video" },
-      { key: "audio", label: "Audio" },
-      { key: "document", label: t.homePage.documents },
-      { key: "data", label: t.homePage.data },
+      ...SECTIONS.map((s) => ({
+        key: s.id,
+        label: s.id === "pdf" ? t.homePage.pdf : s.id === "files" ? t.homePage.files : s.name,
+      })),
     ],
     [t],
   );
@@ -96,8 +87,7 @@ export function HomePage() {
 
   const tabTools = useMemo(() => {
     if (activeTab === "all") return visibleTools;
-    const modalityKey = activeTab === "data" ? "file" : activeTab;
-    return visibleTools.filter((tool) => tool.modality === modalityKey);
+    return visibleTools.filter((tool) => toolSection(tool) === activeTab);
   }, [visibleTools, activeTab]);
 
   const groupedTools = useMemo(() => {
@@ -116,8 +106,8 @@ export function HomePage() {
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: visibleTools.length };
     for (const tool of visibleTools) {
-      const tabKey = tool.modality === "file" ? "data" : tool.modality;
-      counts[tabKey] = (counts[tabKey] ?? 0) + 1;
+      const sec = toolSection(tool);
+      counts[sec] = (counts[sec] ?? 0) + 1;
     }
     return counts;
   }, [visibleTools]);
@@ -296,7 +286,7 @@ function SearchResults({
   );
 }
 
-// ── All Tab: Grouped by modality, then by category ───────────────
+// ── All Tab: Grouped by section, then by category ───────────────
 
 function AllTabContent({
   recentTools,
@@ -306,29 +296,30 @@ function AllTabContent({
   visibleTools: Tool[];
 }) {
   const { t } = useTranslation();
-  const [collapsed, setCollapsed] = useState<Set<string>>(getCollapsedModalities);
+  const [collapsed, setCollapsed] = useState<Set<string>>(getCollapsedSections);
 
-  const toggleModality = useCallback((modalityId: string) => {
+  const toggleSection = useCallback((sectionId: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(modalityId)) next.delete(modalityId);
-      else next.add(modalityId);
-      saveCollapsedModalities(next);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      saveCollapsedSections(next);
       return next;
     });
   }, []);
 
-  const toolsByModality = useMemo(() => {
+  const toolsBySection = useMemo(() => {
     const map = new Map<string, Map<string, Tool[]>>();
     for (const tool of visibleTools) {
-      let modMap = map.get(tool.modality);
-      if (!modMap) {
-        modMap = new Map();
-        map.set(tool.modality, modMap);
+      const sec = toolSection(tool);
+      let catMap = map.get(sec);
+      if (!catMap) {
+        catMap = new Map();
+        map.set(sec, catMap);
       }
-      const existing = modMap.get(tool.category);
+      const existing = catMap.get(tool.category);
       if (existing) existing.push(tool);
-      else modMap.set(tool.category, [tool]);
+      else catMap.set(tool.category, [tool]);
     }
     return map;
   }, [visibleTools]);
@@ -355,37 +346,36 @@ function AllTabContent({
         </section>
       )}
 
-      {/* Modality sections */}
-      {MODALITY_TAB_ORDER.map(({ modalityId, label }) => {
-        const categoryMap = toolsByModality.get(modalityId);
+      {/* Section groups */}
+      {SECTIONS.map((sec) => {
+        const categoryMap = toolsBySection.get(sec.id);
         if (!categoryMap || categoryMap.size === 0) return null;
 
         const totalCount = [...categoryMap.values()].reduce((sum, arr) => sum + arr.length, 0);
-        const isCollapsed = collapsed.has(modalityId);
-        const modality = MODALITIES.find((m) => m.id === modalityId);
-        const ModalityIcon = modality
-          ? (ICON_MAP[modality.icon] as React.ComponentType<{ className?: string }>)
-          : null;
+        const isCollapsed = collapsed.has(sec.id);
+        const SectionIcon = ICON_MAP[sec.icon] as
+          | React.ComponentType<{ className?: string }>
+          | undefined;
 
         return (
-          <section key={modalityId}>
+          <section key={sec.id}>
             <button
               type="button"
-              onClick={() => toggleModality(modalityId)}
+              onClick={() => toggleSection(sec.id)}
               className="w-full flex items-center gap-2 py-2 mb-2 border-b border-border/40 group cursor-pointer"
             >
-              {ModalityIcon && (
+              {SectionIcon && (
                 <div
                   className="p-1 rounded"
                   style={{
-                    backgroundColor: `${modality?.color ?? "#6B7280"}15`,
-                    color: modality?.color ?? "#6B7280",
+                    backgroundColor: `${sec.color}15`,
+                    color: sec.color,
                   }}
                 >
-                  <ModalityIcon className="h-4 w-4" />
+                  <SectionIcon className="h-4 w-4" />
                 </div>
               )}
-              <span className="text-sm font-semibold text-foreground">{label}</span>
+              <span className="text-sm font-semibold text-foreground">{sec.name}</span>
               <span className="text-xs text-muted-foreground">{totalCount}</span>
               <div className="flex-1" />
               <ChevronDown

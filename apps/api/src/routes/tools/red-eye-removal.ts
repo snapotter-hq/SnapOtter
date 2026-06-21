@@ -58,7 +58,7 @@ registerAiJobHandler("red-eye-removal", async (input, data, ctx) => {
 /** Red eye detection and removal route. */
 export function registerRedEyeRemoval(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/red-eye-removal",
+    "/api/v1/tools/image/red-eye-removal",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "red-eye-removal";
       if (!isToolInstalled(toolId)) {

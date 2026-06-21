@@ -1,4 +1,4 @@
-import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
+import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders, parseApiError } from "@/lib/api";
@@ -497,7 +497,7 @@ export function useToolProcessor(toolId: string) {
         clearActiveJob();
       };
 
-      xhr.open("POST", `/api/v1/tools/${toolId}`);
+      xhr.open("POST", apiToolPath(toolId));
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });
@@ -578,7 +578,7 @@ export function useToolProcessor(toolId: string) {
 
       try {
         abortRef.current = new AbortController();
-        const response = await fetch(`/api/v1/tools/${toolId}/batch`, {
+        const response = await fetch(`${apiToolPath(toolId)}/batch`, {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

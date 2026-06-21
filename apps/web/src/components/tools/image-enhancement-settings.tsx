@@ -181,7 +181,7 @@ export function ImageEnhancementControls({
     const formData = new FormData();
     formData.append("file", files[0]);
 
-    fetch("/api/v1/tools/image-enhancement/analyze", {
+    fetch("/api/v1/tools/image/image-enhancement/analyze", {
       method: "POST",
       body: formData,
       signal: controller.signal,

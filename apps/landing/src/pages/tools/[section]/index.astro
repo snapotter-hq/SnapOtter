@@ -1,0 +1,62 @@
+---
+import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
+import Footer from "@/components/Footer.astro";
+import Navbar from "@/components/Navbar.astro";
+import Base from "@/layouts/Base.astro";
+
+export function getStaticPaths() {
+  return SECTIONS.map((s) => ({
+    params: { section: s.id },
+    props: { section: s, tools: TOOLS.filter((t) => toolSection(t) === s.id) },
+  }));
+}
+
+const { section, tools } = Astro.props;
+const canonical = `https://snapotter.com/tools/${section.id}/`;
+const title = `${section.name} Tools | SnapOtter`;
+---
+
+<Base
+  canonical={canonical}
+  title={title}
+  description={`Browse SnapOtter's ${section.name.toLowerCase()} tools.`}
+>
+  <Navbar />
+
+  <main id="main">
+    <nav class="mx-auto max-w-6xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2 text-sm text-muted">
+        <li>
+          <a href="/" class="transition-colors hover:text-foreground">Home</a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li>
+          <a href="/tools" class="transition-colors hover:text-foreground">Tools</a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li class="font-medium text-foreground">{section.name}</li>
+      </ol>
+    </nav>
+
+    <section class="mx-auto max-w-6xl px-6 pt-8 pb-16">
+      <div class="reveal">
+        <h1 class="font-display text-3xl font-bold">{section.name} Tools</h1>
+        <ul class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {tools.map((tool) => (
+            <li>
+              <a
+                class="card-hover block rounded-lg border border-border p-4"
+                href={`/tools/${section.id}/${tool.id}/`}
+              >
+                <span class="font-medium">{tool.name}</span>
+                <span class="mt-1 block text-sm text-muted">{tool.description}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Base>

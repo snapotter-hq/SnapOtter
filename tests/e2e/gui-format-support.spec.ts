@@ -2,8 +2,9 @@ import path from "node:path";
 import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 const fixtureFormat = (name: string) =>
-  path.join(process.cwd(), "tests", "fixtures", "formats", name);
-const fixtureRoot = (name: string) => path.join(process.cwd(), "tests", "fixtures", name);
+  path.join(process.cwd(), "tests", "fixtures", "image", "formats", name);
+const fixtureImage = (name: string) =>
+  path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 
 async function uploadFixture(page: import("@playwright/test").Page, filePath: string) {
   const fileChooserPromise = page.waitForEvent("filechooser");
@@ -39,7 +40,7 @@ test.describe("Format upload and resize processing", () => {
   }
   test("HEIC uploads and resizes", async ({ loggedInPage: page }) => {
     await page.goto("/resize");
-    await uploadFixture(page, fixtureRoot("test-200x150.heic"));
+    await uploadFixture(page, fixtureImage("test-200x150.heic"));
     await page.locator("input[placeholder='Auto']").first().fill("25");
     await page.getByRole("button", { name: "Resize" }).click();
     await waitForProcessing(page);
@@ -108,7 +109,7 @@ test.describe("HEIC-to-JPG conversion", () => {
   test.describe.configure({ timeout: 60_000 });
   test("uploads HEIC, converts to JPG", async ({ loggedInPage: page }) => {
     await page.goto("/convert");
-    await uploadFixture(page, fixtureRoot("test-200x150.heic"));
+    await uploadFixture(page, fixtureImage("test-200x150.heic"));
     await expect(page.getByText(/heic/i).first()).toBeVisible({ timeout: 10_000 });
     await page.selectOption("#convert-target-format", "jpg");
     await page.getByRole("button", { name: /convert/i }).click();

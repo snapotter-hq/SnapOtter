@@ -326,7 +326,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      if (!user || !user.passwordHash) {
+      if (!user?.passwordHash) {
         authAttempts.inc({ method: "password", result: "failure" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
@@ -411,6 +411,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         mfaRequired = isMfaRequiredForUser(policy, user.role) && !user.totpEnabled;
       } catch {
         // MFA plugin not loaded
+      }
+
+      const cookieReply = reply as FastifyReply & {
+        setCookie?: (name: string, value: string, opts: Record<string, unknown>) => FastifyReply;
+      };
+      if (typeof cookieReply.setCookie === "function") {
+        cookieReply.setCookie("snapotter-session", token, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "strict",
+          secure: env.EXTERNAL_URL.startsWith("https"),
+          maxAge: SESSION_DURATION_MS / 1000,
+        });
       }
 
       return reply.send({
@@ -534,72 +547,78 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /api/auth/change-password
-  app.post("/api/auth/change-password", async (request: FastifyRequest, reply: FastifyReply) => {
-    const authUser = requireAuth(request, reply);
-    if (!authUser) return;
+  app.post(
+    "/api/auth/change-password",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authUser = requireAuth(request, reply);
+      if (!authUser) return;
 
-    const parsed = changePasswordSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: "Current password and new password are required",
-        code: "VALIDATION_ERROR",
-      });
-    }
-    const body = parsed.data;
+      const parsed = changePasswordSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: "Current password and new password are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const body = parsed.data;
 
-    const pwError = await validatePasswordStrength(body.newPassword);
-    if (pwError) {
-      return reply.status(400).send({
-        error: pwError,
-        code: "VALIDATION_ERROR",
-      });
-    }
+      const pwError = await validatePasswordStrength(body.newPassword);
+      if (pwError) {
+        return reply.status(400).send({
+          error: pwError,
+          code: "VALIDATION_ERROR",
+        });
+      }
 
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, authUser.id));
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, authUser.id));
 
-    if (!user) {
-      return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
-    }
+      if (!user) {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
 
-    if (!user.passwordHash) {
-      return reply.status(400).send({
-        error: "Password changes are managed by your identity provider.",
-        code: "OIDC_NO_PASSWORD",
-      });
-    }
+      if (!user.passwordHash) {
+        return reply.status(400).send({
+          error: "Password changes are managed by your identity provider.",
+          code: "OIDC_NO_PASSWORD",
+        });
+      }
 
-    const valid = await verifyPassword(body.currentPassword, user.passwordHash);
-    if (!valid) {
-      return reply
-        .status(401)
-        .send({ error: "Current password is incorrect", code: "INVALID_PASSWORD" });
-    }
+      const valid = await verifyPassword(body.currentPassword, user.passwordHash);
+      if (!valid) {
+        return reply
+          .status(401)
+          .send({ error: "Current password is incorrect", code: "INVALID_PASSWORD" });
+      }
 
-    const newHash = await hashPassword(body.newPassword);
+      const newHash = await hashPassword(body.newPassword);
 
-    await db
-      .update(schema.users)
-      .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
-      .where(eq(schema.users.id, authUser.id));
-
-    // Invalidate all other sessions for this user
-    const currentToken = extractToken(request);
-    if (currentToken) {
       await db
-        .delete(schema.sessions)
-        .where(and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)));
-    }
+        .update(schema.users)
+        .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
+        .where(eq(schema.users.id, authUser.id));
 
-    // Revoke all API keys - if credentials were compromised, keys must be rotated too
-    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+      // Invalidate all other sessions for this user
+      const currentToken = extractToken(request);
+      if (currentToken) {
+        await db
+          .delete(schema.sessions)
+          .where(
+            and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
+          );
+      }
 
-    await auditFromRequest(request)("PASSWORD_CHANGED", {
-      userId: authUser.id,
-      username: authUser.username,
-    });
+      // Revoke all API keys - if credentials were compromised, keys must be rotated too
+      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
 
-    return reply.send({ ok: true });
-  });
+      await auditFromRequest(request)("PASSWORD_CHANGED", {
+        userId: authUser.id,
+        username: authUser.username,
+      });
+
+      return reply.send({ ok: true });
+    },
+  );
 
   // GET /api/auth/users (admin only)
   app.get("/api/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {

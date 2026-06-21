@@ -3,7 +3,7 @@
 // make-tiny-pptx.mjs
 //
 // Builds a minimal ECMA-376 (OOXML) presentation skeleton and writes it to
-// tests/fixtures/documents/tiny.pptx using adm-zip (root devDep).
+// tests/fixtures/document/formats/tiny.pptx using adm-zip (root devDep).
 //
 // ACCEPTANCE (2026-06-12, snapotter/snapotter:latest + libreoffice-impress):
 //   soffice --headless --norestore --nolockcheck --nodefault \
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import AdmZip from "adm-zip";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = join(__dirname, "..", "..", "tests", "fixtures", "documents", "tiny.pptx");
+const outPath = join(__dirname, "..", "..", "tests", "fixtures", "document", "formats", "tiny.pptx");
 
 const zip = new AdmZip();
 

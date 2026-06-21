@@ -92,7 +92,7 @@ registerAiJobHandler("remove-background", async (input, data, ctx) => {
 export function registerRemoveBackground(app: FastifyInstance) {
   // ── Phase 1: Background removal ──────────────────────────────────
   app.post(
-    "/api/v1/tools/remove-background",
+    "/api/v1/tools/image/remove-background",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "remove-background";
       if (!isToolInstalled(toolId)) {
@@ -229,7 +229,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
   // ── Phase 2: Effects-only (no AI re-run) ─────────────────────────
   app.post(
-    "/api/v1/tools/remove-background/effects",
+    "/api/v1/tools/image/remove-background/effects",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let settingsRaw: string | null = null;
       let bgImageBuffer: Buffer | null = null;

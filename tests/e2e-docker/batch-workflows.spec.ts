@@ -107,7 +107,7 @@ test.describe("Essential: batch resize 5 images", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ width: 120, fit: "contain" }) }],
     );
-    const res = await request.post("/api/v1/tools/resize/batch", {
+    const res = await request.post("/api/v1/tools/image/resize/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -126,7 +126,7 @@ test.describe("Essential: batch resize 5 images", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ width: 64, height: 64, fit: "cover" }) }],
     );
-    const res = await request.post("/api/v1/tools/resize/batch", {
+    const res = await request.post("/api/v1/tools/image/resize/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -149,7 +149,7 @@ test.describe("Essential: batch compress", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ quality: 20 }) }],
     );
-    const res = await request.post("/api/v1/tools/compress/batch", {
+    const res = await request.post("/api/v1/tools/image/compress/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -165,7 +165,7 @@ test.describe("Essential: batch compress", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ quality: 60 }) }],
     );
-    const res = await request.post("/api/v1/tools/compress/batch", {
+    const res = await request.post("/api/v1/tools/image/compress/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -186,7 +186,7 @@ test.describe("Essential: batch rotate", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ angle: 90 }) }],
     );
-    const res = await request.post("/api/v1/tools/rotate/batch", {
+    const res = await request.post("/api/v1/tools/image/rotate/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -202,7 +202,7 @@ test.describe("Essential: batch rotate", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ angle: 45, background: "#ffffff" }) }],
     );
-    const res = await request.post("/api/v1/tools/rotate/batch", {
+    const res = await request.post("/api/v1/tools/image/rotate/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -228,7 +228,7 @@ test.describe("Adjustment: batch color adjustments", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/adjust-colors/batch", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -247,7 +247,7 @@ test.describe("Adjustment: batch color adjustments", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ grayscale: true }) }],
     );
-    const res = await request.post("/api/v1/tools/adjust-colors/batch", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -263,7 +263,7 @@ test.describe("Adjustment: batch color adjustments", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ brightness: -30, contrast: 20 }) }],
     );
-    const res = await request.post("/api/v1/tools/adjust-colors/batch", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -284,7 +284,7 @@ test.describe("Adjustment: batch sharpening", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ sigma: 2.0 }) }],
     );
-    const res = await request.post("/api/v1/tools/sharpening/batch", {
+    const res = await request.post("/api/v1/tools/image/sharpening/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -300,7 +300,7 @@ test.describe("Adjustment: batch sharpening", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ sigma: 0.5 }) }],
     );
-    const res = await request.post("/api/v1/tools/sharpening/batch", {
+    const res = await request.post("/api/v1/tools/image/sharpening/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -335,7 +335,7 @@ test.describe("Overlay: batch watermark text", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-text/batch", {
+    const res = await request.post("/api/v1/tools/image/watermark-text/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -362,7 +362,7 @@ test.describe("Overlay: batch watermark text", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-text/batch", {
+    const res = await request.post("/api/v1/tools/image/watermark-text/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -394,7 +394,7 @@ test.describe("Overlay: batch watermark image", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image/batch", {
+    const res = await request.post("/api/v1/tools/image/watermark-image/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -429,7 +429,7 @@ test.describe("Format: batch convert JPEG to PNG", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "png" }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -447,7 +447,7 @@ test.describe("Format: batch convert JPEG to PNG", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "webp", quality: 80 }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -463,7 +463,7 @@ test.describe("Format: batch convert JPEG to PNG", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "avif" }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -486,7 +486,7 @@ test.describe("Utility: batch info", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/info/batch", {
+    const res = await request.post("/api/v1/tools/image/info/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -522,7 +522,7 @@ test.describe("Utility: batch strip metadata", () => {
       ],
       [{ name: "settings", value: JSON.stringify({}) }],
     );
-    const res = await request.post("/api/v1/tools/strip-metadata/batch", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -539,7 +539,7 @@ test.describe("Utility: batch strip metadata", () => {
       ],
       [{ name: "settings", value: JSON.stringify({}) }],
     );
-    const res = await request.post("/api/v1/tools/strip-metadata/batch", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -565,7 +565,7 @@ test.describe("Essential: batch crop", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/crop/batch", {
+    const res = await request.post("/api/v1/tools/image/crop/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -598,7 +598,7 @@ test.describe("Overlay: batch text overlay", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/text-overlay/batch", {
+    const res = await request.post("/api/v1/tools/image/text-overlay/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -618,7 +618,7 @@ test.describe("Format: batch convert to TIFF", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "tiff" }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -639,7 +639,7 @@ test.describe("Adjustment: batch enhance", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ preset: "vivid" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-enhancement/batch", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -662,7 +662,7 @@ test.describe("Utility: batch optimize for web", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ maxWidth: 600, quality: 65 }) }],
     );
-    const res = await request.post("/api/v1/tools/optimize-for-web/batch", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -683,7 +683,7 @@ test.describe("Overlay: batch border", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ size: 20, color: "#ff0000" }) }],
     );
-    const res = await request.post("/api/v1/tools/border/batch", {
+    const res = await request.post("/api/v1/tools/image/border/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -703,7 +703,7 @@ test.describe("Format: batch convert to GIF", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ format: "gif" }) }],
     );
-    const res = await request.post("/api/v1/tools/convert/batch", {
+    const res = await request.post("/api/v1/tools/image/convert/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -732,7 +732,7 @@ test.describe("Adjustment: batch replace color", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/replace-color/batch", {
+    const res = await request.post("/api/v1/tools/image/replace-color/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });

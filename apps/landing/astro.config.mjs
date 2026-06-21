@@ -5,6 +5,9 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   site: "https://snapotter.com",
   output: "static",
+  devToolbar: {
+    enabled: !process.env.PLAYWRIGHT,
+  },
   integrations: [
     sitemap({
       filter: (page) => !page.includes("/404"),

@@ -1,5 +1,5 @@
 ---
-import { CATEGORIES, TOOLS } from "@snapotter/shared";
+import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
@@ -37,7 +37,7 @@ const modalityFilters = [
     label: "PDF & Docs",
     count: TOOLS.filter((t) => t.modality === "document").length,
   },
-  { id: "file", label: "Data", count: TOOLS.filter((t) => t.modality === "file").length },
+  { id: "file", label: "Files", count: TOOLS.filter((t) => t.modality === "file").length },
 ];
 
 const breadcrumbJsonLd = {
@@ -68,7 +68,7 @@ const collectionJsonLd = {
       "@type": "ListItem",
       position: i + 1,
       name: tool.name,
-      url: `https://snapotter.com/tools/${tool.id}`,
+      url: `https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`,
     })),
   },
 };
@@ -185,7 +185,7 @@ const collectionJsonLd = {
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.tools.map((tool) => (
                 <a
-                  href={`/tools/${tool.id}`}
+                  href={`/tools/${toolSection(tool)}/${tool.id}/`}
                   class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
                   data-name={tool.name.toLowerCase()}
                   data-desc={tool.description.toLowerCase()}

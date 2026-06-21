@@ -152,7 +152,7 @@ registerAiJobHandler("transparency-fixer", async (input, data, ctx) => {
 
 export function registerTransparencyFixer(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/transparency-fixer",
+    "/api/v1/tools/image/transparency-fixer",
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!isToolInstalled(TOOL_ID)) {
         const bundle = getBundleForTool(TOOL_ID);

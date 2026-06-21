@@ -94,7 +94,10 @@ const AUDIO_OUTPUTS: Record<string, AudioOutput> = {
   ".ogg": {
     ext: ".ogg",
     contentType: "audio/ogg",
-    encodeArgs: ["-c:a", "libvorbis", "-b:a", "192k"],
+    // Quality-based VBR, not a fixed bitrate: libvorbis fails with "encoder setup
+    // failed" when a high fixed bitrate (192k) is requested for a low sample rate
+    // (e.g. 8 kHz mono). -q:a 6 is ~192 kbps for normal audio and adapts to the rate.
+    encodeArgs: ["-c:a", "libvorbis", "-q:a", "6"],
   },
   ".opus": {
     ext: ".opus",

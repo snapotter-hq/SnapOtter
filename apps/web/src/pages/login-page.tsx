@@ -222,7 +222,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <main className="flex h-screen bg-background">
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div>
@@ -415,6 +415,6 @@ export function LoginPage() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

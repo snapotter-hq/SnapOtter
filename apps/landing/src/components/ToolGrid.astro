@@ -1,5 +1,5 @@
 ---
-import { CATEGORIES, TOOLS } from "@snapotter/shared";
+import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 import SectionHeading from "./SectionHeading.astro";
 
@@ -84,7 +84,7 @@ function renderIcon(iconName: string): string {
         const cat = categoryMap.get(tool.category);
         return (
           <a
-            href={`/tools/${tool.id}`}
+            href={`/tools/${toolSection(tool)}/${tool.id}/`}
             class="tool-card flex flex-col items-center rounded-xl border border-border bg-surface px-4 py-5 text-center no-underline transition-all"
             data-name={tool.name.toLowerCase()}
             data-desc={tool.description.toLowerCase()}

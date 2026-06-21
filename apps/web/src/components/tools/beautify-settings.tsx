@@ -1328,7 +1328,7 @@ export function BeautifySettings({
         formData.append("backgroundImage", bgImageFile);
         formData.append("settings", JSON.stringify(settings));
 
-        const res = await fetch("/api/v1/tools/beautify", {
+        const res = await fetch("/api/v1/tools/image/beautify", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

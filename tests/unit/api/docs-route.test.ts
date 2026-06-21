@@ -179,7 +179,7 @@ describe("docs route logic", () => {
         { name: "Auth", description: "Authentication" },
       ],
       paths: {
-        "/api/v1/tools/resize": {
+        "/api/v1/tools/image/resize": {
           post: { tags: ["Tools"], summary: "Resize image" },
         },
         "/api/auth/login": {
@@ -241,7 +241,7 @@ describe("docs route logic", () => {
       },
       tags: [{ name: "Tools", description: "Processing tools" }],
       paths: {
-        "/api/v1/tools/resize": {
+        "/api/v1/tools/image/resize": {
           post: {
             tags: ["Tools"],
             summary: "Resize an image",
@@ -293,7 +293,7 @@ describe("docs route logic", () => {
 
     it("marks auth-required endpoints", () => {
       const result = generateLlmsFullTxt(fullSpec);
-      expect(result).toContain("POST /api/v1/tools/resize (auth required)");
+      expect(result).toContain("POST /api/v1/tools/image/resize (auth required)");
     });
 
     it("marks public endpoints", () => {

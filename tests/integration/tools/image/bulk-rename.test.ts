@@ -1,0 +1,1208 @@
+/**
+ * Integration tests for the bulk-rename tool (/api/v1/tools/image/bulk-rename).
+ *
+ * Covers pattern-based renaming with {{index}}, {{padded}}, {{original}}
+ * placeholders, custom start index, ZIP response format, and input validation.
+ */
+
+import AdmZip from "adm-zip";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { fixtures, readFixture } from "../../../fixtures/index.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  loginAsAdmin,
+  type TestApp,
+} from "../../test-server.js";
+
+const PNG = readFixture(fixtures.image.base.png200);
+const JPG = readFixture(fixtures.image.base.jpg100);
+const WEBP = readFixture(fixtures.image.base.webp50);
+const TINY_PNG = readFixture(fixtures.image.edge.px1);
+const SVG = readFixture(fixtures.image.base.svg100);
+const GIF = readFixture(fixtures.image.animated.gif);
+
+/** Extract sorted filenames from a ZIP buffer. */
+function zipEntryNames(buf: Buffer): string[] {
+  const zip = new AdmZip(buf);
+  return zip
+    .getEntries()
+    .map((e) => e.entryName)
+    .sort();
+}
+
+let testApp: TestApp;
+let app: TestApp["app"];
+let adminToken: string;
+
+beforeAll(async () => {
+  testApp = await buildTestApp();
+  app = testApp.app;
+  adminToken = await loginAsAdmin(app);
+}, 30_000);
+
+afterAll(async () => {
+  await testApp.cleanup();
+}, 10_000);
+
+describe("Bulk Rename", () => {
+  it("renames files using the default pattern and returns a ZIP", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "pic.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+
+    const filenames = zipEntryNames(res.rawPayload);
+
+    // Default pattern is "image-{{index}}", starting at 1
+    expect(filenames).toHaveLength(2);
+    expect(filenames).toContain("image-1.png");
+    expect(filenames).toContain("image-2.jpg");
+  });
+
+  it("renames files using a custom pattern with {{index}}", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ pattern: "photo-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("photo-1.png");
+    expect(filenames).toContain("photo-2.jpg");
+  });
+
+  it("renames files using {{padded}} placeholder", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "c.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ pattern: "img-{{padded}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const filenames = zipEntryNames(res.rawPayload);
+
+    // 3 files starting at 1, max index is 3 => 1 char pad
+    expect(filenames).toContain("img-1.png");
+    expect(filenames).toContain("img-2.jpg");
+    expect(filenames).toContain("img-3.webp");
+  });
+
+  it("renames files using {{original}} placeholder", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "sunset.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "beach.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ pattern: "backup-{{original}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("backup-sunset.png");
+    expect(filenames).toContain("backup-beach.jpg");
+  });
+
+  it("respects custom startIndex", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ pattern: "file-{{index}}", startIndex: 10 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("file-10.png");
+    expect(filenames).toContain("file-11.jpg");
+  });
+
+  it("preserves file content after rename", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "renamed-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const zip = new AdmZip(res.rawPayload);
+    const entry = zip.getEntry("renamed-1.png");
+    expect(entry).not.toBeNull();
+
+    const content = entry?.getData();
+    expect(content.length).toBe(PNG.length);
+    expect(content.equals(PNG)).toBe(true);
+  });
+
+  // ── Validation ──────────────────────────────────────────────────────
+
+  it("rejects requests with no files", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify({ pattern: "file-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no files/i);
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: { "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  // ── Pattern combinations ──────────────────────────────────────
+
+  it("combines {{original}} and {{index}} in one pattern", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "moon.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "star.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "{{original}}-{{index}}" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("moon-1.png");
+    expect(filenames).toContain("star-2.jpg");
+  });
+
+  it("renames a single file correctly", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "renamed-{{index}}" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    expect(filenames).toContain("renamed-1.png");
+  });
+
+  it("handles many files with padded indices", async () => {
+    // Use 10 files (the MAX_BATCH_SIZE in test env) to trigger wider padding
+    const files = [];
+    for (let i = 0; i < 10; i++) {
+      files.push({
+        name: "file",
+        filename: `img${i}.png`,
+        contentType: "image/png",
+        content: PNG,
+      });
+    }
+    files.push({
+      name: "settings",
+      content: JSON.stringify({ pattern: "photo-{{padded}}" }),
+    });
+
+    const { body, contentType } = createMultipartPayload(files);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(10);
+    // With 10 files, padded index 1 should be "01"
+    expect(filenames).toContain("photo-01.png");
+    expect(filenames).toContain("photo-10.png");
+  });
+
+  it("preserves different file extensions per file", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "c.webp", contentType: "image/webp", content: WEBP },
+      { name: "settings", content: JSON.stringify({ pattern: "output-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("output-1.png");
+    expect(filenames).toContain("output-2.jpg");
+    expect(filenames).toContain("output-3.webp");
+  });
+
+  it("skips empty file buffers (zero-length files)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "real.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "settings", content: JSON.stringify({ pattern: "item-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    // Empty file is skipped, so only 1 file should be in the ZIP
+    expect(filenames).toHaveLength(1);
+    expect(filenames).toContain("item-1.png");
+  });
+
+  it("returns 400 for invalid settings JSON", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not-json{{{" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/json/i);
+  });
+
+  it("returns 400 for invalid settings values", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "", startIndex: -1 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  it("handles files with no extension", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "noext", contentType: "application/octet-stream", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "renamed-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    // No extension to preserve
+    expect(filenames[0]).toBe("renamed-1");
+  });
+
+  it("handles startIndex of 0", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "x.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "y.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "zero-{{index}}", startIndex: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("zero-0.png");
+    expect(filenames).toContain("zero-1.jpg");
+  });
+
+  // ── Content-disposition header ──────────────────────────────────
+
+  it("returns correct content-disposition header", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "out-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-disposition"]).toMatch(/^attachment; filename="renamed-/);
+  });
+
+  // ── Pattern with no placeholders ────────────────────────────────
+
+  it("renames with a static pattern (no placeholders)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ pattern: "static-name" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(2);
+    // Both will have the same base name but different extensions
+    expect(filenames).toContain("static-name.png");
+    expect(filenames).toContain("static-name.jpg");
+  });
+
+  // ── All three placeholders together ─────────────────────────────
+
+  it("uses all three placeholders in one pattern", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "snap.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          pattern: "{{original}}-{{index}}-{{padded}}",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("photo-1-1.png");
+    expect(filenames).toContain("snap-2-2.jpg");
+  });
+
+  // ── Large startIndex ────────────────────────────────────────────
+
+  it("handles large startIndex (1000)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "file-{{padded}}", startIndex: 1000 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("file-1000.png");
+  });
+
+  // ── HEIC file handling in rename ────────────────────────────────
+
+  it("renames HEIC files preserving extension", { timeout: 120_000 }, async () => {
+    const HEIC = readFixture(fixtures.image.base.heic200);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ pattern: "renamed-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("renamed-1.heic");
+  });
+
+  // ── Single file with padded index ───────────────────────────────
+
+  it("single file uses no padding for padded placeholder", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "solo-{{padded}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    expect(filenames[0]).toBe("solo-1.png");
+  });
+
+  // ── HEIF file handling ─────────────────────────────────────────
+
+  it("renames HEIF files preserving extension", { timeout: 120_000 }, async () => {
+    const HEIF = readFixture(fixtures.image.formats("heif"));
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.heif", contentType: "image/heif", content: HEIF },
+      { name: "settings", content: JSON.stringify({ pattern: "renamed-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("renamed-1.heif");
+  });
+
+  // ── Large file handling ────────────────────────────────────────
+
+  it("renames a large stress image preserving content", async () => {
+    const LARGE = readFixture(fixtures.image.stressLarge);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "big.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ pattern: "large-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("large-1.jpg");
+
+    const zip = new AdmZip(res.rawPayload);
+    const entry = zip.getEntry("large-1.jpg");
+    expect(entry).not.toBeNull();
+    expect(entry?.getData().length).toBe(LARGE.length);
+  });
+
+  // ── Tiny file handling ─────────────────────────────────────────
+
+  it("renames a 1x1 pixel image", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY_PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "small-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("small-1.png");
+  });
+
+  // ── SVG file handling ──────────────────────────────────────────
+
+  it("renames SVG files preserving extension", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: JSON.stringify({ pattern: "vector-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("vector-1.svg");
+  });
+
+  // ── Animated GIF handling ──────────────────────────────────────
+
+  it("renames animated GIF files preserving extension", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "animation.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({ pattern: "anim-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("anim-1.gif");
+  });
+
+  // ── Mixed format batch (5+ files) ─────────────────────────────
+
+  it("renames a batch of 5+ mixed format files", async () => {
+    const HEIC = readFixture(fixtures.image.base.heic200);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "c.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "d.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "e.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "f.heic", contentType: "image/heic", content: HEIC },
+      { name: "settings", content: JSON.stringify({ pattern: "batch-{{padded}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(6);
+    expect(filenames).toContain("batch-1.png");
+    expect(filenames).toContain("batch-2.jpg");
+    expect(filenames).toContain("batch-3.webp");
+    expect(filenames).toContain("batch-4.gif");
+    expect(filenames).toContain("batch-5.svg");
+    expect(filenames).toContain("batch-6.heic");
+  });
+
+  // ── Pattern with special characters ───────────────────────────
+
+  it("handles pattern with hyphens and underscores", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "my_photo-set_{{index}}" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("my_photo-set_1.png");
+    expect(filenames).toContain("my_photo-set_2.jpg");
+  });
+
+  // ── Only empty files provided ─────────────────────────────────
+
+  it("returns 400 when all files are empty (zero-length)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: Buffer.alloc(0) },
+      { name: "settings", content: JSON.stringify({ pattern: "file-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/no files/i);
+  });
+
+  // ── Padded placeholder with startIndex ────────────────────────
+
+  it("padded placeholder pads relative to total count plus startIndex", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ pattern: "img-{{padded}}", startIndex: 99 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(2);
+    // startIndex=99, 2 files => indices 99,100 => max is 101 (length 3)
+    expect(filenames).toContain("img-099.png");
+    expect(filenames).toContain("img-100.jpg");
+  });
+
+  // ── Double extension filename ─────────────────────────────────
+
+  it("preserves only last extension for double-extension filenames", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "photo.backup.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+      { name: "settings", content: JSON.stringify({ pattern: "clean-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    // extname returns ".png" for "photo.backup.png"
+    expect(filenames[0]).toBe("clean-1.png");
+  });
+
+  // ── Original placeholder with no-extension file ───────────────
+
+  it("{{original}} uses full filename when no extension exists", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "noext",
+        contentType: "application/octet-stream",
+        content: PNG,
+      },
+      { name: "settings", content: JSON.stringify({ pattern: "copy-{{original}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    expect(filenames[0]).toBe("copy-noext");
+  });
+
+  // ── Large file content integrity ──────────────────────────────
+
+  it("preserves content integrity for large file", async () => {
+    const LARGE = readFixture(fixtures.image.stressLarge);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "big.jpg", contentType: "image/jpeg", content: LARGE },
+      { name: "settings", content: JSON.stringify({ pattern: "verify-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entry = zip.getEntry("verify-1.jpg");
+    expect(entry).not.toBeNull();
+    expect(entry?.getData().equals(LARGE)).toBe(true);
+  });
+
+  // ── Pattern with only original placeholder ────────────────────
+
+  it("pattern with only {{original}} keeps original names", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "alpha.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "beta.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ pattern: "{{original}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toContain("alpha.png");
+    expect(filenames).toContain("beta.jpg");
+  });
+
+  // ── Tiny file rename ──────────────────────────────────────────
+
+  it("renames tiny 1x1 image and preserves content", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "pixel.png", contentType: "image/png", content: TINY_PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "dot-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entry = zip.getEntry("dot-1.png");
+    expect(entry).not.toBeNull();
+    expect(entry?.getData().equals(TINY_PNG)).toBe(true);
+  });
+
+  // ── Default settings with no settings field ───────────────────
+
+  it("uses default pattern when settings field is omitted", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "x.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "y.jpg", contentType: "image/jpeg", content: JPG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(2);
+    // Default pattern is "image-{{index}}" starting at 1
+    expect(filenames).toContain("image-1.png");
+    expect(filenames).toContain("image-2.jpg");
+  });
+
+  // ── ZIP response headers ──────────────────────────────────────
+
+  it("returns correct content-type header for ZIP", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+  });
+
+  // ── Special characters in original filenames ──────────────────
+
+  it("handles original filenames with spaces using {{original}}", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "my photo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "{{original}}-copy" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    // The filename should contain the original name (possibly sanitized)
+    expect(filenames[0]).toMatch(/\.png$/);
+  });
+
+  it("handles original filenames with unicode characters", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "foto.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "{{original}}-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    expect(filenames[0]).toMatch(/\.png$/);
+  });
+
+  // ── Unknown placeholder passes through as literal ────────────
+
+  it("treats unknown placeholders as literal text", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "file-{{date}}-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+    // {{date}} is not a recognized placeholder, so it stays literal
+    expect(filenames[0]).toContain("{{date}}");
+    expect(filenames[0]).toContain("-1.png");
+  });
+
+  // ── Content verification for batch of 5+ files ──────────────
+
+  it("batch of 6 files preserves all content and extensions", async () => {
+    const _HEIC = readFixture(fixtures.image.base.heic200);
+    const _LARGE = readFixture(fixtures.image.stressLarge);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "c.webp", contentType: "image/webp", content: WEBP },
+      { name: "file", filename: "d.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "e.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "f.png", contentType: "image/png", content: TINY_PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "export-{{padded}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(6);
+
+    // Verify all extensions are preserved
+    const extensions = filenames.map((f) => f.split(".").pop());
+    expect(extensions).toContain("png");
+    expect(extensions).toContain("jpg");
+    expect(extensions).toContain("webp");
+    expect(extensions).toContain("gif");
+    expect(extensions).toContain("svg");
+
+    // Verify content integrity for the first file
+    const zip = new AdmZip(res.rawPayload);
+    const firstEntry = zip.getEntry("export-1.png");
+    expect(firstEntry).not.toBeNull();
+    expect(firstEntry?.getData().equals(PNG)).toBe(true);
+  });
+
+  // ── Very long pattern ───────────────────────────────────────
+
+  it("handles a long pattern name", async () => {
+    const longPattern = `${"a".repeat(100)}-{{index}}`;
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: longPattern }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const filenames = zipEntryNames(res.rawPayload);
+    expect(filenames).toHaveLength(1);
+  });
+
+  // ── Pattern at max length boundary ──────────────────────────
+
+  it("rejects pattern exceeding max length (1001 chars)", async () => {
+    const tooLong = "x".repeat(1001);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: tooLong }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+});

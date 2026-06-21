@@ -79,7 +79,7 @@ interface UploadedFile {
 }
 
 export function registerFavicon(app: FastifyInstance) {
-  app.post("/api/v1/tools/favicon", async (request, reply) => {
+  app.post("/api/v1/tools/image/favicon", async (request, reply) => {
     const uploadedFiles: UploadedFile[] = [];
     let settingsRaw: string | null = null;
 

@@ -73,7 +73,7 @@ const JPG_SAMPLE = formatFixture("sample.jpg");
 
 test.describe("Resize edge cases", () => {
   test("resize with fit=outside", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -86,7 +86,7 @@ test.describe("Resize edge cases", () => {
   });
 
   test("resize to very large dimensions (4096)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -100,7 +100,7 @@ test.describe("Resize edge cases", () => {
   });
 
   test("resize 1x1 image with withoutEnlargement=false", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -118,7 +118,7 @@ test.describe("Resize edge cases", () => {
   });
 
   test("resize JPEG with explicit height only and fill", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -135,7 +135,7 @@ test.describe("Resize edge cases", () => {
 
 test.describe("Rotate edge cases", () => {
   test("rotate 360 degrees returns same image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -148,7 +148,7 @@ test.describe("Rotate edge cases", () => {
   });
 
   test("rotate negative angle (-90)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -166,7 +166,7 @@ test.describe("Rotate edge cases", () => {
   });
 
   test("rotate 1 degree with transparent background", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -188,7 +188,7 @@ test.describe("Rotate edge cases", () => {
 
 test.describe("Convert quality extremes", () => {
   test("convert to JPEG with quality 1 (minimum)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -202,7 +202,7 @@ test.describe("Convert quality extremes", () => {
   });
 
   test("convert to JPEG with quality 100 (maximum)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -215,7 +215,7 @@ test.describe("Convert quality extremes", () => {
   });
 
   test("convert to WebP with quality 1", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -232,7 +232,7 @@ test.describe("Convert quality extremes", () => {
 
 test.describe("Color adjustments extreme values", () => {
   test("maximum positive brightness (100)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -245,7 +245,7 @@ test.describe("Color adjustments extreme values", () => {
   });
 
   test("maximum negative brightness (-100)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -258,7 +258,7 @@ test.describe("Color adjustments extreme values", () => {
   });
 
   test("all adjustments at extreme values together", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -276,7 +276,7 @@ test.describe("Color adjustments extreme values", () => {
   });
 
   test("hue rotation 360 degrees (full cycle)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -293,7 +293,7 @@ test.describe("Color adjustments extreme values", () => {
 
 test.describe("Sharpening sigma edge values", () => {
   test("sharpen with very low sigma (0.1)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -306,7 +306,7 @@ test.describe("Sharpening sigma edge values", () => {
   });
 
   test("sharpen with very high sigma (5.0)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -319,7 +319,7 @@ test.describe("Sharpening sigma edge values", () => {
   });
 
   test("sharpen with sigma and amount together", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -336,7 +336,7 @@ test.describe("Sharpening sigma edge values", () => {
 
 test.describe("Beautify combined settings", () => {
   test("beautify with all options: frame, shadow, gradient, watermark", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -366,7 +366,7 @@ test.describe("Beautify combined settings", () => {
   });
 
   test("beautify with zero padding", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -383,7 +383,7 @@ test.describe("Beautify combined settings", () => {
   });
 
   test("beautify with very large padding (200)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -400,7 +400,7 @@ test.describe("Beautify combined settings", () => {
   });
 
   test("beautify with large border radius (50)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -421,7 +421,7 @@ test.describe("Beautify combined settings", () => {
 
 test.describe("Meme generator variations", () => {
   test("meme with very long text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -440,7 +440,7 @@ test.describe("Meme generator variations", () => {
   });
 
   test("meme with unicode/emoji text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -462,7 +462,7 @@ test.describe("Meme generator variations", () => {
   test("meme with text alignment variations", async ({ request }) => {
     const alignments = ["left", "center", "right"] as const;
     for (const textAlign of alignments) {
-      const res = await request.post("/api/v1/tools/meme-generator", {
+      const res = await request.post("/api/v1/tools/image/meme-generator", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -487,7 +487,7 @@ test.describe("Meme generator variations", () => {
 
 test.describe("Vectorize additional settings", () => {
   test("vectorize small WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -501,7 +501,7 @@ test.describe("Vectorize additional settings", () => {
   });
 
   test("vectorize HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -515,7 +515,7 @@ test.describe("Vectorize additional settings", () => {
 
   test("vectorize content image", async ({ request }) => {
     const portrait = contentFixture("portrait-isolated.png");
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.png", mimeType: "image/png", buffer: portrait },
@@ -528,7 +528,7 @@ test.describe("Vectorize additional settings", () => {
   });
 
   test("vectorize output can be downloaded", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/vectorize", {
+    const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -556,7 +556,7 @@ test.describe("Vectorize additional settings", () => {
 
 test.describe("Image to Base64 edge cases", () => {
   test("encode 1x1 PNG to base64", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -571,7 +571,7 @@ test.describe("Image to Base64 edge cases", () => {
   });
 
   test("encode HEIC to base64 with format conversion to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -585,7 +585,7 @@ test.describe("Image to Base64 edge cases", () => {
   });
 
   test("encode with both maxWidth and outputFormat", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-to-base64", {
+    const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -606,7 +606,7 @@ test.describe("Text overlay position coverage", () => {
 
   for (const position of positions) {
     test(`text overlay at position=${position}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/text-overlay", {
+      const res = await request.post("/api/v1/tools/image/text-overlay", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -626,7 +626,7 @@ test.describe("Text overlay position coverage", () => {
   }
 
   test("text overlay with background box on HEIC", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -647,7 +647,7 @@ test.describe("Text overlay position coverage", () => {
 
   test("text overlay on AVIF image", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -671,7 +671,7 @@ test.describe("Watermark text extended positions", () => {
   test("watermark at all 4 corners on same image", async ({ request }) => {
     const positions = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
     for (const position of positions) {
-      const res = await request.post("/api/v1/tools/watermark-text", {
+      const res = await request.post("/api/v1/tools/image/watermark-text", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -692,7 +692,7 @@ test.describe("Watermark text extended positions", () => {
 
   test("tiled watermark with rotation on large image", async ({ request }) => {
     const stressImg = contentFixture("stress-large.jpg");
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: stressImg },
@@ -718,7 +718,7 @@ test.describe("Watermark text extended positions", () => {
 test.describe("QR generate edge cases", () => {
   test("generate QR with very long URL", async ({ request }) => {
     const longUrl = `https://example.com/path/${"a".repeat(200)}?key=value`;
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: { text: longUrl, size: 512, errorCorrection: "H" },
     });
@@ -728,7 +728,7 @@ test.describe("QR generate edge cases", () => {
   });
 
   test("generate QR with unicode text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: { text: "Hello World 12345", size: 400 },
     });
@@ -738,7 +738,7 @@ test.describe("QR generate edge cases", () => {
   });
 
   test("generate QR with custom dark/light colors", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/qr-generate", {
+    const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         text: "custom colors",
@@ -765,7 +765,7 @@ test.describe("Compare edge cases", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -784,7 +784,7 @@ test.describe("Compare edge cases", () => {
       ],
       [],
     );
-    const res = await request.post("/api/v1/tools/compare", {
+    const res = await request.post("/api/v1/tools/image/compare", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -798,7 +798,7 @@ test.describe("Compare edge cases", () => {
 
 test.describe("Optimize for Web edge cases", () => {
   test("optimize 1x1 image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -811,7 +811,7 @@ test.describe("Optimize for Web edge cases", () => {
   });
 
   test("optimize with maxWidth smaller than image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -840,7 +840,7 @@ test.describe("Invalid request handling", () => {
   });
 
   test("crop with out-of-bounds region returns error", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },

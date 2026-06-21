@@ -8,9 +8,11 @@
     "docs:preview": "vitepress preview ."
   },
   "devDependencies": {
+    "pagefind": "^1.5.2",
     "tsx": "^4.22.4",
     "vitepress": "^1.1.4",
-    "vitepress-plugin-llms": "^1.13.1"
+    "vitepress-plugin-llms": "^1.13.1",
+    "vitepress-plugin-pagefind": "^0.4.20"
   },
   "license": "AGPL-3.0"
 }

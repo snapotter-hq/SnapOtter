@@ -1,5 +1,5 @@
 ---
-import { TOOLS } from "@snapotter/shared";
+import { TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 
 const MODALITY_META: Record<string, { label: string; color: string }> = {
@@ -7,7 +7,7 @@ const MODALITY_META: Record<string, { label: string; color: string }> = {
   video: { label: "Video", color: "#BE4A3C" },
   audio: { label: "Audio", color: "#2C7A75" },
   document: { label: "PDF", color: "#44568C" },
-  file: { label: "Data", color: "#5C8642" },
+  file: { label: "Files", color: "#5C8642" },
 };
 
 function renderIcon(iconName: string): string {
@@ -56,7 +56,7 @@ function renderIcon(iconName: string): string {
             hidden
           >
             <a
-              href={`/tools/${tool.id}`}
+              href={`/tools/${toolSection(tool)}/${tool.id}/`}
               class="flex items-center gap-3 px-4 py-2.5 no-underline transition-colors hover:bg-primary-subtle"
             >
               <svg

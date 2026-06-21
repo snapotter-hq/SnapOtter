@@ -17,7 +17,7 @@ test.describe("State bleed between tools", () => {
   // ── Core scenario: resize -> rotate ──────────────────────────────────
   test("processed state from resize does NOT appear in rotate", async ({ loggedInPage: page }) => {
     // Step 1: Navigate to resize and process an image
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -30,7 +30,7 @@ test.describe("State bleed between tools", () => {
     });
 
     // Step 2: Navigate to the rotate tool via direct URL
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await page.waitForLoadState("networkidle");
 
     // Step 3: The right pane should be in a clean state — dropzone visible
@@ -50,7 +50,7 @@ test.describe("State bleed between tools", () => {
   // ── Reverse direction: rotate -> resize ──────────────────────────────
   test("processed state from rotate does NOT appear in resize", async ({ loggedInPage: page }) => {
     // Process an image in rotate
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await uploadTestImage(page);
 
     await page.getByTestId("rotate-right").click();
@@ -66,7 +66,7 @@ test.describe("State bleed between tools", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // Navigate to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Should show clean dropzone
@@ -79,7 +79,7 @@ test.describe("State bleed between tools", () => {
     loggedInPage: page,
   }) => {
     // Process an image in compress
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
@@ -89,7 +89,7 @@ test.describe("State bleed between tools", () => {
     });
 
     // Navigate to QR Generate (no-dropzone tool)
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("networkidle");
 
     // QR Generate should NOT show any file upload state or stale results
@@ -107,12 +107,12 @@ test.describe("State bleed between tools", () => {
   // ── Navigate from no-dropzone tool back to dropzone tool ─────────────
   test("QR Generate state does NOT bleed into resize", async ({ loggedInPage: page }) => {
     // Use QR Generate first
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.getByTestId("qr-input-url").fill("https://example.com");
     await expect(page.locator("canvas, svg").first()).toBeVisible({ timeout: 5000 });
 
     // Navigate to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Resize should show a clean dropzone
@@ -123,7 +123,7 @@ test.describe("State bleed between tools", () => {
   // ── Multiple images: upload several files, process, navigate ─────────
   test("multi-file processed state does NOT bleed across tools", async ({ loggedInPage: page }) => {
     // Upload and process in resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Add a second file by uploading again via the "+ Add more" button
@@ -133,7 +133,14 @@ test.describe("State bleed between tools", () => {
       await addMoreBtn.click();
       const fileChooser = await fileChooserPromise;
       await fileChooser.setFiles(
-        require("node:path").join(process.cwd(), "tests", "fixtures", "test-50x50.webp"),
+        require("node:path").join(
+          process.cwd(),
+          "tests",
+          "fixtures",
+          "image",
+          "valid",
+          "test-50x50.webp",
+        ),
       );
       await page.waitForTimeout(500);
     }
@@ -148,7 +155,7 @@ test.describe("State bleed between tools", () => {
     });
 
     // Navigate to convert
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
     // Should show clean state — no leftover files or processed results
@@ -163,7 +170,7 @@ test.describe("State bleed between tools", () => {
   // ── Sidebar navigation (not just goto) ───────────────────────────────
   test("sidebar navigation clears processed state", async ({ loggedInPage: page }) => {
     // Process an image in resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -188,7 +195,7 @@ test.describe("State bleed between tools", () => {
     loggedInPage: page,
   }) => {
     // Process in resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("50");
     await page.getByRole("button", { name: "Resize" }).click();
@@ -199,9 +206,9 @@ test.describe("State bleed between tools", () => {
     });
 
     // Navigate to rotate, then immediately to compress, then to convert
-    await page.goto("/rotate");
-    await page.goto("/compress");
-    await page.goto("/convert");
+    await page.goto("/image/rotate");
+    await page.goto("/image/compress");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
     // The final destination (convert) should have a completely clean state
@@ -217,7 +224,7 @@ test.describe("State bleed between tools", () => {
     loggedInPage: page,
   }) => {
     // Process in compress (shows size comparison after processing)
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
@@ -227,7 +234,7 @@ test.describe("State bleed between tools", () => {
     });
 
     // Navigate to crop
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await page.waitForLoadState("networkidle");
 
     // Crop should show clean dropzone, no processed-state UI

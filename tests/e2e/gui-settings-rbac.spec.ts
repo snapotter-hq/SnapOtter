@@ -499,7 +499,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await login(page, USER_USER, USER_PASS);
 
     // Navigate to the resize tool page -- user role should have tools:use permission
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // The tool page should load (not redirect or show a 403)
@@ -517,7 +517,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await login(page, USER_USER, USER_PASS);
 
     // Navigate to the resize tool
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Upload a test image via the file chooser

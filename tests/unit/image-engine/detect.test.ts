@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { detectFormat } from "@snapotter/image-engine";
 import { describe, expect, it } from "vitest";
-
-const FORMATS_DIR = path.resolve(__dirname, "../../fixtures/formats");
+import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
 
 // ---------------------------------------------------------------------------
 // Format detection via Sharp metadata + magic byte fallback
@@ -22,7 +21,7 @@ describe("detectFormat", () => {
 
   for (const { file, expected } of sharpNativeFormats) {
     it(`detects ${file} as "${expected}" via Sharp metadata`, async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, file));
+      const buffer = readFileSync(path.join(fixtureDir.formats, file));
       const format = await detectFormat(buffer);
       expect(format).toBe(expected);
     });
@@ -38,7 +37,7 @@ describe("detectFormat", () => {
 
   for (const { file, expected } of magicByteFormats) {
     it(`detects ${file} as "${expected}" via magic bytes`, async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, file));
+      const buffer = readFileSync(path.join(fixtureDir.formats, file));
       const format = await detectFormat(buffer);
       expect(format).toBe(expected);
     });
@@ -46,21 +45,21 @@ describe("detectFormat", () => {
 
   // HEIC/HEIF - Sharp may or may not handle these depending on libheif
   it("detects sample.heic via Sharp or magic bytes", async () => {
-    const buffer = readFileSync(path.join(FORMATS_DIR, "sample.heic"));
+    const buffer = readFixture(fixtures.image.formats("heic"));
     const format = await detectFormat(buffer);
     // Sharp may report "heif" or magic bytes may detect "avif" (ftyp box)
     expect(["heif", "avif"]).toContain(format);
   });
 
   it("detects sample.heif via Sharp or magic bytes", async () => {
-    const buffer = readFileSync(path.join(FORMATS_DIR, "sample.heif"));
+    const buffer = readFixture(fixtures.image.formats("heif"));
     const format = await detectFormat(buffer);
     expect(["heif", "avif"]).toContain(format);
   });
 
   // JXL detection
   it("detects sample.jxl", async () => {
-    const buffer = readFileSync(path.join(FORMATS_DIR, "sample.jxl"));
+    const buffer = readFixture(fixtures.image.formats("jxl"));
     const format = await detectFormat(buffer);
     // Sharp may detect "jxl" natively or magic bytes catch it
     expect(["jxl", "unknown"]).toContain(format);
@@ -301,45 +300,45 @@ describe("detectFormat", () => {
 
   describe("exotic format detection from fixtures", () => {
     it("detects sample.ppm as ppm (P6 magic bytes)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.ppm"));
+      const buffer = readFixture(fixtures.image.formats("ppm"));
       expect(await detectFormat(buffer)).toBe("ppm");
     });
 
     it("detects sample.dng as tiff (DNG shares TIFF magic bytes)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.dng"));
+      const buffer = readFixture(fixtures.image.formats("dng"));
       expect(await detectFormat(buffer)).toBe("tiff");
     });
 
     it("detects sample.jp2 as jp2 (JPEG 2000 box signature)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.jp2"));
+      const buffer = readFixture(fixtures.image.formats("jp2"));
       expect(await detectFormat(buffer)).toBe("jp2");
     });
 
     it("detects sample.svgz as svg (Sharp reads gzip-compressed SVG)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.svgz"));
+      const buffer = readFixture(fixtures.image.formats("svgz"));
       expect(await detectFormat(buffer)).toBe("svg");
     });
 
     // PBM (P4) and PGM (P5) have no magic byte entries and Sharp cannot parse them
     it("cannot detect sample.pbm (no P4 magic bytes registered)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.pbm"));
+      const buffer = readFixture(fixtures.image.formats("pbm"));
       expect(await detectFormat(buffer)).toBe("unknown");
     });
 
     it("cannot detect sample.pgm (no P5 magic bytes registered)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.pgm"));
+      const buffer = readFixture(fixtures.image.formats("pgm"));
       expect(await detectFormat(buffer)).toBe("unknown");
     });
 
     // HDR has a text header (#?RGBE) not matched by magic byte table
     it("cannot detect sample.hdr (Radiance text header not in magic bytes)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.hdr"));
+      const buffer = readFixture(fixtures.image.formats("hdr"));
       expect(await detectFormat(buffer)).toBe("unknown");
     });
 
     // TGA has no reliable magic bytes; its header can collide with other formats
     it("does not reliably detect sample.tga (no TGA-specific magic bytes)", async () => {
-      const buffer = readFileSync(path.join(FORMATS_DIR, "sample.tga"));
+      const buffer = readFixture(fixtures.image.formats("tga"));
       // TGA detection is extension-based in validateImageBuffer, not in detectFormat
       expect(await detectFormat(buffer)).not.toBe("tga");
     });
@@ -358,7 +357,7 @@ describe("detectFormat", () => {
 
     for (const { file, expected } of fixtures) {
       it(`detects ${file}`, async () => {
-        const buffer = readFileSync(path.join(FORMATS_DIR, file));
+        const buffer = readFileSync(path.join(fixtureDir.formats, file));
         const format = await detectFormat(buffer);
         expect(expected).toContain(format);
       });

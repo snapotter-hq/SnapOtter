@@ -51,7 +51,6 @@ function displayUrl(img: CollageImage): string {
 }
 
 export function CollagePreview() {
-  const { t } = useTranslation();
   const images = useCollageStore((s) => s.images);
   const templateId = useCollageStore((s) => s.templateId);
   const phase = useCollageStore((s) => s.phase);

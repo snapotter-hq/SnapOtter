@@ -137,6 +137,7 @@ vi.mock("sharp", () => ({
 
 // ── Imports ─────────────────────────────────────────────────────────────
 
+import { apiToolPath } from "@snapotter/shared";
 import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
 import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
@@ -148,10 +149,6 @@ import {
 } from "../../../apps/api/src/routes/tool-factory.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-function uniqueId() {
-  return `factory-test-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 /** Build a mock Zod-like schema that accepts everything. */
 function acceptAllSchema() {
@@ -276,12 +273,12 @@ describe("createToolRoute", () => {
   });
 
   describe("route registration", () => {
-    it("registers a POST route at /api/v1/tools/:toolId", () => {
+    it("registers a POST route at /api/v1/tools/:section/:toolId", () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
       expect(app.post).toHaveBeenCalledWith(
-        `/api/v1/tools/${id}`,
+        apiToolPath(id),
         expect.any(Object),
         expect.any(Function),
       );
@@ -289,7 +286,7 @@ describe("createToolRoute", () => {
 
     it("adds the tool config to the registry", () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
       expect(getToolConfig(id)).toBeDefined();
       expect(getRegisteredToolIds()).toContain(id);
@@ -299,9 +296,9 @@ describe("createToolRoute", () => {
   describe("request handling", () => {
     it("returns 400 when no file is provided", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({});
 
@@ -315,9 +312,9 @@ describe("createToolRoute", () => {
 
     it("returns 400 when multiple files are provided", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -340,9 +337,9 @@ describe("createToolRoute", () => {
         reason: "Corrupt image data",
       } as never);
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({ fileBuffer: Buffer.from("bad") });
 
@@ -358,9 +355,9 @@ describe("createToolRoute", () => {
 
     it("returns 400 when settings JSON is invalid", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -377,9 +374,9 @@ describe("createToolRoute", () => {
 
     it("returns 400 when settings fail Zod validation", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id, strictQualitySchema()));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -397,9 +394,9 @@ describe("createToolRoute", () => {
     it("returns 501 when AI feature bundle is not installed", async () => {
       vi.mocked(isToolInstalled).mockReturnValueOnce(false);
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -416,9 +413,9 @@ describe("createToolRoute", () => {
 
     it("returns 200 success envelope when waitForJob resolves", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -447,9 +444,9 @@ describe("createToolRoute", () => {
         resultPayload: { found: 3 },
       });
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("pdf-data"),
@@ -470,9 +467,9 @@ describe("createToolRoute", () => {
     it("omits resultPayload fields when processV2 returns no resultPayload", async () => {
       // Default mock already returns no resultPayload
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -492,9 +489,9 @@ describe("createToolRoute", () => {
     it("returns 202 when waitForJob returns null (sync window expired)", async () => {
       vi.mocked(waitForJob).mockResolvedValueOnce(null);
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -510,9 +507,9 @@ describe("createToolRoute", () => {
     it("returns 422 when waitForJob rejects", async () => {
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -532,9 +529,9 @@ describe("createToolRoute", () => {
 
     it("uses empty settings when none are provided", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = createMockRequest({
         fileBuffer: Buffer.from("png-data"),
@@ -551,9 +548,9 @@ describe("createToolRoute", () => {
   describe("multipart parsing error", () => {
     it("returns 400 when parts iterator throws", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
       const req = {
         parts: () => ({
@@ -580,9 +577,9 @@ describe("createToolRoute", () => {
   describe("multipart field recovery", () => {
     it("recovers settings from part.fields when the iterator drops trailing fields", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
 
       // Simulate the @fastify/multipart race: the iterator yields only the
@@ -617,9 +614,9 @@ describe("createToolRoute", () => {
 
     it("does not overwrite settings already collected from the iterator", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
 
       // Both the iterator and part.fields carry settings; the iterator value wins
@@ -658,9 +655,9 @@ describe("createToolRoute", () => {
 
     it("recovers fileId and clientJobId from part.fields", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
 
       const req = {
@@ -692,9 +689,9 @@ describe("createToolRoute", () => {
 
     it("handles array-form fields from part.fields", async () => {
       const app = createMockApp();
-      const id = uniqueId();
+      const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
-      const handler = app.routes[`/api/v1/tools/${id}`];
+      const handler = app.routes[apiToolPath(id)];
       const reply = createMockReply();
 
       const req = {

@@ -105,7 +105,7 @@ async function convertSvg(
  */
 export function registerSvgToRaster(app: FastifyInstance) {
   // --- Batch endpoint (registered first for route priority) ---
-  app.post("/api/v1/tools/svg-to-raster/batch", async (request, reply) => {
+  app.post("/api/v1/tools/image/svg-to-raster/batch", async (request, reply) => {
     const files: ParsedSvgFile[] = [];
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
@@ -347,7 +347,7 @@ export function registerSvgToRaster(app: FastifyInstance) {
   });
 
   // --- Single-file endpoint ---
-  app.post("/api/v1/tools/svg-to-raster", async (request, reply) => {
+  app.post("/api/v1/tools/image/svg-to-raster", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "output";
     let settingsRaw: string | null = null;

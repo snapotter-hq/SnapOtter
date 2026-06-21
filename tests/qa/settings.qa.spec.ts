@@ -1035,7 +1035,7 @@ test.describe("IMAGE: image-pad", () => {
   test("target=1:1 -> output is square (max dim)", async ({ page }) => {
     const issues = instrument(page);
     await setupTool(page, "image-pad", IMG_200x150);
-    await selectOption(page, "image-pad-target", "1:1");
+    await clickButton(page, "1:1");
     const dl = await processAndDownload(page, "image-pad");
     if (!dl.ok) {
       bug({
@@ -1063,7 +1063,7 @@ test.describe("IMAGE: image-pad", () => {
   test("target=16:9 -> output is 16:9 ratio", async ({ page }) => {
     const issues = instrument(page);
     await setupTool(page, "image-pad", IMG_200x150);
-    await selectOption(page, "image-pad-target", "16:9");
+    await clickButton(page, "16:9");
     const dl = await processAndDownload(page, "image-pad");
     if (!dl.ok) {
       bug({
@@ -2027,16 +2027,22 @@ test.describe("DOCUMENT: extract-pages", () => {
 test.describe("DOCUMENT: compress-pdf", () => {
   test.setTimeout(TOOL_TIMEOUT * 2);
 
-  test("preset=screen -> output is valid PDF", async ({ page }) => {
+  // compress-pdf uses the shared CompressControls (quality / target-size modes),
+  // not screen/ebook/printer ghostscript presets. These drive the actual UI.
+  test("quality mode (q=20) -> output is valid PDF", async ({ page }) => {
     const issues = instrument(page);
     await setupTool(page, "compress-pdf", PDF_3PAGE);
-    await selectOption(page, "cpdf-preset", "screen");
+    await page
+      .getByRole("button", { name: /quality/i })
+      .first()
+      .click();
+    await setSlider(page, "compress-quality", 20);
     const dl = await processAndDownload(page, "compress-pdf", "long");
     if (!dl.ok) {
       bug({
         tool: "compress-pdf",
-        setting: "preset",
-        value: "screen",
+        setting: "quality",
+        value: "20",
         expected: "valid PDF",
         actual: dl.error ?? "error",
       });
@@ -2045,32 +2051,36 @@ test.describe("DOCUMENT: compress-pdf", () => {
     expect(magicMatches(dl.buf, "pdf")).toBe(true);
   });
 
-  test("preset=ebook -> output is valid PDF", async ({ page }) => {
+  test("quality mode (q=80) -> output is valid PDF", async ({ page }) => {
     const issues = instrument(page);
     await setupTool(page, "compress-pdf", PDF_3PAGE);
-    await selectOption(page, "cpdf-preset", "ebook");
+    await page
+      .getByRole("button", { name: /quality/i })
+      .first()
+      .click();
+    await setSlider(page, "compress-quality", 80);
     const dl = await processAndDownload(page, "compress-pdf", "long");
     if (!dl.ok)
       bug({
         tool: "compress-pdf",
-        setting: "preset",
-        value: "ebook",
+        setting: "quality",
+        value: "80",
         expected: "success",
         actual: dl.error ?? "error",
       });
     expect(dl.ok).toBe(true);
   });
 
-  test("preset=printer -> output is valid PDF", async ({ page }) => {
+  test("target-size mode -> output is valid PDF", async ({ page }) => {
     const issues = instrument(page);
     await setupTool(page, "compress-pdf", PDF_3PAGE);
-    await selectOption(page, "cpdf-preset", "printer");
+    await fillInput(page, "compress-target-size", 100);
     const dl = await processAndDownload(page, "compress-pdf", "long");
     if (!dl.ok)
       bug({
         tool: "compress-pdf",
-        setting: "preset",
-        value: "printer",
+        setting: "targetSize",
+        value: "100KB",
         expected: "success",
         actual: dl.error ?? "error",
       });

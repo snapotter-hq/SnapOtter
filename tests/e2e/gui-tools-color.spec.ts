@@ -11,7 +11,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Adjust Colors", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await expect(page.getByText("Adjust Colors").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -19,7 +19,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("shows light/color/detail/effects sections after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await expect(page.getByText("Light").first()).toBeVisible();
@@ -31,7 +31,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("brightness/contrast/exposure sliders visible in Light section", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await expect(page.locator("#color-slider-brightness")).toBeVisible();
@@ -42,7 +42,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("saturation/temperature/tint/hue sliders visible in Color section", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await expect(page.locator("#color-slider-saturation")).toBeVisible();
@@ -52,7 +52,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("effect buttons (none, grayscale, sepia, invert)", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "none" })).toBeVisible();
@@ -62,7 +62,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("color channels expandable section", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       // Click Color Channels to expand
@@ -75,7 +75,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("submit disabled without changes, enabled after slider change", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("adjust-colors-submit");
@@ -87,7 +87,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("Reset All button appears after changes", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await page.locator("#color-slider-brightness").fill("20");
@@ -95,7 +95,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("selecting grayscale effect enables submit", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("adjust-colors-submit");
@@ -106,7 +106,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("detail section shows clarity and texture sliders", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       // Detail section should have sharpness/clarity controls
@@ -114,7 +114,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("Reset All reverts sliders to defaults", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       // Make a change first
@@ -130,7 +130,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("contrast slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       const slider = page.locator("#color-slider-contrast");
@@ -139,7 +139,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("selecting sepia effect enables submit", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("adjust-colors-submit");
@@ -150,7 +150,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("processes color adjustment and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await page.locator("#color-slider-brightness").fill("20");
@@ -525,7 +525,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("adjust-colors: undo after processing returns to sliders", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await page.locator("#color-slider-brightness").fill("20");
@@ -596,7 +596,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("adjust-colors: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await expect(page.locator("#color-slider-brightness")).toBeVisible();
@@ -607,13 +607,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("adjust-colors: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
       await uploadTestImage(page);
 
       await page.locator("#color-slider-brightness").fill("30");
 
       await page.goto("/sharpening");
-      await page.goto("/adjust-colors");
+      await page.goto("/image/adjust-colors");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });

@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
-const FIXTURE = join(import.meta.dirname, "..", "fixtures", "formats", "sample.png");
+const FIXTURE = join(import.meta.dirname, "..", "fixtures", "image", "formats", "sample.png");
 
 // ── Helpers ─────────────────────────────────────────────────────
 

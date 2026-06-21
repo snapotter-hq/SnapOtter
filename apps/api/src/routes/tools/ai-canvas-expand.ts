@@ -131,7 +131,7 @@ registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
 
 export function registerAiCanvasExpand(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/ai-canvas-expand",
+    "/api/v1/tools/image/ai-canvas-expand",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "ai-canvas-expand";
       if (!isToolInstalled(toolId)) {

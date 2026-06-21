@@ -425,7 +425,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await page.goto("/compose");
       await uploadBaseImage(page);
 
-      const webpPath = path.join(process.cwd(), "tests", "fixtures", "test-50x50.webp");
+      const webpPath = path.join(
+        process.cwd(),
+        "tests",
+        "fixtures",
+        "image",
+        "valid",
+        "test-50x50.webp",
+      );
       await uploadOverlayImage(page, webpPath);
 
       await page.getByTestId("compose-submit").click();

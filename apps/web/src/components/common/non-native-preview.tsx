@@ -109,7 +109,7 @@ export function NonNativePreview({
     } finally {
       stopMessageRotation();
     }
-  }, [file, filename, previewUrl, startMessageRotation, stopMessageRotation]);
+  }, [file, src, filename, previewUrl, startMessageRotation, stopMessageRotation]);
 
   const ext = filename.split(".").pop()?.toUpperCase() ?? "";
   const IconComponent = modality === "audio" ? Volume2 : Video;

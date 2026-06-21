@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile);
  * Does NOT use createToolRoute since it doesn't produce a processed file.
  */
 export function registerInfo(app: FastifyInstance) {
-  app.post("/api/v1/tools/info", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/v1/tools/image/info", async (request: FastifyRequest, reply: FastifyReply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "image";
 

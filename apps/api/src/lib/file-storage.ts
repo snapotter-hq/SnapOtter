@@ -74,7 +74,7 @@ async function getS3(): Promise<S3StorageModule> {
   return s3Mod;
 }
 
-function useS3(): boolean {
+function isS3Enabled(): boolean {
   return env.STORAGE_MODE === "s3";
 }
 
@@ -92,7 +92,7 @@ let storageReady = false;
 
 export async function ensureStorageDir(): Promise<void> {
   if (storageReady) return;
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.checkConnection();
     storageReady = true;
@@ -115,7 +115,7 @@ export async function ensureStorageDir(): Promise<void> {
 
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   const storedName = generateStoredName(originalName);
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.putObject(storedName, buffer);
     return storedName;
@@ -138,7 +138,7 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
 }
 
 export async function readStoredFile(storedName: string): Promise<Buffer> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getObject(storedName);
   }
@@ -146,7 +146,7 @@ export async function readStoredFile(storedName: string): Promise<Buffer> {
 }
 
 export async function streamStoredFile(storedName: string): Promise<Readable> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getObjectStream(storedName);
   }
@@ -154,7 +154,7 @@ export async function streamStoredFile(storedName: string): Promise<Readable> {
 }
 
 export async function deleteStoredFile(storedName: string): Promise<void> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteObject(storedName);
     return;
@@ -177,7 +177,7 @@ let thumbDirReady = false;
 
 async function ensureThumbDir(): Promise<void> {
   if (thumbDirReady) return;
-  if (useS3()) {
+  if (isS3Enabled()) {
     thumbDirReady = true;
     return;
   }
@@ -197,7 +197,7 @@ function thumbPath(storedName: string): string {
 }
 
 export async function getCachedThumbnail(storedName: string): Promise<Buffer | null> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getThumbnail(storedName);
   }
@@ -209,7 +209,7 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
 }
 
 export async function saveThumbnail(storedName: string, buffer: Buffer): Promise<void> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.putThumbnail(storedName, buffer);
     return;
@@ -219,7 +219,7 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
 }
 
 export async function deleteThumbnail(storedName: string): Promise<void> {
-  if (useS3()) {
+  if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteThumbnail(storedName);
     return;

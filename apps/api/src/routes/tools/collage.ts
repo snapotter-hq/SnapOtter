@@ -421,7 +421,7 @@ function getAspectMultiplier(ar: string): number | null {
 // ── Route registration ────────────���─────────────────────────────────
 
 export function registerCollage(app: FastifyInstance) {
-  app.post("/api/v1/tools/collage", async (request, reply) => {
+  app.post("/api/v1/tools/image/collage", async (request, reply) => {
     const files: Array<{ buffer: Buffer; filename: string }> = [];
     let settingsRaw: string | null = null;
 

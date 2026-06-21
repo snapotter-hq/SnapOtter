@@ -90,86 +90,89 @@ registerAiJobHandler("auto-subtitles", async (input, data, ctx) => {
 });
 
 export function registerAutoSubtitles(app: FastifyInstance) {
-  app.post("/api/v1/tools/auto-subtitles", async (request: FastifyRequest, reply: FastifyReply) => {
-    const toolId = "auto-subtitles";
-    if (!isToolInstalled(toolId)) {
-      const bundle = getBundleForTool(toolId);
-      return reply.status(501).send({
-        error: "Feature not installed",
-        code: "FEATURE_NOT_INSTALLED",
-        feature: TOOL_BUNDLE_MAP[toolId],
-        featureName: bundle?.name ?? toolId,
-        estimatedSize: bundle?.estimatedSize ?? "unknown",
-      });
-    }
-
-    const userId = getAuthUser(request)?.id ?? null;
-    const jobId = randomUUID();
-    let filename = "video";
-    let settingsRaw: string | null = null;
-    let clientJobId: string | null = null;
-    let fileId: string | null = null;
-    let inputKey: string | null = null;
-
-    try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          const upload = await receiveUpload(part, jobId);
-          inputKey = upload.key;
-          filename = upload.filename;
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
-        } else if (part.fieldname === "clientJobId") {
-          const raw = part.value as string;
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-            clientJobId = raw;
-          }
-        } else if (part.fieldname === "fileId") {
-          fileId = part.value as string;
-        }
-      }
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
-
-    if (!inputKey) {
-      return reply.status(400).send({ error: "No video file provided" });
-    }
-
-    let settings: z.infer<typeof settingsSchema>;
-    try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
-        return reply.status(400).send({
-          error: "Invalid settings",
-          details: formatZodErrors(result.error.issues),
+  app.post(
+    "/api/v1/tools/video/auto-subtitles",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const toolId = "auto-subtitles";
+      if (!isToolInstalled(toolId)) {
+        const bundle = getBundleForTool(toolId);
+        return reply.status(501).send({
+          error: "Feature not installed",
+          code: "FEATURE_NOT_INSTALLED",
+          feature: TOOL_BUNDLE_MAP[toolId],
+          featureName: bundle?.name ?? toolId,
+          estimatedSize: bundle?.estimatedSize ?? "unknown",
         });
       }
-      settings = result.data;
-    } catch {
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
 
-    const progressJobId = clientJobId || jobId;
+      const userId = getAuthUser(request)?.id ?? null;
+      const jobId = randomUUID();
+      let filename = "video";
+      let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
+      let fileId: string | null = null;
+      let inputKey: string | null = null;
 
-    await enqueueToolJob({
-      jobId,
-      toolId,
-      userId,
-      pool: "ai",
-      inputRefs: [inputKey],
-      filename,
-      settings,
-      clientJobId: clientJobId ?? undefined,
-      fileId: fileId ?? undefined,
-      kind: "ai-tool",
-    });
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            const upload = await receiveUpload(part, jobId);
+            inputKey = upload.key;
+            filename = upload.filename;
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            const raw = part.value as string;
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+              clientJobId = raw;
+            }
+          } else if (part.fieldname === "fileId") {
+            fileId = part.value as string;
+          }
+        }
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Failed to parse multipart request",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
 
-    return reply.status(202).send({ jobId: progressJobId, async: true });
-  });
+      if (!inputKey) {
+        return reply.status(400).send({ error: "No video file provided" });
+      }
+
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: formatZodErrors(result.error.issues),
+          });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      const progressJobId = clientJobId || jobId;
+
+      await enqueueToolJob({
+        jobId,
+        toolId,
+        userId,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings,
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        kind: "ai-tool",
+      });
+
+      return reply.status(202).send({ jobId: progressJobId, async: true });
+    },
+  );
 }

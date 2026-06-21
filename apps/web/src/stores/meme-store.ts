@@ -312,13 +312,13 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         const formData = new FormData();
         formData.append("file", state.customFile);
         formData.append("settings", JSON.stringify(apiSettings));
-        response = await fetch("/api/v1/tools/meme-generator", {
+        response = await fetch("/api/v1/tools/image/meme-generator", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
         });
       } else {
-        response = await fetch("/api/v1/tools/meme-generator", {
+        response = await fetch("/api/v1/tools/image/meme-generator", {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(apiSettings),

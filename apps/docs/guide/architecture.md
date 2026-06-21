@@ -81,7 +81,7 @@ This VitePress site. Deployed to Cloudflare Pages automatically on push to `main
 ## How a request flows
 
 1. The user picks a tool in the web UI and uploads a file.
-2. The frontend sends a multipart POST to `/api/v1/tools/:toolId` with the file and settings.
+2. The frontend sends a multipart POST to `/api/v1/tools/:section/:toolId` with the file and settings.
 3. The API route validates the input with Zod, then dispatches processing.
 4. For standard tools, the job is enqueued to the appropriate BullMQ pool (image, media, or docs based on modality). The in-process BullMQ worker auto-orients the image based on EXIF metadata, runs the tool's process function, and returns the result.
 5. For AI tools, the TypeScript bridge sends a request to the persistent Python dispatcher (or spawns a fresh subprocess as fallback), waits for it to finish, and reads the output file.

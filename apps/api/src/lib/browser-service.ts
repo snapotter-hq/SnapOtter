@@ -1,6 +1,9 @@
+import { lookup } from "node:dns/promises";
 import { existsSync } from "node:fs";
+import { isIP } from "node:net";
 import PQueue from "p-queue";
-import { type Browser, chromium } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
+import { isPrivateIp } from "./ssrf.js";
 
 const MAX_PAGES = Math.max(1, parseInt(process.env.BROWSER_MAX_PAGES || "3", 10));
 const CRASH_WINDOW_MS = 60_000;
@@ -56,6 +59,59 @@ function recordCrash(): void {
   backoffUntil = now + delay;
 }
 
+async function isBlockedUrl(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.protocol === "data:" ||
+      parsed.protocol === "blob:" ||
+      parsed.protocol === "about:"
+    ) {
+      return false;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return true;
+    }
+    const hostname = parsed.hostname.replace(/^\[|]$/g, "");
+    if (isIP(hostname)) {
+      return isPrivateIp(hostname);
+    }
+    try {
+      const result = await lookup(hostname, { all: true });
+      const entries = Array.isArray(result) ? result : [result];
+      return entries.some((e) => isPrivateIp(e.address));
+    } catch {
+      return true;
+    }
+  } catch {
+    return true;
+  }
+}
+
+async function installNetworkGuard(page: Page): Promise<void> {
+  await page.route("**/*", async (route) => {
+    const url = route.request().url();
+    if (await isBlockedUrl(url)) {
+      await route.abort("blockedbyclient").catch(() => {});
+      return;
+    }
+    try {
+      const response = await route.fetch();
+      const responseUrl = response.url();
+      if (responseUrl !== url && (await isBlockedUrl(responseUrl))) {
+        await route.abort("blockedbyclient").catch(() => {});
+        return;
+      }
+      await route.fulfill({ response });
+    } catch {
+      await route.abort("failed").catch(() => {});
+    }
+  });
+  await page.routeWebSocket("**/*", (ws) => {
+    ws.close();
+  });
+}
+
 async function getBrowser(): Promise<Browser> {
   if (browserFailed) {
     throw new Error("Browser service permanently disabled after repeated crashes");
@@ -67,7 +123,12 @@ async function getBrowser(): Promise<Browser> {
     return browser;
   }
   browser = await chromium.launch({
-    args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+    args: [
+      "--no-sandbox",
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--disable-background-networking",
+    ],
   });
   browser.on("disconnected", () => {
     browser = null;
@@ -88,7 +149,9 @@ export async function capturePage(url: string, options: CaptureOptions): Promise
     const page = await b.newPage({
       viewport: { width: options.viewportWidth, height: options.viewportHeight },
       isMobile: options.isMobile,
+      serviceWorkers: "block",
     });
+    await installNetworkGuard(page);
 
     try {
       await page.goto(url, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });
@@ -138,7 +201,9 @@ export async function captureHtml(html: string, options: CaptureOptions): Promis
     const page = await b.newPage({
       viewport: { width: options.viewportWidth, height: options.viewportHeight },
       isMobile: options.isMobile,
+      serviceWorkers: "block",
     });
+    await installNetworkGuard(page);
 
     try {
       await page.setContent(html, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });

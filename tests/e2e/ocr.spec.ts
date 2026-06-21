@@ -81,7 +81,7 @@ test.describe("OCR / Text Extraction", () => {
   test("uploads image and OCR processing completes", async ({ loggedInPage: page }) => {
     await skipIfFeatureNotInstalled(page);
 
-    await uploadOcrFile(page, "tests/fixtures/test-portrait.jpg");
+    await uploadOcrFile(page, "tests/fixtures/image/valid/test-portrait.jpg");
     await submitOcr(page);
 
     const hasText = await page.getByTestId("ocr-result-text").isVisible();
@@ -92,7 +92,7 @@ test.describe("OCR / Text Extraction", () => {
   test("copy button is visible after OCR completes", async ({ loggedInPage: page }) => {
     await skipIfFeatureNotInstalled(page);
 
-    await uploadOcrFile(page, "tests/fixtures/test-portrait.jpg");
+    await uploadOcrFile(page, "tests/fixtures/image/valid/test-portrait.jpg");
     await submitOcr(page);
 
     await expect(page.getByText("Copy")).toBeVisible();
@@ -101,7 +101,7 @@ test.describe("OCR / Text Extraction", () => {
   test("shows 'no text detected' for blank image", async ({ loggedInPage: page }) => {
     await skipIfFeatureNotInstalled(page);
 
-    await uploadOcrFile(page, "tests/fixtures/test-blank.png");
+    await uploadOcrFile(page, "tests/fixtures/image/edge/test-blank.png");
     await submitOcr(page);
 
     await expect(page.getByText("No text detected")).toBeVisible();

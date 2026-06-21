@@ -63,14 +63,14 @@ export const zhCN: TranslationKeys = {
     "pdf-security": "Security",
     "pdf-optimize": "Optimize",
     "doc-convert": "Convert",
-    data: "Data Files",
+    data: "Files",
     archives: "Archives",
   },
   modalities: {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "PDF & Data",
+    documentsAndFiles: "PDF & Files",
   },
   tools: {
     resize: {
@@ -2430,7 +2430,9 @@ export const zhCN: TranslationKeys = {
     clearSearch: "Clear search",
     all: "All",
     documents: "PDF",
-    data: "Data",
+    data: "Files",
+    pdf: "PDF",
+    files: "Files",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },
@@ -3389,3 +3391,5 @@ export const zhCN: TranslationKeys = {
     homeLink: "SnapOtter home",
   },
 } as const;
+
+export default zhCN;

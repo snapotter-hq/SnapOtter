@@ -7,4 +7,5 @@ export * from "./features.js";
 export * from "./i18n/index.js";
 export * from "./modality.js";
 export * from "./permissions.js";
+export * from "./section.js";
 export * from "./types.js";

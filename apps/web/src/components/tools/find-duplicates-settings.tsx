@@ -114,7 +114,7 @@ export function FindDuplicatesSettings() {
       setScanning(false);
     };
 
-    xhr.open("POST", "/api/v1/tools/find-duplicates");
+    xhr.open("POST", "/api/v1/tools/image/find-duplicates");
     xhr.timeout = 300_000;
     const headers = formatHeaders();
     headers.forEach((value, key) => {

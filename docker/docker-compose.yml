@@ -16,7 +16,7 @@ services:
       # - "127.0.0.1:1349:1349"
       - "1349:1349"
     volumes:
-      - SnapOtter-data:/data           # Database, AI models, user files
+      - SnapOtter-data:/data           # AI models, user files
       - SnapOtter-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
       - AUTH_ENABLED=true
@@ -32,12 +32,12 @@ services:
       - MAX_WORKER_THREADS=${MAX_WORKER_THREADS:-0}
       - PROCESSING_TIMEOUT_S=${PROCESSING_TIMEOUT_S:-0}
       - MAX_PIPELINE_STEPS=${MAX_PIPELINE_STEPS:-20}
-      - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-1000}
+      - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-300}
       - MAX_USERS=${MAX_USERS:-0}
       - SESSION_DURATION_HOURS=${SESSION_DURATION_HOURS:-168}
       - TRUST_PROXY=${TRUST_PROXY:-true}
       - DATABASE_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-snapotter}@redis:6379
       # 1.x upgrade: uncomment to import the old SQLite database on first boot;
       # re-comment after the migration succeeds.
       # - SQLITE_MIGRATE_PATH=/data/snapotter.db
@@ -113,6 +113,7 @@ services:
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    mem_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter}"]
       interval: 10s
@@ -123,12 +124,18 @@ services:
   redis:
     image: redis:8-alpine
     container_name: SnapOtter-redis
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    command: >-
+      redis-server
+      --maxmemory-policy noeviction
+      --maxmemory 512mb
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-snapotter}
     volumes:
       - SnapOtter-redisdata:/data
     restart: unless-stopped
+    mem_limit: 1g
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-snapotter}", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 12

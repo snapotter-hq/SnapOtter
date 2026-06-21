@@ -1,10 +1,8 @@
 import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
 export function CompareSettings() {
-  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError, setProcessedUrl } = useFileStore();
   const [secondFile, setSecondFile] = useState<File | null>(null);
   const [similarity, setSimilarity] = useState<number | null>(null);
@@ -24,7 +22,7 @@ export function CompareSettings() {
       formData.append("file", files[0]);
       formData.append("file", secondFile);
 
-      const res = await fetch("/api/v1/tools/compare", {
+      const res = await fetch("/api/v1/tools/image/compare", {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

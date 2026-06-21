@@ -44,7 +44,7 @@ function resolveOutputFormat(
 }
 
 export function registerSplit(app: FastifyInstance) {
-  app.post("/api/v1/tools/split", async (request, reply) => {
+  app.post("/api/v1/tools/image/split", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "image";
     let settingsRaw: string | null = null;

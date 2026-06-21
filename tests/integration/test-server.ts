@@ -36,7 +36,7 @@ import {
   stopCancelListener,
 } from "../../apps/api/src/jobs/cancel.js";
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
-import { closeQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
+import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import {
@@ -83,6 +83,12 @@ async function ensureSpine(): Promise<void> {
   spineStarted = true;
   await startCancelListener();
   startWorkers();
+  // Position every pool's QueueEvents consumer at the stream tail *before* the
+  // first job is enqueued. Without this, the first sync-wait per fork lazily
+  // creates a consumer that can miss a fast job's completion event and block
+  // for the full SYNC_WAIT_MS window -- the root cause of the csv-json 30s
+  // timeout flake. Awaited here so it is deterministic for the first request.
+  await warmQueueEvents();
 }
 
 // Module-scope afterAll: vitest registers this into any importing file's

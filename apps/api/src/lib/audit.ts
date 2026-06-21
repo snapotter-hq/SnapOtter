@@ -37,8 +37,10 @@ export async function isToolAuditEnabled(): Promise<boolean> {
   }
 }
 
+const AUDIT_STRIP_RE = /[<>&"'\r\n\0\x85\u2028\u2029]/g;
+
 export function sanitizeAuditInput(raw: string): string {
-  return raw.replace(/[<>&"']/g, "").slice(0, MAX_AUDIT_INPUT_LENGTH) || "(empty)";
+  return raw.replace(AUDIT_STRIP_RE, "").slice(0, MAX_AUDIT_INPUT_LENGTH) || "(empty)";
 }
 
 /**

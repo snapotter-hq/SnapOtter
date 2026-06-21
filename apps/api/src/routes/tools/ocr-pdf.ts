@@ -57,7 +57,7 @@ registerAiJobHandler("ocr-pdf", async (input, data, ctx) => {
 });
 
 export function registerOcrPdf(app: FastifyInstance) {
-  app.post("/api/v1/tools/ocr-pdf", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/v1/tools/pdf/ocr-pdf", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "ocr-pdf";
     if (!isToolInstalled(toolId)) {
       const bundle = getBundleForTool(toolId);

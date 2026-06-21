@@ -30,6 +30,10 @@ const SERIAL_SPECS =
 // linux baselines are committed.
 const VISUAL_SPECS = /visual-regression|gui-visual-/;
 
+// Device-emulated specs (real touch, UA, DPR). Tagged @mobile or @tablet
+// and routed to the dedicated device projects below.
+const DEVICE_SPECS = /device-mobile|device-tablet|device-visual|device-a11y/;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -68,7 +72,7 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         storageState: authFile,
       },
-      testIgnore: [SERIAL_SPECS, VISUAL_SPECS],
+      testIgnore: [SERIAL_SPECS, VISUAL_SPECS, DEVICE_SPECS],
       dependencies: ["setup"],
     },
     {
@@ -105,6 +109,48 @@ export default defineConfig({
         storageState: authFile,
       },
       testMatch: /gui-cross-browser\.spec\.ts/,
+      dependencies: ["setup"],
+    },
+
+    // ---- Real device-emulated projects (touch, UA, DPR, engine) ----
+    {
+      name: "mobile-chromium",
+      use: {
+        ...devices["Pixel 7"],
+        storageState: authFile,
+      },
+      testMatch: DEVICE_SPECS,
+      grep: /@mobile/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "mobile-webkit",
+      use: {
+        ...devices["iPhone 14"],
+        storageState: authFile,
+      },
+      testMatch: DEVICE_SPECS,
+      grep: /@mobile/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "tablet-webkit",
+      use: {
+        ...devices["iPad (gen 7)"],
+        storageState: authFile,
+      },
+      testMatch: DEVICE_SPECS,
+      grep: /@tablet/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "tablet-chromium",
+      use: {
+        ...devices["Galaxy Tab S9"],
+        storageState: authFile,
+      },
+      testMatch: DEVICE_SPECS,
+      grep: /@tablet/,
       dependencies: ["setup"],
     },
   ],

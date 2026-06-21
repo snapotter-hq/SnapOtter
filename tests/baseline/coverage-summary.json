@@ -1,0 +1,1947 @@
+{
+  "total": {
+    "lines": { "total": 39868, "covered": 30690, "skipped": 0, "pct": 76.97 },
+    "statements": { "total": 39868, "covered": 30690, "skipped": 0, "pct": 76.97 },
+    "functions": { "total": 1388, "covered": 1159, "skipped": 0, "pct": 83.5 },
+    "branches": { "total": 8247, "covered": 6693, "skipped": 0, "pct": 81.15 },
+    "branchesTrue": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/config.ts": {
+    "lines": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/permissions.ts": {
+    "lines": { "total": 125, "covered": 99, "skipped": 0, "pct": 79.2 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 125, "covered": 99, "skipped": 0, "pct": 79.2 },
+    "branches": { "total": 28, "covered": 26, "skipped": 0, "pct": 92.85 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/tracing.ts": {
+    "lines": { "total": 76, "covered": 63, "skipped": 0, "pct": 82.89 },
+    "functions": { "total": 5, "covered": 3, "skipped": 0, "pct": 60 },
+    "statements": { "total": 76, "covered": 63, "skipped": 0, "pct": 82.89 },
+    "branches": { "total": 9, "covered": 5, "skipped": 0, "pct": 55.55 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/db/index.ts": {
+    "lines": { "total": 18, "covered": 12, "skipped": 0, "pct": 66.66 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 18, "covered": 12, "skipped": 0, "pct": 66.66 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/db/migrate-from-sqlite.ts": {
+    "lines": { "total": 144, "covered": 121, "skipped": 0, "pct": 84.02 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 144, "covered": 121, "skipped": 0, "pct": 84.02 },
+    "branches": { "total": 47, "covered": 42, "skipped": 0, "pct": 89.36 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/db/schema.ts": {
+    "lines": { "total": 187, "covered": 187, "skipped": 0, "pct": 100 },
+    "functions": { "total": 8, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 187, "covered": 187, "skipped": 0, "pct": 100 },
+    "branches": { "total": 15, "covered": 15, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/ai-handlers.ts": {
+    "lines": { "total": 16, "covered": 8, "skipped": 0, "pct": 50 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 16, "covered": 8, "skipped": 0, "pct": 50 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/alert-evaluator.ts": {
+    "lines": { "total": 85, "covered": 6, "skipped": 0, "pct": 7.05 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 85, "covered": 6, "skipped": 0, "pct": 7.05 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/audit-archive.ts": {
+    "lines": { "total": 138, "covered": 13, "skipped": 0, "pct": 9.42 },
+    "functions": { "total": 5, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 138, "covered": 13, "skipped": 0, "pct": 9.42 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/batch-progress.ts": {
+    "lines": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "branches": { "total": 16, "covered": 16, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/cancel.ts": {
+    "lines": { "total": 59, "covered": 49, "skipped": 0, "pct": 83.05 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 59, "covered": 49, "skipped": 0, "pct": 83.05 },
+    "branches": { "total": 14, "covered": 12, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/connection.ts": {
+    "lines": { "total": 28, "covered": 23, "skipped": 0, "pct": 82.14 },
+    "functions": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 },
+    "statements": { "total": 28, "covered": 23, "skipped": 0, "pct": 82.14 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/enqueue.ts": {
+    "lines": { "total": 113, "covered": 86, "skipped": 0, "pct": 76.1 },
+    "functions": { "total": 8, "covered": 7, "skipped": 0, "pct": 87.5 },
+    "statements": { "total": 113, "covered": 86, "skipped": 0, "pct": 76.1 },
+    "branches": { "total": 25, "covered": 15, "skipped": 0, "pct": 60 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/gdpr-export.ts": {
+    "lines": { "total": 75, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 75, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/postprocess.ts": {
+    "lines": { "total": 179, "covered": 127, "skipped": 0, "pct": 70.94 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 179, "covered": 127, "skipped": 0, "pct": 70.94 },
+    "branches": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/queues.ts": {
+    "lines": { "total": 80, "covered": 39, "skipped": 0, "pct": 48.75 },
+    "functions": { "total": 5, "covered": 3, "skipped": 0, "pct": 60 },
+    "statements": { "total": 80, "covered": 39, "skipped": 0, "pct": 48.75 },
+    "branches": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/siem-forward.ts": {
+    "lines": { "total": 73, "covered": 12, "skipped": 0, "pct": 16.43 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 73, "covered": 12, "skipped": 0, "pct": 16.43 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/storage-reconciliation.ts": {
+    "lines": { "total": 39, "covered": 3, "skipped": 0, "pct": 7.69 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 39, "covered": 3, "skipped": 0, "pct": 7.69 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/system-jobs.ts": {
+    "lines": { "total": 222, "covered": 155, "skipped": 0, "pct": 69.81 },
+    "functions": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 },
+    "statements": { "total": 222, "covered": 155, "skipped": 0, "pct": 69.81 },
+    "branches": { "total": 43, "covered": 25, "skipped": 0, "pct": 58.13 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/types.ts": {
+    "lines": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/jobs/worker.ts": {
+    "lines": { "total": 580, "covered": 500, "skipped": 0, "pct": 86.2 },
+    "functions": { "total": 15, "covered": 15, "skipped": 0, "pct": 100 },
+    "statements": { "total": 580, "covered": 500, "skipped": 0, "pct": 86.2 },
+    "branches": { "total": 152, "covered": 99, "skipped": 0, "pct": 65.13 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/analytics.ts": {
+    "lines": { "total": 135, "covered": 89, "skipped": 0, "pct": 65.92 },
+    "functions": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 },
+    "statements": { "total": 135, "covered": 89, "skipped": 0, "pct": 65.92 },
+    "branches": { "total": 42, "covered": 35, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/audit-integrity.ts": {
+    "lines": { "total": 18, "covered": 18, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 18, "covered": 18, "skipped": 0, "pct": 100 },
+    "branches": { "total": 11, "covered": 11, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/audit.ts": {
+    "lines": { "total": 108, "covered": 81, "skipped": 0, "pct": 75 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 108, "covered": 81, "skipped": 0, "pct": 75 },
+    "branches": { "total": 62, "covered": 58, "skipped": 0, "pct": 93.54 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/auto-orient.ts": {
+    "lines": { "total": 11, "covered": 11, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 11, "covered": 11, "skipped": 0, "pct": 100 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/bg-effects.ts": {
+    "lines": { "total": 174, "covered": 172, "skipped": 0, "pct": 98.85 },
+    "functions": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "statements": { "total": 174, "covered": 172, "skipped": 0, "pct": 98.85 },
+    "branches": { "total": 44, "covered": 36, "skipped": 0, "pct": 81.81 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/browser-service.ts": {
+    "lines": { "total": 155, "covered": 20, "skipped": 0, "pct": 12.9 },
+    "functions": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 155, "covered": 20, "skipped": 0, "pct": 12.9 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/cleanup.ts": {
+    "lines": { "total": 28, "covered": 25, "skipped": 0, "pct": 89.28 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 28, "covered": 25, "skipped": 0, "pct": 89.28 },
+    "branches": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/csp.ts": {
+    "lines": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/encryption.ts": {
+    "lines": { "total": 54, "covered": 54, "skipped": 0, "pct": 100 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 54, "covered": 54, "skipped": 0, "pct": 100 },
+    "branches": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/env.ts": {
+    "lines": { "total": 228, "covered": 138, "skipped": 0, "pct": 60.52 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 228, "covered": 138, "skipped": 0, "pct": 60.52 },
+    "branches": { "total": 22, "covered": 14, "skipped": 0, "pct": 63.63 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/errors.ts": {
+    "lines": { "total": 17, "covered": 17, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 17, "covered": 17, "skipped": 0, "pct": 100 },
+    "branches": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/exiftool.ts": {
+    "lines": { "total": 215, "covered": 175, "skipped": 0, "pct": 81.39 },
+    "functions": { "total": 8, "covered": 7, "skipped": 0, "pct": 87.5 },
+    "statements": { "total": 215, "covered": 175, "skipped": 0, "pct": 81.39 },
+    "branches": { "total": 99, "covered": 86, "skipped": 0, "pct": 86.86 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/external-auth-resolver.ts": {
+    "lines": { "total": 154, "covered": 34, "skipped": 0, "pct": 22.07 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 154, "covered": 34, "skipped": 0, "pct": 22.07 },
+    "branches": { "total": 9, "covered": 8, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/feature-status.ts": {
+    "lines": { "total": 538, "covered": 405, "skipped": 0, "pct": 75.27 },
+    "functions": { "total": 27, "covered": 23, "skipped": 0, "pct": 85.18 },
+    "statements": { "total": 538, "covered": 405, "skipped": 0, "pct": 75.27 },
+    "branches": { "total": 158, "covered": 128, "skipped": 0, "pct": 81.01 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/file-storage.ts": {
+    "lines": { "total": 194, "covered": 119, "skipped": 0, "pct": 61.34 },
+    "functions": { "total": 15, "covered": 14, "skipped": 0, "pct": 93.33 },
+    "statements": { "total": 194, "covered": 119, "skipped": 0, "pct": 61.34 },
+    "branches": { "total": 41, "covered": 26, "skipped": 0, "pct": 63.41 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/file-validation.ts": {
+    "lines": { "total": 256, "covered": 245, "skipped": 0, "pct": 95.7 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 256, "covered": 245, "skipped": 0, "pct": 95.7 },
+    "branches": { "total": 92, "covered": 81, "skipped": 0, "pct": 88.04 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/filename.ts": {
+    "lines": { "total": 99, "covered": 99, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 99, "covered": 99, "skipped": 0, "pct": 100 },
+    "branches": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/format-decoders.ts": {
+    "lines": { "total": 450, "covered": 394, "skipped": 0, "pct": 87.55 },
+    "functions": { "total": 21, "covered": 20, "skipped": 0, "pct": 95.23 },
+    "statements": { "total": 450, "covered": 394, "skipped": 0, "pct": 87.55 },
+    "branches": { "total": 61, "covered": 51, "skipped": 0, "pct": 83.6 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/format-encoders.ts": {
+    "lines": { "total": 188, "covered": 179, "skipped": 0, "pct": 95.21 },
+    "functions": { "total": 12, "covered": 12, "skipped": 0, "pct": 100 },
+    "statements": { "total": 188, "covered": 179, "skipped": 0, "pct": 95.21 },
+    "branches": { "total": 33, "covered": 22, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/heic-converter.ts": {
+    "lines": { "total": 77, "covered": 72, "skipped": 0, "pct": 93.5 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 77, "covered": 72, "skipped": 0, "pct": 93.5 },
+    "branches": { "total": 19, "covered": 16, "skipped": 0, "pct": 84.21 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/log-trace-mixin.ts": {
+    "lines": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/logger.ts": {
+    "lines": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/media-tool.ts": {
+    "lines": { "total": 130, "covered": 130, "skipped": 0, "pct": 100 },
+    "functions": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "statements": { "total": 130, "covered": 130, "skipped": 0, "pct": 100 },
+    "branches": { "total": 32, "covered": 32, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/meme-text-renderer.ts": {
+    "lines": { "total": 163, "covered": 154, "skipped": 0, "pct": 94.47 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 163, "covered": 154, "skipped": 0, "pct": 94.47 },
+    "branches": { "total": 44, "covered": 40, "skipped": 0, "pct": 90.9 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/metrics.ts": {
+    "lines": { "total": 48, "covered": 48, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 48, "covered": 48, "skipped": 0, "pct": 100 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/object-storage.ts": {
+    "lines": { "total": 197, "covered": 136, "skipped": 0, "pct": 69.03 },
+    "functions": { "total": 17, "covered": 16, "skipped": 0, "pct": 94.11 },
+    "statements": { "total": 197, "covered": 136, "skipped": 0, "pct": 69.03 },
+    "branches": { "total": 51, "covered": 36, "skipped": 0, "pct": 70.58 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/output-format.ts": {
+    "lines": { "total": 34, "covered": 34, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 34, "covered": 34, "skipped": 0, "pct": 100 },
+    "branches": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/page-spec.ts": {
+    "lines": { "total": 70, "covered": 66, "skipped": 0, "pct": 94.28 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 70, "covered": 66, "skipped": 0, "pct": 94.28 },
+    "branches": { "total": 31, "covered": 28, "skipped": 0, "pct": 90.32 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/pool.ts": {
+    "lines": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/settings-helpers.ts": {
+    "lines": { "total": 38, "covered": 37, "skipped": 0, "pct": 97.36 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 38, "covered": 37, "skipped": 0, "pct": 97.36 },
+    "branches": { "total": 12, "covered": 11, "skipped": 0, "pct": 91.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/ssrf.ts": {
+    "lines": { "total": 172, "covered": 126, "skipped": 0, "pct": 73.25 },
+    "functions": { "total": 8, "covered": 6, "skipped": 0, "pct": 75 },
+    "statements": { "total": 172, "covered": 126, "skipped": 0, "pct": 73.25 },
+    "branches": { "total": 93, "covered": 86, "skipped": 0, "pct": 92.47 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/subtitle-format.ts": {
+    "lines": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/support-bundle.ts": {
+    "lines": { "total": 110, "covered": 99, "skipped": 0, "pct": 90 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 110, "covered": 99, "skipped": 0, "pct": 90 },
+    "branches": { "total": 18, "covered": 12, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/svg-sanitize.ts": {
+    "lines": { "total": 68, "covered": 68, "skipped": 0, "pct": 100 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 68, "covered": 68, "skipped": 0, "pct": 100 },
+    "branches": { "total": 19, "covered": 18, "skipped": 0, "pct": 94.73 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/timeout.ts": {
+    "lines": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/upload-stream.ts": {
+    "lines": { "total": 12, "covered": 12, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 12, "covered": 12, "skipped": 0, "pct": 100 },
+    "branches": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/webhook-delivery.ts": {
+    "lines": { "total": 45, "covered": 45, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 45, "covered": 45, "skipped": 0, "pct": 100 },
+    "branches": { "total": 11, "covered": 10, "skipped": 0, "pct": 90.9 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/beautify/backgrounds.ts": {
+    "lines": { "total": 72, "covered": 72, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 72, "covered": 72, "skipped": 0, "pct": 100 },
+    "branches": { "total": 21, "covered": 20, "skipped": 0, "pct": 95.23 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/beautify/constants.ts": {
+    "lines": { "total": 101, "covered": 101, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 101, "covered": 101, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/beautify/frames.ts": {
+    "lines": { "total": 188, "covered": 184, "skipped": 0, "pct": 97.87 },
+    "functions": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "statements": { "total": 188, "covered": 184, "skipped": 0, "pct": 97.87 },
+    "branches": { "total": 60, "covered": 53, "skipped": 0, "pct": 88.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/lib/beautify/shadow.ts": {
+    "lines": { "total": 58, "covered": 58, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 58, "covered": 58, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/contract.ts": {
+    "lines": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/document-input.ts": {
+    "lines": { "total": 57, "covered": 55, "skipped": 0, "pct": 96.49 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 57, "covered": 55, "skipped": 0, "pct": 96.49 },
+    "branches": { "total": 21, "covered": 18, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/image-input.ts": {
+    "lines": { "total": 89, "covered": 67, "skipped": 0, "pct": 75.28 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 89, "covered": 67, "skipped": 0, "pct": 75.28 },
+    "branches": { "total": 24, "covered": 19, "skipped": 0, "pct": 79.16 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/input-handler.ts": {
+    "lines": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/media-input.ts": {
+    "lines": { "total": 93, "covered": 85, "skipped": 0, "pct": 91.39 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 93, "covered": 85, "skipped": 0, "pct": 91.39 },
+    "branches": { "total": 60, "covered": 56, "skipped": 0, "pct": 93.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/modality/preview.ts": {
+    "lines": { "total": 84, "covered": 75, "skipped": 0, "pct": 89.28 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 84, "covered": 75, "skipped": 0, "pct": 89.28 },
+    "branches": { "total": 16, "covered": 10, "skipped": 0, "pct": 62.5 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/auth.ts": {
+    "lines": { "total": 926, "covered": 774, "skipped": 0, "pct": 83.58 },
+    "functions": { "total": 17, "covered": 16, "skipped": 0, "pct": 94.11 },
+    "statements": { "total": 926, "covered": 774, "skipped": 0, "pct": 83.58 },
+    "branches": { "total": 257, "covered": 207, "skipped": 0, "pct": 80.54 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/ip-allowlist.ts": {
+    "lines": { "total": 114, "covered": 108, "skipped": 0, "pct": 94.73 },
+    "functions": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "statements": { "total": 114, "covered": 108, "skipped": 0, "pct": 94.73 },
+    "branches": { "total": 58, "covered": 51, "skipped": 0, "pct": 87.93 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/mfa.ts": {
+    "lines": { "total": 343, "covered": 214, "skipped": 0, "pct": 62.39 },
+    "functions": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "statements": { "total": 343, "covered": 214, "skipped": 0, "pct": 62.39 },
+    "branches": { "total": 72, "covered": 45, "skipped": 0, "pct": 62.5 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/oidc.ts": {
+    "lines": { "total": 215, "covered": 122, "skipped": 0, "pct": 56.74 },
+    "functions": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 215, "covered": 122, "skipped": 0, "pct": 56.74 },
+    "branches": { "total": 28, "covered": 19, "skipped": 0, "pct": 67.85 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/per-user-rate-limit.ts": {
+    "lines": { "total": 32, "covered": 18, "skipped": 0, "pct": 56.25 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 32, "covered": 18, "skipped": 0, "pct": 56.25 },
+    "branches": { "total": 11, "covered": 7, "skipped": 0, "pct": 63.63 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/saml.ts": {
+    "lines": { "total": 137, "covered": 11, "skipped": 0, "pct": 8.02 },
+    "functions": { "total": 4, "covered": 1, "skipped": 0, "pct": 25 },
+    "statements": { "total": 137, "covered": 11, "skipped": 0, "pct": 8.02 },
+    "branches": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/static.ts": {
+    "lines": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/plugins/upload.ts": {
+    "lines": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/admin-ops.ts": {
+    "lines": { "total": 207, "covered": 140, "skipped": 0, "pct": 67.63 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 207, "covered": 140, "skipped": 0, "pct": 67.63 },
+    "branches": { "total": 29, "covered": 19, "skipped": 0, "pct": 65.51 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/analytics.ts": {
+    "lines": { "total": 72, "covered": 62, "skipped": 0, "pct": 86.11 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 72, "covered": 62, "skipped": 0, "pct": 86.11 },
+    "branches": { "total": 12, "covered": 8, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/api-keys.ts": {
+    "lines": { "total": 135, "covered": 133, "skipped": 0, "pct": 98.51 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 135, "covered": 133, "skipped": 0, "pct": 98.51 },
+    "branches": { "total": 41, "covered": 36, "skipped": 0, "pct": 87.8 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/audit-log.ts": {
+    "lines": { "total": 67, "covered": 55, "skipped": 0, "pct": 82.08 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 67, "covered": 55, "skipped": 0, "pct": 82.08 },
+    "branches": { "total": 25, "covered": 19, "skipped": 0, "pct": 76 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/batch.ts": {
+    "lines": { "total": 363, "covered": 309, "skipped": 0, "pct": 85.12 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 363, "covered": 309, "skipped": 0, "pct": 85.12 },
+    "branches": { "total": 92, "covered": 76, "skipped": 0, "pct": 82.6 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/config.ts": {
+    "lines": { "total": 11, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 11, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/docs.ts": {
+    "lines": { "total": 128, "covered": 126, "skipped": 0, "pct": 98.43 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 128, "covered": 126, "skipped": 0, "pct": 98.43 },
+    "branches": { "total": 39, "covered": 31, "skipped": 0, "pct": 79.48 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/features.ts": {
+    "lines": { "total": 303, "covered": 61, "skipped": 0, "pct": 20.13 },
+    "functions": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 },
+    "statements": { "total": 303, "covered": 61, "skipped": 0, "pct": 20.13 },
+    "branches": { "total": 10, "covered": 6, "skipped": 0, "pct": 60 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/fetch-urls.ts": {
+    "lines": { "total": 192, "covered": 178, "skipped": 0, "pct": 92.7 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 192, "covered": 178, "skipped": 0, "pct": 92.7 },
+    "branches": { "total": 52, "covered": 42, "skipped": 0, "pct": 80.76 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/file-preview.ts": {
+    "lines": { "total": 292, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 292, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/files.ts": {
+    "lines": { "total": 204, "covered": 180, "skipped": 0, "pct": 88.23 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 204, "covered": 180, "skipped": 0, "pct": 88.23 },
+    "branches": { "total": 58, "covered": 47, "skipped": 0, "pct": 81.03 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/meme-templates.ts": {
+    "lines": { "total": 101, "covered": 42, "skipped": 0, "pct": 41.58 },
+    "functions": { "total": 5, "covered": 2, "skipped": 0, "pct": 40 },
+    "statements": { "total": 101, "covered": 42, "skipped": 0, "pct": 41.58 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/pipeline.ts": {
+    "lines": { "total": 878, "covered": 654, "skipped": 0, "pct": 74.48 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 878, "covered": 654, "skipped": 0, "pct": 74.48 },
+    "branches": { "total": 193, "covered": 146, "skipped": 0, "pct": 75.64 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/progress.ts": {
+    "lines": { "total": 278, "covered": 215, "skipped": 0, "pct": 77.33 },
+    "functions": { "total": 14, "covered": 13, "skipped": 0, "pct": 92.85 },
+    "statements": { "total": 278, "covered": 215, "skipped": 0, "pct": 77.33 },
+    "branches": { "total": 80, "covered": 65, "skipped": 0, "pct": 81.25 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/roles.ts": {
+    "lines": { "total": 218, "covered": 200, "skipped": 0, "pct": 91.74 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 218, "covered": 200, "skipped": 0, "pct": 91.74 },
+    "branches": { "total": 56, "covered": 50, "skipped": 0, "pct": 89.28 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/settings.ts": {
+    "lines": { "total": 117, "covered": 107, "skipped": 0, "pct": 91.45 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 117, "covered": 107, "skipped": 0, "pct": 91.45 },
+    "branches": { "total": 39, "covered": 28, "skipped": 0, "pct": 71.79 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/teams.ts": {
+    "lines": { "total": 137, "covered": 137, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 137, "covered": 137, "skipped": 0, "pct": 100 },
+    "branches": { "total": 39, "covered": 35, "skipped": 0, "pct": 89.74 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tool-factory.ts": {
+    "lines": { "total": 370, "covered": 340, "skipped": 0, "pct": 91.89 },
+    "functions": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "statements": { "total": 370, "covered": 340, "skipped": 0, "pct": 91.89 },
+    "branches": { "total": 172, "covered": 156, "skipped": 0, "pct": 90.69 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/user-files.ts": {
+    "lines": { "total": 520, "covered": 415, "skipped": 0, "pct": 79.8 },
+    "functions": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 },
+    "statements": { "total": 520, "covered": 415, "skipped": 0, "pct": 79.8 },
+    "branches": { "total": 134, "covered": 86, "skipped": 0, "pct": 64.17 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/audit-export.ts": {
+    "lines": { "total": 120, "covered": 43, "skipped": 0, "pct": 35.83 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 120, "covered": 43, "skipped": 0, "pct": 35.83 },
+    "branches": { "total": 9, "covered": 5, "skipped": 0, "pct": 55.55 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/config.ts": {
+    "lines": { "total": 299, "covered": 197, "skipped": 0, "pct": 65.88 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 299, "covered": 197, "skipped": 0, "pct": 65.88 },
+    "branches": { "total": 49, "covered": 35, "skipped": 0, "pct": 71.42 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/gdpr.ts": {
+    "lines": { "total": 275, "covered": 94, "skipped": 0, "pct": 34.18 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 275, "covered": 94, "skipped": 0, "pct": 34.18 },
+    "branches": { "total": 20, "covered": 7, "skipped": 0, "pct": 35 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/index.ts": {
+    "lines": { "total": 20, "covered": 20, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 20, "covered": 20, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/ip-allowlist.ts": {
+    "lines": { "total": 99, "covered": 97, "skipped": 0, "pct": 97.97 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 99, "covered": 97, "skipped": 0, "pct": 97.97 },
+    "branches": { "total": 27, "covered": 25, "skipped": 0, "pct": 92.59 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/legal-hold.ts": {
+    "lines": { "total": 91, "covered": 49, "skipped": 0, "pct": 53.84 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 91, "covered": 49, "skipped": 0, "pct": 53.84 },
+    "branches": { "total": 14, "covered": 8, "skipped": 0, "pct": 57.14 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/scim.ts": {
+    "lines": { "total": 932, "covered": 336, "skipped": 0, "pct": 36.05 },
+    "functions": { "total": 10, "covered": 6, "skipped": 0, "pct": 60 },
+    "statements": { "total": 932, "covered": 336, "skipped": 0, "pct": 36.05 },
+    "branches": { "total": 52, "covered": 25, "skipped": 0, "pct": 48.07 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/siem.ts": {
+    "lines": { "total": 112, "covered": 97, "skipped": 0, "pct": 86.6 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 112, "covered": 97, "skipped": 0, "pct": 86.6 },
+    "branches": { "total": 27, "covered": 23, "skipped": 0, "pct": 85.18 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/upgrade.ts": {
+    "lines": { "total": 129, "covered": 102, "skipped": 0, "pct": 79.06 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 129, "covered": 102, "skipped": 0, "pct": 79.06 },
+    "branches": { "total": 36, "covered": 27, "skipped": 0, "pct": 75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/enterprise/webhooks.ts": {
+    "lines": { "total": 210, "covered": 167, "skipped": 0, "pct": 79.52 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 210, "covered": 167, "skipped": 0, "pct": 79.52 },
+    "branches": { "total": 52, "covered": 37, "skipped": 0, "pct": 71.15 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/adjust-colors.ts": {
+    "lines": { "total": 100, "covered": 100, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 100, "covered": 100, "skipped": 0, "pct": 100 },
+    "branches": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/ai-canvas-expand.ts": {
+    "lines": { "total": 270, "covered": 83, "skipped": 0, "pct": 30.74 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 270, "covered": 83, "skipped": 0, "pct": 30.74 },
+    "branches": { "total": 15, "covered": 2, "skipped": 0, "pct": 13.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/aspect-pad.ts": {
+    "lines": { "total": 78, "covered": 76, "skipped": 0, "pct": 97.43 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 78, "covered": 76, "skipped": 0, "pct": 97.43 },
+    "branches": { "total": 10, "covered": 7, "skipped": 0, "pct": 70 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/audio-channels.ts": {
+    "lines": { "total": 42, "covered": 40, "skipped": 0, "pct": 95.23 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 42, "covered": 40, "skipped": 0, "pct": 95.23 },
+    "branches": { "total": 17, "covered": 15, "skipped": 0, "pct": 88.23 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/audio-metadata.ts": {
+    "lines": { "total": 59, "covered": 57, "skipped": 0, "pct": 96.61 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 59, "covered": 57, "skipped": 0, "pct": 96.61 },
+    "branches": { "total": 7, "covered": 6, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/audio-speed.ts": {
+    "lines": { "total": 27, "covered": 25, "skipped": 0, "pct": 92.59 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 27, "covered": 25, "skipped": 0, "pct": 92.59 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/auto-subtitles.ts": {
+    "lines": { "total": 147, "covered": 65, "skipped": 0, "pct": 44.21 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 147, "covered": 65, "skipped": 0, "pct": 44.21 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/background-replace.ts": {
+    "lines": { "total": 200, "covered": 71, "skipped": 0, "pct": 35.5 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 200, "covered": 71, "skipped": 0, "pct": 35.5 },
+    "branches": { "total": 13, "covered": 2, "skipped": 0, "pct": 15.38 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/barcode-generate.ts": {
+    "lines": { "total": 54, "covered": 52, "skipped": 0, "pct": 96.29 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 54, "covered": 52, "skipped": 0, "pct": 96.29 },
+    "branches": { "total": 9, "covered": 7, "skipped": 0, "pct": 77.77 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/barcode-read.ts": {
+    "lines": { "total": 204, "covered": 182, "skipped": 0, "pct": 89.21 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 204, "covered": 182, "skipped": 0, "pct": 89.21 },
+    "branches": { "total": 54, "covered": 45, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/beautify.ts": {
+    "lines": { "total": 285, "covered": 271, "skipped": 0, "pct": 95.08 },
+    "functions": { "total": 7, "covered": 6, "skipped": 0, "pct": 85.71 },
+    "statements": { "total": 285, "covered": 271, "skipped": 0, "pct": 95.08 },
+    "branches": { "total": 89, "covered": 78, "skipped": 0, "pct": 87.64 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/blur-background.ts": {
+    "lines": { "total": 177, "covered": 66, "skipped": 0, "pct": 37.28 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 177, "covered": 66, "skipped": 0, "pct": 37.28 },
+    "branches": { "total": 13, "covered": 2, "skipped": 0, "pct": 15.38 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/blur-faces.ts": {
+    "lines": { "total": 207, "covered": 75, "skipped": 0, "pct": 36.23 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 207, "covered": 75, "skipped": 0, "pct": 36.23 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/blur-pad.ts": {
+    "lines": { "total": 79, "covered": 77, "skipped": 0, "pct": 97.46 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 79, "covered": 77, "skipped": 0, "pct": 97.46 },
+    "branches": { "total": 11, "covered": 8, "skipped": 0, "pct": 72.72 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/booklet-pdf.ts": {
+    "lines": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/border.ts": {
+    "lines": { "total": 139, "covered": 139, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 139, "covered": 139, "skipped": 0, "pct": 100 },
+    "branches": { "total": 19, "covered": 15, "skipped": 0, "pct": 78.94 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/bulk-rename.ts": {
+    "lines": { "total": 93, "covered": 85, "skipped": 0, "pct": 91.39 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 93, "covered": 85, "skipped": 0, "pct": 91.39 },
+    "branches": { "total": 27, "covered": 24, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/burn-subtitles.ts": {
+    "lines": { "total": 64, "covered": 60, "skipped": 0, "pct": 93.75 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 64, "covered": 60, "skipped": 0, "pct": 93.75 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/change-fps.ts": {
+    "lines": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/chart-maker.ts": {
+    "lines": { "total": 202, "covered": 184, "skipped": 0, "pct": 91.08 },
+    "functions": { "total": 8, "covered": 7, "skipped": 0, "pct": 87.5 },
+    "statements": { "total": 202, "covered": 184, "skipped": 0, "pct": 91.08 },
+    "branches": { "total": 51, "covered": 35, "skipped": 0, "pct": 68.62 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/circle-crop.ts": {
+    "lines": { "total": 81, "covered": 81, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 81, "covered": 81, "skipped": 0, "pct": 100 },
+    "branches": { "total": 12, "covered": 10, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/collage.ts": {
+    "lines": { "total": 629, "covered": 606, "skipped": 0, "pct": 96.34 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 629, "covered": 606, "skipped": 0, "pct": 96.34 },
+    "branches": { "total": 99, "covered": 88, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/color-blindness.ts": {
+    "lines": { "total": 34, "covered": 34, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 34, "covered": 34, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/color-palette.ts": {
+    "lines": { "total": 216, "covered": 191, "skipped": 0, "pct": 88.42 },
+    "functions": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "statements": { "total": 216, "covered": 191, "skipped": 0, "pct": 88.42 },
+    "branches": { "total": 73, "covered": 60, "skipped": 0, "pct": 82.19 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/colorize.ts": {
+    "lines": { "total": 180, "covered": 75, "skipped": 0, "pct": 41.66 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 180, "covered": 75, "skipped": 0, "pct": 41.66 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/compare.ts": {
+    "lines": { "total": 176, "covered": 138, "skipped": 0, "pct": 78.4 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 176, "covered": 138, "skipped": 0, "pct": 78.4 },
+    "branches": { "total": 51, "covered": 37, "skipped": 0, "pct": 72.54 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/compose.ts": {
+    "lines": { "total": 149, "covered": 149, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 149, "covered": 149, "skipped": 0, "pct": 100 },
+    "branches": { "total": 49, "covered": 42, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/compress-pdf.ts": {
+    "lines": { "total": 66, "covered": 59, "skipped": 0, "pct": 89.39 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 66, "covered": 59, "skipped": 0, "pct": 89.39 },
+    "branches": { "total": 12, "covered": 10, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/compress-video.ts": {
+    "lines": { "total": 52, "covered": 50, "skipped": 0, "pct": 96.15 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 52, "covered": 50, "skipped": 0, "pct": 96.15 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/compress.ts": {
+    "lines": { "total": 30, "covered": 30, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 30, "covered": 30, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/content-aware-resize.ts": {
+    "lines": { "total": 179, "covered": 130, "skipped": 0, "pct": 72.62 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 179, "covered": 130, "skipped": 0, "pct": 72.62 },
+    "branches": { "total": 44, "covered": 38, "skipped": 0, "pct": 86.36 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert-audio.ts": {
+    "lines": { "total": 76, "covered": 64, "skipped": 0, "pct": 84.21 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 76, "covered": 64, "skipped": 0, "pct": 84.21 },
+    "branches": { "total": 9, "covered": 8, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert-document.ts": {
+    "lines": { "total": 47, "covered": 38, "skipped": 0, "pct": 80.85 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 47, "covered": 38, "skipped": 0, "pct": 80.85 },
+    "branches": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert-presentation.ts": {
+    "lines": { "total": 45, "covered": 36, "skipped": 0, "pct": 80 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 45, "covered": 36, "skipped": 0, "pct": 80 },
+    "branches": { "total": 7, "covered": 5, "skipped": 0, "pct": 71.42 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert-spreadsheet.ts": {
+    "lines": { "total": 46, "covered": 37, "skipped": 0, "pct": 80.43 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 46, "covered": 37, "skipped": 0, "pct": 80.43 },
+    "branches": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert-video.ts": {
+    "lines": { "total": 73, "covered": 71, "skipped": 0, "pct": 97.26 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 73, "covered": 71, "skipped": 0, "pct": 97.26 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/convert.ts": {
+    "lines": { "total": 137, "covered": 134, "skipped": 0, "pct": 97.81 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 137, "covered": 134, "skipped": 0, "pct": 97.81 },
+    "branches": { "total": 29, "covered": 22, "skipped": 0, "pct": 75.86 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/create-zip.ts": {
+    "lines": { "total": 56, "covered": 49, "skipped": 0, "pct": 87.5 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 56, "covered": 49, "skipped": 0, "pct": 87.5 },
+    "branches": { "total": 9, "covered": 6, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/crop-pdf.ts": {
+    "lines": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/crop-video.ts": {
+    "lines": { "total": 54, "covered": 52, "skipped": 0, "pct": 96.29 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 54, "covered": 52, "skipped": 0, "pct": 96.29 },
+    "branches": { "total": 10, "covered": 7, "skipped": 0, "pct": 70 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/crop.ts": {
+    "lines": { "total": 27, "covered": 27, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 27, "covered": 27, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/csv-excel.ts": {
+    "lines": { "total": 62, "covered": 54, "skipped": 0, "pct": 87.09 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 62, "covered": 54, "skipped": 0, "pct": 87.09 },
+    "branches": { "total": 10, "covered": 7, "skipped": 0, "pct": 70 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/csv-json.ts": {
+    "lines": { "total": 63, "covered": 54, "skipped": 0, "pct": 85.71 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 63, "covered": 54, "skipped": 0, "pct": 85.71 },
+    "branches": { "total": 17, "covered": 13, "skipped": 0, "pct": 76.47 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/duotone.ts": {
+    "lines": { "total": 69, "covered": 69, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 69, "covered": 69, "skipped": 0, "pct": 100 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/edit-metadata.ts": {
+    "lines": { "total": 206, "covered": 172, "skipped": 0, "pct": 83.49 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 206, "covered": 172, "skipped": 0, "pct": 83.49 },
+    "branches": { "total": 50, "covered": 42, "skipped": 0, "pct": 84 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/embed-subtitles.ts": {
+    "lines": { "total": 67, "covered": 65, "skipped": 0, "pct": 97.01 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 67, "covered": 65, "skipped": 0, "pct": 97.01 },
+    "branches": { "total": 7, "covered": 5, "skipped": 0, "pct": 71.42 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/enhance-faces.ts": {
+    "lines": { "total": 182, "covered": 77, "skipped": 0, "pct": 42.3 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 182, "covered": 77, "skipped": 0, "pct": 42.3 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/epub-convert.ts": {
+    "lines": { "total": 52, "covered": 34, "skipped": 0, "pct": 65.38 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 52, "covered": 34, "skipped": 0, "pct": 65.38 },
+    "branches": { "total": 8, "covered": 6, "skipped": 0, "pct": 75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/erase-object.ts": {
+    "lines": { "total": 221, "covered": 66, "skipped": 0, "pct": 29.86 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 221, "covered": 66, "skipped": 0, "pct": 29.86 },
+    "branches": { "total": 10, "covered": 2, "skipped": 0, "pct": 20 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/excel-to-pdf.ts": {
+    "lines": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "branches": { "total": 4, "covered": 2, "skipped": 0, "pct": 50 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/extract-audio.ts": {
+    "lines": { "total": 42, "covered": 39, "skipped": 0, "pct": 92.85 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 42, "covered": 39, "skipped": 0, "pct": 92.85 },
+    "branches": { "total": 8, "covered": 7, "skipped": 0, "pct": 87.5 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/extract-pages.ts": {
+    "lines": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/extract-subtitles.ts": {
+    "lines": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "branches": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/extract-zip.ts": {
+    "lines": { "total": 191, "covered": 166, "skipped": 0, "pct": 86.91 },
+    "functions": { "total": 8, "covered": 7, "skipped": 0, "pct": 87.5 },
+    "statements": { "total": 191, "covered": 166, "skipped": 0, "pct": 86.91 },
+    "branches": { "total": 58, "covered": 38, "skipped": 0, "pct": 65.51 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/fade-audio.ts": {
+    "lines": { "total": 53, "covered": 49, "skipped": 0, "pct": 92.45 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 53, "covered": 49, "skipped": 0, "pct": 92.45 },
+    "branches": { "total": 11, "covered": 7, "skipped": 0, "pct": 63.63 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/favicon.ts": {
+    "lines": { "total": 251, "covered": 224, "skipped": 0, "pct": 89.24 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 251, "covered": 224, "skipped": 0, "pct": 89.24 },
+    "branches": { "total": 76, "covered": 66, "skipped": 0, "pct": 86.84 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/find-duplicates.ts": {
+    "lines": { "total": 267, "covered": 225, "skipped": 0, "pct": 84.26 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 267, "covered": 225, "skipped": 0, "pct": 84.26 },
+    "branches": { "total": 86, "covered": 72, "skipped": 0, "pct": 83.72 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/flatten-pdf.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/gif-to-video.ts": {
+    "lines": { "total": 61, "covered": 59, "skipped": 0, "pct": 96.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 61, "covered": 59, "skipped": 0, "pct": 96.72 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/gif-tools.ts": {
+    "lines": { "total": 231, "covered": 224, "skipped": 0, "pct": 96.96 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 231, "covered": 224, "skipped": 0, "pct": 96.96 },
+    "branches": { "total": 72, "covered": 53, "skipped": 0, "pct": 73.61 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/gif-webp.ts": {
+    "lines": { "total": 46, "covered": 46, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 46, "covered": 46, "skipped": 0, "pct": 100 },
+    "branches": { "total": 12, "covered": 11, "skipped": 0, "pct": 91.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/grayscale-pdf.ts": {
+    "lines": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/histogram.ts": {
+    "lines": { "total": 142, "covered": 138, "skipped": 0, "pct": 97.18 },
+    "functions": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 },
+    "statements": { "total": 142, "covered": 138, "skipped": 0, "pct": 97.18 },
+    "branches": { "total": 23, "covered": 21, "skipped": 0, "pct": 91.3 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/html-to-image.ts": {
+    "lines": { "total": 118, "covered": 118, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 118, "covered": 118, "skipped": 0, "pct": 100 },
+    "branches": { "total": 31, "covered": 29, "skipped": 0, "pct": 93.54 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/html-to-pdf.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/image-enhancement.ts": {
+    "lines": { "total": 157, "covered": 120, "skipped": 0, "pct": 76.43 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 157, "covered": 120, "skipped": 0, "pct": 76.43 },
+    "branches": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/image-pad.ts": {
+    "lines": { "total": 113, "covered": 113, "skipped": 0, "pct": 100 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 113, "covered": 113, "skipped": 0, "pct": 100 },
+    "branches": { "total": 21, "covered": 18, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/image-to-base64.ts": {
+    "lines": { "total": 186, "covered": 181, "skipped": 0, "pct": 97.31 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 186, "covered": 181, "skipped": 0, "pct": 97.31 },
+    "branches": { "total": 72, "covered": 58, "skipped": 0, "pct": 80.55 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/image-to-pdf.ts": {
+    "lines": { "total": 293, "covered": 270, "skipped": 0, "pct": 92.15 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 293, "covered": 270, "skipped": 0, "pct": 92.15 },
+    "branches": { "total": 94, "covered": 84, "skipped": 0, "pct": 89.36 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/images-to-video.ts": {
+    "lines": { "total": 69, "covered": 67, "skipped": 0, "pct": 97.1 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 69, "covered": 67, "skipped": 0, "pct": 97.1 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/index.ts": {
+    "lines": { "total": 349, "covered": 345, "skipped": 0, "pct": 98.85 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 349, "covered": 345, "skipped": 0, "pct": 98.85 },
+    "branches": { "total": 7, "covered": 3, "skipped": 0, "pct": 42.85 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/info.ts": {
+    "lines": { "total": 136, "covered": 134, "skipped": 0, "pct": 98.52 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 136, "covered": 134, "skipped": 0, "pct": 98.52 },
+    "branches": { "total": 79, "covered": 56, "skipped": 0, "pct": 70.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/json-xml.ts": {
+    "lines": { "total": 51, "covered": 44, "skipped": 0, "pct": 86.27 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 51, "covered": 44, "skipped": 0, "pct": 86.27 },
+    "branches": { "total": 12, "covered": 7, "skipped": 0, "pct": 58.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/linearize-pdf.ts": {
+    "lines": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/lqip-placeholder.ts": {
+    "lines": { "total": 79, "covered": 74, "skipped": 0, "pct": 93.67 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 79, "covered": 74, "skipped": 0, "pct": 93.67 },
+    "branches": { "total": 12, "covered": 7, "skipped": 0, "pct": 58.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/markdown-to-docx.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/markdown-to-html.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/markdown-to-pdf.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/meme-generator.ts": {
+    "lines": { "total": 271, "covered": 226, "skipped": 0, "pct": 83.39 },
+    "functions": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 },
+    "statements": { "total": 271, "covered": 226, "skipped": 0, "pct": 83.39 },
+    "branches": { "total": 67, "covered": 53, "skipped": 0, "pct": 79.1 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/merge-audio.ts": {
+    "lines": { "total": 71, "covered": 69, "skipped": 0, "pct": 97.18 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 71, "covered": 69, "skipped": 0, "pct": 97.18 },
+    "branches": { "total": 13, "covered": 11, "skipped": 0, "pct": 84.61 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/merge-csvs.ts": {
+    "lines": { "total": 60, "covered": 50, "skipped": 0, "pct": 83.33 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 60, "covered": 50, "skipped": 0, "pct": 83.33 },
+    "branches": { "total": 10, "covered": 4, "skipped": 0, "pct": 40 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/merge-pdf.ts": {
+    "lines": { "total": 32, "covered": 30, "skipped": 0, "pct": 93.75 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 32, "covered": 30, "skipped": 0, "pct": 93.75 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/merge-videos.ts": {
+    "lines": { "total": 77, "covered": 70, "skipped": 0, "pct": 90.9 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 77, "covered": 70, "skipped": 0, "pct": 90.9 },
+    "branches": { "total": 21, "covered": 17, "skipped": 0, "pct": 80.95 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/mute-video.ts": {
+    "lines": { "total": 24, "covered": 22, "skipped": 0, "pct": 91.66 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 24, "covered": 22, "skipped": 0, "pct": 91.66 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/noise-reduction.ts": {
+    "lines": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 34, "covered": 32, "skipped": 0, "pct": 94.11 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/noise-removal.ts": {
+    "lines": { "total": 205, "covered": 81, "skipped": 0, "pct": 39.51 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 205, "covered": 81, "skipped": 0, "pct": 39.51 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/normalize-audio.ts": {
+    "lines": { "total": 32, "covered": 30, "skipped": 0, "pct": 93.75 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 32, "covered": 30, "skipped": 0, "pct": 93.75 },
+    "branches": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/nup-pdf.ts": {
+    "lines": { "total": 43, "covered": 34, "skipped": 0, "pct": 79.06 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 43, "covered": 34, "skipped": 0, "pct": 79.06 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/ocr-pdf.ts": {
+    "lines": { "total": 123, "covered": 58, "skipped": 0, "pct": 47.15 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 123, "covered": 58, "skipped": 0, "pct": 47.15 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/ocr.ts": {
+    "lines": { "total": 198, "covered": 45, "skipped": 0, "pct": 22.72 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 198, "covered": 45, "skipped": 0, "pct": 22.72 },
+    "branches": { "total": 13, "covered": 2, "skipped": 0, "pct": 15.38 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/optimize-for-web.ts": {
+    "lines": { "total": 149, "covered": 122, "skipped": 0, "pct": 81.87 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 149, "covered": 122, "skipped": 0, "pct": 81.87 },
+    "branches": { "total": 38, "covered": 32, "skipped": 0, "pct": 84.21 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/organize-pdf.ts": {
+    "lines": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/passport-photo.ts": {
+    "lines": { "total": 537, "covered": 200, "skipped": 0, "pct": 37.24 },
+    "functions": { "total": 6, "covered": 1, "skipped": 0, "pct": 16.66 },
+    "statements": { "total": 537, "covered": 200, "skipped": 0, "pct": 37.24 },
+    "branches": { "total": 43, "covered": 13, "skipped": 0, "pct": 30.23 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdf-metadata.ts": {
+    "lines": { "total": 43, "covered": 32, "skipped": 0, "pct": 74.41 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 43, "covered": 32, "skipped": 0, "pct": 74.41 },
+    "branches": { "total": 7, "covered": 6, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdf-page-numbers.ts": {
+    "lines": { "total": 44, "covered": 35, "skipped": 0, "pct": 79.54 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 44, "covered": 35, "skipped": 0, "pct": 79.54 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdf-to-image.ts": {
+    "lines": { "total": 350, "covered": 308, "skipped": 0, "pct": 88 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 350, "covered": 308, "skipped": 0, "pct": 88 },
+    "branches": { "total": 114, "covered": 97, "skipped": 0, "pct": 85.08 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdf-to-text.ts": {
+    "lines": { "total": 31, "covered": 21, "skipped": 0, "pct": 67.74 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 31, "covered": 21, "skipped": 0, "pct": 67.74 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdf-to-word.ts": {
+    "lines": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 21, "skipped": 0, "pct": 70 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pdfa-convert.ts": {
+    "lines": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pitch-shift.ts": {
+    "lines": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 30, "covered": 28, "skipped": 0, "pct": 93.33 },
+    "branches": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/pixelate.ts": {
+    "lines": { "total": 68, "covered": 68, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 68, "covered": 68, "skipped": 0, "pct": 100 },
+    "branches": { "total": 11, "covered": 9, "skipped": 0, "pct": 81.81 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/popular.ts": {
+    "lines": { "total": 38, "covered": 21, "skipped": 0, "pct": 55.26 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 38, "covered": 21, "skipped": 0, "pct": 55.26 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/powerpoint-to-pdf.ts": {
+    "lines": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "branches": { "total": 4, "covered": 2, "skipped": 0, "pct": 50 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/protect-pdf.ts": {
+    "lines": { "total": 47, "covered": 45, "skipped": 0, "pct": 95.74 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 47, "covered": 45, "skipped": 0, "pct": 95.74 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/qr-generate.ts": {
+    "lines": { "total": 91, "covered": 84, "skipped": 0, "pct": 92.3 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 91, "covered": 84, "skipped": 0, "pct": 92.3 },
+    "branches": { "total": 14, "covered": 12, "skipped": 0, "pct": 85.71 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/red-eye-removal.ts": {
+    "lines": { "total": 195, "covered": 79, "skipped": 0, "pct": 40.51 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 195, "covered": 79, "skipped": 0, "pct": 40.51 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/redact-pdf.ts": {
+    "lines": { "total": 35, "covered": 25, "skipped": 0, "pct": 71.42 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 35, "covered": 25, "skipped": 0, "pct": 71.42 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/remove-background.ts": {
+    "lines": { "total": 321, "covered": 147, "skipped": 0, "pct": 45.79 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 321, "covered": 147, "skipped": 0, "pct": 45.79 },
+    "branches": { "total": 26, "covered": 8, "skipped": 0, "pct": 30.76 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/remove-pages.ts": {
+    "lines": { "total": 51, "covered": 49, "skipped": 0, "pct": 96.07 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 51, "covered": 49, "skipped": 0, "pct": 96.07 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/repair-pdf.ts": {
+    "lines": { "total": 31, "covered": 29, "skipped": 0, "pct": 93.54 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 31, "covered": 29, "skipped": 0, "pct": 93.54 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/replace-audio.ts": {
+    "lines": { "total": 61, "covered": 55, "skipped": 0, "pct": 90.16 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 61, "covered": 55, "skipped": 0, "pct": 90.16 },
+    "branches": { "total": 16, "covered": 13, "skipped": 0, "pct": 81.25 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/replace-color.ts": {
+    "lines": { "total": 80, "covered": 79, "skipped": 0, "pct": 98.75 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 80, "covered": 79, "skipped": 0, "pct": 98.75 },
+    "branches": { "total": 16, "covered": 15, "skipped": 0, "pct": 93.75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/resize-video.ts": {
+    "lines": { "total": 57, "covered": 55, "skipped": 0, "pct": 96.49 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 57, "covered": 55, "skipped": 0, "pct": 96.49 },
+    "branches": { "total": 12, "covered": 11, "skipped": 0, "pct": 91.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/resize.ts": {
+    "lines": { "total": 32, "covered": 32, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 32, "covered": 32, "skipped": 0, "pct": 100 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/restore-photo.ts": {
+    "lines": { "total": 226, "covered": 85, "skipped": 0, "pct": 37.61 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 226, "covered": 85, "skipped": 0, "pct": 37.61 },
+    "branches": { "total": 13, "covered": 2, "skipped": 0, "pct": 15.38 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/reverse-audio.ts": {
+    "lines": { "total": 24, "covered": 22, "skipped": 0, "pct": 91.66 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 24, "covered": 22, "skipped": 0, "pct": 91.66 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/reverse-video.ts": {
+    "lines": { "total": 55, "covered": 51, "skipped": 0, "pct": 92.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 55, "covered": 51, "skipped": 0, "pct": 92.72 },
+    "branches": { "total": 9, "covered": 7, "skipped": 0, "pct": 77.77 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/ringtone-maker.ts": {
+    "lines": { "total": 51, "covered": 49, "skipped": 0, "pct": 96.07 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 51, "covered": 49, "skipped": 0, "pct": 96.07 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/rotate-pdf.ts": {
+    "lines": { "total": 38, "covered": 36, "skipped": 0, "pct": 94.73 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 38, "covered": 36, "skipped": 0, "pct": 94.73 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/rotate-video.ts": {
+    "lines": { "total": 41, "covered": 39, "skipped": 0, "pct": 95.12 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 41, "covered": 39, "skipped": 0, "pct": 95.12 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/rotate.ts": {
+    "lines": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "branches": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/sharpening.ts": {
+    "lines": { "total": 49, "covered": 49, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 49, "covered": 49, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/silence-removal.ts": {
+    "lines": { "total": 33, "covered": 31, "skipped": 0, "pct": 93.93 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 31, "skipped": 0, "pct": 93.93 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/smart-crop.ts": {
+    "lines": { "total": 171, "covered": 41, "skipped": 0, "pct": 23.97 },
+    "functions": { "total": 6, "covered": 1, "skipped": 0, "pct": 16.66 },
+    "statements": { "total": 171, "covered": 41, "skipped": 0, "pct": 23.97 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/split-audio.ts": {
+    "lines": { "total": 127, "covered": 123, "skipped": 0, "pct": 96.85 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 127, "covered": 123, "skipped": 0, "pct": 96.85 },
+    "branches": { "total": 27, "covered": 24, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/split-csv.ts": {
+    "lines": { "total": 73, "covered": 65, "skipped": 0, "pct": 89.04 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 73, "covered": 65, "skipped": 0, "pct": 89.04 },
+    "branches": { "total": 12, "covered": 9, "skipped": 0, "pct": 75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/split-pdf.ts": {
+    "lines": { "total": 80, "covered": 78, "skipped": 0, "pct": 97.5 },
+    "functions": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 },
+    "statements": { "total": 80, "covered": 78, "skipped": 0, "pct": 97.5 },
+    "branches": { "total": 18, "covered": 16, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/split.ts": {
+    "lines": { "total": 287, "covered": 269, "skipped": 0, "pct": 93.72 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 287, "covered": 269, "skipped": 0, "pct": 93.72 },
+    "branches": { "total": 108, "covered": 92, "skipped": 0, "pct": 85.18 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/sprite-sheet.ts": {
+    "lines": { "total": 105, "covered": 100, "skipped": 0, "pct": 95.23 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 105, "covered": 100, "skipped": 0, "pct": 95.23 },
+    "branches": { "total": 17, "covered": 14, "skipped": 0, "pct": 82.35 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/stabilize-video.ts": {
+    "lines": { "total": 88, "covered": 86, "skipped": 0, "pct": 97.72 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 88, "covered": 86, "skipped": 0, "pct": 97.72 },
+    "branches": { "total": 15, "covered": 14, "skipped": 0, "pct": 93.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/stitch.ts": {
+    "lines": { "total": 367, "covered": 340, "skipped": 0, "pct": 92.64 },
+    "functions": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "statements": { "total": 367, "covered": 340, "skipped": 0, "pct": 92.64 },
+    "branches": { "total": 145, "covered": 129, "skipped": 0, "pct": 88.96 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/strip-metadata.ts": {
+    "lines": { "total": 196, "covered": 109, "skipped": 0, "pct": 55.61 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 196, "covered": 109, "skipped": 0, "pct": 55.61 },
+    "branches": { "total": 32, "covered": 23, "skipped": 0, "pct": 71.87 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/svg-to-raster.ts": {
+    "lines": { "total": 397, "covered": 337, "skipped": 0, "pct": 84.88 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 397, "covered": 337, "skipped": 0, "pct": 84.88 },
+    "branches": { "total": 100, "covered": 83, "skipped": 0, "pct": 83 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/text-overlay.ts": {
+    "lines": { "total": 77, "covered": 77, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 77, "covered": 77, "skipped": 0, "pct": 100 },
+    "branches": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/to-epub.ts": {
+    "lines": { "total": 32, "covered": 23, "skipped": 0, "pct": 71.87 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 32, "covered": 23, "skipped": 0, "pct": 71.87 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/transcribe-audio.ts": {
+    "lines": { "total": 143, "covered": 67, "skipped": 0, "pct": 46.85 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 143, "covered": 67, "skipped": 0, "pct": 46.85 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/transparency-fixer.ts": {
+    "lines": { "total": 251, "covered": 76, "skipped": 0, "pct": 30.27 },
+    "functions": { "total": 5, "covered": 1, "skipped": 0, "pct": 20 },
+    "statements": { "total": 251, "covered": 76, "skipped": 0, "pct": 30.27 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/trim-audio.ts": {
+    "lines": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/trim-video.ts": {
+    "lines": { "total": 56, "covered": 54, "skipped": 0, "pct": 96.42 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 56, "covered": 54, "skipped": 0, "pct": 96.42 },
+    "branches": { "total": 9, "covered": 8, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/unlock-pdf.ts": {
+    "lines": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/upscale.ts": {
+    "lines": { "total": 237, "covered": 79, "skipped": 0, "pct": 33.33 },
+    "functions": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 },
+    "statements": { "total": 237, "covered": 79, "skipped": 0, "pct": 33.33 },
+    "branches": { "total": 12, "covered": 2, "skipped": 0, "pct": 16.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/vectorize.ts": {
+    "lines": { "total": 190, "covered": 181, "skipped": 0, "pct": 95.26 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 190, "covered": 181, "skipped": 0, "pct": 95.26 },
+    "branches": { "total": 56, "covered": 46, "skipped": 0, "pct": 82.14 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-color.ts": {
+    "lines": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-loudnorm.ts": {
+    "lines": { "total": 41, "covered": 39, "skipped": 0, "pct": 95.12 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 41, "covered": 39, "skipped": 0, "pct": 95.12 },
+    "branches": { "total": 9, "covered": 7, "skipped": 0, "pct": 77.77 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-metadata.ts": {
+    "lines": { "total": 42, "covered": 40, "skipped": 0, "pct": 95.23 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 42, "covered": 40, "skipped": 0, "pct": 95.23 },
+    "branches": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-speed.ts": {
+    "lines": { "total": 64, "covered": 62, "skipped": 0, "pct": 96.87 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 64, "covered": 62, "skipped": 0, "pct": 96.87 },
+    "branches": { "total": 12, "covered": 10, "skipped": 0, "pct": 83.33 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-to-frames.ts": {
+    "lines": { "total": 113, "covered": 101, "skipped": 0, "pct": 89.38 },
+    "functions": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 },
+    "statements": { "total": 113, "covered": 101, "skipped": 0, "pct": 89.38 },
+    "branches": { "total": 23, "covered": 19, "skipped": 0, "pct": 82.6 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-to-gif.ts": {
+    "lines": { "total": 39, "covered": 37, "skipped": 0, "pct": 94.87 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 39, "covered": 37, "skipped": 0, "pct": 94.87 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/video-to-webp.ts": {
+    "lines": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/vignette.ts": {
+    "lines": { "total": 62, "covered": 62, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 62, "covered": 62, "skipped": 0, "pct": 100 },
+    "branches": { "total": 9, "covered": 5, "skipped": 0, "pct": 55.55 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/volume-adjust.ts": {
+    "lines": { "total": 27, "covered": 25, "skipped": 0, "pct": 92.59 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 27, "covered": 25, "skipped": 0, "pct": 92.59 },
+    "branches": { "total": 5, "covered": 4, "skipped": 0, "pct": 80 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/watermark-image.ts": {
+    "lines": { "total": 221, "covered": 185, "skipped": 0, "pct": 83.71 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 221, "covered": 185, "skipped": 0, "pct": 83.71 },
+    "branches": { "total": 73, "covered": 57, "skipped": 0, "pct": 78.08 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/watermark-pdf.ts": {
+    "lines": { "total": 47, "covered": 38, "skipped": 0, "pct": 80.85 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 47, "covered": 38, "skipped": 0, "pct": 80.85 },
+    "branches": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/watermark-text.ts": {
+    "lines": { "total": 101, "covered": 101, "skipped": 0, "pct": 100 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 101, "covered": 101, "skipped": 0, "pct": 100 },
+    "branches": { "total": 18, "covered": 16, "skipped": 0, "pct": 88.88 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/watermark-video.ts": {
+    "lines": { "total": 62, "covered": 58, "skipped": 0, "pct": 93.54 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 62, "covered": 58, "skipped": 0, "pct": 93.54 },
+    "branches": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/waveform-image.ts": {
+    "lines": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 40, "covered": 38, "skipped": 0, "pct": 95 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/word-to-pdf.ts": {
+    "lines": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 33, "covered": 24, "skipped": 0, "pct": 72.72 },
+    "branches": { "total": 4, "covered": 2, "skipped": 0, "pct": 50 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/xml-to-csv.ts": {
+    "lines": { "total": 92, "covered": 79, "skipped": 0, "pct": 85.86 },
+    "functions": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 },
+    "statements": { "total": 92, "covered": 79, "skipped": 0, "pct": 85.86 },
+    "branches": { "total": 32, "covered": 21, "skipped": 0, "pct": 65.62 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/api/src/routes/tools/yaml-json.ts": {
+    "lines": { "total": 52, "covered": 45, "skipped": 0, "pct": 86.53 },
+    "functions": { "total": 3, "covered": 2, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 52, "covered": 45, "skipped": 0, "pct": 86.53 },
+    "branches": { "total": 10, "covered": 6, "skipped": 0, "pct": 60 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/analytics.ts": {
+    "lines": { "total": 118, "covered": 118, "skipped": 0, "pct": 100 },
+    "functions": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "statements": { "total": 118, "covered": 118, "skipped": 0, "pct": 100 },
+    "branches": { "total": 58, "covered": 57, "skipped": 0, "pct": 98.27 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/api-errors.ts": {
+    "lines": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/api.ts": {
+    "lines": { "total": 263, "covered": 225, "skipped": 0, "pct": 85.55 },
+    "functions": { "total": 24, "covered": 21, "skipped": 0, "pct": 87.5 },
+    "statements": { "total": 263, "covered": 225, "skipped": 0, "pct": 85.55 },
+    "branches": { "total": 94, "covered": 85, "skipped": 0, "pct": 90.42 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/collage-templates.ts": {
+    "lines": { "total": 324, "covered": 324, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 324, "covered": 324, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/download.ts": {
+    "lines": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/format.ts": {
+    "lines": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "branches": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/icon-map.ts": {
+    "lines": { "total": 113, "covered": 113, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 113, "covered": 113, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/image-preview.ts": {
+    "lines": { "total": 89, "covered": 89, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 89, "covered": 89, "skipped": 0, "pct": 100 },
+    "branches": { "total": 13, "covered": 10, "skipped": 0, "pct": 76.92 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/lazy-with-retry.ts": {
+    "lines": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "branches": { "total": 16, "covered": 16, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/metadata-utils.ts": {
+    "lines": { "total": 108, "covered": 108, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 108, "covered": 108, "skipped": 0, "pct": 100 },
+    "branches": { "total": 26, "covered": 26, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/suggested-tools.ts": {
+    "lines": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/tool-display-modes.ts": {
+    "lines": { "total": 171, "covered": 171, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 171, "covered": 171, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/tool-i18n.ts": {
+    "lines": { "total": 15, "covered": 12, "skipped": 0, "pct": 80 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 15, "covered": 12, "skipped": 0, "pct": 80 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/tool-registry.tsx": {
+    "lines": { "total": 868, "covered": 385, "skipped": 0, "pct": 44.35 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 868, "covered": 385, "skipped": 0, "pct": 44.35 },
+    "branches": { "total": 17, "covered": 16, "skipped": 0, "pct": 94.11 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/url-parser.ts": {
+    "lines": { "total": 31, "covered": 31, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 31, "covered": 31, "skipped": 0, "pct": 100 },
+    "branches": { "total": 12, "covered": 12, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/lib/utils.ts": {
+    "lines": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/analytics-store.ts": {
+    "lines": { "total": 82, "covered": 82, "skipped": 0, "pct": 100 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 82, "covered": 82, "skipped": 0, "pct": 100 },
+    "branches": { "total": 17, "covered": 16, "skipped": 0, "pct": 94.11 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/base64-store.ts": {
+    "lines": { "total": 16, "covered": 16, "skipped": 0, "pct": 100 },
+    "functions": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "statements": { "total": 16, "covered": 16, "skipped": 0, "pct": 100 },
+    "branches": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/collage-store.ts": {
+    "lines": { "total": 206, "covered": 206, "skipped": 0, "pct": 100 },
+    "functions": { "total": 22, "covered": 22, "skipped": 0, "pct": 100 },
+    "statements": { "total": 206, "covered": 206, "skipped": 0, "pct": 100 },
+    "branches": { "total": 48, "covered": 46, "skipped": 0, "pct": 95.83 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/connection-store.ts": {
+    "lines": { "total": 64, "covered": 64, "skipped": 0, "pct": 100 },
+    "functions": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 },
+    "statements": { "total": 64, "covered": 64, "skipped": 0, "pct": 100 },
+    "branches": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/duplicate-store.ts": {
+    "lines": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "functions": { "total": 6, "covered": 6, "skipped": 0, "pct": 100 },
+    "statements": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/editor-store.ts": {
+    "lines": { "total": 1107, "covered": 1001, "skipped": 0, "pct": 90.42 },
+    "functions": { "total": 100, "covered": 68, "skipped": 0, "pct": 68 },
+    "statements": { "total": 1107, "covered": 1001, "skipped": 0, "pct": 90.42 },
+    "branches": { "total": 260, "covered": 224, "skipped": 0, "pct": 86.15 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/features-store.ts": {
+    "lines": { "total": 280, "covered": 243, "skipped": 0, "pct": 86.78 },
+    "functions": { "total": 17, "covered": 17, "skipped": 0, "pct": 100 },
+    "statements": { "total": 280, "covered": 243, "skipped": 0, "pct": 86.78 },
+    "branches": { "total": 91, "covered": 84, "skipped": 0, "pct": 92.3 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/file-store.ts": {
+    "lines": { "total": 277, "covered": 263, "skipped": 0, "pct": 94.94 },
+    "functions": { "total": 21, "covered": 19, "skipped": 0, "pct": 90.47 },
+    "statements": { "total": 277, "covered": 263, "skipped": 0, "pct": 94.94 },
+    "branches": { "total": 81, "covered": 61, "skipped": 0, "pct": 75.3 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/files-page-store.ts": {
+    "lines": { "total": 79, "covered": 74, "skipped": 0, "pct": 93.67 },
+    "functions": { "total": 9, "covered": 8, "skipped": 0, "pct": 88.88 },
+    "statements": { "total": 79, "covered": 74, "skipped": 0, "pct": 93.67 },
+    "branches": { "total": 32, "covered": 30, "skipped": 0, "pct": 93.75 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/html-to-image-store.ts": {
+    "lines": { "total": 69, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 69, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/meme-store.ts": {
+    "lines": { "total": 269, "covered": 266, "skipped": 0, "pct": 98.88 },
+    "functions": { "total": 19, "covered": 19, "skipped": 0, "pct": 100 },
+    "statements": { "total": 269, "covered": 266, "skipped": 0, "pct": 98.88 },
+    "branches": { "total": 50, "covered": 46, "skipped": 0, "pct": 92 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/pdf-to-image-store.ts": {
+    "lines": { "total": 186, "covered": 184, "skipped": 0, "pct": 98.92 },
+    "functions": { "total": 15, "covered": 15, "skipped": 0, "pct": 100 },
+    "statements": { "total": 186, "covered": 184, "skipped": 0, "pct": 98.92 },
+    "branches": { "total": 81, "covered": 74, "skipped": 0, "pct": 91.35 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/pipeline-store.ts": {
+    "lines": { "total": 55, "covered": 55, "skipped": 0, "pct": 100 },
+    "functions": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "statements": { "total": 55, "covered": 55, "skipped": 0, "pct": 100 },
+    "branches": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/qr-store.ts": {
+    "lines": { "total": 148, "covered": 141, "skipped": 0, "pct": 95.27 },
+    "functions": { "total": 31, "covered": 31, "skipped": 0, "pct": 100 },
+    "statements": { "total": 148, "covered": 141, "skipped": 0, "pct": 95.27 },
+    "branches": { "total": 54, "covered": 53, "skipped": 0, "pct": 98.14 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/settings-store.ts": {
+    "lines": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 33, "covered": 33, "skipped": 0, "pct": 100 },
+    "branches": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/split-store.ts": {
+    "lines": { "total": 76, "covered": 76, "skipped": 0, "pct": 100 },
+    "functions": { "total": 17, "covered": 17, "skipped": 0, "pct": 100 },
+    "statements": { "total": 76, "covered": 76, "skipped": 0, "pct": 100 },
+    "branches": { "total": 28, "covered": 28, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/apps/web/src/stores/theme-store.ts": {
+    "lines": { "total": 31, "covered": 31, "skipped": 0, "pct": 100 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 31, "covered": 31, "skipped": 0, "pct": 100 },
+    "branches": { "total": 12, "covered": 11, "skipped": 0, "pct": 91.66 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/engine.ts": {
+    "lines": { "total": 75, "covered": 75, "skipped": 0, "pct": 100 },
+    "functions": { "total": 19, "covered": 19, "skipped": 0, "pct": 100 },
+    "statements": { "total": 75, "covered": 75, "skipped": 0, "pct": 100 },
+    "branches": { "total": 29, "covered": 29, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/index.ts": {
+    "lines": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 25, "covered": 25, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/types.ts": {
+    "lines": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/formats/detect.ts": {
+    "lines": { "total": 91, "covered": 91, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 91, "covered": 91, "skipped": 0, "pct": 100 },
+    "branches": { "total": 28, "covered": 28, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/formats/qoi.ts": {
+    "lines": { "total": 173, "covered": 173, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 173, "covered": 173, "skipped": 0, "pct": 100 },
+    "branches": { "total": 61, "covered": 61, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/auto-enhance.ts": {
+    "lines": { "total": 240, "covered": 240, "skipped": 0, "pct": 100 },
+    "functions": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "statements": { "total": 240, "covered": 240, "skipped": 0, "pct": 100 },
+    "branches": { "total": 65, "covered": 62, "skipped": 0, "pct": 95.38 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/brightness.ts": {
+    "lines": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/color-blindness.ts": {
+    "lines": { "total": 45, "covered": 45, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 45, "covered": 45, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/color-channels.ts": {
+    "lines": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 },
+    "branches": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/compress.ts": {
+    "lines": { "total": 100, "covered": 97, "skipped": 0, "pct": 97 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 100, "covered": 97, "skipped": 0, "pct": 97 },
+    "branches": { "total": 39, "covered": 33, "skipped": 0, "pct": 84.61 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/contrast.ts": {
+    "lines": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/convert.ts": {
+    "lines": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 24, "covered": 24, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/crop.ts": {
+    "lines": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 37, "covered": 37, "skipped": 0, "pct": 100 },
+    "branches": { "total": 17, "covered": 15, "skipped": 0, "pct": 88.23 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/edit-metadata.ts": {
+    "lines": { "total": 89, "covered": 89, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 89, "covered": 89, "skipped": 0, "pct": 100 },
+    "branches": { "total": 32, "covered": 32, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/flip.ts": {
+    "lines": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 },
+    "branches": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/grayscale.ts": {
+    "lines": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/invert.ts": {
+    "lines": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/optimize-for-web.ts": {
+    "lines": { "total": 36, "covered": 35, "skipped": 0, "pct": 97.22 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 36, "covered": 35, "skipped": 0, "pct": 97.22 },
+    "branches": { "total": 10, "covered": 9, "skipped": 0, "pct": 90 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/resize.ts": {
+    "lines": { "total": 37, "covered": 33, "skipped": 0, "pct": 89.18 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 37, "covered": 33, "skipped": 0, "pct": 89.18 },
+    "branches": { "total": 26, "covered": 24, "skipped": 0, "pct": 92.3 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/rotate.ts": {
+    "lines": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 10, "covered": 10, "skipped": 0, "pct": 100 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/saturation.ts": {
+    "lines": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "branches": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/sepia.ts": {
+    "lines": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "branches": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/sharpen.ts": {
+    "lines": { "total": 92, "covered": 92, "skipped": 0, "pct": 100 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 92, "covered": 92, "skipped": 0, "pct": 100 },
+    "branches": { "total": 28, "covered": 28, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/operations/strip-metadata.ts": {
+    "lines": { "total": 28, "covered": 28, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 28, "covered": 28, "skipped": 0, "pct": 100 },
+    "branches": { "total": 21, "covered": 21, "skipped": 0, "pct": 100 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/utils/metadata.ts": {
+    "lines": { "total": 107, "covered": 103, "skipped": 0, "pct": 96.26 },
+    "functions": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 },
+    "statements": { "total": 107, "covered": 103, "skipped": 0, "pct": 96.26 },
+    "branches": { "total": 52, "covered": 46, "skipped": 0, "pct": 88.46 }
+  },
+  "/Users/sidd/Desktop/Personal/Projects/SnapOtter/.claude/worktrees/test+suite-overhaul-and-real-fixtures/packages/image-engine/src/utils/mime.ts": {
+    "lines": { "total": 140, "covered": 140, "skipped": 0, "pct": 100 },
+    "functions": { "total": 4, "covered": 4, "skipped": 0, "pct": 100 },
+    "statements": { "total": 140, "covered": 140, "skipped": 0, "pct": 100 },
+    "branches": { "total": 11, "covered": 11, "skipped": 0, "pct": 100 }
+  }
+}

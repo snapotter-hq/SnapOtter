@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 /**
  * Generates the tiny media/document fixtures committed under tests/fixtures/.
  * Requires ffmpeg on PATH (or FFMPEG_PATH) and qpdf (or QPDF_PATH).
@@ -13,9 +13,11 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const mediaDir = join(root, "tests/fixtures/media");
-const docsDir = join(root, "tests/fixtures/documents");
-mkdirSync(mediaDir, { recursive: true });
+const videoDir = join(root, "tests/fixtures/video/formats");
+const audioDir = join(root, "tests/fixtures/audio/formats");
+const docsDir = join(root, "tests/fixtures/document/formats");
+mkdirSync(videoDir, { recursive: true });
+mkdirSync(audioDir, { recursive: true });
 mkdirSync(docsDir, { recursive: true });
 
 const ffmpeg = process.env.FFMPEG_PATH || "ffmpeg";
@@ -58,7 +60,7 @@ run([
   "-b:a",
   "32k",
   "-shortest",
-  join(mediaDir, "tiny.mp4"),
+  join(videoDir, "tiny.mp4"),
 ]);
 // 1s sine mp3
 run([
@@ -70,7 +72,7 @@ run([
   "libmp3lame",
   "-b:a",
   "32k",
-  join(mediaDir, "tiny.mp3"),
+  join(audioDir, "tiny.mp3"),
 ]);
 // 1s sine wav
 run([
@@ -82,7 +84,7 @@ run([
   "pcm_s16le",
   "-ar",
   "8000",
-  join(mediaDir, "tiny.wav"),
+  join(audioDir, "tiny.wav"),
 ]);
 
 // Minimal OOXML/EPUB containers via archiver (resolved from apps/api).
@@ -152,20 +154,26 @@ await writeZip(
 );
 
 // Encrypted PDF fixture derived from test-3page.pdf via qpdf (AES-256).
-const qpdf = whichBin("QPDF_PATH", "qpdf");
-if (qpdf) {
-  const srcPdf = join(root, "tests/fixtures/test-3page.pdf");
-  const encPdf = join(docsDir, "encrypted.pdf");
-  const qres = spawnSync(qpdf, [srcPdf, "--encrypt", "test123", "owner123", "256", "--", encPdf], {
-    stdio: "inherit",
-  });
-  if (qres.status !== 0) {
-    console.error("qpdf encryption failed");
-    process.exit(1);
-  }
-  console.log("encrypted.pdf written");
+// Skip if the file already exists -- qpdf encryption uses random IVs, so
+// re-running produces different bytes and would break manifest hashes.
+const encPdf = join(root, "tests/fixtures/document/valid/encrypted.pdf");
+if (existsSync(encPdf)) {
+  console.log("encrypted.pdf already exists; skipping (qpdf encryption is non-deterministic)");
 } else {
-  console.warn("qpdf not found; skipping encrypted.pdf");
+  const qpdf = whichBin("QPDF_PATH", "qpdf");
+  if (qpdf) {
+    const srcPdf = join(root, "tests/fixtures/document/valid/test-3page.pdf");
+    const qres = spawnSync(qpdf, [srcPdf, "--encrypt", "test123", "owner123", "256", "--", encPdf], {
+      stdio: "inherit",
+    });
+    if (qres.status !== 0) {
+      console.error("qpdf encryption failed");
+      process.exit(1);
+    }
+    console.log("encrypted.pdf written");
+  } else {
+    console.warn("qpdf not found; skipping encrypted.pdf");
+  }
 }
 
 // tiny.html fixture for html-to-pdf tests.
@@ -192,4 +200,4 @@ A paragraph with **bold** and a list:
 `,
 );
 
-console.log("Fixtures written to tests/fixtures/media and tests/fixtures/documents");
+console.log("Fixtures written to tests/fixtures/{video,audio}/formats and tests/fixtures/document/formats");

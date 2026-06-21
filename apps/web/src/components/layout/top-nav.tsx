@@ -89,7 +89,7 @@ export function TopNav({
               {breadcrumb.modality && (
                 <span className={isDark ? "text-[#aaa]" : "text-muted-foreground"}>
                   {breadcrumb.modalityTab ? (
-                    <Link to={`/?modality=${breadcrumb.modalityTab}`} className="hover:underline">
+                    <Link to={`/?section=${breadcrumb.modalityTab}`} className="hover:underline">
                       {breadcrumb.modality}
                     </Link>
                   ) : (
@@ -163,7 +163,7 @@ export function TopNav({
               />
               {breadcrumb.modalityTab ? (
                 <Link
-                  to={`/?modality=${breadcrumb.modalityTab}`}
+                  to={`/?section=${breadcrumb.modalityTab}`}
                   className={cn(
                     "shrink-0 hover:underline",
                     isDark

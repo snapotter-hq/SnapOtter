@@ -57,13 +57,20 @@ test.describe("Analytics disabled by server", () => {
     // Intercept ALL network requests and log any that hit analytics domains
     await page.route("**/*", (route) => {
       const url = route.request().url();
+      // Match on the URL host, not a substring, so an unrelated host that merely
+      // contains "posthog"/"sentry" can't false-trigger (CodeQL
+      // js/incomplete-url-substring-sanitization).
+      let host = "";
+      try {
+        host = new URL(url).hostname.toLowerCase();
+      } catch {
+        // non-URL scheme (data:/blob:) -- not an analytics host
+      }
       if (
-        url.includes("posthog.com") ||
-        url.includes("posthog") ||
-        url.includes("sentry.io") ||
-        url.includes("sentry") ||
-        url.includes("us.i.posthog.com") ||
-        url.includes("ingest.sentry.io")
+        host === "posthog.com" ||
+        host.endsWith(".posthog.com") ||
+        host === "sentry.io" ||
+        host.endsWith(".sentry.io")
       ) {
         analyticsRequests.push(url);
       }

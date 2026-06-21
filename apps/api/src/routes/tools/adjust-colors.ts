@@ -133,14 +133,20 @@ async function processColorAdjustments(
 }
 
 export function registerColorAdjustments(app: FastifyInstance) {
-  const allIds = [
-    "adjust-colors",
-    "brightness-contrast",
-    "saturation",
-    "color-channels",
-    "color-effects",
-  ];
-  for (const toolId of allIds) {
-    createToolRoute(app, { toolId, settingsSchema, process: processColorAdjustments });
+  createToolRoute(app, {
+    toolId: "adjust-colors",
+    settingsSchema,
+    process: processColorAdjustments,
+  });
+  // Backwards-compatible alias routes consolidated into adjust-colors. These
+  // ids are not catalog TOOLS, so pass the section explicitly (all image).
+  const aliasIds = ["brightness-contrast", "saturation", "color-channels", "color-effects"];
+  for (const toolId of aliasIds) {
+    createToolRoute(app, {
+      toolId,
+      section: "image",
+      settingsSchema,
+      process: processColorAdjustments,
+    });
   }
 }

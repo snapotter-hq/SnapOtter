@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { apiToolPath } from "@snapotter/shared";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ test.describe("Tool route guards", () => {
 
   // ocr bundle is uninstalled -- expect 501
   test("ocr returns 501 FEATURE_NOT_INSTALLED with correct bundle", async ({ request }) => {
-    const response = await request.post("/api/v1/tools/ocr", {
+    const response = await request.post("/api/v1/tools/image/ocr", {
       multipart: {
         file: {
           name: "test.png",
@@ -178,7 +179,7 @@ test.describe("Tool route guards", () => {
 
   for (const { tool } of installedAiTools) {
     test(`${tool} returns 200 when bundle is installed`, async ({ request }) => {
-      const response = await request.post(`/api/v1/tools/${tool}`, {
+      const response = await request.post(apiToolPath(tool), {
         multipart: {
           file: {
             name: "test.png",
@@ -193,7 +194,7 @@ test.describe("Tool route guards", () => {
   }
 
   test("non-AI tool works normally (resize)", async ({ request }) => {
-    const response = await request.post("/api/v1/tools/resize", {
+    const response = await request.post("/api/v1/tools/image/resize", {
       multipart: {
         file: {
           name: "test.png",
@@ -217,7 +218,7 @@ test.describe("Tool route guards", () => {
   // ─── Batch guard (ocr is not installed at this point) ─────────────
 
   test("batch endpoint returns 501 for uninstalled AI tool", async ({ request }) => {
-    const response = await request.post("/api/v1/tools/ocr/batch", {
+    const response = await request.post("/api/v1/tools/image/ocr/batch", {
       multipart: {
         "files[]": {
           name: "test.png",

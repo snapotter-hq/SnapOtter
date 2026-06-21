@@ -24,7 +24,7 @@ function _uploadMultipleFiles(page: import("@playwright/test").Page, filePaths: 
 
 test.describe("Batch processing preview and download", () => {
   test("batch adjust-colors shows image preview, not UUID text", async ({ loggedInPage: page }) => {
-    await page.goto("/adjust-colors");
+    await page.goto("/image/adjust-colors");
 
     // Upload 2 images (PNG + JPG)
     const files = [getFixturePath("test-200x150.png"), getFixturePath("test-100x100.jpg")];
@@ -66,7 +66,7 @@ test.describe("Batch processing preview and download", () => {
   });
 
   test("batch adjust-colors with HEIC shows preview", async ({ loggedInPage: page }) => {
-    await page.goto("/adjust-colors");
+    await page.goto("/image/adjust-colors");
 
     // Upload HEIC + PNG
     const heicPath = getTestHeicPath();
@@ -101,7 +101,7 @@ test.describe("Batch processing preview and download", () => {
     loggedInPage: page,
   }) => {
     await page.goto("/brightness-contrast");
-    await page.waitForURL("/adjust-colors");
+    await page.waitForURL("/image/adjust-colors");
     await expect(page.getByText("Adjust Colors")).toBeVisible();
   });
 });

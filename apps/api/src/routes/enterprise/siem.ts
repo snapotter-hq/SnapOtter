@@ -4,7 +4,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt, isEncrypted } from "../../lib/encryption.js";
+import { encrypt } from "../../lib/encryption.js";
 import { requirePermission } from "../../permissions.js";
 
 const configSchema = z.object({

@@ -2,6 +2,9 @@
   <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
 </p>
 
+> [!NOTE]
+> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 157 tools across image, video, audio, documents, and data. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
+
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
   <a href="https://github.com/orgs/snapotter-hq/packages/container/package/snapotter"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fsnapotter--hq%2Fsnapotter-blue?logo=github" alt="GHCR"></a>

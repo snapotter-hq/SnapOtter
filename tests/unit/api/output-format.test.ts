@@ -1,12 +1,10 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveOutputFormat } from "../../../apps/api/src/lib/output-format.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
-const FIXTURES = join(__dirname, "..", "..", "fixtures");
-const JPG = readFileSync(join(FIXTURES, "test-100x100.jpg"));
-const PNG = readFileSync(join(FIXTURES, "test-200x150.png"));
-const WEBP = readFileSync(join(FIXTURES, "test-50x50.webp"));
+const JPG = readFixture(fixtures.image.base.jpg100);
+const PNG = readFixture(fixtures.image.base.png200);
+const WEBP = readFixture(fixtures.image.base.webp50);
 
 describe("resolveOutputFormat", () => {
   it("detects JPEG input and returns jpeg config", async () => {

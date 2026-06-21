@@ -1,5 +1,5 @@
 ---
-import { TOOLS } from "@snapotter/shared";
+import { TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 
 function renderIcon(iconName: string): string {
@@ -18,6 +18,7 @@ function renderIcon(iconName: string): string {
 const MODALITIES = [
   {
     id: "image",
+    section: "image",
     label: "Image Tools",
     blurb: "Resize, convert, and enhance",
     icon: "Image",
@@ -25,6 +26,7 @@ const MODALITIES = [
   },
   {
     id: "video",
+    section: "video",
     label: "Video Tools",
     blurb: "Trim, convert, and caption",
     icon: "Video",
@@ -32,6 +34,7 @@ const MODALITIES = [
   },
   {
     id: "audio",
+    section: "audio",
     label: "Audio Tools",
     blurb: "Convert, trim, and transcribe",
     icon: "Music",
@@ -39,6 +42,7 @@ const MODALITIES = [
   },
   {
     id: "document",
+    section: "pdf",
     label: "PDF & Documents",
     blurb: "Merge, split, and convert",
     icon: "FileText",
@@ -46,7 +50,8 @@ const MODALITIES = [
   },
   {
     id: "file",
-    label: "Data & Files",
+    section: "files",
+    label: "File Tools",
     blurb: "Convert and transform",
     icon: "Database",
     color: "#5C8642",
@@ -54,7 +59,7 @@ const MODALITIES = [
 ];
 
 const cards = MODALITIES.map((m) => {
-  const tools = TOOLS.filter((t) => t.modality === m.id);
+  const tools = TOOLS.filter((t) => toolSection(t) === m.section);
   return { ...m, count: tools.length };
 });
 ---
@@ -63,7 +68,7 @@ const cards = MODALITIES.map((m) => {
   <div class="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
     {cards.map((c) => (
       <a
-        href="/tools"
+        href={`/tools/${c.section}/`}
         class="group flex flex-col rounded-2xl p-4 text-start text-white no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
         style={`background-color: ${c.color}`}
       >

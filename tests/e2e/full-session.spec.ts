@@ -10,7 +10,7 @@ import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 test.describe("Full user session", () => {
   test("upload -> resize -> download cycle", async ({ loggedInPage: page }) => {
     // Navigate to resize tool
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await expect(page.getByText("Resize").first()).toBeVisible();
 
     // Upload test image
@@ -49,7 +49,7 @@ test.describe("Full user session", () => {
   });
 
   test("upload -> rotate 90 -> download cycle", async ({ loggedInPage: page }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await expect(page.getByText("Rotate").first()).toBeVisible();
 
     await uploadTestImage(page);
@@ -77,7 +77,7 @@ test.describe("Full user session", () => {
   });
 
   test("upload -> convert to JPEG -> download cycle", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await expect(page.getByText("Convert").first()).toBeVisible();
 
     await uploadTestImage(page);
@@ -106,7 +106,7 @@ test.describe("Full user session", () => {
   });
 
   test("upload -> crop -> download cycle", async ({ loggedInPage: page }) => {
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await expect(page.getByText("Crop").first()).toBeVisible();
 
     await uploadTestImage(page);
@@ -141,7 +141,7 @@ test.describe("Full user session", () => {
   });
 
   test("upload -> compress -> download cycle", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await expect(page.getByText("Compress").first()).toBeVisible();
 
     await uploadTestImage(page);
@@ -168,7 +168,7 @@ test.describe("Full user session", () => {
 
   test("multi-tool session: resize then compress", async ({ loggedInPage: page }) => {
     // Step 1: Resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("200");
     await page.getByRole("button", { name: "Resize" }).click();
@@ -178,7 +178,7 @@ test.describe("Full user session", () => {
     await expect(resizeDownloadBtn).toBeVisible({ timeout: 15_000 });
 
     // Step 2: Navigate to compress and process a new image
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
@@ -191,7 +191,7 @@ test.describe("Full user session", () => {
     loggedInPage: page,
   }) => {
     // Go to resize, upload, configure
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("300");
 
@@ -200,12 +200,12 @@ test.describe("Full user session", () => {
     await expect(page.getByText("Upload from computer")).toBeVisible();
 
     // Navigate back to resize - the tool should reset (fresh state)
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await expect(page.getByText("Upload from computer")).toBeVisible();
   });
 
   test("download button triggers actual file download", async ({ loggedInPage: page }) => {
-    await page.goto("/strip-metadata");
+    await page.goto("/image/strip-metadata");
     await uploadTestImage(page);
 
     await page.getByRole("button", { name: /remove metadata/i }).click();

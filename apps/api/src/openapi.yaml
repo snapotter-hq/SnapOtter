@@ -243,7 +243,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
 
-  /api/v1/tools/resize:
+  /api/v1/tools/image/resize:
     post:
       operationId: resizeImage
       tags: [Tools]
@@ -292,7 +292,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/content-aware-resize:
+  /api/v1/tools/image/content-aware-resize:
     post:
       operationId: contentAwareResize
       tags: [Tools]
@@ -351,7 +351,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/crop:
+  /api/v1/tools/image/crop:
     post:
       operationId: cropImage
       tags: [Tools]
@@ -400,7 +400,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/rotate:
+  /api/v1/tools/image/rotate:
     post:
       operationId: rotateImage
       tags: [Tools]
@@ -447,7 +447,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/convert:
+  /api/v1/tools/image/convert:
     post:
       operationId: convertFormat
       tags: [Tools]
@@ -493,7 +493,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/compress:
+  /api/v1/tools/image/compress:
     post:
       operationId: compressImage
       tags: [Tools]
@@ -540,7 +540,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/strip-metadata:
+  /api/v1/tools/image/strip-metadata:
     post:
       operationId: stripMetadata
       tags: [Tools]
@@ -589,7 +589,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/border:
+  /api/v1/tools/image/border:
     post:
       operationId: addBorder
       tags: [Tools]
@@ -644,7 +644,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/beautify:
+  /api/v1/tools/image/beautify:
     post:
       operationId: beautifyScreenshot
       tags: [Tools]
@@ -716,7 +716,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/adjust-colors:
+  /api/v1/tools/image/adjust-colors:
     post:
       operationId: adjustColors
       tags: [Tools]
@@ -775,7 +775,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/sharpening:
+  /api/v1/tools/image/sharpening:
     post:
       operationId: sharpenImage
       tags: [Tools]
@@ -832,7 +832,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/optimize-for-web:
+  /api/v1/tools/image/optimize-for-web:
     post:
       operationId: optimizeForWeb
       tags: [Tools]
@@ -882,7 +882,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/optimize-for-web/preview:
+  /api/v1/tools/image/optimize-for-web/preview:
     post:
       operationId: optimizeForWebPreview
       tags: [Tools]
@@ -942,7 +942,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/image-enhancement:
+  /api/v1/tools/image/image-enhancement:
     post:
       operationId: enhanceImage
       tags: [Tools]
@@ -999,7 +999,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/image-enhancement/analyze:
+  /api/v1/tools/image/image-enhancement/analyze:
     post:
       operationId: analyzeImageEnhancement
       tags: [Tools]
@@ -1048,7 +1048,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/noise-removal:
+  /api/v1/tools/image/noise-removal:
     post:
       operationId: removeNoise
       tags: [Tools]
@@ -1122,7 +1122,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/red-eye-removal:
+  /api/v1/tools/image/red-eye-removal:
     post:
       operationId: removeRedEye
       tags: [Tools]
@@ -1194,7 +1194,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/restore-photo:
+  /api/v1/tools/image/restore-photo:
     post:
       operationId: restorePhoto
       tags: [Tools]
@@ -1269,7 +1269,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/passport-photo/analyze:
+  /api/v1/tools/image/passport-photo/analyze:
     post:
       operationId: analyzePassportPhoto
       tags: [Tools]
@@ -1400,7 +1400,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/passport-photo/generate:
+  /api/v1/tools/image/passport-photo/generate:
     post:
       operationId: generatePassportPhoto
       tags: [Tools]
@@ -1537,7 +1537,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/colorize:
+  /api/v1/tools/image/colorize:
     post:
       operationId: colorizeImage
       tags: [Tools]
@@ -1607,7 +1607,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/enhance-faces:
+  /api/v1/tools/image/enhance-faces:
     post:
       operationId: enhanceFaces
       tags: [Tools]
@@ -1679,7 +1679,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/image-to-base64:
+  /api/v1/tools/image/image-to-base64:
     post:
       operationId: imageToBase64
       tags: [Tools]
@@ -1770,7 +1770,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/watermark-text:
+  /api/v1/tools/image/watermark-text:
     post:
       operationId: addTextWatermark
       tags: [Tools]
@@ -1820,7 +1820,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/text-overlay:
+  /api/v1/tools/image/text-overlay:
     post:
       operationId: addTextOverlay
       tags: [Tools]
@@ -1871,7 +1871,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/replace-color:
+  /api/v1/tools/image/replace-color:
     post:
       operationId: replaceColor
       tags: [Tools]
@@ -1919,7 +1919,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/color-blindness:
+  /api/v1/tools/image/color-blindness:
     post:
       operationId: simulateColorBlindness
       tags: [Tools]
@@ -1964,7 +1964,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/gif-tools:
+  /api/v1/tools/image/gif-tools:
     post:
       operationId: processGif
       tags: [Tools]
@@ -2025,7 +2025,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/gif-tools/info:
+  /api/v1/tools/image/gif-tools/info:
     post:
       operationId: getGifInfo
       tags: [Tools]
@@ -2079,7 +2079,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/smart-crop:
+  /api/v1/tools/image/smart-crop:
     post:
       operationId: smartCrop
       tags: [Tools]
@@ -2135,7 +2135,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/vectorize:
+  /api/v1/tools/image/vectorize:
     post:
       operationId: vectorizeImage
       tags: [Tools]
@@ -2187,7 +2187,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/svg-to-raster:
+  /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster
       tags: [Tools]
@@ -2237,7 +2237,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/svg-to-raster/batch:
+  /api/v1/tools/image/svg-to-raster/batch:
     post:
       operationId: svgToRasterBatch
       tags: [Tools]
@@ -2292,7 +2292,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/image-to-pdf:
+  /api/v1/tools/image/image-to-pdf:
     post:
       operationId: imageToPdf
       tags: [Tools]
@@ -2371,7 +2371,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/pdf-to-image:
+  /api/v1/tools/pdf/pdf-to-image:
     post:
       operationId: pdfToImage
       tags: [Tools]
@@ -2448,7 +2448,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdf-to-image/info:
+  /api/v1/tools/pdf/pdf-to-image/info:
     post:
       operationId: getPdfInfo
       tags: [Tools]
@@ -2484,7 +2484,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/pdf-to-image/preview:
+  /api/v1/tools/pdf/pdf-to-image/preview:
     post:
       operationId: previewPdfPages
       tags: [Tools]
@@ -2534,7 +2534,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/split:
+  /api/v1/tools/image/split:
     post:
       operationId: splitImage
       tags: [Tools]
@@ -2585,7 +2585,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/bulk-rename:
+  /api/v1/tools/image/bulk-rename:
     post:
       operationId: bulkRename
       tags: [Tools]
@@ -2634,7 +2634,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/favicon:
+  /api/v1/tools/image/favicon:
     post:
       operationId: generateFavicon
       tags: [Tools]
@@ -2675,7 +2675,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/watermark-image:
+  /api/v1/tools/image/watermark-image:
     post:
       operationId: addImageWatermark
       tags: [Tools]
@@ -2726,7 +2726,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/compose:
+  /api/v1/tools/image/compose:
     post:
       operationId: composeImages
       tags: [Tools]
@@ -2778,7 +2778,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/meme-generator:
+  /api/v1/tools/image/meme-generator:
     post:
       operationId: generateMeme
       tags: [Tools]
@@ -3017,7 +3017,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/compare:
+  /api/v1/tools/image/compare:
     post:
       operationId: compareImages
       tags: [Tools]
@@ -3080,7 +3080,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/erase-object:
+  /api/v1/tools/image/erase-object:
     post:
       operationId: eraseObject
       tags: [Tools]
@@ -3156,7 +3156,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/ai-canvas-expand:
+  /api/v1/tools/image/ai-canvas-expand:
     post:
       operationId: aiCanvasExpand
       tags: [Tools]
@@ -3234,7 +3234,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/collage:
+  /api/v1/tools/image/collage:
     post:
       operationId: createCollage
       tags: [Tools]
@@ -3288,7 +3288,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/stitch:
+  /api/v1/tools/image/stitch:
     post:
       operationId: stitchImages
       tags: [Tools]
@@ -3344,7 +3344,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/remove-background:
+  /api/v1/tools/image/remove-background:
     post:
       operationId: removeBackground
       tags: [Tools]
@@ -3419,14 +3419,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/remove-background/effects:
+  /api/v1/tools/image/remove-background/effects:
     post:
       operationId: applyBackgroundEffects
       tags: [Tools]
       summary: Apply background effects
       description: >
         Apply background replacement or effects to a previously processed remove-background result.
-        Requires a jobId from a prior POST /api/v1/tools/remove-background call.
+        Requires a jobId from a prior POST /api/v1/tools/image/remove-background call.
       security:
         - bearerAuth: []
       requestBody:
@@ -3483,7 +3483,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/transparency-fixer:
+  /api/v1/tools/image/transparency-fixer:
     post:
       operationId: fixTransparency
       tags: [Tools]
@@ -3556,7 +3556,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/upscale:
+  /api/v1/tools/image/upscale:
     post:
       operationId: upscaleImage
       tags: [Tools]
@@ -3627,7 +3627,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/blur-faces:
+  /api/v1/tools/image/blur-faces:
     post:
       operationId: blurFaces
       tags: [Tools]
@@ -3694,7 +3694,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/ocr:
+  /api/v1/tools/image/ocr:
     post:
       operationId: extractText
       tags: [Tools]
@@ -3766,7 +3766,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/info:
+  /api/v1/tools/image/info:
     post:
       operationId: getImageInfo
       tags: [Tools]
@@ -3864,7 +3864,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/color-palette:
+  /api/v1/tools/image/color-palette:
     post:
       operationId: extractColorPalette
       tags: [Tools]
@@ -3914,7 +3914,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/barcode-read:
+  /api/v1/tools/image/barcode-read:
     post:
       operationId: readBarcode
       tags: [Tools]
@@ -4006,7 +4006,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/find-duplicates:
+  /api/v1/tools/image/find-duplicates:
     post:
       operationId: findDuplicates
       tags: [Tools]
@@ -4105,7 +4105,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/qr-generate:
+  /api/v1/tools/image/qr-generate:
     post:
       operationId: generateQrCode
       tags: [Tools]
@@ -4163,7 +4163,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/html-to-image:
+  /api/v1/tools/image/html-to-image:
     post:
       operationId: captureWebpage
       tags: [Tools]
@@ -4241,7 +4241,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/strip-metadata/inspect:
+  /api/v1/tools/image/strip-metadata/inspect:
     post:
       operationId: inspectMetadata
       tags: [Tools]
@@ -4307,7 +4307,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/edit-metadata:
+  /api/v1/tools/image/edit-metadata:
     post:
       operationId: editMetadata
       tags: [Tools]
@@ -4373,7 +4373,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/edit-metadata/inspect:
+  /api/v1/tools/image/edit-metadata/inspect:
     post:
       operationId: inspectMetadataExifTool
       tags: [Tools]
@@ -4422,7 +4422,7 @@ paths:
 
   # ─── Batch ────────────────────────────────────────────────────────────────
 
-  /api/v1/tools/{toolId}/batch:
+  /api/v1/tools/{section}/{toolId}/batch:
     post:
       operationId: batchProcess
       tags: [Batch]
@@ -4433,6 +4433,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tool section slug (image, video, audio, pdf, files)
         - name: toolId
           in: path
           required: true
@@ -5876,6 +5882,7 @@ paths:
                     type: array
                     items:
                       type: string
+                    nullable: true
                   expiresAt:
                     type: string
                     format: date-time
@@ -5923,6 +5930,7 @@ paths:
                           type: array
                           items:
                             type: string
+                          nullable: true
                         createdAt:
                           type: string
                           format: date-time
@@ -6739,19 +6747,26 @@ paths:
                           type: string
                         actorId:
                           type: string
+                          nullable: true
                         actorUsername:
                           type: string
                         action:
                           type: string
                         targetType:
                           type: string
+                          nullable: true
                         targetId:
                           type: string
+                          nullable: true
                         details:
                           type: object
                           nullable: true
                         ipAddress:
                           type: string
+                          nullable: true
+                        requestId:
+                          type: string
+                          nullable: true
                         createdAt:
                           type: string
                           format: date-time
@@ -7042,7 +7057,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/convert-video:
+  /api/v1/tools/video/convert-video:
     post:
       operationId: convertVideo
       tags: [Tools]
@@ -7103,7 +7118,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/compress-video:
+  /api/v1/tools/video/compress-video:
     post:
       operationId: compressVideo
       tags: [Tools]
@@ -7164,7 +7179,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/trim-video:
+  /api/v1/tools/video/trim-video:
     post:
       operationId: trimVideo
       tags: [Tools]
@@ -7211,7 +7226,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/mute-video:
+  /api/v1/tools/video/mute-video:
     post:
       operationId: muteVideo
       tags: [Tools]
@@ -7251,7 +7266,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-to-gif:
+  /api/v1/tools/video/video-to-gif:
     post:
       operationId: videoToGif
       tags: [Tools]
@@ -7314,7 +7329,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/resize-video:
+  /api/v1/tools/video/resize-video:
     post:
       operationId: resizeVideo
       tags: [Tools]
@@ -7361,7 +7376,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/crop-video:
+  /api/v1/tools/video/crop-video:
     post:
       operationId: cropVideo
       tags: [Tools]
@@ -7409,7 +7424,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/rotate-video:
+  /api/v1/tools/video/rotate-video:
     post:
       operationId: rotateVideo
       tags: [Tools]
@@ -7454,7 +7469,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/change-fps:
+  /api/v1/tools/video/change-fps:
     post:
       operationId: changeFps
       tags: [Tools]
@@ -7499,7 +7514,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-color:
+  /api/v1/tools/video/video-color:
     post:
       operationId: videoColor
       tags: [Tools]
@@ -7547,7 +7562,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-speed:
+  /api/v1/tools/video/video-speed:
     post:
       operationId: videoSpeed
       tags: [Tools]
@@ -7593,7 +7608,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/reverse-video:
+  /api/v1/tools/video/reverse-video:
     post:
       operationId: reverseVideo
       tags: [Tools]
@@ -7633,7 +7648,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-loudnorm:
+  /api/v1/tools/video/video-loudnorm:
     post:
       operationId: videoLoudnorm
       tags: [Tools]
@@ -7673,7 +7688,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/aspect-pad:
+  /api/v1/tools/video/aspect-pad:
     post:
       operationId: aspectPad
       tags: [Tools]
@@ -7719,7 +7734,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/blur-pad:
+  /api/v1/tools/video/blur-pad:
     post:
       operationId: blurPad
       tags: [Tools]
@@ -7765,7 +7780,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/watermark-video:
+  /api/v1/tools/video/watermark-video:
     post:
       operationId: watermarkVideo
       tags: [Tools]
@@ -7814,7 +7829,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/stabilize-video:
+  /api/v1/tools/video/stabilize-video:
     post:
       operationId: stabilizeVideo
       tags: [Tools]
@@ -7874,7 +7889,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/gif-to-video:
+  /api/v1/tools/video/gif-to-video:
     post:
       operationId: gifToVideo
       tags: [Tools]
@@ -7919,7 +7934,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-to-webp:
+  /api/v1/tools/video/video-to-webp:
     post:
       operationId: videoToWebp
       tags: [Tools]
@@ -7967,7 +7982,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-to-frames:
+  /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
       tags: [Tools]
@@ -8015,7 +8030,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/merge-videos:
+  /api/v1/tools/video/merge-videos:
     post:
       operationId: mergeVideos
       tags: [Tools]
@@ -8074,7 +8089,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/replace-audio:
+  /api/v1/tools/video/replace-audio:
     post:
       operationId: replaceAudio
       tags: [Tools]
@@ -8116,7 +8131,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/burn-subtitles:
+  /api/v1/tools/video/burn-subtitles:
     post:
       operationId: burnSubtitles
       tags: [Tools]
@@ -8178,7 +8193,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/tools/embed-subtitles:
+  /api/v1/tools/video/embed-subtitles:
     post:
       operationId: embedSubtitles
       tags: [Tools]
@@ -8225,7 +8240,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/extract-subtitles:
+  /api/v1/tools/video/extract-subtitles:
     post:
       operationId: extractSubtitles
       tags: [Tools]
@@ -8265,7 +8280,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/images-to-video:
+  /api/v1/tools/video/images-to-video:
     post:
       operationId: imagesToVideo
       tags: [Tools]
@@ -8314,7 +8329,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/video-metadata:
+  /api/v1/tools/video/video-metadata:
     post:
       operationId: videoMetadata
       tags: [Tools]
@@ -8354,7 +8369,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/auto-subtitles:
+  /api/v1/tools/video/auto-subtitles:
     post:
       operationId: autoSubtitles
       tags: [Tools]
@@ -8424,7 +8439,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/extract-audio:
+  /api/v1/tools/video/extract-audio:
     post:
       operationId: extractAudio
       tags: [Tools]
@@ -8468,7 +8483,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
-  /api/v1/tools/convert-audio:
+  /api/v1/tools/audio/convert-audio:
     post:
       operationId: convertAudio
       tags: [Tools]
@@ -8514,7 +8529,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/trim-audio:
+  /api/v1/tools/audio/trim-audio:
     post:
       operationId: trimAudio
       tags: [Tools]
@@ -8560,7 +8575,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/volume-adjust:
+  /api/v1/tools/audio/volume-adjust:
     post:
       operationId: volumeAdjust
       tags: [Tools]
@@ -8605,7 +8620,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/normalize-audio:
+  /api/v1/tools/audio/normalize-audio:
     post:
       operationId: normalizeAudio
       tags: [Tools]
@@ -8645,7 +8660,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/fade-audio:
+  /api/v1/tools/audio/fade-audio:
     post:
       operationId: fadeAudio
       tags: [Tools]
@@ -8691,7 +8706,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/reverse-audio:
+  /api/v1/tools/audio/reverse-audio:
     post:
       operationId: reverseAudio
       tags: [Tools]
@@ -8731,7 +8746,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/audio-speed:
+  /api/v1/tools/audio/audio-speed:
     post:
       operationId: audioSpeed
       tags: [Tools]
@@ -8776,7 +8791,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pitch-shift:
+  /api/v1/tools/audio/pitch-shift:
     post:
       operationId: pitchShift
       tags: [Tools]
@@ -8821,7 +8836,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/audio-channels:
+  /api/v1/tools/audio/audio-channels:
     post:
       operationId: audioChannels
       tags: [Tools]
@@ -8866,7 +8881,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/silence-removal:
+  /api/v1/tools/audio/silence-removal:
     post:
       operationId: removeSilence
       tags: [Tools]
@@ -8912,7 +8927,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/noise-reduction:
+  /api/v1/tools/audio/noise-reduction:
     post:
       operationId: reduceNoise
       tags: [Tools]
@@ -8957,7 +8972,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/merge-audio:
+  /api/v1/tools/audio/merge-audio:
     post:
       operationId: mergeAudio
       tags: [Tools]
@@ -9004,7 +9019,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/split-audio:
+  /api/v1/tools/audio/split-audio:
     post:
       operationId: splitAudio
       tags: [Tools]
@@ -9055,7 +9070,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/ringtone-maker:
+  /api/v1/tools/audio/ringtone-maker:
     post:
       operationId: ringtoneMaker
       tags: [Tools]
@@ -9101,7 +9116,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/waveform-image:
+  /api/v1/tools/audio/waveform-image:
     post:
       operationId: waveformImage
       tags: [Tools]
@@ -9148,7 +9163,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/audio-metadata:
+  /api/v1/tools/audio/audio-metadata:
     post:
       operationId: audioMetadata
       tags: [Tools]
@@ -9199,7 +9214,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/transcribe-audio:
+  /api/v1/tools/audio/transcribe-audio:
     post:
       operationId: transcribeAudio
       tags: [Tools]
@@ -9268,7 +9283,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
-  /api/v1/tools/merge-pdf:
+  /api/v1/tools/pdf/merge-pdf:
     post:
       operationId: mergePdf
       tags: [Tools]
@@ -9310,7 +9325,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/split-pdf:
+  /api/v1/tools/pdf/split-pdf:
     post:
       operationId: splitPdf
       tags: [Tools]
@@ -9360,7 +9375,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/compress-pdf:
+  /api/v1/tools/pdf/compress-pdf:
     post:
       operationId: compressPdf
       tags: [Tools]
@@ -9411,7 +9426,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/rotate-pdf:
+  /api/v1/tools/pdf/rotate-pdf:
     post:
       operationId: rotatePdf
       tags: [Tools]
@@ -9457,7 +9472,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/extract-pages:
+  /api/v1/tools/pdf/extract-pages:
     post:
       operationId: extractPages
       tags: [Tools]
@@ -9502,7 +9517,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/remove-pages:
+  /api/v1/tools/pdf/remove-pages:
     post:
       operationId: removePages
       tags: [Tools]
@@ -9547,7 +9562,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/organize-pdf:
+  /api/v1/tools/pdf/organize-pdf:
     post:
       operationId: organizePdf
       tags: [Tools]
@@ -9592,7 +9607,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/protect-pdf:
+  /api/v1/tools/pdf/protect-pdf:
     post:
       operationId: protectPdf
       tags: [Tools]
@@ -9638,7 +9653,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/unlock-pdf:
+  /api/v1/tools/pdf/unlock-pdf:
     post:
       operationId: unlockPdf
       tags: [Tools]
@@ -9683,7 +9698,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/repair-pdf:
+  /api/v1/tools/pdf/repair-pdf:
     post:
       operationId: repairPdf
       tags: [Tools]
@@ -9723,7 +9738,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/linearize-pdf:
+  /api/v1/tools/pdf/linearize-pdf:
     post:
       operationId: linearizePdf
       tags: [Tools]
@@ -9763,7 +9778,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/grayscale-pdf:
+  /api/v1/tools/pdf/grayscale-pdf:
     post:
       operationId: grayscalePdf
       tags: [Tools]
@@ -9803,7 +9818,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdfa-convert:
+  /api/v1/tools/pdf/pdfa-convert:
     post:
       operationId: pdfaConvert
       tags: [Tools]
@@ -9843,7 +9858,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/crop-pdf:
+  /api/v1/tools/pdf/crop-pdf:
     post:
       operationId: cropPdf
       tags: [Tools]
@@ -9888,7 +9903,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/nup-pdf:
+  /api/v1/tools/pdf/nup-pdf:
     post:
       operationId: nupPdf
       tags: [Tools]
@@ -9933,7 +9948,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/booklet-pdf:
+  /api/v1/tools/pdf/booklet-pdf:
     post:
       operationId: bookletPdf
       tags: [Tools]
@@ -9978,7 +9993,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/watermark-pdf:
+  /api/v1/tools/pdf/watermark-pdf:
     post:
       operationId: watermarkPdf
       tags: [Tools]
@@ -10027,7 +10042,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdf-page-numbers:
+  /api/v1/tools/pdf/pdf-page-numbers:
     post:
       operationId: pdfPageNumbers
       tags: [Tools]
@@ -10072,7 +10087,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
-  /api/v1/tools/convert-document:
+  /api/v1/tools/files/convert-document:
     post:
       operationId: convertDocument
       tags: [Tools]
@@ -10126,7 +10141,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/convert-presentation:
+  /api/v1/tools/files/convert-presentation:
     post:
       operationId: convertPresentation
       tags: [Tools]
@@ -10180,7 +10195,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/convert-spreadsheet:
+  /api/v1/tools/files/convert-spreadsheet:
     post:
       operationId: convertSpreadsheet
       tags: [Tools]
@@ -10234,7 +10249,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/excel-to-pdf:
+  /api/v1/tools/files/excel-to-pdf:
     post:
       operationId: excelToPdf
       tags: [Tools]
@@ -10283,7 +10298,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/word-to-pdf:
+  /api/v1/tools/files/word-to-pdf:
     post:
       operationId: wordToPdf
       tags: [Tools]
@@ -10332,7 +10347,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/powerpoint-to-pdf:
+  /api/v1/tools/files/powerpoint-to-pdf:
     post:
       operationId: powerpointToPdf
       tags: [Tools]
@@ -10381,7 +10396,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/html-to-pdf:
+  /api/v1/tools/files/html-to-pdf:
     post:
       operationId: htmlToPdf
       tags: [Tools]
@@ -10430,7 +10445,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/markdown-to-docx:
+  /api/v1/tools/files/markdown-to-docx:
     post:
       operationId: markdownToDocx
       tags: [Tools]
@@ -10470,7 +10485,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/markdown-to-html:
+  /api/v1/tools/files/markdown-to-html:
     post:
       operationId: markdownToHtml
       tags: [Tools]
@@ -10510,7 +10525,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/markdown-to-pdf:
+  /api/v1/tools/files/markdown-to-pdf:
     post:
       operationId: markdownToPdf
       tags: [Tools]
@@ -10559,7 +10574,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/epub-convert:
+  /api/v1/tools/files/epub-convert:
     post:
       operationId: epubConvert
       tags: [Tools]
@@ -10613,7 +10628,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/to-epub:
+  /api/v1/tools/files/to-epub:
     post:
       operationId: toEpub
       tags: [Tools]
@@ -10662,7 +10677,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/flatten-pdf:
+  /api/v1/tools/pdf/flatten-pdf:
     post:
       operationId: flattenPdf
       tags: [Tools]
@@ -10702,7 +10717,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/redact-pdf:
+  /api/v1/tools/pdf/redact-pdf:
     post:
       operationId: redactPdf
       tags: [Tools]
@@ -10754,7 +10769,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdf-to-text:
+  /api/v1/tools/pdf/pdf-to-text:
     post:
       operationId: pdfToText
       tags: [Tools]
@@ -10800,7 +10815,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdf-to-word:
+  /api/v1/tools/pdf/pdf-to-word:
     post:
       operationId: pdfToWord
       tags: [Tools]
@@ -10849,7 +10864,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pdf-metadata:
+  /api/v1/tools/pdf/pdf-metadata:
     post:
       operationId: pdfMetadata
       tags: [Tools]
@@ -10903,7 +10918,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/ocr-pdf:
+  /api/v1/tools/pdf/ocr-pdf:
     post:
       operationId: ocrPdf
       tags: [Tools]
@@ -10973,7 +10988,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
-  /api/v1/tools/chart-maker:
+  /api/v1/tools/files/chart-maker:
     post:
       operationId: chartMaker
       tags: [Tools]
@@ -11021,7 +11036,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/csv-excel:
+  /api/v1/tools/files/csv-excel:
     post:
       operationId: csvExcel
       tags: [Tools]
@@ -11066,7 +11081,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/csv-json:
+  /api/v1/tools/files/csv-json:
     post:
       operationId: csvJson
       tags: [Tools]
@@ -11111,7 +11126,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/json-xml:
+  /api/v1/tools/files/json-xml:
     post:
       operationId: jsonXml
       tags: [Tools]
@@ -11156,7 +11171,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/split-csv:
+  /api/v1/tools/files/split-csv:
     post:
       operationId: splitCsv
       tags: [Tools]
@@ -11202,7 +11217,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/merge-csvs:
+  /api/v1/tools/files/merge-csvs:
     post:
       operationId: mergeCsvs
       tags: [Tools]
@@ -11244,7 +11259,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/yaml-json:
+  /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
       tags: [Tools]
@@ -11284,7 +11299,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/xml-to-csv:
+  /api/v1/tools/files/xml-to-csv:
     post:
       operationId: xmlToCsv
       tags: [Tools]
@@ -11324,7 +11339,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/create-zip:
+  /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
       tags: [Tools]
@@ -11366,7 +11381,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/extract-zip:
+  /api/v1/tools/files/extract-zip:
     post:
       operationId: extractZip
       tags: [Tools]
@@ -11405,7 +11420,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
-  /api/v1/tools/background-replace:
+  /api/v1/tools/image/background-replace:
     post:
       operationId: backgroundReplace
       tags: [Tools]
@@ -11480,7 +11495,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/blur-background:
+  /api/v1/tools/image/blur-background:
     post:
       operationId: blurBackground
       tags: [Tools]
@@ -11551,7 +11566,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
 
-  /api/v1/tools/barcode-generate:
+  /api/v1/tools/image/barcode-generate:
     post:
       operationId: generateBarcode
       tags: [Tools]
@@ -11607,7 +11622,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/circle-crop:
+  /api/v1/tools/image/circle-crop:
     post:
       operationId: circleCrop
       tags: [Tools]
@@ -11658,7 +11673,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/duotone:
+  /api/v1/tools/image/duotone:
     post:
       operationId: duotone
       tags: [Tools]
@@ -11705,7 +11720,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/image-pad:
+  /api/v1/tools/image/image-pad:
     post:
       operationId: imagePad
       tags: [Tools]
@@ -11755,7 +11770,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/pixelate:
+  /api/v1/tools/image/pixelate:
     post:
       operationId: pixelate
       tags: [Tools]
@@ -11805,7 +11820,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/vignette:
+  /api/v1/tools/image/vignette:
     post:
       operationId: vignette
       tags: [Tools]
@@ -11856,7 +11871,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/gif-webp:
+  /api/v1/tools/image/gif-webp:
     post:
       operationId: gifWebp
       tags: [Tools]
@@ -11903,7 +11918,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/histogram:
+  /api/v1/tools/image/histogram:
     post:
       operationId: histogram
       tags: [Tools]
@@ -12034,7 +12049,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/lqip-placeholder:
+  /api/v1/tools/image/lqip-placeholder:
     post:
       operationId: lqipPlaceholder
       tags: [Tools]
@@ -12110,7 +12125,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
-  /api/v1/tools/sprite-sheet:
+  /api/v1/tools/image/sprite-sheet:
     post:
       operationId: spriteSheet
       tags: [Tools]

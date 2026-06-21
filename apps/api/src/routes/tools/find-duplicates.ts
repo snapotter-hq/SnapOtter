@@ -95,7 +95,7 @@ async function extractFileInfo(file: FileData): Promise<FileInfo> {
 }
 
 export function registerFindDuplicates(app: FastifyInstance) {
-  app.post("/api/v1/tools/find-duplicates", async (request, reply) => {
+  app.post("/api/v1/tools/image/find-duplicates", async (request, reply) => {
     const files: FileData[] = [];
     let settingsRaw: string | null = null;
 

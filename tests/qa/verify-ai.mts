@@ -3,6 +3,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { apiToolPath } from "@snapotter/shared";
 
 const BASE = "http://localhost:13499";
 
@@ -63,7 +64,7 @@ async function run(toolId: string, file: string, settings: Record<string, unknow
   const fd = new FormData();
   fd.append("file", new Blob([buf]), path.basename(file));
   fd.append("settings", JSON.stringify(settings));
-  const res = await fetch(`${BASE}/api/v1/tools/${toolId}`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}${apiToolPath(toolId)}`, { method: "POST", body: fd });
   if (res.status === 200) {
     const j = (await res.json()) as { downloadUrl?: string };
     if (j.downloadUrl) {
@@ -89,21 +90,23 @@ async function run(toolId: string, file: string, settings: Record<string, unknow
   return { status: res.status, body: (await res.text()).slice(0, 200) };
 }
 
-const C = "tests/fixtures/content";
+const IMG = "tests/fixtures/image/valid";
+const AUD = "tests/fixtures/audio/valid";
+const DOC = "tests/fixtures/document/valid";
 
-const t = await run("transcribe-audio", `${C}/speech-10s.wav`, { outputFormat: "txt" });
+const t = await run("transcribe-audio", `${AUD}/speech-10s.wav`, { outputFormat: "txt" });
 console.log(
   "TRANSCRIBE:",
   t.out ? `text="${t.out.toString("utf8").slice(0, 200)}"` : JSON.stringify(t).slice(0, 300),
 );
 
-const o = await run("ocr", `${C}/ocr-clean.png`, {});
+const o = await run("ocr", `${IMG}/ocr-clean.png`, {});
 console.log(
   "OCR:",
   o.out ? `text="${o.out.toString("utf8").slice(0, 200)}"` : JSON.stringify(o).slice(0, 300),
 );
 
-const r = await run("remove-background", `${C}/portrait-color.jpg`, { outputFormat: "png" });
+const r = await run("remove-background", `${IMG}/portrait-color.jpg`, { outputFormat: "png" });
 if (r.out) {
   fs.writeFileSync("/tmp/rembg-out.png", r.out);
   let probe = "";
@@ -122,14 +125,14 @@ if (r.out) {
 }
 
 // F9: ocr-pdf must not segfault and should return text
-const op = await run("ocr-pdf", `${C}/ocr-scanned.pdf`, {});
+const op = await run("ocr-pdf", `${DOC}/ocr-scanned.pdf`, {});
 console.log(
   "OCR-PDF:",
   op.out ? `out="${op.out.toString("utf8").slice(0, 160)}"` : JSON.stringify(op).slice(0, 300),
 );
 
 // F11: RAW processing must work (resize a .cr2 from the formats fixtures)
-const raw = await run("resize", "tests/fixtures/formats/sample.cr2", { width: 80 });
+const raw = await run("resize", "tests/fixtures/image/formats/sample.cr2", { width: 80 });
 console.log(
   "RAW-RESIZE(cr2):",
   raw.out ? `bytes=${raw.out.length}` : JSON.stringify(raw).slice(0, 300),

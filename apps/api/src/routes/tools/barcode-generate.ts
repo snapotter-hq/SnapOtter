@@ -19,7 +19,7 @@ const settingsSchema = z.object({
  */
 export function registerBarcodeGenerate(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/barcode-generate",
+    "/api/v1/tools/image/barcode-generate",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let body: unknown;
       try {

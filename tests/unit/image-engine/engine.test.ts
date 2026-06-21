@@ -7,7 +7,7 @@
  * - Edge cases around operation ordering
  * - The Operation type contract
  */
-import { readFileSync } from "node:fs";
+
 import { createRequire } from "node:module";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -18,18 +18,16 @@ const require = createRequire(
 const _sharp = require("sharp") as typeof import("sharp").default;
 
 import { processImage } from "@snapotter/image-engine";
-
-const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
-const FORMATS_DIR = path.resolve(__dirname, "../../fixtures/formats");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 let png200x150: Buffer;
 let jpg100x100: Buffer;
 let webp50x50: Buffer;
 
 beforeAll(() => {
-  png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
-  jpg100x100 = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
-  webp50x50 = readFileSync(path.join(FIXTURES_DIR, "test-50x50.webp"));
+  png200x150 = readFixture(fixtures.image.base.png200);
+  jpg100x100 = readFixture(fixtures.image.base.jpg100);
+  webp50x50 = readFixture(fixtures.image.base.webp50);
 });
 
 // ---------------------------------------------------------------------------
@@ -213,21 +211,21 @@ describe("processImage with different input formats", () => {
   });
 
   it("processes AVIF input from fixture", async () => {
-    const avif = readFileSync(path.join(FORMATS_DIR, "sample.avif"));
+    const avif = readFixture(fixtures.image.formats("avif"));
     const result = await processImage(avif, [{ type: "resize", options: { width: 40 } }]);
     expect(result.info.width).toBe(40);
     expect(result.buffer.length).toBeGreaterThan(0);
   });
 
   it("processes GIF input from fixture", async () => {
-    const gif = readFileSync(path.join(FORMATS_DIR, "sample.gif"));
+    const gif = readFixture(fixtures.image.formats("gif"));
     const result = await processImage(gif, [{ type: "resize", options: { width: 30 } }]);
     expect(result.info.width).toBe(30);
     expect(result.buffer.length).toBeGreaterThan(0);
   });
 
   it("processes TIFF input from fixture", async () => {
-    const tiff = readFileSync(path.join(FORMATS_DIR, "sample.tiff"));
+    const tiff = readFixture(fixtures.image.formats("tiff"));
     const result = await processImage(tiff, [{ type: "resize", options: { width: 30 } }]);
     expect(result.info.width).toBe(30);
     expect(result.buffer.length).toBeGreaterThan(0);

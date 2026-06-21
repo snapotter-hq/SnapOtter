@@ -348,7 +348,7 @@ describe("isPublicRoute", () => {
   });
 
   it("treats tool endpoints as private", () => {
-    expect(isPublicRoute("/api/v1/tools/resize")).toBe(false);
+    expect(isPublicRoute("/api/v1/tools/image/resize")).toBe(false);
     expect(isPublicRoute("/api/v1/features")).toBe(false);
     expect(isPublicRoute("/api/v1/files")).toBe(false);
   });

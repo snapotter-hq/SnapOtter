@@ -84,7 +84,7 @@ test.describe("Security: XSS in filenames", () => {
     formData.append("file", blob, "<img src=x onerror=alert(1)>.png");
     formData.append("settings", JSON.stringify({ width: 50, height: 50, fit: "contain" }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -110,7 +110,7 @@ test.describe("Security: XSS in filenames", () => {
     formData.append("file", blob, "../../../etc/passwd.png");
     formData.append("settings", JSON.stringify({ width: 50, height: 50, fit: "contain" }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -130,7 +130,7 @@ test.describe("Security: XSS in filenames", () => {
     formData.append("file", blob, "test\x00.png");
     formData.append("settings", JSON.stringify({ width: 50 }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -292,7 +292,7 @@ test.describe("Security: CSRF and request validation", () => {
     formData.append("file", blob, "not-an-image.txt");
     formData.append("settings", JSON.stringify({ width: 50 }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,
@@ -309,7 +309,7 @@ test.describe("Security: CSRF and request validation", () => {
     formData.append("file", emptyBlob, "empty.png");
     formData.append("settings", JSON.stringify({ width: 50 }));
 
-    const res = await fetch(`${API}/api/v1/tools/resize`, {
+    const res = await fetch(`${API}/api/v1/tools/image/resize`, {
       method: "POST",
       headers: authHeaders(token),
       body: formData,

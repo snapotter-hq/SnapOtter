@@ -107,7 +107,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("adjust-colors processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/adjust-colors");
+    await page.goto("/image/adjust-colors");
     await uploadTestImage(page);
     // Adjust brightness to non-zero so processing makes a change
     const brightnessSlider = page.locator("input[type='range']").first();

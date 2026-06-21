@@ -122,7 +122,7 @@ export function SplitSettings() {
         formData.append("file", file);
         formData.append("settings", settingsJson);
 
-        const res = await fetch("/api/v1/tools/split", {
+        const res = await fetch("/api/v1/tools/image/split", {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

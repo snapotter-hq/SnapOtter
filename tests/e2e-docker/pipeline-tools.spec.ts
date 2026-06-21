@@ -811,7 +811,7 @@ test.describe("Pipeline output verification", () => {
     const buffer = Buffer.from(await dlRes.body());
 
     // Verify dimensions via info
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "output.png", mimeType: "image/png", buffer: buffer },

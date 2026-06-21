@@ -1106,7 +1106,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["html-to-pdf", { accept: ".html,.htm", Settings: HtmlToPdfSettings }],
   ["markdown-to-pdf", { accept: ".md,.markdown", Settings: MarkdownToPdfSettings }],
 
-  // Data tools
+  // File tools
   ["chart-maker", { accept: ".csv,.json", Settings: ChartMakerSettings }],
   ["csv-excel", { accept: ".csv,.tsv,.xlsx", Settings: CsvExcelSettings }],
   ["csv-json", { accept: ".csv,.tsv,.json", Settings: CsvJsonSettings }],

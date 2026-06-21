@@ -37,7 +37,11 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
       />
 
       {/* Main content area */}
-      <main id="main-content" className={cn("flex-1 overflow-y-auto", isMobile && "pb-20")}>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={cn("flex-1 overflow-y-auto", isMobile && "pb-20")}
+      >
         {children}
       </main>
 

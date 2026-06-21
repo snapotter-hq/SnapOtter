@@ -61,7 +61,7 @@ const JPG_WITH_EXIF = fixture("test-with-exif.jpg");
 
 test.describe("Resize", () => {
   test("resize to explicit width and height", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -75,7 +75,7 @@ test.describe("Resize", () => {
   });
 
   test("resize with only width preserves aspect ratio", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -89,7 +89,7 @@ test.describe("Resize", () => {
   });
 
   test("resize with only height preserves aspect ratio", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -102,7 +102,7 @@ test.describe("Resize", () => {
   });
 
   test("resize with fit=cover", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -115,7 +115,7 @@ test.describe("Resize", () => {
   });
 
   test("resize with withoutEnlargement prevents upscaling", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -129,7 +129,7 @@ test.describe("Resize", () => {
   });
 
   test("resize HEIC image succeeds", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -142,7 +142,7 @@ test.describe("Resize", () => {
   });
 
   test("resize rejects invalid width=0", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -155,7 +155,7 @@ test.describe("Resize", () => {
   });
 
   test("resize rejects request with no file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         settings: JSON.stringify({ width: 100 }),
@@ -169,7 +169,7 @@ test.describe("Resize", () => {
 
 test.describe("Crop", () => {
   test("crop to specific region", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -185,7 +185,7 @@ test.describe("Crop", () => {
   });
 
   test("crop with zero offset extracts from corner", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -198,7 +198,7 @@ test.describe("Crop", () => {
   });
 
   test("crop JPEG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -215,7 +215,7 @@ test.describe("Crop", () => {
 
 test.describe("Rotate", () => {
   test("rotate 90 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -229,7 +229,7 @@ test.describe("Rotate", () => {
   });
 
   test("rotate 180 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -242,7 +242,7 @@ test.describe("Rotate", () => {
   });
 
   test("rotate 270 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -255,7 +255,7 @@ test.describe("Rotate", () => {
   });
 
   test("rotate 45 degrees with background fill", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -270,7 +270,7 @@ test.describe("Rotate", () => {
   });
 
   test("rotate 0 degrees returns image unchanged", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -287,7 +287,7 @@ test.describe("Rotate", () => {
 
 test.describe("Convert", () => {
   test("convert PNG to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -301,7 +301,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -314,7 +314,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -327,7 +327,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to TIFF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -340,7 +340,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to GIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -353,7 +353,7 @@ test.describe("Convert", () => {
   });
 
   test("convert JPEG to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -366,7 +366,7 @@ test.describe("Convert", () => {
   });
 
   test("convert HEIC to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -379,7 +379,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to HEIC", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -392,7 +392,7 @@ test.describe("Convert", () => {
   });
 
   test("convert with quality parameter", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -405,7 +405,7 @@ test.describe("Convert", () => {
   });
 
   test("convert PNG to BMP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -423,7 +423,7 @@ test.describe("Convert", () => {
 
 test.describe("Compress", () => {
   test("compress with default settings", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -437,7 +437,7 @@ test.describe("Compress", () => {
   });
 
   test("compress with low quality produces smaller file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: formatFixture("sample.jpg") },
@@ -452,7 +452,7 @@ test.describe("Compress", () => {
   });
 
   test("compress PNG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -466,7 +466,7 @@ test.describe("Compress", () => {
 
   test("compress WebP image", async ({ request }) => {
     const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -483,7 +483,7 @@ test.describe("Compress", () => {
 
 test.describe("Metadata", () => {
   test("returns dimensions and format for PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -498,7 +498,7 @@ test.describe("Metadata", () => {
   });
 
   test("returns dimensions for JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -513,7 +513,7 @@ test.describe("Metadata", () => {
 
   test("returns EXIF data when present", async ({ request }) => {
     const jpgExif = fixture("test-with-exif.jpg");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test-with-exif.jpg", mimeType: "image/jpeg", buffer: jpgExif },
@@ -525,7 +525,7 @@ test.describe("Metadata", () => {
   });
 
   test("returns channel and alpha info", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -543,7 +543,7 @@ test.describe("Metadata", () => {
 
 test.describe("Colors", () => {
   test("adjust brightness", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -557,7 +557,7 @@ test.describe("Colors", () => {
   });
 
   test("adjust contrast and saturation together", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -570,7 +570,7 @@ test.describe("Colors", () => {
   });
 
   test("convert to grayscale", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -583,7 +583,7 @@ test.describe("Colors", () => {
   });
 
   test("negative brightness darkens image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -601,7 +601,7 @@ test.describe("Colors", () => {
 
 test.describe("Sharpening", () => {
   test("sharpen with default sigma", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -615,7 +615,7 @@ test.describe("Sharpening", () => {
   });
 
   test("sharpen with explicit sigma", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -628,7 +628,7 @@ test.describe("Sharpening", () => {
   });
 
   test("sharpen HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -645,7 +645,7 @@ test.describe("Sharpening", () => {
 
 test.describe("Resize — additional", () => {
   test("resize with fit=inside constrains within bounds", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -659,7 +659,7 @@ test.describe("Resize — additional", () => {
   });
 
   test("resize with percentage scale via width only", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -673,7 +673,7 @@ test.describe("Resize — additional", () => {
 
   test("resize WebP image", async ({ request }) => {
     const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -686,7 +686,7 @@ test.describe("Resize — additional", () => {
   });
 
   test("resize rejects negative width", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -703,7 +703,7 @@ test.describe("Resize — additional", () => {
 
 test.describe("Crop — additional", () => {
   test("crop HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -718,7 +718,7 @@ test.describe("Crop — additional", () => {
 
   test("crop WebP image", async ({ request }) => {
     const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -731,7 +731,7 @@ test.describe("Crop — additional", () => {
   });
 
   test("crop full image returns same-size output", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -749,7 +749,7 @@ test.describe("Crop — additional", () => {
 
 test.describe("Rotate — additional", () => {
   test("rotate HEIC image 90 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -762,7 +762,7 @@ test.describe("Rotate — additional", () => {
   });
 
   test("rotate arbitrary angle (30 degrees)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -780,7 +780,7 @@ test.describe("Rotate — additional", () => {
 
 test.describe("Compress — additional", () => {
   test("compress HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -794,7 +794,7 @@ test.describe("Compress — additional", () => {
   });
 
   test("compress with high quality (95)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -807,7 +807,7 @@ test.describe("Compress — additional", () => {
   });
 
   test("compress with minimum quality (1)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: formatFixture("sample.jpg") },
@@ -825,7 +825,7 @@ test.describe("Compress — additional", () => {
 
 test.describe("Convert — output verification", () => {
   test("converted file can be downloaded", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -847,7 +847,7 @@ test.describe("Convert — output verification", () => {
 
   test("convert WebP to AVIF", async ({ request }) => {
     const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -865,7 +865,7 @@ test.describe("Convert — output verification", () => {
 test.describe("Metadata — additional", () => {
   test("returns metadata for SVG image", async ({ request }) => {
     const svg = readFileSync(join(FIXTURES, "test-100x100.svg"));
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: svg },
@@ -879,7 +879,7 @@ test.describe("Metadata — additional", () => {
 
   test("returns metadata for WebP image", async ({ request }) => {
     const webp = readFileSync(join(FIXTURES, "test-50x50.webp"));
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: webp },
@@ -897,7 +897,7 @@ test.describe("Metadata — additional", () => {
 
 test.describe("Color Blindness Simulation", () => {
   test("simulate deuteranomaly (default)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -911,7 +911,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("simulate protanopia", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -924,7 +924,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("simulate tritanopia", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -937,7 +937,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("simulate achromatopsia (total color blindness)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -950,7 +950,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("simulate deuteranopia on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -963,7 +963,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("simulate blueConeMonochromacy", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -976,7 +976,7 @@ test.describe("Color Blindness Simulation", () => {
   });
 
   test("color-blindness without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-blindness", {
+    const res = await request.post("/api/v1/tools/image/color-blindness", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({ simulationType: "protanopia" }),
@@ -990,7 +990,7 @@ test.describe("Color Blindness Simulation", () => {
 
 test.describe("Strip Metadata", () => {
   test("strip metadata with default settings", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_WITH_EXIF },
@@ -1006,7 +1006,7 @@ test.describe("Strip Metadata", () => {
   });
 
   test("strip metadata from PNG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1019,7 +1019,7 @@ test.describe("Strip Metadata", () => {
   });
 
   test("strip metadata from HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -1033,7 +1033,7 @@ test.describe("Strip Metadata", () => {
 
   test("strip then verify no EXIF via info tool", async ({ request }) => {
     // Strip metadata
-    const stripRes = await request.post("/api/v1/tools/strip-metadata", {
+    const stripRes = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_WITH_EXIF },
@@ -1051,7 +1051,7 @@ test.describe("Strip Metadata", () => {
     const strippedBuffer = Buffer.from(await dlRes.body());
 
     // Verify via info tool
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stripped.jpg", mimeType: "image/jpeg", buffer: strippedBuffer },
@@ -1067,7 +1067,7 @@ test.describe("Strip Metadata", () => {
 
 test.describe("Edit Metadata", () => {
   test("set artist field on JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -1081,7 +1081,7 @@ test.describe("Edit Metadata", () => {
   });
 
   test("set all EXIF fields at once", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -1100,7 +1100,7 @@ test.describe("Edit Metadata", () => {
   });
 
   test("edit metadata on PNG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1113,7 +1113,7 @@ test.describe("Edit Metadata", () => {
   });
 
   test("edit metadata round-trip verification", async ({ request }) => {
-    const editRes = await request.post("/api/v1/tools/edit-metadata", {
+    const editRes = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -1131,7 +1131,7 @@ test.describe("Edit Metadata", () => {
     const editedBuffer = Buffer.from(await dlRes.body());
 
     // Check info on the edited image
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "edited.jpg", mimeType: "image/jpeg", buffer: editedBuffer },
@@ -1143,7 +1143,7 @@ test.describe("Edit Metadata", () => {
   });
 
   test("edit metadata on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -1160,7 +1160,7 @@ test.describe("Edit Metadata", () => {
 
 test.describe("SVG Input", () => {
   test("resize SVG input", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -1174,7 +1174,7 @@ test.describe("SVG Input", () => {
   });
 
   test("rotate SVG input", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -1187,7 +1187,7 @@ test.describe("SVG Input", () => {
   });
 
   test("compress SVG input (rasterized)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -1200,7 +1200,7 @@ test.describe("SVG Input", () => {
   });
 
   test("convert SVG to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: SVG_100x100 },
@@ -1218,7 +1218,7 @@ test.describe("SVG Input", () => {
 
 test.describe("Tiny file (1x1 pixel)", () => {
   test("resize 1x1 PNG to larger dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1232,7 +1232,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
   });
 
   test("crop 1x1 PNG to same size succeeds", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1245,7 +1245,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
   });
 
   test("rotate 1x1 PNG by 90 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1258,7 +1258,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
   });
 
   test("convert 1x1 PNG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1271,7 +1271,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
   });
 
   test("compress 1x1 PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1284,7 +1284,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
   });
 
   test("info returns 1x1 dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_1x1 },
@@ -1302,7 +1302,7 @@ test.describe("Tiny file (1x1 pixel)", () => {
 
 test.describe("Large file processing", () => {
   test("resize large JPEG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE_LARGE },
@@ -1318,7 +1318,7 @@ test.describe("Large file processing", () => {
   });
 
   test("compress large JPEG with aggressive quality", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE_LARGE },
@@ -1332,7 +1332,7 @@ test.describe("Large file processing", () => {
   });
 
   test("convert large JPEG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE_LARGE },
@@ -1346,7 +1346,7 @@ test.describe("Large file processing", () => {
   });
 
   test("rotate large JPEG 270 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE_LARGE },
@@ -1360,7 +1360,7 @@ test.describe("Large file processing", () => {
   });
 
   test("info on large JPEG returns dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE_LARGE },
@@ -1378,7 +1378,7 @@ test.describe("Large file processing", () => {
 
 test.describe("Output download verification", () => {
   test("resized file is downloadable and valid", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1397,7 +1397,7 @@ test.describe("Output download verification", () => {
     expect(buffer.length).toBeGreaterThan(0);
 
     // Verify dimensions via info tool
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "resized.png", mimeType: "image/png", buffer: buffer },
@@ -1409,7 +1409,7 @@ test.describe("Output download verification", () => {
   });
 
   test("cropped file dimensions match request", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1425,7 +1425,7 @@ test.describe("Output download verification", () => {
     expect(dlRes.ok()).toBe(true);
     const buffer = Buffer.from(await dlRes.body());
 
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "cropped.png", mimeType: "image/png", buffer: buffer },
@@ -1438,7 +1438,7 @@ test.describe("Output download verification", () => {
   });
 
   test("90-degree rotation swaps width and height", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1454,7 +1454,7 @@ test.describe("Output download verification", () => {
     expect(dlRes.ok()).toBe(true);
     const buffer = Buffer.from(await dlRes.body());
 
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "rotated.png", mimeType: "image/png", buffer: buffer },
@@ -1472,7 +1472,7 @@ test.describe("Output download verification", () => {
 
 test.describe("Auth failure", () => {
   test("resize without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({ width: 100 }),
@@ -1482,7 +1482,7 @@ test.describe("Auth failure", () => {
   });
 
   test("crop without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({ left: 0, top: 0, width: 50, height: 50 }),
@@ -1492,7 +1492,7 @@ test.describe("Auth failure", () => {
   });
 
   test("convert without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({ format: "jpg" }),
@@ -1502,7 +1502,7 @@ test.describe("Auth failure", () => {
   });
 
   test("compress without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({ quality: 50 }),
@@ -1512,7 +1512,7 @@ test.describe("Auth failure", () => {
   });
 
   test("sharpening without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({}),
@@ -1522,7 +1522,7 @@ test.describe("Auth failure", () => {
   });
 
   test("strip-metadata without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_WITH_EXIF },
         settings: JSON.stringify({}),
@@ -1532,7 +1532,7 @@ test.describe("Auth failure", () => {
   });
 
   test("edit-metadata without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({ artist: "Test" }),

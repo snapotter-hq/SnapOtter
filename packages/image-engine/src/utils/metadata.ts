@@ -137,7 +137,9 @@ export function parseXmp(xmpBuffer: Buffer): Record<string, string> {
   const xml = xmpBuffer.toString("utf-8");
   const result: Record<string, string> = {};
 
-  for (const match of xml.matchAll(/(\w+:\w+)="([^"]+)"/g)) {
+  // Bound the namespace:name key segments (real XMP keys are short) so the
+  // pattern cannot backtrack polynomially on hostile input (CodeQL js/polynomial-redos).
+  for (const match of xml.matchAll(/(\w{1,80}:\w{1,80})="([^"]+)"/g)) {
     const key = match[1];
     if (key.startsWith("xmlns:") || key.startsWith("rdf:")) continue;
     result[key] = match[2];

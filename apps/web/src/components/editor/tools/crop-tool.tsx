@@ -71,7 +71,7 @@ export function useCropTool(): CropToolApi {
     (label: string) => {
       setAspectRatioState(label);
       const preset = ASPECT_RATIOS.find((p) => p.label === label);
-      if (!preset || !preset.value || !cropState) return;
+      if (!preset?.value || !cropState) return;
       const ratio = preset.value;
 
       let w = cropState.width;

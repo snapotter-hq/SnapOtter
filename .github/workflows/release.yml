@@ -169,6 +169,13 @@ jobs:
   docker:
     name: Build (${{ matrix.platform }})
     needs: release
+    # PUBLISHING PAUSED (2026-06-17): building and pushing the app image to
+    # Docker Hub + GHCR is disabled while the app is still being stabilized.
+    # The scan, sbom, ai-bundles, and manifest jobs all `need` this job, so
+    # they are skipped too and nothing reaches either registry. The release,
+    # changelog, and source-archive (prebuilt) jobs still run.
+    # To resume publishing, delete the `if: ${{ false }}` line below.
+    if: ${{ false }}
     permissions:
       contents: read
       packages: write
@@ -380,6 +387,14 @@ jobs:
     name: AI Bundles
     needs: [release, docker]
     if: needs.release.outputs.new_version
+    # The top-level `permissions: {}` default means this reusable-workflow call
+    # grants no token scopes by default. ai-bundles.yml's jobs declare
+    # `contents: read` / `packages: read`, and GitHub rejects a called workflow
+    # requesting scopes the caller never granted -- failing at startup before any
+    # job runs. Grant them here so the call passes startup validation.
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/ai-bundles.yml
     with:
       version: ${{ needs.release.outputs.new_version }}

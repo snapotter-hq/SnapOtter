@@ -6,6 +6,10 @@ description: Set up Single Sign-On with OpenID Connect. Step-by-step guides for 
 
 SnapOtter supports OpenID Connect (OIDC) for single sign-on. Users can log in with an external identity provider such as Keycloak, Authentik, or Google instead of (or alongside) local username/password authentication.
 
+::: tip See also
+[SAML SSO](/guide/saml) | [SCIM Provisioning](/guide/scim) | [Users, Roles & Permissions](/guide/users-roles)
+:::
+
 ## Quick start
 
 Add these environment variables to your `docker-compose.yml`:

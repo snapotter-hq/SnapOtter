@@ -63,7 +63,7 @@ async function processImage(inputBuffer: Buffer, settings: Settings, filename: s
 export function registerOptimizeForWeb(app: FastifyInstance) {
   // Lightweight preview route for live parameter tuning
   app.post(
-    "/api/v1/tools/optimize-for-web/preview",
+    "/api/v1/tools/image/optimize-for-web/preview",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";

@@ -55,7 +55,7 @@ export async function drawOnCanvas(
 export async function loadTestImage(page: Page): Promise<void> {
   await page.route("**/test-fixture.png", (route) =>
     route.fulfill({
-      path: "tests/fixtures/test-200x150.png",
+      path: "tests/fixtures/image/valid/test-200x150.png",
       contentType: "image/png",
     }),
   );

@@ -96,7 +96,7 @@ function parseIccProfile(iccBuffer: Buffer): Record<string, string> {
 export function registerStripMetadata(app: FastifyInstance) {
   // Inspect endpoint — returns parsed metadata as JSON
   app.post(
-    "/api/v1/tools/strip-metadata/inspect",
+    "/api/v1/tools/image/strip-metadata/inspect",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";

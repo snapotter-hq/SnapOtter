@@ -102,70 +102,76 @@ export async function registerUpgradeRoutes(app: FastifyInstance): Promise<void>
   );
 
   // GET /api/v1/admin/upgrade-check
-  app.get("/api/v1/admin/upgrade-check", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = await requirePermission("system:health")(request, reply);
-    if (!user) return;
-    if (!(await requireUpgradeFeature(reply))) return;
+  app.get(
+    "/api/v1/admin/upgrade-check",
+    {
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = await requirePermission("system:health")(request, reply);
+      if (!user) return;
+      if (!(await requireUpgradeFeature(reply))) return;
 
-    // Check database connectivity
-    let dbOk = false;
-    try {
-      await db.select().from(schema.settings).limit(1);
-      dbOk = true;
-    } catch {
-      /* db unreachable */
-    }
-
-    // Check Redis connectivity
-    let redisOk = false;
-    try {
-      redisOk = await pingRedis();
-    } catch {
-      /* redis unreachable */
-    }
-
-    // Check in-flight jobs
-    let activeCount = 0;
-    let noInFlightJobs = true;
-    try {
-      const [row] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(schema.jobs)
-        .where(sql`${schema.jobs.status} IN ('queued', 'processing')`);
-      activeCount = row?.count ?? 0;
-      noInFlightJobs = activeCount === 0;
-    } catch {
-      // If we can't query, assume there may be jobs
-      noInFlightJobs = false;
-    }
-
-    // Check disk space (> 1 GB free)
-    const MIN_FREE_BYTES = 1024 * 1024 * 1024; // 1 GB
-    let diskOk = true;
-    let freeGb = 0;
-    if (env.STORAGE_MODE !== "s3") {
+      // Check database connectivity
+      let dbOk = false;
       try {
-        const stats = await statfs(env.WORKSPACE_PATH);
-        const freeBytes = stats.bfree * stats.bsize;
-        freeGb = Math.round((freeBytes / (1024 * 1024 * 1024)) * 100) / 100;
-        diskOk = freeBytes > MIN_FREE_BYTES;
+        await db.select().from(schema.settings).limit(1);
+        dbOk = true;
       } catch {
-        // Path doesn't exist -- skip check
+        /* db unreachable */
       }
-    }
 
-    const ready = diskOk && noInFlightJobs && dbOk && redisOk;
+      // Check Redis connectivity
+      let redisOk = false;
+      try {
+        redisOk = await pingRedis();
+      } catch {
+        /* redis unreachable */
+      }
 
-    return reply.send({
-      ready,
-      checks: {
-        diskSpace: { ok: diskOk, freeGb },
-        inFlightJobs: { ok: noInFlightJobs, activeCount },
-        databaseConnected: { ok: dbOk },
-        redisConnected: { ok: redisOk },
-      },
-    });
-  });
+      // Check in-flight jobs
+      let activeCount = 0;
+      let noInFlightJobs = true;
+      try {
+        const [row] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.jobs)
+          .where(sql`${schema.jobs.status} IN ('queued', 'processing')`);
+        activeCount = row?.count ?? 0;
+        noInFlightJobs = activeCount === 0;
+      } catch {
+        // If we can't query, assume there may be jobs
+        noInFlightJobs = false;
+      }
+
+      // Check disk space (> 1 GB free)
+      const MIN_FREE_BYTES = 1024 * 1024 * 1024; // 1 GB
+      let diskOk = true;
+      let freeGb = 0;
+      if (env.STORAGE_MODE !== "s3") {
+        try {
+          const stats = await statfs(env.WORKSPACE_PATH);
+          const freeBytes = stats.bfree * stats.bsize;
+          freeGb = Math.round((freeBytes / (1024 * 1024 * 1024)) * 100) / 100;
+          diskOk = freeBytes > MIN_FREE_BYTES;
+        } catch {
+          // Path doesn't exist -- skip check
+        }
+      }
+
+      const ready = diskOk && noInFlightJobs && dbOk && redisOk;
+
+      return reply.send({
+        ready,
+        checks: {
+          diskSpace: { ok: diskOk, freeGb },
+          inFlightJobs: { ok: noInFlightJobs, activeCount },
+          databaseConnected: { ok: dbOk },
+          redisConnected: { ok: redisOk },
+        },
+      });
+    },
+  );
 
   app.log.info("Enterprise upgrade management routes registered");
 }

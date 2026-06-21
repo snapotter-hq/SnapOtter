@@ -21,7 +21,7 @@ const settingsSchema = z.object({
 
 export function registerWatermarkImage(app: FastifyInstance) {
   // Custom route since we need two file uploads
-  app.post("/api/v1/tools/watermark-image", async (request, reply) => {
+  app.post("/api/v1/tools/image/watermark-image", async (request, reply) => {
     let mainBuffer: Buffer | null = null;
     let watermarkBuffer: Buffer | null = null;
     let filename = "image";

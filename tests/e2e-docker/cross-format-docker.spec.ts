@@ -37,7 +37,7 @@ const HEIC_200x150 = fixture("test-200x150.heic");
 
 test.describe("Resize: JPEG", () => {
   test("resize JPEG to 50px wide", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -53,7 +53,7 @@ test.describe("Resize: JPEG", () => {
 
 test.describe("Resize: PNG", () => {
   test("resize PNG to 80px wide", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -69,7 +69,7 @@ test.describe("Resize: PNG", () => {
 
 test.describe("Resize: WebP", () => {
   test("resize WebP to 30px wide", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -86,7 +86,7 @@ test.describe("Resize: WebP", () => {
 test.describe("Resize: AVIF", () => {
   test("resize AVIF to 60px wide", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -102,7 +102,7 @@ test.describe("Resize: AVIF", () => {
 
 test.describe("Resize: HEIC", () => {
   test("resize HEIC to 80px wide", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -119,7 +119,7 @@ test.describe("Resize: HEIC", () => {
 test.describe("Resize: TIFF", () => {
   test("resize TIFF to 60px wide", async ({ request }) => {
     const tiff = formatFixture("sample.tiff");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: tiff },
@@ -136,7 +136,7 @@ test.describe("Resize: TIFF", () => {
 test.describe("Resize: BMP", () => {
   test("resize BMP to 40px wide", async ({ request }) => {
     const bmp = formatFixture("sample.bmp");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.bmp", mimeType: "image/bmp", buffer: bmp },
@@ -157,7 +157,7 @@ test.describe("Resize: BMP", () => {
 test.describe("Resize: GIF", () => {
   test("resize GIF to 40px wide", async ({ request }) => {
     const gif = formatFixture("sample.gif");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: gif },
@@ -175,7 +175,7 @@ test.describe("Resize: GIF", () => {
 
 test.describe("Convert to PNG: from JPEG", () => {
   test("JPEG to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -191,7 +191,7 @@ test.describe("Convert to PNG: from JPEG", () => {
 
 test.describe("Convert to PNG: from WebP", () => {
   test("WebP to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -208,7 +208,7 @@ test.describe("Convert to PNG: from WebP", () => {
 test.describe("Convert to PNG: from AVIF", () => {
   test("AVIF to PNG", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -224,7 +224,7 @@ test.describe("Convert to PNG: from AVIF", () => {
 
 test.describe("Convert to PNG: from HEIC", () => {
   test("HEIC to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -241,7 +241,7 @@ test.describe("Convert to PNG: from HEIC", () => {
 test.describe("Convert to PNG: from TIFF", () => {
   test("TIFF to PNG", async ({ request }) => {
     const tiff = formatFixture("sample.tiff");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: tiff },
@@ -258,7 +258,7 @@ test.describe("Convert to PNG: from TIFF", () => {
 test.describe("Convert to PNG: from GIF", () => {
   test("GIF to PNG", async ({ request }) => {
     const gif = formatFixture("sample.gif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: gif },
@@ -275,7 +275,7 @@ test.describe("Convert to PNG: from GIF", () => {
 test.describe("Convert to PNG: from HEIF", () => {
   test("HEIF to PNG", async ({ request }) => {
     const heif = formatFixture("sample.heif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.heif", mimeType: "image/heif", buffer: heif },
@@ -292,7 +292,7 @@ test.describe("Convert to PNG: from HEIF", () => {
 test.describe("Convert to PNG: from BMP", () => {
   test("BMP to PNG", async ({ request }) => {
     const bmp = formatFixture("sample.bmp");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.bmp", mimeType: "image/bmp", buffer: bmp },
@@ -314,7 +314,7 @@ test.describe("Convert to PNG: from BMP", () => {
 
 test.describe("Compress: JPEG", () => {
   test("compress JPEG with quality 30", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: formatFixture("sample.jpg") },
@@ -331,7 +331,7 @@ test.describe("Compress: JPEG", () => {
 
 test.describe("Compress: PNG", () => {
   test("compress PNG with quality 40", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -348,7 +348,7 @@ test.describe("Compress: PNG", () => {
 test.describe("Compress: WebP", () => {
   test("compress WebP with quality 25", async ({ request }) => {
     const webp = formatFixture("sample.webp");
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.webp", mimeType: "image/webp", buffer: webp },
@@ -365,7 +365,7 @@ test.describe("Compress: WebP", () => {
 test.describe("Compress: AVIF", () => {
   test("compress AVIF with quality 40", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -385,7 +385,7 @@ test.describe("Compress: AVIF", () => {
 
 test.describe("Compress: HEIC", () => {
   test("compress HEIC with quality 50", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -407,7 +407,7 @@ test.describe("Compress: HEIC", () => {
 
 test.describe("Info: JPEG", () => {
   test("get info for JPEG returns correct dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -424,7 +424,7 @@ test.describe("Info: JPEG", () => {
 
 test.describe("Info: PNG", () => {
   test("get info for PNG returns correct dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -441,7 +441,7 @@ test.describe("Info: PNG", () => {
 
 test.describe("Info: WebP", () => {
   test("get info for WebP returns correct dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -459,7 +459,7 @@ test.describe("Info: WebP", () => {
 test.describe("Info: AVIF", () => {
   test("get info for AVIF returns dimensions and format", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -475,7 +475,7 @@ test.describe("Info: AVIF", () => {
 
 test.describe("Info: HEIC", () => {
   test("get info for HEIC returns dimensions", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -492,7 +492,7 @@ test.describe("Info: HEIC", () => {
 test.describe("Info: TIFF", () => {
   test("get info for TIFF returns dimensions and format", async ({ request }) => {
     const tiff = formatFixture("sample.tiff");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: tiff },
@@ -509,7 +509,7 @@ test.describe("Info: TIFF", () => {
 test.describe("Info: GIF", () => {
   test("get info for GIF returns dimensions and format", async ({ request }) => {
     const gif = formatFixture("sample.gif");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: gif },
@@ -527,7 +527,7 @@ test.describe("Info: GIF", () => {
 test.describe("Info: HEIF", () => {
   test("get info for HEIF returns dimensions", async ({ request }) => {
     const heif = formatFixture("sample.heif");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.heif", mimeType: "image/heif", buffer: heif },
@@ -544,7 +544,7 @@ test.describe("Info: HEIF", () => {
 test.describe("Info: BMP", () => {
   test("get info for BMP returns dimensions if supported", async ({ request }) => {
     const bmp = formatFixture("sample.bmp");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.bmp", mimeType: "image/bmp", buffer: bmp },
@@ -565,7 +565,7 @@ test.describe("Info: BMP", () => {
 
 test.describe("Cross-format: JPEG to all targets", () => {
   test("JPEG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -579,7 +579,7 @@ test.describe("Cross-format: JPEG to all targets", () => {
   });
 
   test("JPEG to AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -593,7 +593,7 @@ test.describe("Cross-format: JPEG to all targets", () => {
   });
 
   test("JPEG to TIFF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -607,7 +607,7 @@ test.describe("Cross-format: JPEG to all targets", () => {
   });
 
   test("JPEG to GIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -621,7 +621,7 @@ test.describe("Cross-format: JPEG to all targets", () => {
   });
 
   test("JPEG to HEIC", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -637,7 +637,7 @@ test.describe("Cross-format: JPEG to all targets", () => {
 
 test.describe("Cross-format: PNG to all targets", () => {
   test("PNG to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -651,7 +651,7 @@ test.describe("Cross-format: PNG to all targets", () => {
   });
 
   test("PNG to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -665,7 +665,7 @@ test.describe("Cross-format: PNG to all targets", () => {
   });
 
   test("PNG to AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -681,7 +681,7 @@ test.describe("Cross-format: PNG to all targets", () => {
 
 test.describe("Cross-format: WebP to all targets", () => {
   test("WebP to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -695,7 +695,7 @@ test.describe("Cross-format: WebP to all targets", () => {
   });
 
   test("WebP to AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -709,7 +709,7 @@ test.describe("Cross-format: WebP to all targets", () => {
   });
 
   test("WebP to TIFF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -725,7 +725,7 @@ test.describe("Cross-format: WebP to all targets", () => {
 
 test.describe("Cross-format: HEIC to all targets", () => {
   test("HEIC to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -739,7 +739,7 @@ test.describe("Cross-format: HEIC to all targets", () => {
   });
 
   test("HEIC to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -753,7 +753,7 @@ test.describe("Cross-format: HEIC to all targets", () => {
   });
 
   test("HEIC to AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -767,7 +767,7 @@ test.describe("Cross-format: HEIC to all targets", () => {
   });
 
   test("HEIC to TIFF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -786,7 +786,7 @@ test.describe("Cross-format: HEIC to all targets", () => {
 test.describe("Resize + info verification: JPEG", () => {
   test("resize JPEG then verify dimensions via info", async ({ request }) => {
     // Step 1: Resize
-    const resizeRes = await request.post("/api/v1/tools/resize", {
+    const resizeRes = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -805,7 +805,7 @@ test.describe("Resize + info verification: JPEG", () => {
     const resizedBuffer = Buffer.from(await dlRes.body());
 
     // Step 3: Verify dimensions via info
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "resized.jpg", mimeType: "image/jpeg", buffer: resizedBuffer },
@@ -820,7 +820,7 @@ test.describe("Resize + info verification: JPEG", () => {
 
 test.describe("Resize + info verification: PNG", () => {
   test("resize PNG then verify dimensions via info", async ({ request }) => {
-    const resizeRes = await request.post("/api/v1/tools/resize", {
+    const resizeRes = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -836,7 +836,7 @@ test.describe("Resize + info verification: PNG", () => {
     expect(dlRes.ok()).toBe(true);
     const resizedBuffer = Buffer.from(await dlRes.body());
 
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "resized.png", mimeType: "image/png", buffer: resizedBuffer },
@@ -855,7 +855,7 @@ test.describe("Resize + info verification: PNG", () => {
 
 test.describe("Convert + info verification", () => {
   test("convert JPEG to WebP then verify format via info", async ({ request }) => {
-    const convertRes = await request.post("/api/v1/tools/convert", {
+    const convertRes = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -871,7 +871,7 @@ test.describe("Convert + info verification", () => {
     expect(dlRes.ok()).toBe(true);
     const convertedBuffer = Buffer.from(await dlRes.body());
 
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "converted.webp", mimeType: "image/webp", buffer: convertedBuffer },
@@ -885,7 +885,7 @@ test.describe("Convert + info verification", () => {
   });
 
   test("convert PNG to AVIF then verify format via info", async ({ request }) => {
-    const convertRes = await request.post("/api/v1/tools/convert", {
+    const convertRes = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -901,7 +901,7 @@ test.describe("Convert + info verification", () => {
     expect(dlRes.ok()).toBe(true);
     const convertedBuffer = Buffer.from(await dlRes.body());
 
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "converted.avif", mimeType: "image/avif", buffer: convertedBuffer },

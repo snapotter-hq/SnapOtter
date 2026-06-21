@@ -65,15 +65,15 @@ export const en = {
     "pdf-security": "Security",
     "pdf-optimize": "Optimize",
     "doc-convert": "Convert",
-    // Data & Files
-    data: "Data Files",
+    // Files
+    data: "Files",
     archives: "Archives",
   },
   modalities: {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "PDF & Data",
+    documentsAndFiles: "PDF & Files",
   },
   tools: {
     resize: {
@@ -2452,7 +2452,9 @@ export const en = {
     clearSearch: "Clear search",
     all: "All",
     documents: "PDF",
-    data: "Data",
+    data: "Files",
+    pdf: "PDF",
+    files: "Files",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },

@@ -318,7 +318,7 @@ test.describe("Editor Menu Bar", () => {
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.click('[data-testid="menu-item-open"]');
     const chooser = await fileChooserPromise;
-    await chooser.setFiles("tests/fixtures/test-200x150.png");
+    await chooser.setFiles("tests/fixtures/image/valid/test-200x150.png");
     await page.waitForTimeout(1000);
     await page.click('[data-testid="menu-select"]');
     await page.click('[data-testid="menu-item-all"]');

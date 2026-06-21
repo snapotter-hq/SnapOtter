@@ -42,7 +42,7 @@ const SVG_SAMPLE = formatFixture("sample.svg");
 
 test.describe("TIFF input through core tools", () => {
   test("resize TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -56,7 +56,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("crop TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -69,7 +69,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("rotate TIFF image 90 degrees", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/rotate", {
+    const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -82,7 +82,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("sharpen TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/sharpening", {
+    const res = await request.post("/api/v1/tools/image/sharpening", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -95,7 +95,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("adjust colors on TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -108,7 +108,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("color palette from TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -121,7 +121,7 @@ test.describe("TIFF input through core tools", () => {
   });
 
   test("border on TIFF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/border", {
+    const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: TIFF_SAMPLE },
@@ -138,7 +138,7 @@ test.describe("TIFF input through core tools", () => {
 
 test.describe("AVIF input through core tools", () => {
   test("resize AVIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -151,7 +151,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("crop AVIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/crop", {
+    const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -164,7 +164,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("compress AVIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/compress", {
+    const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -177,7 +177,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("convert AVIF to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -190,7 +190,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("convert AVIF to JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -203,7 +203,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("info on AVIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -216,7 +216,7 @@ test.describe("AVIF input through core tools", () => {
   });
 
   test("watermark text on AVIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: AVIF_SAMPLE },
@@ -239,7 +239,7 @@ test.describe("AVIF input through core tools", () => {
 
 test.describe("GIF input through core tools", () => {
   test("resize GIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: GIF_SAMPLE },
@@ -252,7 +252,7 @@ test.describe("GIF input through core tools", () => {
   });
 
   test("convert GIF to PNG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: GIF_SAMPLE },
@@ -265,7 +265,7 @@ test.describe("GIF input through core tools", () => {
   });
 
   test("convert GIF to WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: GIF_SAMPLE },
@@ -278,7 +278,7 @@ test.describe("GIF input through core tools", () => {
   });
 
   test("info on GIF image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: GIF_SAMPLE },
@@ -296,7 +296,7 @@ test.describe("GIF input through core tools", () => {
 test.describe("PSD input through core tools", () => {
   test("info on PSD image", async ({ request }) => {
     const psd = formatFixture("sample.psd");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.psd", mimeType: "image/vnd.adobe.photoshop", buffer: psd },
@@ -314,7 +314,7 @@ test.describe("PSD input through core tools", () => {
 
   test("resize PSD image", async ({ request }) => {
     const psd = formatFixture("sample.psd");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.psd", mimeType: "image/vnd.adobe.photoshop", buffer: psd },
@@ -332,7 +332,7 @@ test.describe("PSD input through core tools", () => {
 
   test("convert PSD to PNG", async ({ request }) => {
     const psd = formatFixture("sample.psd");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.psd", mimeType: "image/vnd.adobe.photoshop", buffer: psd },
@@ -354,7 +354,7 @@ test.describe("SVG input through extended tools", () => {
   test("SVG to raster at multiple widths", async ({ request }) => {
     const widths = [64, 256, 512, 1024] as const;
     for (const width of widths) {
-      const res = await request.post("/api/v1/tools/svg-to-raster", {
+      const res = await request.post("/api/v1/tools/image/svg-to-raster", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "sample.svg", mimeType: "image/svg+xml", buffer: SVG_SAMPLE },
@@ -369,7 +369,7 @@ test.describe("SVG input through extended tools", () => {
   });
 
   test("SVG to raster as JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.svg", mimeType: "image/svg+xml", buffer: SVG_SAMPLE },
@@ -382,7 +382,7 @@ test.describe("SVG input through extended tools", () => {
   });
 
   test("SVG to raster as AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/svg-to-raster", {
+    const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.svg", mimeType: "image/svg+xml", buffer: SVG_SAMPLE },
@@ -396,7 +396,7 @@ test.describe("SVG input through extended tools", () => {
 
   test("color palette from SVG input", async ({ request }) => {
     const svgLogo = contentFixture("svg-logo.svg");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "logo.svg", mimeType: "image/svg+xml", buffer: svgLogo },
@@ -410,7 +410,7 @@ test.describe("SVG input through extended tools", () => {
 
   test("beautify SVG input", async ({ request }) => {
     const svg100 = fixture("test-100x100.svg");
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.svg", mimeType: "image/svg+xml", buffer: svg100 },
@@ -433,7 +433,7 @@ test.describe("SVG input through extended tools", () => {
 test.describe("HEIF input through core tools", () => {
   test("info on HEIF image", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -447,7 +447,7 @@ test.describe("HEIF input through core tools", () => {
 
   test("resize HEIF image", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -461,7 +461,7 @@ test.describe("HEIF input through core tools", () => {
 
   test("convert HEIF to JPEG", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -475,7 +475,7 @@ test.describe("HEIF input through core tools", () => {
 
   test("convert HEIF to WebP", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -489,7 +489,7 @@ test.describe("HEIF input through core tools", () => {
 
   test("color palette from HEIF image", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/color-palette", {
+    const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -503,7 +503,7 @@ test.describe("HEIF input through core tools", () => {
 
   test("adjust colors on HEIF image", async ({ request }) => {
     const heif = contentFixture("motorcycle.heif");
-    const res = await request.post("/api/v1/tools/adjust-colors", {
+    const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "motorcycle.heif", mimeType: "image/heif", buffer: heif },
@@ -521,7 +521,7 @@ test.describe("HEIF input through core tools", () => {
 test.describe("Multipage TIFF", () => {
   test("info on multipage TIFF", async ({ request }) => {
     const multiTiff = formatFixture("multipage.tiff");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "multipage.tiff", mimeType: "image/tiff", buffer: multiTiff },
@@ -535,7 +535,7 @@ test.describe("Multipage TIFF", () => {
 
   test("convert multipage TIFF to PNG", async ({ request }) => {
     const multiTiff = formatFixture("multipage.tiff");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "multipage.tiff", mimeType: "image/tiff", buffer: multiTiff },
@@ -553,7 +553,7 @@ test.describe("Multipage TIFF", () => {
 test.describe("Animated GIF through core tools", () => {
   test("info on animated GIF", async ({ request }) => {
     const animated = fixture("animated.gif");
-    const res = await request.post("/api/v1/tools/info", {
+    const res = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "animated.gif", mimeType: "image/gif", buffer: animated },
@@ -567,7 +567,7 @@ test.describe("Animated GIF through core tools", () => {
 
   test("resize animated GIF (first frame)", async ({ request }) => {
     const animated = fixture("animated.gif");
-    const res = await request.post("/api/v1/tools/resize", {
+    const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "animated.gif", mimeType: "image/gif", buffer: animated },
@@ -581,7 +581,7 @@ test.describe("Animated GIF through core tools", () => {
 
   test("convert animated GIF to PNG (first frame)", async ({ request }) => {
     const animated = fixture("animated.gif");
-    const res = await request.post("/api/v1/tools/convert", {
+    const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "animated.gif", mimeType: "image/gif", buffer: animated },
@@ -610,7 +610,7 @@ test.describe("Cross-format conversion matrix", () => {
   for (const { from, file, mime, to } of conversions) {
     test(`convert ${from} to ${to}`, async ({ request }) => {
       const buffer = formatFixture(file);
-      const res = await request.post("/api/v1/tools/convert", {
+      const res = await request.post("/api/v1/tools/image/convert", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: file, mimeType: mime, buffer },

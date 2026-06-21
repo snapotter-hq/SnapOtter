@@ -22,122 +22,131 @@ const createApiKeySchema = z.object({
 
 export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/api-keys — Generate a new API key
-  app.post("/api/v1/api-keys", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
-    if (!user) return;
+  app.post(
+    "/api/v1/api-keys",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
 
-    const parsed = createApiKeySchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: parsed.error.issues.map((i) => i.message).join("; "),
-        code: "VALIDATION_ERROR",
-      });
-    }
-    const body = parsed.data;
-    const name = body.name?.trim() || "Default API Key";
-
-    let scopedPermissions: string[] | null = null;
-    if (body.permissions && body.permissions.length > 0) {
-      const userPerms = await getPermissions(user.role);
-      const permSet = new Set<string>(userPerms);
-      const invalid = body.permissions.filter((p) => !permSet.has(p));
-      if (invalid.length > 0) {
+      const parsed = createApiKeySchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
         return reply.status(400).send({
-          error: `Cannot scope key with permissions you don't have: ${invalid.join(", ")}`,
+          error: parsed.error.issues.map((i) => i.message).join("; "),
           code: "VALIDATION_ERROR",
         });
       }
-      scopedPermissions = body.permissions;
-    }
+      const body = parsed.data;
+      const name = body.name?.trim() || "Default API Key";
 
-    let expiresAt: Date | null = null;
-    if (body.expiresAt) {
-      const parsedDate = new Date(body.expiresAt);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return reply
-          .status(400)
-          .send({ error: "Invalid expiresAt date", code: "VALIDATION_ERROR" });
+      let scopedPermissions: string[] | null = null;
+      if (body.permissions && body.permissions.length > 0) {
+        const userPerms = await getPermissions(user.role);
+        const permSet = new Set<string>(userPerms);
+        const invalid = body.permissions.filter((p) => !permSet.has(p));
+        if (invalid.length > 0) {
+          return reply.status(400).send({
+            error: `Cannot scope key with permissions you don't have: ${invalid.join(", ")}`,
+            code: "VALIDATION_ERROR",
+          });
+        }
+        scopedPermissions = body.permissions;
       }
-      if (parsedDate <= new Date()) {
-        return reply
-          .status(400)
-          .send({ error: "expiresAt must be in the future", code: "VALIDATION_ERROR" });
+
+      let expiresAt: Date | null = null;
+      if (body.expiresAt) {
+        const parsedDate = new Date(body.expiresAt);
+        if (Number.isNaN(parsedDate.getTime())) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid expiresAt date", code: "VALIDATION_ERROR" });
+        }
+        if (parsedDate <= new Date()) {
+          return reply
+            .status(400)
+            .send({ error: "expiresAt must be in the future", code: "VALIDATION_ERROR" });
+        }
+        expiresAt = parsedDate;
       }
-      expiresAt = parsedDate;
-    }
 
-    // Generate a raw API key: "si_" prefix + 48 random bytes as hex
-    const rawKey = `si_${randomBytes(48).toString("hex")}`;
-    const keyHash = await hashPassword(rawKey);
-    const keyPrefix = computeKeyPrefix(rawKey);
-    const id = randomUUID();
+      // Generate a raw API key: "si_" prefix + 48 random bytes as hex
+      const rawKey = `si_${randomBytes(48).toString("hex")}`;
+      const keyHash = await hashPassword(rawKey);
+      const keyPrefix = computeKeyPrefix(rawKey);
+      const id = randomUUID();
 
-    try {
-      await db.insert(schema.apiKeys).values({
-        id,
+      try {
+        await db.insert(schema.apiKeys).values({
+          id,
+          userId: user.id,
+          keyHash,
+          keyPrefix,
+          name,
+          permissions: scopedPermissions,
+          expiresAt,
+        });
+      } catch {
+        return reply.status(409).send({ error: "Failed to create API key" });
+      }
+
+      await auditFromRequest(request)("API_KEY_CREATED", {
         userId: user.id,
-        keyHash,
-        keyPrefix,
+        keyId: id,
+        keyName: name,
+      });
+
+      // Return the raw key ONCE — it cannot be retrieved again
+      return reply.status(201).send({
+        id,
+        key: rawKey,
         name,
         permissions: scopedPermissions,
-        expiresAt,
+        expiresAt: expiresAt?.toISOString() ?? null,
+        createdAt: new Date().toISOString(),
       });
-    } catch {
-      return reply.status(409).send({ error: "Failed to create API key" });
-    }
-
-    await auditFromRequest(request)("API_KEY_CREATED", {
-      userId: user.id,
-      keyId: id,
-      keyName: name,
-    });
-
-    // Return the raw key ONCE — it cannot be retrieved again
-    return reply.status(201).send({
-      id,
-      key: rawKey,
-      name,
-      permissions: scopedPermissions,
-      expiresAt: expiresAt?.toISOString() ?? null,
-      createdAt: new Date().toISOString(),
-    });
-  });
+    },
+  );
 
   // GET /api/v1/api-keys — List user's API keys (never returns the key itself)
-  app.get("/api/v1/api-keys", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
-    if (!user) return;
+  app.get(
+    "/api/v1/api-keys",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
 
-    const selectFields = {
-      id: schema.apiKeys.id,
-      name: schema.apiKeys.name,
-      permissions: schema.apiKeys.permissions,
-      createdAt: schema.apiKeys.createdAt,
-      lastUsedAt: schema.apiKeys.lastUsedAt,
-      expiresAt: schema.apiKeys.expiresAt,
-    };
-    const keys = (await hasEffectivePermission(user, "apikeys:all"))
-      ? await db.select(selectFields).from(schema.apiKeys)
-      : await db
-          .select(selectFields)
-          .from(schema.apiKeys)
-          .where(eq(schema.apiKeys.userId, user.id));
+      const selectFields = {
+        id: schema.apiKeys.id,
+        name: schema.apiKeys.name,
+        permissions: schema.apiKeys.permissions,
+        createdAt: schema.apiKeys.createdAt,
+        lastUsedAt: schema.apiKeys.lastUsedAt,
+        expiresAt: schema.apiKeys.expiresAt,
+      };
+      const keys = (await hasEffectivePermission(user, "apikeys:all"))
+        ? await db.select(selectFields).from(schema.apiKeys)
+        : await db
+            .select(selectFields)
+            .from(schema.apiKeys)
+            .where(eq(schema.apiKeys.userId, user.id));
 
-    return reply.send({
-      apiKeys: keys.map((k) => ({
-        id: k.id,
-        name: k.name,
-        permissions: k.permissions ?? null,
-        createdAt: k.createdAt.toISOString(),
-        lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
-        expiresAt: k.expiresAt?.toISOString() ?? null,
-      })),
-    });
-  });
+      return reply.send({
+        apiKeys: keys.map((k) => ({
+          id: k.id,
+          name: k.name,
+          permissions: k.permissions ?? null,
+          createdAt: k.createdAt.toISOString(),
+          lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+          expiresAt: k.expiresAt?.toISOString() ?? null,
+        })),
+      });
+    },
+  );
 
   // DELETE /api/v1/api-keys/:id — Delete an API key
   app.delete(
     "/api/v1/api-keys/:id",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;

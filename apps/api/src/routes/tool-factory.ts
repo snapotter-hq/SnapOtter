@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  apiToolPath,
+  getBundleForTool,
+  type Section,
+  TOOL_BUNDLE_MAP,
+  TOOLS,
+} from "@snapotter/shared";
 import { and, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
@@ -67,6 +74,12 @@ export type ToolProcessV2 = (ctx: ToolProcessCtxV2) => Promise<ToolProcessResult
 export interface ToolRouteConfig<T> {
   /** Unique tool identifier, used as the URL path segment. */
   toolId: string;
+  /**
+   * Override the URL section for non-catalog alias routes kept for
+   * backwards-compatible URLs (e.g. adjust-colors' brightness-contrast).
+   * Catalog tools omit this; their section is derived via apiToolPath.
+   */
+  section?: Section;
   /**
    * How many file parts the route accepts (default 1). Inputs beyond the
    * first are validated by the same modality handler and appended to
@@ -186,7 +199,7 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
 }
 
 /**
- * Factory that registers a POST /api/v1/tools/:toolId route.
+ * Factory that registers a POST /api/v1/tools/:section/:toolId route.
  *
  * The route accepts multipart with:
  *   - A file part (the image to process)
@@ -220,7 +233,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         };
 
   app.post(
-    `/api/v1/tools/${config.toolId}`,
+    config.section
+      ? `/api/v1/tools/${config.section}/${config.toolId}`
+      : apiToolPath(config.toolId),
     { config: { rateLimit: toolRateLimit } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       // Check per-tool access before processing uploads

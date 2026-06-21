@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -12,15 +11,14 @@ const exifReader = require(
 ) as typeof import("exif-reader").default;
 
 import { editMetadata } from "@snapotter/image-engine";
-
-const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 let jpgWithExif: Buffer;
 let png200x150: Buffer;
 
 beforeAll(() => {
-  jpgWithExif = readFileSync(path.join(FIXTURES_DIR, "test-with-exif.jpg"));
-  png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
+  jpgWithExif = readFixture(fixtures.image.exifGps);
+  png200x150 = readFixture(fixtures.image.base.png200);
 });
 
 async function getExif(img: sharp.Sharp) {

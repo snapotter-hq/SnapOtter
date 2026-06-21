@@ -181,7 +181,7 @@ function isPdfBuffer(buf: Buffer): boolean {
 // ── Route registration ───────────────────────────────────────────
 export function registerPdfToImage(app: FastifyInstance) {
   // ── Info endpoint ────────────────────────────────────────────
-  app.post("/api/v1/tools/pdf-to-image/info", async (request, reply) => {
+  app.post("/api/v1/tools/pdf/pdf-to-image/info", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -223,7 +223,7 @@ export function registerPdfToImage(app: FastifyInstance) {
   });
 
   // ── Preview endpoint (thumbnails) ─────────────────────────────
-  app.post("/api/v1/tools/pdf-to-image/preview", async (request, reply) => {
+  app.post("/api/v1/tools/pdf/pdf-to-image/preview", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -288,7 +288,7 @@ export function registerPdfToImage(app: FastifyInstance) {
   });
 
   // ── Main processing endpoint ─────────────────────────────────
-  app.post("/api/v1/tools/pdf-to-image", async (request, reply) => {
+  app.post("/api/v1/tools/pdf/pdf-to-image", async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let settingsRaw: string | null = null;
 

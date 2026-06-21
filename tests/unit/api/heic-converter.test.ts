@@ -1,10 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { decodeHeic, ensureSharpCompat } from "../../../apps/api/src/lib/heic-converter.js";
-
-const FIXTURES = join(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 function isPng(buf: Buffer): boolean {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
@@ -20,7 +18,7 @@ function makeHeicHeader(brand: string): Buffer {
 
 describe("decodeHeic", () => {
   it("decodes sample.heic to a valid PNG buffer", async () => {
-    const heicBuf = await readFile(join(FIXTURES, "formats/sample.heic"));
+    const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await decodeHeic(heicBuf);
     expect(isPng(result)).toBe(true);
     const meta = await sharp(result).metadata();
@@ -29,7 +27,7 @@ describe("decodeHeic", () => {
   });
 
   it("decodes sample.heif to a valid PNG buffer", { timeout: 60_000 }, async () => {
-    const heifBuf = await readFile(join(FIXTURES, "formats/sample.heif"));
+    const heifBuf = readFixture(fixtures.image.formats("heif"));
     const result = await decodeHeic(heifBuf);
     expect(isPng(result)).toBe(true);
     const meta = await sharp(result).metadata();
@@ -38,7 +36,7 @@ describe("decodeHeic", () => {
   });
 
   it("preserves image dimensions after decoding", async () => {
-    const heicBuf = await readFile(join(FIXTURES, "formats/sample.heic"));
+    const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await decodeHeic(heicBuf);
     const meta = await sharp(result).metadata();
     expect(meta.width).toBeGreaterThan(0);
@@ -56,7 +54,7 @@ describe("decodeHeic", () => {
   });
 
   it("cleans up temp files after success", { timeout: 60_000 }, async () => {
-    const heicBuf = await readFile(join(FIXTURES, "formats/sample.heic"));
+    const heicBuf = readFixture(fixtures.image.formats("heic"));
     const { tmpdir } = await import("node:os");
     const { readdirSync } = await import("node:fs");
     const beforeSet = new Set(
@@ -75,25 +73,25 @@ describe("decodeHeic", () => {
 
 describe("ensureSharpCompat", () => {
   it("decodes a HEIC buffer to PNG", async () => {
-    const heicBuf = await readFile(join(FIXTURES, "formats/sample.heic"));
+    const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await ensureSharpCompat(heicBuf);
     expect(isPng(result)).toBe(true);
   });
 
   it("passes through a PNG buffer unchanged", async () => {
-    const pngBuf = await readFile(join(FIXTURES, "formats/sample.png"));
+    const pngBuf = readFixture(fixtures.image.formats("png"));
     const result = await ensureSharpCompat(pngBuf);
     expect(result).toBe(pngBuf);
   });
 
   it("passes through a JPEG buffer unchanged", async () => {
-    const jpgBuf = await readFile(join(FIXTURES, "formats/sample.jpg"));
+    const jpgBuf = readFixture(fixtures.image.formats("jpg"));
     const result = await ensureSharpCompat(jpgBuf);
     expect(result).toBe(jpgBuf);
   });
 
   it("passes through a WebP buffer unchanged", async () => {
-    const webpBuf = await readFile(join(FIXTURES, "formats/sample.webp"));
+    const webpBuf = readFixture(fixtures.image.formats("webp"));
     const result = await ensureSharpCompat(webpBuf);
     expect(result).toBe(webpBuf);
   });

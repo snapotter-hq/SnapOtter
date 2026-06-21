@@ -646,7 +646,7 @@ test.describe("Memory and Stability", () => {
       "/convert",
       "/compress",
       "/sharpening",
-      "/adjust-colors",
+      "/image/adjust-colors",
       "/strip-metadata",
       "/bulk-rename",
       "/favicon",
@@ -732,7 +732,7 @@ test.describe("Memory and Stability", () => {
       "/convert",
       "/compress",
       "/sharpening",
-      "/adjust-colors",
+      "/image/adjust-colors",
       "/strip-metadata",
       "/bulk-rename",
       "/favicon",
@@ -795,7 +795,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept to return 413 (payload too large)
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 413,
         contentType: "application/json",
@@ -818,7 +818,7 @@ test.describe("Server Error Handling", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("server 500 response shows error, not crash", async ({ loggedInPage: page }) => {
@@ -826,7 +826,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept the tool API endpoint to return 500
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -849,7 +849,7 @@ test.describe("Server Error Handling", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("empty file upload (0 bytes) is handled gracefully", async ({ loggedInPage: page }) => {
@@ -882,7 +882,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept to return 400 with a validation message
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 400,
         contentType: "application/json",
@@ -905,7 +905,7 @@ test.describe("Server Error Handling", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("auth expiry (401) redirects to login or shows re-auth prompt", async ({
@@ -915,7 +915,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept to return 401 (session expired)
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 401,
         contentType: "application/json",
@@ -945,7 +945,7 @@ test.describe("Server Error Handling", () => {
     expect(content).toBeDefined();
     expect(content?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("rate limit (429) shows throttle message, not crash", async ({ loggedInPage: page }) => {
@@ -953,7 +953,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept to return 429 (rate limited)
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 429,
         contentType: "application/json",
@@ -976,7 +976,7 @@ test.describe("Server Error Handling", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("network timeout shows error, not infinite spinner", async ({ loggedInPage: page }) => {
@@ -984,7 +984,7 @@ test.describe("Server Error Handling", () => {
     await uploadTestImage(page);
 
     // Intercept and never respond -- simulates a timeout/hang
-    await page.route("**/api/v1/tools/resize", async (route) => {
+    await page.route("**/api/v1/tools/image/resize", async (route) => {
       // Just hold the request indefinitely (abort after test timeout)
       await new Promise(() => {});
       void route;
@@ -1002,7 +1002,7 @@ test.describe("Server Error Handling", () => {
     const bodyText = await page.textContent("body");
     expect(bodyText).toBeDefined();
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 });
 
@@ -1088,7 +1088,7 @@ test.describe("Toast Notifications", () => {
     await uploadTestImage(page);
 
     // Intercept to cause a failure
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -1108,7 +1108,7 @@ test.describe("Toast Notifications", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("toast does not block interactive elements beneath it", async ({ loggedInPage: page }) => {
@@ -1246,7 +1246,7 @@ test.describe("Server Error Handling - Service Unavailable", () => {
     await page.goto("/resize");
     await uploadTestImage(page);
 
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 503,
         contentType: "application/json",
@@ -1266,7 +1266,7 @@ test.describe("Server Error Handling - Service Unavailable", () => {
     expect(bodyText).toBeDefined();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 });
 
@@ -1320,7 +1320,7 @@ test.describe("Double-Click Prevention", () => {
 
     const requestCount: string[] = [];
     page.on("request", (req) => {
-      if (req.url().includes("/api/v1/tools/resize") && req.method() === "POST") {
+      if (req.url().includes("/api/v1/tools/image/resize") && req.method() === "POST") {
         requestCount.push(req.url());
       }
     });
@@ -1450,7 +1450,7 @@ test.describe("Processing State Cleanup", () => {
     await page.goto("/resize");
     await uploadTestImage(page);
 
-    await page.route("**/api/v1/tools/resize", (route) =>
+    await page.route("**/api/v1/tools/image/resize", (route) =>
       route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -1469,7 +1469,7 @@ test.describe("Processing State Cleanup", () => {
     await expect(resizeBtn).toBeVisible();
     await expect(resizeBtn).toBeEnabled({ timeout: 5_000 });
 
-    await page.unroute("**/api/v1/tools/resize");
+    await page.unroute("**/api/v1/tools/image/resize");
   });
 
   test("successful processing followed by clear resets fully", async ({ loggedInPage: page }) => {

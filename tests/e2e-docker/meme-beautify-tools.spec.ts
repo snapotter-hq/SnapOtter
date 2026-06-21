@@ -69,7 +69,7 @@ const JPG_SAMPLE = formatFixture("sample.jpg");
 
 test.describe("Meme Generator — custom image", () => {
   test("meme with top-bottom text layout", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -89,7 +89,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme with top-only text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -108,7 +108,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme with bottom-only text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -126,7 +126,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme with center text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -143,7 +143,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme with no text boxes passes image through", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -159,7 +159,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme with custom font and colors", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -183,7 +183,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -202,7 +202,7 @@ test.describe("Meme Generator — custom image", () => {
   });
 
   test("meme rejects request with no image and no template", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         textLayout: "top-bottom",
@@ -221,7 +221,7 @@ test.describe("Meme Generator — template mode", () => {
   test("meme with template ID (JSON body)", async ({ request }) => {
     // First, fetch the available templates to find a valid ID
     // Use a well-known template if available, otherwise skip
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         templateId: "drake",
@@ -243,7 +243,7 @@ test.describe("Meme Generator — template mode", () => {
   });
 
   test("meme with invalid template ID returns error", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         templateId: "nonexistent-template-99999",
@@ -260,7 +260,7 @@ test.describe("Meme Generator — template mode", () => {
 
 test.describe("Beautify — basic", () => {
   test("beautify with default settings", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -274,7 +274,7 @@ test.describe("Beautify — basic", () => {
   });
 
   test("beautify with solid background", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -293,7 +293,7 @@ test.describe("Beautify — basic", () => {
   });
 
   test("beautify with transparent background", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -311,7 +311,7 @@ test.describe("Beautify — basic", () => {
   });
 
   test("beautify with linear gradient background", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -332,7 +332,7 @@ test.describe("Beautify — basic", () => {
   });
 
   test("beautify with radial gradient background", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -356,7 +356,7 @@ test.describe("Beautify — basic", () => {
 
 test.describe("Beautify — shadows", () => {
   test("beautify with subtle shadow", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -372,7 +372,7 @@ test.describe("Beautify — shadows", () => {
   });
 
   test("beautify with dramatic shadow", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -388,7 +388,7 @@ test.describe("Beautify — shadows", () => {
   });
 
   test("beautify with no shadow", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -408,7 +408,7 @@ test.describe("Beautify — shadows", () => {
 
 test.describe("Beautify — frames", () => {
   test("beautify with macOS light frame", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -425,7 +425,7 @@ test.describe("Beautify — frames", () => {
   });
 
   test("beautify with macOS dark frame", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -444,7 +444,7 @@ test.describe("Beautify — frames", () => {
   });
 
   test("beautify with browser light frame", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -461,7 +461,7 @@ test.describe("Beautify — frames", () => {
   });
 
   test("beautify with no frame", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -482,7 +482,7 @@ test.describe("Beautify — frames", () => {
 
 test.describe("Beautify — social presets", () => {
   test("beautify for Twitter", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -498,7 +498,7 @@ test.describe("Beautify — social presets", () => {
   });
 
   test("beautify for Instagram square", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -516,7 +516,7 @@ test.describe("Beautify — social presets", () => {
   });
 
   test("beautify for LinkedIn", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -536,7 +536,7 @@ test.describe("Beautify — social presets", () => {
 
 test.describe("Beautify — watermark", () => {
   test("beautify with watermark text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -554,7 +554,7 @@ test.describe("Beautify — watermark", () => {
   });
 
   test("beautify with center watermark", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -576,7 +576,7 @@ test.describe("Beautify — watermark", () => {
 
 test.describe("Beautify — output formats", () => {
   test("beautify with JPEG output", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -597,7 +597,7 @@ test.describe("Beautify — output formats", () => {
   });
 
   test("beautify with WebP output", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -613,7 +613,7 @@ test.describe("Beautify — output formats", () => {
   });
 
   test("beautify HEIC input image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -654,7 +654,7 @@ test.describe("Beautify — background image", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -669,7 +669,7 @@ test.describe("Beautify — background image", () => {
 
 test.describe("Beautify — validation", () => {
   test("beautify rejects request with no file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         settings: JSON.stringify({ padding: 32 }),
@@ -685,7 +685,7 @@ test.describe("Beautify — validation", () => {
 
 test.describe("Auth failure", () => {
   test("meme-generator without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/meme-generator", {
+    const res = await request.post("/api/v1/tools/image/meme-generator", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({
@@ -698,7 +698,7 @@ test.describe("Auth failure", () => {
   });
 
   test("beautify without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/beautify", {
+    const res = await request.post("/api/v1/tools/image/beautify", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({}),

@@ -12,7 +12,7 @@ import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
  * Compare two images: compute a pixel-level diff and similarity score.
  */
 export function registerCompare(app: FastifyInstance) {
-  app.post("/api/v1/tools/compare", async (request, reply) => {
+  app.post("/api/v1/tools/image/compare", async (request, reply) => {
     let bufferA: Buffer | null = null;
     let bufferB: Buffer | null = null;
 

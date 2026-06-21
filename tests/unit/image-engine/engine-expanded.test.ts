@@ -7,7 +7,7 @@
  * - Queued operation ordering
  * - processImage with ico/jp2/qoi/bmp/heic in OutputFormat (unsupported check)
  */
-import { readFileSync } from "node:fs";
+
 import { createRequire } from "node:module";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -18,15 +18,14 @@ const require = createRequire(
 const _sharp = require("sharp") as typeof import("sharp").default;
 
 import { processImage } from "@snapotter/image-engine";
-
-const FIXTURES_DIR = path.resolve(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 let png200x150: Buffer;
 let jpg100x100: Buffer;
 
 beforeAll(() => {
-  png200x150 = readFileSync(path.join(FIXTURES_DIR, "test-200x150.png"));
-  jpg100x100 = readFileSync(path.join(FIXTURES_DIR, "test-100x100.jpg"));
+  png200x150 = readFixture(fixtures.image.base.png200);
+  jpg100x100 = readFixture(fixtures.image.base.jpg100);
 });
 
 describe("processImage FORMAT_MAP coverage", () => {

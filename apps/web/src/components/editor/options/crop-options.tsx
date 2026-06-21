@@ -23,7 +23,7 @@ export function CropOptions() {
       if (!cropState) return;
 
       const preset = ASPECT_RATIOS.find((p) => p.label === label);
-      if (!preset || !preset.value) {
+      if (!preset?.value) {
         setCropState({ ...cropState, aspectRatio: null });
         return;
       }

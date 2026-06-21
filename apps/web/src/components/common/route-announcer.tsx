@@ -6,6 +6,7 @@ export function RouteAnnouncer() {
   const isFirstRender = useRef(true);
   const announcerRef = useRef<HTMLDivElement>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the intentional trigger for re-announcing on route change
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;

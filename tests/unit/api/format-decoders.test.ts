@@ -1,11 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { decodeToSharpCompat, needsCliDecode } from "../../../apps/api/src/lib/format-decoders.js";
 import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
-
-const FIXTURES = join(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 function isImageMagickError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -176,7 +173,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes BMP to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.bmp"));
+      const input = readFixture(fixtures.image.formats("bmp"));
       const result = await decodeToSharpCompat(input, "bmp");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -188,7 +185,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes ICO to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.ico"));
+      const input = readFixture(fixtures.image.formats("ico"));
       const result = await decodeToSharpCompat(input, "ico");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -200,7 +197,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes TGA to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.tga"));
+      const input = readFixture(fixtures.image.formats("tga"));
       const result = await decodeToSharpCompat(input, "tga");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -212,7 +209,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes PSD to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.psd"));
+      const input = readFixture(fixtures.image.formats("psd"));
       const result = await decodeToSharpCompat(input, "psd");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -224,7 +221,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes EXR to valid PNG (requires EXR delegate)", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.exr"));
+      const input = readFixture(fixtures.image.formats("exr"));
       const result = await decodeToSharpCompat(input, "exr");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -238,7 +235,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes HDR to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.hdr"));
+      const input = readFixture(fixtures.image.formats("hdr"));
       const result = await decodeToSharpCompat(input, "hdr");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -250,7 +247,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes JXL to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.jxl"));
+      const input = readFixture(fixtures.image.formats("jxl"));
       const result = await decodeToSharpCompat(input, "jxl");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -262,7 +259,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes JP2 to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.jp2"));
+      const input = readFixture(fixtures.image.formats("jp2"));
       const result = await decodeToSharpCompat(input, "jp2");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -274,7 +271,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes DDS to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.dds"));
+      const input = readFixture(fixtures.image.formats("dds"));
       const result = await decodeToSharpCompat(input, "dds");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -286,7 +283,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes CUR using ICO decoder to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.cur"));
+      const input = readFixture(fixtures.image.formats("cur"));
       const result = await decodeToSharpCompat(input, "cur");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -298,7 +295,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes DPX to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.dpx"));
+      const input = readFixture(fixtures.image.formats("dpx"));
       const result = await decodeToSharpCompat(input, "dpx");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -310,7 +307,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes FITS to valid PNG (requires FITS delegate)", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.fits"));
+      const input = readFixture(fixtures.image.formats("fits"));
       const result = await decodeToSharpCompat(input, "fits");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -324,7 +321,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes PPM to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.ppm"));
+      const input = readFixture(fixtures.image.formats("ppm"));
       const result = await decodeToSharpCompat(input, "ppm");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -336,7 +333,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes PGM to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.pgm"));
+      const input = readFixture(fixtures.image.formats("pgm"));
       const result = await decodeToSharpCompat(input, "pgm");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -348,7 +345,7 @@ describe("decodeToSharpCompat", () => {
 
   it("decodes PBM to valid PNG", async () => {
     try {
-      const input = await readFile(join(FIXTURES, "formats/sample.pbm"));
+      const input = readFixture(fixtures.image.formats("pbm"));
       const result = await decodeToSharpCompat(input, "pbm");
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
@@ -365,7 +362,7 @@ describe("decodeToSharpCompat - individual decoder verification", () => {
   for (const fmt of formats) {
     it(`${fmt}: output has non-zero dimensions`, async () => {
       try {
-        const input = await readFile(join(FIXTURES, `formats/sample.${fmt}`));
+        const input = readFixture(fixtures.image.formats(fmt));
         const result = await decodeToSharpCompat(input, fmt);
         const { width, height } = await assertValidImage(result);
         expect(width).toBeGreaterThan(0);
@@ -382,7 +379,7 @@ describe("decodeToSharpCompat - individual decoder verification", () => {
   for (const fmt of delegateFormats) {
     it(`${fmt}: output has non-zero dimensions (requires delegate)`, async () => {
       try {
-        const input = await readFile(join(FIXTURES, `formats/sample.${fmt}`));
+        const input = readFixture(fixtures.image.formats(fmt));
         const result = await decodeToSharpCompat(input, fmt);
         const { width, height } = await assertValidImage(result);
         expect(width).toBeGreaterThan(0);
@@ -399,14 +396,14 @@ describe("decodeToSharpCompat - individual decoder verification", () => {
 
 describe("decodeToSharpCompat - QOI decoder", () => {
   it("decodes QOI fixture to valid PNG", async () => {
-    const input = await readFile(join(FIXTURES, "formats/sample.qoi"));
+    const input = readFixture(fixtures.image.formats("qoi"));
     const result = await decodeToSharpCompat(input, "qoi");
     expect(isPng(result)).toBe(true);
     await assertValidImage(result);
   });
 
   it("round-trips PNG -> QOI -> PNG", async () => {
-    const png = await readFile(join(FIXTURES, "formats/sample.png"));
+    const png = readFixture(fixtures.image.formats("png"));
     const qoi = await encodeQoi(png);
     const decoded = await decodeToSharpCompat(Buffer.from(qoi), "qoi");
     expect(isPng(decoded)).toBe(true);
@@ -417,7 +414,7 @@ describe("decodeToSharpCompat - QOI decoder", () => {
   });
 
   it("decoded QOI produces a buffer sharp can process further", async () => {
-    const input = await readFile(join(FIXTURES, "formats/sample.qoi"));
+    const input = readFixture(fixtures.image.formats("qoi"));
     const decoded = await decodeToSharpCompat(input, "qoi");
     const resized = await sharp(decoded).resize(10, 10).png().toBuffer();
     expect(resized.length).toBeGreaterThan(0);

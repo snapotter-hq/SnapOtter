@@ -63,14 +63,14 @@ export const fr: TranslationKeys = {
     "pdf-security": "Security",
     "pdf-optimize": "Optimize",
     "doc-convert": "Convert",
-    data: "Data Files",
+    data: "Files",
     archives: "Archives",
   },
   modalities: {
     image: "Image",
     video: "Video",
     audio: "Audio",
-    documentsAndFiles: "PDF & Data",
+    documentsAndFiles: "PDF & Files",
   },
   tools: {
     resize: {
@@ -2503,7 +2503,9 @@ export const fr: TranslationKeys = {
     clearSearch: "Clear search",
     all: "All",
     documents: "PDF",
-    data: "Data",
+    data: "Files",
+    pdf: "PDF",
+    files: "Files",
     toolCount: "{count} tools",
     heading: "SnapOtter Tools",
   },

@@ -111,36 +111,36 @@ log "Auth token obtained"
 for run in 1 2 3; do
   log "--- AI Run $run of 3 ---"
 
-  bench_ai_tool "remove-background" "portrait-r${run}" "$P" '{"backgroundType":"transparent"}'
-  bench_ai_tool "remove-background" "isolated-r${run}" "$ISO" '{"backgroundType":"color","backgroundColor":"#0000FF"}'
+  bench_ai_tool "image/remove-background" "portrait-r${run}" "$P" '{"backgroundType":"transparent"}'
+  bench_ai_tool "image/remove-background" "isolated-r${run}" "$ISO" '{"backgroundType":"color","backgroundColor":"#0000FF"}'
 
-  bench_ai_tool "upscale" "2x-small-r${run}" "$J" '{"scale":2}'
-  bench_ai_tool "upscale" "2x-large-r${run}" "$P" '{"scale":2}'
-  bench_ai_tool "upscale" "face-r${run}" "$P" '{"scale":2,"faceEnhance":true}'
+  bench_ai_tool "image/upscale" "2x-small-r${run}" "$J" '{"scale":2}'
+  bench_ai_tool "image/upscale" "2x-large-r${run}" "$P" '{"scale":2}'
+  bench_ai_tool "image/upscale" "face-r${run}" "$P" '{"scale":2,"faceEnhance":true}'
 
-  bench_ai_tool "ocr" "fast-r${run}" "$OCR" '{"quality":"fast","language":"en"}'
-  bench_ai_tool "ocr" "best-r${run}" "$OCR" '{"quality":"best","language":"en"}'
-  bench_ai_tool "ocr" "japanese-r${run}" "$OCRJP" '{"quality":"balanced","language":"ja"}'
+  bench_ai_tool "image/ocr" "fast-r${run}" "$OCR" '{"quality":"fast","language":"en"}'
+  bench_ai_tool "image/ocr" "best-r${run}" "$OCR" '{"quality":"best","language":"en"}'
+  bench_ai_tool "image/ocr" "japanese-r${run}" "$OCRJP" '{"quality":"balanced","language":"ja"}'
 
-  bench_ai_tool "blur-faces" "r${run}" "$FACE" '{"blurRadius":30,"sensitivity":0.5}'
+  bench_ai_tool "image/blur-faces" "r${run}" "$FACE" '{"blurRadius":30,"sensitivity":0.5}'
 
-  bench_ai_tool "smart-crop" "face-r${run}" "$P" '{"mode":"face","width":400,"height":400}'
+  bench_ai_tool "image/smart-crop" "face-r${run}" "$P" '{"mode":"face","width":400,"height":400}'
 
-  bench_ai_tool "colorize" "r${run}" "$BW" '{"intensity":1.0}'
+  bench_ai_tool "image/colorize" "r${run}" "$BW" '{"intensity":1.0}'
 
-  bench_ai_tool "enhance-faces" "gfpgan-r${run}" "$P" '{"model":"gfpgan","strength":0.8}'
-  bench_ai_tool "enhance-faces" "codeformer-r${run}" "$P" '{"model":"codeformer","strength":0.7}'
+  bench_ai_tool "image/enhance-faces" "gfpgan-r${run}" "$P" '{"model":"gfpgan","strength":0.8}'
+  bench_ai_tool "image/enhance-faces" "codeformer-r${run}" "$P" '{"model":"codeformer","strength":0.7}'
 
-  bench_ai_tool "noise-removal" "quick-r${run}" "$S" '{"tier":"quick"}'
-  bench_ai_tool "noise-removal" "quality-r${run}" "$L" '{"tier":"quality"}'
+  bench_ai_tool "image/noise-removal" "quick-r${run}" "$S" '{"tier":"quick"}'
+  bench_ai_tool "image/noise-removal" "quality-r${run}" "$L" '{"tier":"quality"}'
 
-  bench_ai_tool "red-eye-removal" "r${run}" "$REDEYE" '{"sensitivity":50,"strength":80}'
+  bench_ai_tool "image/red-eye-removal" "r${run}" "$REDEYE" '{"sensitivity":50,"strength":80}'
 
-  bench_ai_tool "restore-photo" "full-r${run}" "$BW" '{"mode":"auto","scratchRemoval":true,"faceEnhancement":true,"colorize":true}'
+  bench_ai_tool "image/restore-photo" "full-r${run}" "$BW" '{"mode":"auto","scratchRemoval":true,"faceEnhancement":true,"colorize":true}'
 
-  bench_ai_tool "passport-photo" "r${run}" "$HEAD" ''
+  bench_ai_tool "image/passport-photo" "r${run}" "$HEAD" ''
 
-  bench_ai_tool "content-aware-resize" "face-r${run}" "$P" '{"width":300,"protectFaces":true}'
+  bench_ai_tool "image/content-aware-resize" "face-r${run}" "$P" '{"width":300,"protectFaces":true}'
 done
 
 log "=== TIER 3: AI Batch Processing ==="
@@ -150,7 +150,7 @@ for batch_size in 3 5; do
   output_file=$(mktemp)
   cid=$(get_container_id)
 
-  curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/remove-background" -H "Authorization: Bearer ${TOKEN}")
+  curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/image/remove-background" -H "Authorization: Bearer ${TOKEN}")
   for i in $(seq 1 "$batch_size"); do
     curl_args+=(-F "file=@${P}")
   done
@@ -175,7 +175,7 @@ mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 vram_start=$(gpu_vram_mb)
 
 for i in $(seq 1 10); do
-  bench_ai_tool "remove-background" "sustained-${i}" "$P" '{"backgroundType":"transparent"}'
+  bench_ai_tool "image/remove-background" "sustained-${i}" "$P" '{"backgroundType":"transparent"}'
 done
 
 mem_end=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")

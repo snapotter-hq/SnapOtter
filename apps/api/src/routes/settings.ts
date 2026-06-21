@@ -28,6 +28,10 @@ const SENSITIVE_KEYS = new Set([
   "siem_webhook_auth",
 ]);
 
+const REDACTED_KEYS = new Set(["cookie_secret", "oidc_client_secret", "siem_webhook_auth"]);
+
+const READONLY_KEYS = new Set(["cookie_secret", "instance_id"]);
+
 async function encryptIfSensitive(key: string, value: string): Promise<string> {
   if (!env.DATA_ENCRYPTION_KEY || !SENSITIVE_KEYS.has(key)) return value;
   return encrypt(value, env.DATA_ENCRYPTION_KEY);
@@ -47,21 +51,29 @@ async function decryptIfNeeded(value: string): Promise<string> {
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/settings — Get all settings as a key-value object
-  app.get("/api/v1/settings", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
-    if (!user) return;
+  app.get(
+    "/api/v1/settings",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
 
-    const isAdmin = user.role === "admin";
-    const rows = await db.select().from(schema.settings);
+      const isAdmin = user.role === "admin";
+      const rows = await db.select().from(schema.settings);
 
-    const settings: Record<string, string> = {};
-    for (const row of rows) {
-      if (!isAdmin && SENSITIVE_KEYS.has(row.key)) continue;
-      settings[row.key] = await decryptIfNeeded(row.value);
-    }
+      const settings: Record<string, string> = {};
+      for (const row of rows) {
+        if (!isAdmin && SENSITIVE_KEYS.has(row.key)) continue;
+        if (REDACTED_KEYS.has(row.key)) {
+          settings[row.key] = "********";
+          continue;
+        }
+        settings[row.key] = await decryptIfNeeded(row.value);
+      }
 
-    return reply.send({ settings });
-  });
+      return reply.send({ settings });
+    },
+  );
 
   // PUT /api/v1/settings — Save settings (admin only)
   app.put("/api/v1/settings", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -89,6 +101,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({
           error: "Settings keys and values must not contain HTML tags",
           code: "VALIDATION_ERROR",
+        });
+      }
+
+      if (READONLY_KEYS.has(key)) {
+        return reply.status(400).send({
+          error: `Setting "${key}" cannot be modified via the API`,
+          code: "READONLY_SETTING",
         });
       }
 
@@ -131,6 +150,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/settings/:key — Get a specific setting
   app.get(
     "/api/v1/settings/:key",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { key: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -152,7 +172,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.send({
         key: row.key,
-        value: await decryptIfNeeded(row.value),
+        value: REDACTED_KEYS.has(row.key) ? "********" : await decryptIfNeeded(row.value),
         updatedAt: row.updatedAt.toISOString(),
       });
     },

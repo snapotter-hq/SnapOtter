@@ -1,3 +1,10 @@
+# rembg is pinned to 2.0.69. The patched 2.0.75 (GHSA: server SSRF/CORS +
+# custom-model path traversal) pulls numpy>=2.3, scipy>=1.16 and
+# scikit-image>=0.26 -- a numpy 2.x closure that is incompatible with this
+# numpy==1.26.4-locked stack (realesrgan 0.3.0 and codeformer-pip 0.0.4 break
+# on numpy 2.x). Both advisories are unreachable here: rembg is used purely as
+# a library (we never run `rembg s`), and new_session() only ever receives
+# allowlisted model names (remove_bg.py ALLOWED_MODELS), never user paths.
 rembg[cpu]==2.0.69
 realesrgan==0.3.0
 paddleocr[doc-parser]>=3.4.0,<3.5.0

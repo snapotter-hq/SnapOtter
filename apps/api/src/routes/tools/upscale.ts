@@ -116,7 +116,7 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
  * Uses Real-ESRGAN when available, falls back to Lanczos.
  */
 export function registerUpscale(app: FastifyInstance) {
-  app.post("/api/v1/tools/upscale", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/v1/tools/image/upscale", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "upscale";
     if (!isToolInstalled(toolId)) {
       const bundle = getBundleForTool(toolId);

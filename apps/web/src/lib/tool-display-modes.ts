@@ -192,7 +192,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "epub-convert": "no-comparison",
   "to-epub": "no-comparison",
 
-  // Data tools
+  // File tools
   "chart-maker": "no-comparison",
   "csv-excel": "no-comparison",
   "csv-json": "no-comparison",

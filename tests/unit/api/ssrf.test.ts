@@ -95,6 +95,39 @@ describe("validateFetchUrl", () => {
     await expect(validateFetchUrl("http://[2001:DB8::1]/image.jpg")).rejects.toThrow("private");
   });
 
+  // IPv4-compatible IPv6 (::a.b.c.d, the deprecated ::/96 embedding) is a
+  // distinct form from IPv4-mapped (::ffff:a.b.c.d). The URL parser keeps it
+  // in the hex form (::7f00:1), which textual ::ffff: matching never sees.
+  it("rejects IPv4-compatible IPv6 loopback (::127.0.0.1 canonicalizes to ::7f00:1)", async () => {
+    await expect(validateFetchUrl("http://[::127.0.0.1]/")).rejects.toThrow("private");
+    await expect(validateFetchUrl("http://[::7f00:1]/")).rejects.toThrow("private");
+  });
+
+  it("rejects IPv4-compatible IPv6 metadata (::169.254.169.254 -> ::a9fe:a9fe)", async () => {
+    await expect(validateFetchUrl("http://[::169.254.169.254]/")).rejects.toThrow("private");
+    await expect(validateFetchUrl("http://[::a9fe:a9fe]/")).rejects.toThrow("private");
+  });
+
+  it("rejects deprecated site-local addresses (fec0::/10)", async () => {
+    await expect(validateFetchUrl("http://[fec0::1]/")).rejects.toThrow("private");
+  });
+
+  // Link-local is fe80::/10 (fe80 through febf), not just literals starting
+  // with "fe80:". Addresses like fea9:: and febf:: are equally link-local.
+  it("rejects link-local across the full fe80::/10 range", async () => {
+    await expect(validateFetchUrl("http://[fe80::1]/")).rejects.toThrow("private");
+    await expect(validateFetchUrl("http://[fea9::1]/")).rejects.toThrow("private");
+    await expect(validateFetchUrl("http://[febf::1]/")).rejects.toThrow("private");
+  });
+
+  it("allows public IPv6 literals without over-blocking", async () => {
+    const direct = await validateFetchUrl("http://[2606:4700::1]/");
+    expect(direct.resolvedIp).toBe("2606:4700::1");
+    // 8.8.8.8 expressed as an IPv4-mapped IPv6 literal must stay allowed.
+    const mapped = await validateFetchUrl("http://[::ffff:808:808]/");
+    expect(mapped.resolvedIp).toBeTruthy();
+  });
+
   it("allows a public IP address directly in URL and returns resolved IP", async () => {
     // Exercises the early-return path in resolveAndCheck when hostname is a
     // non-private IP literal (covers the `return` after the isIP check).

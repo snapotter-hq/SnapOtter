@@ -173,6 +173,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/api/v1/files",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (
       request: FastifyRequest<{
         Querystring: { search?: string; limit?: string; offset?: string };
@@ -344,6 +345,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/api/v1/files/:id",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -430,6 +432,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/api/v1/files/:id/download",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -469,6 +472,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/api/v1/files/:id/thumbnail",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -567,52 +571,55 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    * Bulk delete. Body: { ids: string[] }
    * For each id, deletes the entire version chain (all ancestors and descendants).
    */
-  app.delete("/api/v1/files", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
-    if (!user) return;
+  app.delete(
+    "/api/v1/files",
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = requireAuth(request, reply);
+      if (!user) return;
 
-    const deleteSchema = z.object({
-      ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
-    });
-    const parsed = deleteSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: parsed.error.issues.map((i) => i.message).join("; "),
+      const deleteSchema = z.object({
+        ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
       });
-    }
-    const { ids } = parsed.data;
+      const parsed = deleteSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.issues.map((i) => i.message).join("; "),
+        });
+      }
+      const { ids } = parsed.data;
 
-    // Check files:all permission once upfront
-    const canDeleteAll = await hasEffectivePermission(user, "files:all");
+      // Check files:all permission once upfront
+      const canDeleteAll = await hasEffectivePermission(user, "files:all");
 
-    // Batch ownership check: single SELECT for all requested IDs
-    const candidates = await db
-      .select({ id: schema.userFiles.id, userId: schema.userFiles.userId })
-      .from(schema.userFiles)
-      .where(inArray(schema.userFiles.id, ids));
+      // Batch ownership check: single SELECT for all requested IDs
+      const candidates = await db
+        .select({ id: schema.userFiles.id, userId: schema.userFiles.userId })
+        .from(schema.userFiles)
+        .where(inArray(schema.userFiles.id, ids));
 
-    const validIds = candidates
-      .filter((f) => f.userId === user.id || canDeleteAll)
-      .map((f) => f.id);
+      const validIds = candidates
+        .filter((f) => f.userId === user.id || canDeleteAll)
+        .map((f) => f.id);
 
-    if (validIds.length === 0) {
-      await auditFromRequest(request)("FILE_DELETED", { userId: user.id, count: 0, ids });
-      return reply.send({ deleted: 0 });
-    }
+      if (validIds.length === 0) {
+        await auditFromRequest(request)("FILE_DELETED", { userId: user.id, count: 0, ids });
+        return reply.send({ deleted: 0 });
+      }
 
-    type DeleteChainRow = {
-      id: string;
-      stored_name: string;
-      size: number | null;
-      user_id: string | null;
-    };
+      type DeleteChainRow = {
+        id: string;
+        stored_name: string;
+        size: number | null;
+        user_id: string | null;
+      };
 
-    // Single recursive CTE to collect all chain members for every valid ID
-    const seedIds = sql.join(
-      validIds.map((id) => sql`${id}`),
-      sql`, `,
-    );
-    const cteResult = await db.execute<DeleteChainRow>(sql`
+      // Single recursive CTE to collect all chain members for every valid ID
+      const seedIds = sql.join(
+        validIds.map((id) => sql`${id}`),
+        sql`, `,
+      );
+      const cteResult = await db.execute<DeleteChainRow>(sql`
       WITH RECURSIVE
       ancestors(id, parent_id) AS (
         SELECT id, parent_id FROM user_files
@@ -631,44 +638,45 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       )
       SELECT DISTINCT id, stored_name, size, user_id FROM chain
     `);
-    const chainRows = cteResult.rows;
+      const chainRows = cteResult.rows;
 
-    // Filesystem deletes (must loop; cannot batch across the OS)
-    for (const row of chainRows) {
-      await deleteStoredFile(row.stored_name);
-      await deleteThumbnail(row.stored_name);
-    }
-
-    // Batch DB delete
-    const chainIds = chainRows.map((r) => r.id);
-    if (chainIds.length > 0) {
-      await db.delete(schema.userFiles).where(inArray(schema.userFiles.id, chainIds));
-    }
-
-    // Decrement storageUsed per user (group by userId for files:all scenarios)
-    const perUserSizes = new Map<string, number>();
-    for (const row of chainRows) {
-      if (row.user_id && row.size) {
-        perUserSizes.set(row.user_id, (perUserSizes.get(row.user_id) ?? 0) + row.size);
+      // Filesystem deletes (must loop; cannot batch across the OS)
+      for (const row of chainRows) {
+        await deleteStoredFile(row.stored_name);
+        await deleteThumbnail(row.stored_name);
       }
-    }
-    for (const [uid, totalSize] of perUserSizes) {
-      await db
-        .update(schema.users)
-        .set({
-          storageUsed: sql`GREATEST(0, ${schema.users.storageUsed} - ${totalSize})`,
-        })
-        .where(eq(schema.users.id, uid));
-    }
 
-    await auditFromRequest(request)("FILE_DELETED", {
-      userId: user.id,
-      count: chainRows.length,
-      ids,
-    });
+      // Batch DB delete
+      const chainIds = chainRows.map((r) => r.id);
+      if (chainIds.length > 0) {
+        await db.delete(schema.userFiles).where(inArray(schema.userFiles.id, chainIds));
+      }
 
-    return reply.send({ deleted: chainRows.length });
-  });
+      // Decrement storageUsed per user (group by userId for files:all scenarios)
+      const perUserSizes = new Map<string, number>();
+      for (const row of chainRows) {
+        if (row.user_id && row.size) {
+          perUserSizes.set(row.user_id, (perUserSizes.get(row.user_id) ?? 0) + row.size);
+        }
+      }
+      for (const [uid, totalSize] of perUserSizes) {
+        await db
+          .update(schema.users)
+          .set({
+            storageUsed: sql`GREATEST(0, ${schema.users.storageUsed} - ${totalSize})`,
+          })
+          .where(eq(schema.users.id, uid));
+      }
+
+      await auditFromRequest(request)("FILE_DELETED", {
+        userId: user.id,
+        count: chainRows.length,
+        ids,
+      });
+
+      return reply.send({ deleted: chainRows.length });
+    },
+  );
 
   /**
    * POST /api/v1/files/save-result

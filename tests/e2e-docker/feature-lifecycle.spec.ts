@@ -1,5 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { apiToolPath } from "@snapotter/shared";
 
 // ---- Helpers ---------------------------------------------------------------
 
@@ -87,7 +88,7 @@ async function callTool(
   settings: Record<string, unknown> = {},
 ) {
   const headers = await authHeaders(request);
-  return request.post(`${API}/api/v1/tools/${toolId}`, {
+  return request.post(`${API}${apiToolPath(toolId)}`, {
     headers,
     multipart: {
       file: {

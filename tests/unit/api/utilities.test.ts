@@ -4,8 +4,7 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const FIXTURES = join(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // ---------------------------------------------------------------------------
 // 1. File validation
@@ -32,7 +31,7 @@ describe("validateImageBuffer", () => {
   // -- Valid formats --------------------------------------------------------
 
   it("accepts a valid PNG file", async () => {
-    const buf = await readFile(join(FIXTURES, "test-200x150.png"));
+    const buf = readFixture(fixtures.image.base.png200);
     const result = await validateImageBuffer(buf);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -43,7 +42,7 @@ describe("validateImageBuffer", () => {
   });
 
   it("accepts a valid JPEG file", async () => {
-    const buf = await readFile(join(FIXTURES, "test-100x100.jpg"));
+    const buf = readFixture(fixtures.image.base.jpg100);
     const result = await validateImageBuffer(buf);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -54,7 +53,7 @@ describe("validateImageBuffer", () => {
   });
 
   it("accepts a valid WebP file", async () => {
-    const buf = await readFile(join(FIXTURES, "test-50x50.webp"));
+    const buf = readFixture(fixtures.image.base.webp50);
     const result = await validateImageBuffer(buf);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -65,7 +64,7 @@ describe("validateImageBuffer", () => {
   });
 
   it("accepts a tiny 1x1 PNG file", async () => {
-    const buf = await readFile(join(FIXTURES, "test-1x1.png"));
+    const buf = readFixture(fixtures.image.edge.px1);
     const result = await validateImageBuffer(buf);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -130,7 +129,7 @@ describe("validateImageBuffer", () => {
   });
 
   it("accepts a HEIC file with correct magic bytes", async () => {
-    const heicBuf = await readFile(join(FIXTURES, "test-200x150.heic"));
+    const heicBuf = readFixture(fixtures.image.base.heic200);
     const result = await validateImageBuffer(heicBuf);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -323,7 +322,7 @@ describe("validateImageBuffer", () => {
     origMod.env.MAX_MEGAPIXELS = 0.0001; // 100 pixels -- 200x150 = 30000px >> 100
 
     try {
-      const buf = await readFile(join(FIXTURES, "test-200x150.png"));
+      const buf = readFixture(fixtures.image.base.png200);
       const result = await validateImageBuffer(buf);
       expect(result.valid).toBe(false);
       if (!result.valid) {
@@ -572,73 +571,72 @@ describe("validateImageBuffer", () => {
 
   describe("validates exotic formats", () => {
     const { readFileSync } = require("node:fs");
-    const FORMATS_DIR = join(FIXTURES, "formats");
 
     it("accepts PBM file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.pbm"));
+      const buf = readFixture(fixtures.image.formats("pbm"));
       const result = await validateImageBuffer(buf, "sample.pbm");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("pbm");
     });
 
     it("accepts PGM file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.pgm"));
+      const buf = readFixture(fixtures.image.formats("pgm"));
       const result = await validateImageBuffer(buf, "sample.pgm");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("pgm");
     });
 
     it("accepts PPM file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.ppm"));
+      const buf = readFixture(fixtures.image.formats("ppm"));
       const result = await validateImageBuffer(buf, "sample.ppm");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("ppm");
     });
 
     it("accepts DDS file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.dds"));
+      const buf = readFixture(fixtures.image.formats("dds"));
       const result = await validateImageBuffer(buf, "sample.dds");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("dds");
     });
 
     it("accepts DPX file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.dpx"));
+      const buf = readFixture(fixtures.image.formats("dpx"));
       const result = await validateImageBuffer(buf, "sample.dpx");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("dpx");
     });
 
     it("accepts FITS file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.fits"));
+      const buf = readFixture(fixtures.image.formats("fits"));
       const result = await validateImageBuffer(buf, "sample.fits");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("fits");
     });
 
     it("accepts JP2 file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.jp2"));
+      const buf = readFixture(fixtures.image.formats("jp2"));
       const result = await validateImageBuffer(buf, "sample.jp2");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("jp2");
     });
 
     it("accepts QOI file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.qoi"));
+      const buf = readFixture(fixtures.image.formats("qoi"));
       const result = await validateImageBuffer(buf, "sample.qoi");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("qoi");
     });
 
     it("accepts SVGZ file (detected as svg)", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.svgz"));
+      const buf = readFixture(fixtures.image.formats("svgz"));
       const result = await validateImageBuffer(buf, "sample.svgz");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("svg");
     });
 
     it("accepts EPS file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.eps"));
+      const buf = readFixture(fixtures.image.formats("eps"));
       const result = await validateImageBuffer(buf, "sample.eps");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("eps");
@@ -659,21 +657,21 @@ describe("validateImageBuffer", () => {
     });
 
     it("accepts HEIF file", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.heif"));
+      const buf = readFixture(fixtures.image.formats("heif"));
       const result = await validateImageBuffer(buf, "sample.heif");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("heif");
     });
 
     it("accepts APNG file (detected as png)", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.apng"));
+      const buf = readFixture(fixtures.image.formats("apng"));
       const result = await validateImageBuffer(buf, "sample.apng");
       expect(result.valid).toBe(true);
       if (result.valid) expect(result.format).toBe("png");
     });
 
     it("accepts DNG file (detected as raw)", async () => {
-      const buf = readFileSync(join(FORMATS_DIR, "sample.dng"));
+      const buf = readFixture(fixtures.image.formats("dng"));
       const result = await validateImageBuffer(buf, "sample.dng");
       expect(result.valid).toBe(true);
       if (result.valid) {

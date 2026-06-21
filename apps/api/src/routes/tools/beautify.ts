@@ -245,7 +245,7 @@ export async function processBeautify(
 
 export function registerBeautify(app: FastifyInstance) {
   // Custom HTTP route (multi-file upload: main image + optional background image)
-  app.post("/api/v1/tools/beautify", async (request, reply) => {
+  app.post("/api/v1/tools/image/beautify", async (request, reply) => {
     let mainBuffer: Buffer | null = null;
     let bgImageBuffer: Buffer | null = null;
     let filename = "image";

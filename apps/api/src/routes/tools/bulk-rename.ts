@@ -17,7 +17,7 @@ const settingsSchema = z.object({
  * No image processing - just renames.
  */
 export function registerBulkRename(app: FastifyInstance) {
-  app.post("/api/v1/tools/bulk-rename", async (request, reply) => {
+  app.post("/api/v1/tools/image/bulk-rename", async (request, reply) => {
     const files: Array<{ buffer: Buffer; filename: string }> = [];
     let settingsRaw: string | null = null;
 

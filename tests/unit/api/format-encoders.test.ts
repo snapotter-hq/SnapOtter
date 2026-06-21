@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,8 +7,7 @@ import {
   encodeJp2,
   encodeQoi,
 } from "../../../apps/api/src/lib/format-encoders.js";
-
-const FIXTURES = join(__dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 async function createTestPng(width = 50, height = 50): Promise<Buffer> {
   return sharp({
@@ -52,7 +50,7 @@ describe("encodeQoi", () => {
   });
 
   it("encodes fixture image to QOI", async () => {
-    const input = await readFile(join(FIXTURES, "test-200x150.png"));
+    const input = readFixture(fixtures.image.base.png200);
     const result = await encodeQoi(input);
     expect(result.length).toBeGreaterThan(100);
   });
@@ -170,7 +168,7 @@ describe("encodeJp2", () => {
   });
 
   it("produces valid output at different quality levels", async () => {
-    const input = await readFile(join(FIXTURES, "test-200x150.png"));
+    const input = readFixture(fixtures.image.base.png200);
     try {
       const low = await encodeJp2(input, 10);
       const high = await encodeJp2(input, 90);

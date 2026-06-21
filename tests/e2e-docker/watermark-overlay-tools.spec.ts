@@ -75,7 +75,7 @@ const JPG_SAMPLE = formatFixture("sample.jpg");
 
 test.describe("Watermark Text — extended", () => {
   test("watermark with large font on high-res image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -95,7 +95,7 @@ test.describe("Watermark Text — extended", () => {
   });
 
   test("watermark with small font and low opacity", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -114,7 +114,7 @@ test.describe("Watermark Text — extended", () => {
   });
 
   test("watermark on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -134,7 +134,7 @@ test.describe("Watermark Text — extended", () => {
 
   test("watermark on WebP image", async ({ request }) => {
     const webpSample = formatFixture("sample.webp");
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.webp", mimeType: "image/webp", buffer: webpSample },
@@ -153,7 +153,7 @@ test.describe("Watermark Text — extended", () => {
   });
 
   test("tiled watermark with rotation", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -173,7 +173,7 @@ test.describe("Watermark Text — extended", () => {
   });
 
   test("watermark with full opacity (100)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -208,7 +208,7 @@ test.describe("Watermark Image — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -236,7 +236,7 @@ test.describe("Watermark Image — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -263,7 +263,7 @@ test.describe("Watermark Image — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -290,7 +290,7 @@ test.describe("Watermark Image — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -318,7 +318,7 @@ test.describe("Watermark Image — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -332,7 +332,7 @@ test.describe("Watermark Image — extended", () => {
 
 test.describe("Text Overlay — extended", () => {
   test("text overlay on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -351,7 +351,7 @@ test.describe("Text Overlay — extended", () => {
 
   test("text overlay on WebP image", async ({ request }) => {
     const webpSample = formatFixture("sample.webp");
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.webp", mimeType: "image/webp", buffer: webpSample },
@@ -369,7 +369,7 @@ test.describe("Text Overlay — extended", () => {
   });
 
   test("text overlay with large font on high-res image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -388,7 +388,7 @@ test.describe("Text Overlay — extended", () => {
   });
 
   test("text overlay with background box and custom color", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -408,7 +408,7 @@ test.describe("Text Overlay — extended", () => {
   });
 
   test("text overlay at top position", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -428,7 +428,7 @@ test.describe("Text Overlay — extended", () => {
   });
 
   test("text overlay with empty text is rejected", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -462,7 +462,7 @@ test.describe("Compose — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 100 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -485,7 +485,7 @@ test.describe("Compose — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 50, y: 50, opacity: 70 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -507,7 +507,7 @@ test.describe("Compose — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 10, y: 10, opacity: 5 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -529,7 +529,7 @@ test.describe("Compose — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 150, y: 100, opacity: 50 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -553,7 +553,7 @@ test.describe("Watermark Text — all positions", () => {
 
   for (const position of positions) {
     test(`watermark at ${position} position`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/watermark-text", {
+      const res = await request.post("/api/v1/tools/image/watermark-text", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -594,7 +594,7 @@ test.describe("Watermark Image — tiled", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -620,7 +620,7 @@ test.describe("Compose — format combinations", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 50 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -642,7 +642,7 @@ test.describe("Compose — format combinations", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 80 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -656,7 +656,7 @@ test.describe("Compose — format combinations", () => {
 
 test.describe("Text Overlay — validation", () => {
   test("text overlay with multiline text", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -674,7 +674,7 @@ test.describe("Text Overlay — validation", () => {
   });
 
   test("text overlay with shadow effect", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -700,7 +700,7 @@ test.describe("Watermark Text -- rotation", () => {
 
   for (const rotation of rotations) {
     test(`tiled watermark with rotation=${rotation}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/watermark-text", {
+      const res = await request.post("/api/v1/tools/image/watermark-text", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -728,7 +728,7 @@ test.describe("Watermark Text -- opacity range", () => {
 
   for (const opacity of opacities) {
     test(`watermark with opacity=${opacity}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/watermark-text", {
+      const res = await request.post("/api/v1/tools/image/watermark-text", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -772,7 +772,7 @@ test.describe("Watermark Image -- all positions", () => {
           },
         ],
       );
-      const res = await request.post("/api/v1/tools/watermark-image", {
+      const res = await request.post("/api/v1/tools/image/watermark-image", {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
         data: body,
       });
@@ -807,7 +807,7 @@ test.describe("Watermark Image -- scale variations", () => {
           },
         ],
       );
-      const res = await request.post("/api/v1/tools/watermark-image", {
+      const res = await request.post("/api/v1/tools/image/watermark-image", {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
         data: body,
       });
@@ -825,7 +825,7 @@ test.describe("Text Overlay -- all positions", () => {
 
   for (const position of positions) {
     test(`text overlay at ${position}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/text-overlay", {
+      const res = await request.post("/api/v1/tools/image/text-overlay", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -851,7 +851,7 @@ test.describe("Text Overlay -- font size range", () => {
 
   for (const fontSize of fontSizes) {
     test(`text overlay with fontSize=${fontSize}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/text-overlay", {
+      const res = await request.post("/api/v1/tools/image/text-overlay", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -877,7 +877,7 @@ test.describe("Text Overlay -- color variations", () => {
 
   for (const color of colors) {
     test(`text overlay with color=${color}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/text-overlay", {
+      const res = await request.post("/api/v1/tools/image/text-overlay", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -912,7 +912,7 @@ test.describe("Compose -- output verification", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 10, y: 10, opacity: 80 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -942,7 +942,7 @@ test.describe("Compose -- output verification", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 100 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -957,7 +957,7 @@ test.describe("Compose -- output verification", () => {
 
 test.describe("Watermark Text -- download verification", () => {
   test("watermarked file is downloadable and non-empty", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -986,7 +986,7 @@ test.describe("Watermark Text -- download verification", () => {
 
 test.describe("Auth failure", () => {
   test("watermark-text without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/watermark-text", {
+    const res = await request.post("/api/v1/tools/image/watermark-text", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
@@ -1014,7 +1014,7 @@ test.describe("Auth failure", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ x: 0, y: 0, opacity: 100 }) }],
     );
-    const res = await request.post("/api/v1/tools/compose", {
+    const res = await request.post("/api/v1/tools/image/compose", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -1039,7 +1039,7 @@ test.describe("Auth failure", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/watermark-image", {
+    const res = await request.post("/api/v1/tools/image/watermark-image", {
       headers: { "Content-Type": contentType },
       data: body,
     });
@@ -1047,7 +1047,7 @@ test.describe("Auth failure", () => {
   });
 
   test("text-overlay without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/text-overlay", {
+    const res = await request.post("/api/v1/tools/image/text-overlay", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({

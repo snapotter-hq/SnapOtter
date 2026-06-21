@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { apiToolPath } from "@snapotter/shared";
 
 // ─── AI Tools ───────────────────────────────────────────────────────
 // Tests for: remove-background, upscale, ocr, blur-faces, smart-crop,
@@ -92,7 +93,7 @@ async function callAiTool(
   filename = "test.png",
   mimeType = "image/png",
 ): Promise<{ installed: boolean; ok: boolean; status: number; body: Record<string, unknown> }> {
-  const res = await request.post(`/api/v1/tools/${toolId}`, {
+  const res = await request.post(apiToolPath(toolId), {
     headers: { Authorization: `Bearer ${token}` },
     multipart: {
       file: { name: filename, mimeType, buffer: imageBuffer },
@@ -808,7 +809,7 @@ test.describe("AI Feature Bundle Status", () => {
       if (installed) continue;
 
       testedCount++;
-      const res = await request.post(`/api/v1/tools/${tool}`, {
+      const res = await request.post(apiToolPath(tool), {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
@@ -838,7 +839,7 @@ test.describe("AI Feature Bundle Status", () => {
 test.describe("Transparency Fixer", () => {
   test("transparency fixer returns 202 or 501", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
-    const res = await request.post("/api/v1/tools/transparency-fixer", {
+    const res = await request.post("/api/v1/tools/image/transparency-fixer", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.jpg", mimeType: "image/jpeg", buffer: portrait },
@@ -860,7 +861,7 @@ test.describe("Transparency Fixer", () => {
   });
 
   test("transparency fixer with custom defringe", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/transparency-fixer", {
+    const res = await request.post("/api/v1/tools/image/transparency-fixer", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
@@ -879,7 +880,7 @@ test.describe("Transparency Fixer", () => {
   });
 
   test("transparency fixer with webp output", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/transparency-fixer", {
+    const res = await request.post("/api/v1/tools/image/transparency-fixer", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -898,7 +899,7 @@ test.describe("Transparency Fixer", () => {
   });
 
   test("transparency fixer rejects empty file", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/transparency-fixer", {
+    const res = await request.post("/api/v1/tools/image/transparency-fixer", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         settings: JSON.stringify({}),
@@ -977,7 +978,7 @@ test.describe("Colorize — additional", () => {
 
 test.describe("Auth failure", () => {
   test("remove-background without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/remove-background", {
+    const res = await request.post("/api/v1/tools/image/remove-background", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({}),
@@ -987,7 +988,7 @@ test.describe("Auth failure", () => {
   });
 
   test("upscale without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/upscale", {
+    const res = await request.post("/api/v1/tools/image/upscale", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({ scale: 2, model: "auto" }),
@@ -997,7 +998,7 @@ test.describe("Auth failure", () => {
   });
 
   test("ocr without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/ocr", {
+    const res = await request.post("/api/v1/tools/image/ocr", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({}),
@@ -1007,7 +1008,7 @@ test.describe("Auth failure", () => {
   });
 
   test("transparency-fixer without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/transparency-fixer", {
+    const res = await request.post("/api/v1/tools/image/transparency-fixer", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({}),
@@ -1017,7 +1018,7 @@ test.describe("Auth failure", () => {
   });
 
   test("blur-faces without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/blur-faces", {
+    const res = await request.post("/api/v1/tools/image/blur-faces", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({ blurRadius: 30 }),
@@ -1027,7 +1028,7 @@ test.describe("Auth failure", () => {
   });
 
   test("colorize without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/colorize", {
+    const res = await request.post("/api/v1/tools/image/colorize", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: TINY_PNG },
         settings: JSON.stringify({}),

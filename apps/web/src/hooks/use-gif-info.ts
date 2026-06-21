@@ -38,7 +38,7 @@ export function useGifInfo() {
     const formData = new FormData();
     formData.append("file", file);
 
-    fetch("/api/v1/tools/gif-tools/info", {
+    fetch("/api/v1/tools/image/gif-tools/info", {
       method: "POST",
       headers: formatHeaders(),
       body: formData,

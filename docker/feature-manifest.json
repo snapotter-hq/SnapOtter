@@ -1,9 +1,9 @@
 {
   "manifestVersion": 2,
   "imageVersion": "2.0.0",
-  "pythonVersion": "3.12",
+  "pythonVersion": "3.11",
   "basePackages": ["numpy==1.26.4", "Pillow==12.2.0", "opencv-python-headless==4.10.0.84"],
-  "bundleRepo": "snapotter/feature-bundles",
+  "bundleRepo": "deepsafe/feature-bundles",
   "bundles": {
     "background-removal": {
       "name": "Background Removal",
@@ -12,15 +12,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/background-removal-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "a1dfbdd5862fd32c7719ca79b0c7e4b76a327330a5991ddad98a2761abca10cb",
+          "compressedSize": 4808242472,
+          "extractedSize": 0
         },
         "arm64-cpu": {
           "file": "v2.0.0/background-removal-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "cbb570b81bfd740dd05e265dd8c93ade53a9f41fdd30cc8b3fbc47a8daa824af",
+          "compressedSize": 4631430295,
+          "extractedSize": 0
         }
       },
       "packages": {
@@ -31,13 +31,21 @@
       "pipFlags": {},
       "postInstall": [],
       "models": [
-        { "id": "rembg-u2net", "downloadFn": "rembg_session", "args": ["u2net"] },
+        {
+          "id": "rembg-u2net",
+          "downloadFn": "rembg_session",
+          "args": ["u2net"]
+        },
         {
           "id": "rembg-isnet-general-use",
           "downloadFn": "rembg_session",
           "args": ["isnet-general-use"]
         },
-        { "id": "rembg-bria-rmbg", "downloadFn": "rembg_session", "args": ["bria-rmbg"] },
+        {
+          "id": "rembg-bria-rmbg",
+          "downloadFn": "rembg_session",
+          "args": ["bria-rmbg"]
+        },
         {
           "id": "rembg-birefnet-general-lite",
           "downloadFn": "rembg_session",
@@ -79,15 +87,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/face-detection-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "0ee28b86dac88c60e005604ba0595746f455ec97f08d0c8307ba9b57e131bc7f",
+          "compressedSize": 75358868,
+          "extractedSize": 209838080
         },
         "arm64-cpu": {
           "file": "v2.0.0/face-detection-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "8ad922514aba1721de154d370f9335f78c5ce5aceade5b19515e0192d4367909",
+          "compressedSize": 222878753,
+          "extractedSize": 704276480
         }
       },
       "packages": {
@@ -120,15 +128,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/object-eraser-colorize-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "a3f6cd2eca9e5dd907497d0d58ca5f6532887bb748e4062de0f4fb9815782c31",
+          "compressedSize": 1545472964,
+          "extractedSize": 2249379840
         },
         "arm64-cpu": {
           "file": "v2.0.0/object-eraser-colorize-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "e043d91acca20b3259711fd3a54521890f624b9952e617159f21a97216830630",
+          "compressedSize": 1266922599,
+          "extractedSize": 0
         }
       },
       "packages": {
@@ -186,15 +194,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "37f0e7a62dcb83b2dc0760532fb41ac9d1c40d336abe1aea01d889ad039ebc65",
+          "compressedSize": 5314188723,
+          "extractedSize": 8412712960
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "de65321f1cc5d5664c63e38e49cd39c36fe88e0569d666821e982ff6d6999bea",
+          "compressedSize": 2262502457,
+          "extractedSize": 0
         }
       },
       "packages": {
@@ -206,7 +214,13 @@
           "realesrgan==0.3.0",
           "mediapipe>=0.10.21"
         ],
-        "arm64": ["lpips", "basicsr==1.4.2", "realesrgan==0.3.0", "mediapipe>=0.10.18"]
+        "arm64": [
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
+          "lpips",
+          "basicsr==1.4.2",
+          "realesrgan==0.3.0",
+          "mediapipe>=0.10.18"
+        ]
       },
       "pipFlags": {
         "codeformer-pip==0.0.4": "--no-deps",
@@ -267,6 +281,13 @@
           "minSize": 60000000
         }
       ],
+      "patches": [
+        {
+          "file": "basicsr/data/degradations.py",
+          "search": "from torchvision.transforms.functional_tensor import rgb_to_grayscale",
+          "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
+        }
+      ],
       "enablesTools": ["upscale", "enhance-faces", "noise-removal"]
     },
     "photo-restoration": {
@@ -276,15 +297,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/photo-restoration-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "2ccac73c862f04dafc8d7ecc6543bbe8481b9d796a53a9c4e7cf34e53f261a24",
+          "compressedSize": 4698091043,
+          "extractedSize": 8246353920
         },
         "arm64-cpu": {
           "file": "v2.0.0/photo-restoration-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "13afbaae45d84f1148d00b76a20115283ab3f75d7b2a9e33b940c9bf800b40e1",
+          "compressedSize": 1367026285,
+          "extractedSize": 0
         }
       },
       "packages": {
@@ -298,6 +319,7 @@
           "realesrgan==0.3.0"
         ],
         "arm64": [
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
           "onnxruntime==1.20.1",
           "mediapipe>=0.10.18",
           "lpips",
@@ -364,6 +386,13 @@
           "minSize": 3000000
         }
       ],
+      "patches": [
+        {
+          "file": "basicsr/data/degradations.py",
+          "search": "from torchvision.transforms.functional_tensor import rgb_to_grayscale",
+          "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
+        }
+      ],
       "enablesTools": ["restore-photo"]
     },
     "ocr": {
@@ -373,15 +402,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/ocr-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "80db475eb442899cedad3590b18f080225deaf50985224b302475fbfdf5883f6",
+          "compressedSize": 5927587552,
+          "extractedSize": 9367838720
         },
         "arm64-cpu": {
           "file": "v2.0.0/ocr-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "5c40dfc5f3147dd61bf8f3b24604eefb5591e6412a2ca61f7e2fb7e1c7d11b9c",
+          "compressedSize": 1977460762,
+          "extractedSize": 0
         }
       },
       "packages": {
@@ -445,18 +474,22 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/transcription-amd64-gpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "3033d480c6183df66855d78c355233dbc86a754d07414e544e1df1038337c9e1",
+          "compressedSize": 559189061,
+          "extractedSize": 845987840
         },
         "arm64-cpu": {
           "file": "v2.0.0/transcription-arm64-cpu.tar.gz",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "compressedSize": 1,
-          "extractedSize": 1
+          "sha256": "6184434bc10986677d15e96e22b6998c3a780d6619b6457b8854c01dfd0f9a28",
+          "compressedSize": 531990919,
+          "extractedSize": 0
         }
       },
-      "packages": { "common": ["faster-whisper>=1.0.0"], "amd64": [], "arm64": [] },
+      "packages": {
+        "common": ["faster-whisper>=1.0.0"],
+        "amd64": [],
+        "arm64": []
+      },
       "pipFlags": {},
       "postInstall": [],
       "models": [

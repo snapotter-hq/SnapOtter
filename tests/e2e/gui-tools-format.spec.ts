@@ -86,7 +86,9 @@ test.describe("GUI Format & Conversion Tools", () => {
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(path.join(process.cwd(), "tests", "fixtures", "test-100x100.svg"));
+      await fileChooser.setFiles(
+        path.join(process.cwd(), "tests", "fixtures", "image", "valid", "test-100x100.svg"),
+      );
       await page.waitForTimeout(500);
 
       await page.getByRole("button", { name: "Scale Factor" }).click();
@@ -294,7 +296,9 @@ test.describe("GUI Format & Conversion Tools", () => {
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(path.join(process.cwd(), "tests", "fixtures", "animated.gif"));
+      await fileChooser.setFiles(
+        path.join(process.cwd(), "tests", "fixtures", "image", "valid", "animated.gif"),
+      );
       await page.waitForTimeout(500);
 
       await page.getByRole("button", { name: "Speed" }).first().click();
@@ -308,7 +312,9 @@ test.describe("GUI Format & Conversion Tools", () => {
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(path.join(process.cwd(), "tests", "fixtures", "animated.gif"));
+      await fileChooser.setFiles(
+        path.join(process.cwd(), "tests", "fixtures", "image", "valid", "animated.gif"),
+      );
       await page.waitForTimeout(500);
 
       await page.getByRole("button", { name: "Extract" }).first().click();

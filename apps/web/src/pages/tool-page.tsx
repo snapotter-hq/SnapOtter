@@ -1,4 +1,10 @@
-import { MODALITIES, PYTHON_SIDECAR_TOOLS, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import {
+  PYTHON_SIDECAR_TOOLS,
+  SECTIONS,
+  TOOL_BUNDLE_MAP,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import {
   AlertCircle,
   CheckCircle2,
@@ -233,11 +239,11 @@ export function ToolPage() {
 
   const breadcrumb = useMemo(() => {
     if (!tool) return undefined;
-    const modalityInfo = MODALITIES.find((m) => m.id === tool.modality);
-    const modalityDisplay = modalityInfo?.name ?? tool.modality;
+    const section = toolSection(tool);
+    const sectionInfo = SECTIONS.find((s) => s.id === section);
     return {
-      modality: modalityDisplay,
-      modalityTab: tool.modality === "file" ? "data" : tool.modality,
+      modality: sectionInfo?.name ?? section,
+      modalityTab: section,
       toolName: getToolName(t, tool.id, tool.name),
     };
   }, [tool, t]);

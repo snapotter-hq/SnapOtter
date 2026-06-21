@@ -1,9 +1,7 @@
 import { Check, Copy, Download, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { format } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -99,7 +97,7 @@ function scanOneFile(
     xhr.onerror = () => reject(new Error("Network error"));
     xhr.ontimeout = () => reject(new Error("Request timed out"));
 
-    xhr.open("POST", "/api/v1/tools/barcode-read");
+    xhr.open("POST", "/api/v1/tools/image/barcode-read");
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }
@@ -108,7 +106,6 @@ function scanOneFile(
 }
 
 export function BarcodeReadSettings() {
-  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
   const [tryHarder, setTryHarder] = useState(false);

@@ -77,7 +77,7 @@ const JPG_SAMPLE = formatFixture("sample.jpg");
 
 test.describe("Optimize for Web — extended", () => {
   test("optimize with aggressive quality (20)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -91,7 +91,7 @@ test.describe("Optimize for Web — extended", () => {
   });
 
   test("optimize with high quality (95) preserves detail", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -105,7 +105,7 @@ test.describe("Optimize for Web — extended", () => {
   });
 
   test("optimize HEIC for web", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -119,7 +119,7 @@ test.describe("Optimize for Web — extended", () => {
 
   test("optimize WebP for web", async ({ request }) => {
     const webpSample = formatFixture("sample.webp");
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.webp", mimeType: "image/webp", buffer: webpSample },
@@ -133,7 +133,7 @@ test.describe("Optimize for Web — extended", () => {
   });
 
   test("optimize without maxWidth (no resize, only compress)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -147,7 +147,7 @@ test.describe("Optimize for Web — extended", () => {
 
   test("optimize large content image for web", async ({ request }) => {
     const stressImg = contentFixture("stress-large.jpg");
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stress-large.jpg", mimeType: "image/jpeg", buffer: stressImg },
@@ -173,7 +173,7 @@ test.describe("Bulk Rename — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pattern: "2024-01-{{index}}" }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -201,7 +201,7 @@ test.describe("Bulk Rename — extended", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -229,7 +229,7 @@ test.describe("Bulk Rename — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pattern: "gallery-{{index}}" }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -241,7 +241,7 @@ test.describe("Bulk Rename — extended", () => {
 
 test.describe("Favicon — extended", () => {
   test("generate favicon from WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -260,7 +260,7 @@ test.describe("Favicon — extended", () => {
   });
 
   test("generate favicon from HEIC", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -271,7 +271,7 @@ test.describe("Favicon — extended", () => {
   });
 
   test("generate favicon from large sample JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -291,7 +291,7 @@ test.describe("Favicon — extended", () => {
 
   test("generate favicon from AVIF format", async ({ request }) => {
     const avif = formatFixture("sample.avif");
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
@@ -314,7 +314,7 @@ test.describe("Image to PDF — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -329,7 +329,7 @@ test.describe("Image to PDF — extended", () => {
       [{ name: "file", filename: "test.jpg", contentType: "image/jpeg", buffer: JPG_100x100 }],
       [{ name: "settings", value: JSON.stringify({ pageSize: "Letter" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -344,7 +344,7 @@ test.describe("Image to PDF — extended", () => {
       [{ name: "file", filename: "test.heic", contentType: "image/heic", buffer: HEIC_200x150 }],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -370,7 +370,7 @@ test.describe("Image to PDF — extended", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: body,
     });
@@ -385,7 +385,7 @@ test.describe("Image to PDF — extended", () => {
 
 test.describe("Replace Color — extended", () => {
   test("replace color on WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -403,7 +403,7 @@ test.describe("Replace Color — extended", () => {
   });
 
   test("replace color with zero tolerance (exact match)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -420,7 +420,7 @@ test.describe("Replace Color — extended", () => {
   });
 
   test("replace color with maximum tolerance (100)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -437,7 +437,7 @@ test.describe("Replace Color — extended", () => {
   });
 
   test("replace color on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -455,7 +455,7 @@ test.describe("Replace Color — extended", () => {
 
   test("replace color on content image", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.jpg", mimeType: "image/jpeg", buffer: portrait },
@@ -477,7 +477,7 @@ test.describe("Replace Color — extended", () => {
 
 test.describe("Edit Metadata — extended", () => {
   test("set all EXIF fields at once", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -496,7 +496,7 @@ test.describe("Edit Metadata — extended", () => {
   });
 
   test("edit metadata on WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/edit-metadata", {
+    const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -510,7 +510,7 @@ test.describe("Edit Metadata — extended", () => {
 
   test("edit metadata round-trip verification", async ({ request }) => {
     // Set metadata
-    const editRes = await request.post("/api/v1/tools/edit-metadata", {
+    const editRes = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -528,7 +528,7 @@ test.describe("Edit Metadata — extended", () => {
     const editedBuffer = Buffer.from(await dlRes.body());
 
     // Check info on the edited image
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "edited.jpg", mimeType: "image/jpeg", buffer: editedBuffer },
@@ -545,7 +545,7 @@ test.describe("Edit Metadata — extended", () => {
 test.describe("Strip Metadata — extended", () => {
   test("strip metadata from JPEG with EXIF preserves dimensions", async ({ request }) => {
     const jpgExif = fixture("test-with-exif.jpg");
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: jpgExif },
@@ -560,7 +560,7 @@ test.describe("Strip Metadata — extended", () => {
   });
 
   test("strip metadata from WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -573,7 +573,7 @@ test.describe("Strip Metadata — extended", () => {
   });
 
   test("strip metadata from HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/strip-metadata", {
+    const res = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -587,7 +587,7 @@ test.describe("Strip Metadata — extended", () => {
 
   test("stripped image verified via info has no EXIF", async ({ request }) => {
     const jpgExif = fixture("test-with-exif.jpg");
-    const stripRes = await request.post("/api/v1/tools/strip-metadata", {
+    const stripRes = await request.post("/api/v1/tools/image/strip-metadata", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: jpgExif },
@@ -605,7 +605,7 @@ test.describe("Strip Metadata — extended", () => {
     const strippedBuffer = Buffer.from(await dlRes.body());
 
     // Verify via info tool
-    const infoRes = await request.post("/api/v1/tools/info", {
+    const infoRes = await request.post("/api/v1/tools/image/info", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "stripped.jpg", mimeType: "image/jpeg", buffer: strippedBuffer },
@@ -621,7 +621,7 @@ test.describe("Strip Metadata — extended", () => {
 
 test.describe("Image Enhancement — extended", () => {
   test("enhancement with auto preset", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-enhancement", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -635,7 +635,7 @@ test.describe("Image Enhancement — extended", () => {
   });
 
   test("enhancement with vivid preset", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-enhancement", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -650,7 +650,7 @@ test.describe("Image Enhancement — extended", () => {
   });
 
   test("enhancement on WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-enhancement", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -663,7 +663,7 @@ test.describe("Image Enhancement — extended", () => {
   });
 
   test("enhancement on HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/image-enhancement", {
+    const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -680,7 +680,7 @@ test.describe("Image Enhancement — extended", () => {
 
 test.describe("Content-Aware Resize — extended", () => {
   test("content-aware resize to smaller width", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -699,7 +699,7 @@ test.describe("Content-Aware Resize — extended", () => {
   });
 
   test("content-aware resize JPEG image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -717,7 +717,7 @@ test.describe("Content-Aware Resize — extended", () => {
   });
 
   test("content-aware resize on large content image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -739,7 +739,7 @@ test.describe("Content-Aware Resize — extended", () => {
 
 test.describe("Content-Aware Resize — HEIC & edge cases", () => {
   test("content-aware resize HEIC image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
@@ -757,7 +757,7 @@ test.describe("Content-Aware Resize — HEIC & edge cases", () => {
   });
 
   test("content-aware resize WebP image", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
@@ -779,7 +779,7 @@ test.describe("Content-Aware Resize — HEIC & edge cases", () => {
 
 test.describe("Optimize for Web — output verification", () => {
   test("optimized file can be downloaded and is valid", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -805,7 +805,7 @@ test.describe("Optimize for Web — output verification", () => {
 
 test.describe("Favicon — output verification", () => {
   test("favicon output can be downloaded", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -832,7 +832,7 @@ test.describe("Favicon — output verification", () => {
 
   test("favicon from TIFF format", async ({ request }) => {
     const tiff = formatFixture("sample.tiff");
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.tiff", mimeType: "image/tiff", buffer: tiff },
@@ -847,7 +847,7 @@ test.describe("Favicon — output verification", () => {
 
 test.describe("Optimize for Web -- target format", () => {
   test("optimize with target format WebP", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -861,7 +861,7 @@ test.describe("Optimize for Web -- target format", () => {
   });
 
   test("optimize with target format AVIF", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -874,7 +874,7 @@ test.describe("Optimize for Web -- target format", () => {
   });
 
   test("optimize preserves original format when no target specified", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -891,7 +891,7 @@ test.describe("Optimize for Web -- target format", () => {
 
 test.describe("Optimize for Web -- constraints", () => {
   test("optimize with maxWidth only (no quality)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -905,7 +905,7 @@ test.describe("Optimize for Web -- constraints", () => {
   });
 
   test("optimize with quality only (no resize)", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -919,7 +919,7 @@ test.describe("Optimize for Web -- constraints", () => {
   });
 
   test("optimize with very small maxWidth", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
@@ -937,7 +937,7 @@ test.describe("Optimize for Web -- constraints", () => {
 
 test.describe("Favicon -- multi-size", () => {
   test("favicon from PNG generates downloadable output", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -964,7 +964,7 @@ test.describe("Favicon -- multi-size", () => {
   });
 
   test("favicon from JPEG", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -976,7 +976,7 @@ test.describe("Favicon -- multi-size", () => {
 
   test("favicon from PNG content image", async ({ request }) => {
     const portrait = contentFixture("portrait-isolated.png");
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "portrait.png", mimeType: "image/png", buffer: portrait },
@@ -988,7 +988,7 @@ test.describe("Favicon -- multi-size", () => {
 
   test("favicon from GIF format", async ({ request }) => {
     const gif = formatFixture("sample.gif");
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.gif", mimeType: "image/gif", buffer: gif },
@@ -1006,7 +1006,7 @@ test.describe("Replace Color -- tolerance levels", () => {
 
   for (const tolerance of tolerances) {
     test(`replace color with tolerance=${tolerance}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/replace-color", {
+      const res = await request.post("/api/v1/tools/image/replace-color", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1029,7 +1029,7 @@ test.describe("Replace Color -- tolerance levels", () => {
 
 test.describe("Replace Color -- download verification", () => {
   test("replaced-color image is downloadable and valid", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
@@ -1076,7 +1076,7 @@ test.describe("Bulk Rename -- ZIP output", () => {
       ],
       [{ name: "settings", value: JSON.stringify({ pattern: "photo-{{index}}", startIndex: 1 }) }],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -1116,7 +1116,7 @@ test.describe("Bulk Rename -- ZIP output", () => {
         },
       ],
     );
-    const res = await request.post("/api/v1/tools/bulk-rename", {
+    const res = await request.post("/api/v1/tools/image/bulk-rename", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
@@ -1131,7 +1131,7 @@ test.describe("Image Enhancement -- presets", () => {
 
   for (const preset of presets) {
     test(`enhancement with preset=${preset}`, async ({ request }) => {
-      const res = await request.post("/api/v1/tools/image-enhancement", {
+      const res = await request.post("/api/v1/tools/image/image-enhancement", {
         headers: { Authorization: `Bearer ${token}` },
         multipart: {
           file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
@@ -1150,7 +1150,7 @@ test.describe("Image Enhancement -- presets", () => {
 
 test.describe("Auth failure", () => {
   test("optimize-for-web without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/optimize-for-web", {
+    const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({ maxWidth: 800, quality: 75 }),
@@ -1160,7 +1160,7 @@ test.describe("Auth failure", () => {
   });
 
   test("favicon without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/favicon", {
+    const res = await request.post("/api/v1/tools/image/favicon", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({}),
@@ -1170,7 +1170,7 @@ test.describe("Auth failure", () => {
   });
 
   test("replace-color without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/replace-color", {
+    const res = await request.post("/api/v1/tools/image/replace-color", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
@@ -1188,7 +1188,7 @@ test.describe("Auth failure", () => {
       [{ name: "file", filename: "test.jpg", contentType: "image/jpeg", buffer: JPG_100x100 }],
       [{ name: "settings", value: JSON.stringify({ pageSize: "A4" }) }],
     );
-    const res = await request.post("/api/v1/tools/image-to-pdf", {
+    const res = await request.post("/api/v1/tools/image/image-to-pdf", {
       headers: { "Content-Type": contentType },
       data: reqBody,
     });
@@ -1196,7 +1196,7 @@ test.describe("Auth failure", () => {
   });
 
   test("content-aware-resize without token returns 401", async ({ request }) => {
-    const res = await request.post("/api/v1/tools/content-aware-resize", {
+    const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({ width: 100, height: 100 }),

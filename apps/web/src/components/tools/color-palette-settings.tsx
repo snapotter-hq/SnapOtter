@@ -31,7 +31,7 @@ export function ColorPaletteSettings() {
       formData.append("file", files[0]);
       formData.append("settings", JSON.stringify({ count, format }));
 
-      const res = await fetch("/api/v1/tools/color-palette", {
+      const res = await fetch("/api/v1/tools/image/color-palette", {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

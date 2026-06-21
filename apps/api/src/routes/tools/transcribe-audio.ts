@@ -79,7 +79,7 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
 
 export function registerTranscribeAudio(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/transcribe-audio",
+    "/api/v1/tools/audio/transcribe-audio",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "transcribe-audio";
       if (!isToolInstalled(toolId)) {

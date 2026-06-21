@@ -28,7 +28,7 @@ type Settings = z.infer<typeof settingsSchema>;
 /** Content-aware resize (seam carving via caire) route. */
 export function registerContentAwareResize(app: FastifyInstance) {
   app.post(
-    "/api/v1/tools/content-aware-resize",
+    "/api/v1/tools/image/content-aware-resize",
     async (request: FastifyRequest, reply: FastifyReply) => {
       let fileBuffer: Buffer | null = null;
       let filename = "image";

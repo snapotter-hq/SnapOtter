@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import type { EditMetadataSettings } from "../../../apps/api/src/lib/exiftool.js";
@@ -8,8 +6,7 @@ import {
   inspectMetadata,
   writeMetadata,
 } from "../../../apps/api/src/lib/exiftool.js";
-
-const FIXTURES = join(import.meta.dirname, "../../fixtures");
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 describe("buildTagArgs", () => {
   it("returns empty array for empty settings", () => {
@@ -289,33 +286,33 @@ describe("buildTagArgs", () => {
 
 describe("inspectMetadata", () => {
   it("returns correct filename and fileSize for JPEG with EXIF", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const result = await inspectMetadata(buf, "test-with-exif.jpg");
     expect(result.filename).toBe("test-with-exif.jpg");
     expect(result.fileSize).toBe(buf.length);
   });
 
   it("returns non-null exif object for JPEG with EXIF data", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const result = await inspectMetadata(buf, "test-with-exif.jpg");
     expect(result.exif).not.toBeNull();
     expect(typeof result.exif).toBe("object");
   });
 
   it("returns keywords array (may be empty)", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const result = await inspectMetadata(buf, "test-with-exif.jpg");
     expect(Array.isArray(result.keywords)).toBe(true);
   });
 
   it("returns null for GPS when no GPS data present", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const result = await inspectMetadata(buf, "test-with-exif.jpg");
     expect(result.gps).toBeNull();
   });
 
   it("works with PNG which has no EXIF -- returns null for exif, iptc, xmp, gps", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-1x1.png"));
+    const buf = readFixture(fixtures.image.edge.px1);
     const result = await inspectMetadata(buf, "test-1x1.png");
     expect(result.filename).toBe("test-1x1.png");
     expect(result.fileSize).toBe(buf.length);
@@ -328,13 +325,13 @@ describe("inspectMetadata", () => {
 
 describe("writeMetadata", () => {
   it("empty tags array returns buffer unchanged", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const result = await writeMetadata(buf, "test-with-exif.jpg", []);
     expect(Buffer.compare(result, buf)).toBe(0);
   });
 
   it("writing -Artist=TestArtist then inspecting shows the artist", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const written = await writeMetadata(buf, "test-with-exif.jpg", ["-Artist=TestArtist"]);
     const result = await inspectMetadata(written, "test-with-exif.jpg");
     expect(result.exif).not.toBeNull();
@@ -342,7 +339,7 @@ describe("writeMetadata", () => {
   });
 
   it("writing multiple tags works", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const written = await writeMetadata(buf, "test-with-exif.jpg", [
       "-Artist=MultiTest",
       "-Copyright=2024 Test Corp",
@@ -353,7 +350,7 @@ describe("writeMetadata", () => {
   });
 
   it("returns a valid image buffer that Sharp can read", async () => {
-    const buf = readFileSync(join(FIXTURES, "test-with-exif.jpg"));
+    const buf = readFixture(fixtures.image.exifGps);
     const written = await writeMetadata(buf, "test-with-exif.jpg", ["-Software=SnapOtter"]);
     const meta = await sharp(written).metadata();
     expect(meta.format).toBe("jpeg");

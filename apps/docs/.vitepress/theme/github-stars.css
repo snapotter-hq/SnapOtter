@@ -1,34 +1,3 @@
-/* Move the docker command banner between hero and features */
-.VPHome {
-  display: flex;
-  flex-direction: column;
-}
-
-.VPHome > .VPHomeHero {
-  order: 0;
-}
-
-.VPHome > .vp-doc {
-  order: 1;
-}
-
-.VPHome > .VPHomeFeatures {
-  order: 2;
-}
-
-/* Quick start command banner on homepage */
-.quick-start-banner {
-  max-width: 960px;
-  margin: 0 auto 48px;
-  padding: 0 24px;
-  text-align: center;
-}
-
-.quick-start-banner div[class*="language-"] {
-  margin: 0;
-  border-radius: 10px;
-}
-
 /* Hide the three-dots extra menu - its contents are now in the navbar directly */
 .VPNavBarExtra {
   display: none !important;
