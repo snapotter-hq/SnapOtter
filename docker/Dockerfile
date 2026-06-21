@@ -195,7 +195,11 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
 # System dependencies (all platforms)
 # Split into runtime deps and build deps to minimize final image size.
 # Retry apt-get update with backoff — Ubuntu mirrors can be flaky on CI runners
+# `apt-get upgrade` pulls security patches for base-image packages (e.g.
+# libgnutls30t64, libgcrypt20, liblzma5) that the pinned base digest ships at an
+# outdated patch level -- closes the Trivy OS-package CVEs on every rebuild.
 RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     tini \
     imagemagick \
@@ -269,7 +273,7 @@ RUN ldconfig
 # Uses pre-built manylinux wheels where available; gcc/g++ above covers the rest.
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade "pip==25.1.1" && \
+    /opt/venv/bin/pip install --upgrade "pip==26.1.2" && \
     /opt/venv/bin/pip install wheel setuptools && \
     /opt/venv/bin/pip install \
         Pillow==12.2.0 \

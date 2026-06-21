@@ -26,3 +26,25 @@ CVE-2026-24842
 CVE-2026-26960
 CVE-2026-29786
 CVE-2026-31802
+
+# pnpm 9.x core (2026 rescan) -- same build-time-tool rationale as above; every
+# one of these is fixed only in pnpm 10.x (10.0.0 / 10.28.1 / 10.28.2), a major
+# breaking migration tracked separately. pnpm runs only at install/start time.
+CVE-2024-47829
+CVE-2026-23888
+CVE-2026-23889
+CVE-2026-23890
+CVE-2026-24056
+CVE-2026-24131
+
+# golang.org/x/image bundled in the caire binary (content-aware seam-carving
+# resize, one tool). esimov/caire v1.5.0 is the latest release and still pins
+# golang.org/x/image v0.18.0; there is no upstream caire build with the fixed
+# x/image >=0.38.0. Re-evaluate when caire publishes a new release.
+CVE-2026-33809
+
+# brace-expansion: build-toolchain transitive of minimatch/glob. The patched
+# instance (5.0.6) is already present; the only flagged copy is the 2.x line
+# pulled by glob, whose fix is a major-version bump (5.0.5) the glob ecosystem
+# has not adopted. Not reachable from user input.
+CVE-2026-33750
