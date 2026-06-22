@@ -1,4 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ZoomToolbar } from "@/components/common/zoom-toolbar";
+import { useZoomPan } from "@/hooks/use-zoom-pan";
+import { renderSize } from "@/hooks/zoom-pan-math";
 
 type Point = { x: number; y: number };
 type Stroke = { points: Point[]; size: number };
@@ -43,6 +46,17 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
   // Cursor position for brush preview
   const [cursorPos, setCursorPos] = useState<Point | null>(null);
 
+  // Zoom & pan. Sizes become available once the image is measured.
+  const sizes =
+    canvasSize && naturalRef.current.w
+      ? { natural: { ...naturalRef.current }, fitted: { w: canvasSize.w, h: canvasSize.h } }
+      : null;
+  const zp = useZoomPan({ sizes, viewportRef: wrapperRef, resetKey: imageSrc });
+  const { isPanMode, beginPan, movePan, endPan, toContent } = zp;
+
+  // Mask backing-store resolution: natural res (capped) so the overlay stays crisp when zoomed.
+  const renderDims = sizes ? renderSize(sizes) : null;
+
   // Measure and fit image to container
   const measure = useCallback(() => {
     const img = imgRef.current;
@@ -59,6 +73,17 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       h: Math.floor(img.naturalHeight * scale),
     });
   }, []);
+
+  // Acquire the mask context with the backing-store scale applied, so all drawing
+  // happens in fitted (canvasSize) coordinates but renders at natural resolution.
+  const prepCtx = useCallback((): CanvasRenderingContext2D | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || !canvasSize) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(canvas.width / canvasSize.w, 0, 0, canvas.height / canvasSize.h, 0, 0);
+    return ctx;
+  }, [canvasSize]);
 
   // Persist current strokes to the per-image map
   const persistStrokes = useCallback(() => {
@@ -114,7 +139,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
 
   // Redraw all strokes
   const redraw = useCallback(() => {
-    const ctx = canvasRef.current?.getContext("2d");
+    const ctx = prepCtx();
     if (!ctx || !canvasSize) return;
 
     ctx.clearRect(0, 0, canvasSize.w, canvasSize.h);
@@ -122,7 +147,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
     for (const stroke of strokesRef.current) {
       drawStroke(ctx, stroke);
     }
-  }, [canvasSize, drawStroke]);
+  }, [canvasSize, drawStroke, prepCtx]);
 
   // Keyboard shortcut: Ctrl+Z for undo
   useEffect(() => {
@@ -140,19 +165,33 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
     return () => window.removeEventListener("keydown", handler);
   }, [onStrokeChange, onMaskedCountChange, redraw, persistStrokes]);
 
-  // Get canvas-relative point from event
-  const getPoint = useCallback((e: React.MouseEvent | React.TouchEvent): Point | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-
-    const raw = "touches" in e ? e.touches[0] : e;
-    if (!raw) return null;
-    return { x: raw.clientX - rect.left, y: raw.clientY - rect.top };
-  }, []);
+  // Get canvas-relative point from event (transform-agnostic: divides out zoom/pan)
+  const getPoint = useCallback(
+    (e: React.MouseEvent | React.TouchEvent): Point | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const raw = "touches" in e ? e.touches[0] : e;
+      if (!raw) return null;
+      return toContent(raw.clientX, raw.clientY, canvas.getBoundingClientRect());
+    },
+    [toContent],
+  );
 
   const handleDown = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
+      // Multi-touch -> hand off to pinch-zoom; never paint a stray stroke.
+      // Return BEFORE preventDefault so the gesture sees the pinch.
+      if ("touches" in e && e.touches.length > 1) {
+        drawingRef.current = false;
+        currentPointsRef.current = [];
+        return;
+      }
+      // Pan mode -> drag pans instead of painting.
+      if (isPanMode) {
+        const raw = "touches" in e ? e.touches[0] : e;
+        if (raw) beginPan(raw.clientX, raw.clientY);
+        return;
+      }
       if ("touches" in e) e.preventDefault();
       const pt = getPoint(e);
       if (!pt) return;
@@ -160,7 +199,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       currentPointsRef.current = [pt];
 
       // Immediate dot
-      const ctx = canvasRef.current?.getContext("2d");
+      const ctx = prepCtx();
       if (ctx) {
         ctx.beginPath();
         ctx.fillStyle = "rgba(255, 60, 60, 0.4)";
@@ -168,11 +207,23 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
         ctx.fill();
       }
     },
-    [getPoint, brushSize],
+    [getPoint, brushSize, isPanMode, beginPan, prepCtx],
   );
 
   const handleMove = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
+      if ("touches" in e && e.touches.length > 1) {
+        drawingRef.current = false;
+        return;
+      }
+      // Pan mode -> drag pans; hide the brush preview.
+      if (isPanMode) {
+        const raw = "touches" in e ? e.touches[0] : e;
+        if (raw) movePan(raw.clientX, raw.clientY);
+        setCursorPos(null);
+        return;
+      }
+
       // Update cursor position for brush preview
       const pt = getPoint(e);
       if (pt) setCursorPos(pt);
@@ -183,7 +234,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
 
       currentPointsRef.current.push(pt);
 
-      const ctx = canvasRef.current?.getContext("2d");
+      const ctx = prepCtx();
       if (!ctx) return;
       const pts = currentPointsRef.current;
       if (pts.length < 2) return;
@@ -196,10 +247,11 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       ctx.lineTo(pt.x, pt.y);
       ctx.stroke();
     },
-    [getPoint, brushSize],
+    [getPoint, brushSize, isPanMode, movePan, prepCtx],
   );
 
   const handleUp = useCallback(() => {
+    endPan();
     if (!drawingRef.current) return;
     drawingRef.current = false;
 
@@ -214,7 +266,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       persistStrokes();
       onMaskedCountChange?.(allStrokesRef.current.size);
     }
-  }, [brushSize, onStrokeChange, onMaskedCountChange, redraw, persistStrokes]);
+  }, [brushSize, onStrokeChange, onMaskedCountChange, redraw, persistStrokes, endPan]);
 
   const handleLeave = useCallback(() => {
     setCursorPos(null);
@@ -363,7 +415,12 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
   );
 
   return (
-    <div ref={wrapperRef} className="relative flex items-center justify-center w-full h-full">
+    <div
+      ref={wrapperRef}
+      data-testid="zoom-viewport"
+      className="relative flex items-center justify-center w-full h-full overflow-hidden touch-none"
+      {...zp.bindGestures()}
+    >
       {/* Hidden img for measuring natural size before canvas is ready */}
       {!canvasSize && (
         <img
@@ -374,43 +431,67 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
           className="max-w-full max-h-full object-contain"
         />
       )}
-      {canvasSize && (
-        <div className="relative" style={{ width: canvasSize.w, height: canvasSize.h }}>
-          <img
-            ref={imgRef}
-            src={imageSrc}
-            alt="Paint over objects to erase"
-            className="block"
-            style={{ width: canvasSize.w, height: canvasSize.h }}
-          />
-          <canvas
-            ref={canvasRef}
-            width={canvasSize.w}
-            height={canvasSize.h}
-            className="absolute inset-0 touch-none"
-            style={{ cursor: "none" }}
-            onMouseDown={handleDown}
-            onMouseMove={handleMove}
-            onMouseUp={handleUp}
-            onMouseLeave={handleLeave}
-            onTouchStart={handleDown}
-            onTouchMove={handleMove}
-            onTouchEnd={handleUp}
-          />
-          {/* Brush cursor preview */}
-          {cursorPos && (
-            <div
-              className="pointer-events-none absolute rounded-full border-2 border-white/80"
-              style={{
-                width: brushSize,
-                height: brushSize,
-                left: cursorPos.x - brushSize / 2,
-                top: cursorPos.y - brushSize / 2,
-                boxShadow: "0 0 0 1px rgba(0,0,0,0.3)",
-              }}
+      {canvasSize && renderDims && (
+        <>
+          <div
+            data-testid="zoom-content"
+            className="relative"
+            style={{
+              width: canvasSize.w,
+              height: canvasSize.h,
+              transform: zp.transform,
+              transformOrigin: "center center",
+            }}
+          >
+            <img
+              ref={imgRef}
+              src={imageSrc}
+              alt="Paint over objects to erase"
+              className="block"
+              style={{ width: canvasSize.w, height: canvasSize.h }}
+              draggable={false}
             />
-          )}
-        </div>
+            <canvas
+              ref={canvasRef}
+              width={renderDims.w}
+              height={renderDims.h}
+              className="absolute inset-0 touch-none"
+              style={{ cursor: isPanMode ? "grab" : "none" }}
+              onMouseDown={handleDown}
+              onMouseMove={handleMove}
+              onMouseUp={handleUp}
+              onMouseLeave={handleLeave}
+              onTouchStart={handleDown}
+              onTouchMove={handleMove}
+              onTouchEnd={handleUp}
+            />
+            {/* Brush cursor preview */}
+            {cursorPos && !isPanMode && (
+              <div
+                className="pointer-events-none absolute rounded-full border-2 border-white/80"
+                style={{
+                  width: brushSize,
+                  height: brushSize,
+                  left: cursorPos.x - brushSize / 2,
+                  top: cursorPos.y - brushSize / 2,
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.3)",
+                }}
+              />
+            )}
+          </div>
+          <ZoomToolbar
+            percent={zp.percent}
+            canZoomIn={zp.canZoomIn}
+            canZoomOut={zp.canZoomOut}
+            canActualSize={zp.canActualSize}
+            handToolActive={zp.handToolActive}
+            onZoomIn={zp.zoomIn}
+            onZoomOut={zp.zoomOut}
+            onFit={zp.fit}
+            onActualSize={zp.actualSize}
+            onToggleHandTool={zp.toggleHandTool}
+          />
+        </>
       )}
     </div>
   );
