@@ -1547,7 +1547,7 @@ export const de: TranslationKeys = {
       presets: {
         desktop: "Desktop",
         tablet: "Tablet",
-        mobile: "Mobile",
+        mobile: "Mobil",
         custom: "Benutzerdefiniert",
       },
     },
@@ -1844,7 +1844,7 @@ export const de: TranslationKeys = {
       progressLabel: "GIF wird erstellt",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "Voreinstellung",
       width: "Breite (px)",
       height: "Höhe (px)",
       hint: "Ein Feld leer lassen, um das Seitenverhältnis beizubehalten",
@@ -2241,7 +2241,7 @@ export const de: TranslationKeys = {
       progressLabel: "Wird verschlüsselt",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "Passwort",
       submit: "Entsperren",
       submitBatch: "Entsperren ({count} Dateien)",
       progressLabel: "Wird entschlüsselt",
@@ -3241,7 +3241,7 @@ export const de: TranslationKeys = {
   },
   nav: {
     tools: "Werkzeuge",
-    reader: "Reader",
+    reader: "Leser",
     automate: "Automatisieren",
     editor: "Editor",
     files: "Dateien",

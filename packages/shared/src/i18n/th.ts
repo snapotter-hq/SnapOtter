@@ -68,8 +68,8 @@ export const th: TranslationKeys = {
   },
   modalities: {
     image: "รูปภาพ",
-    video: "Video",
-    audio: "Audio",
+    video: "วิดีโอ",
+    audio: "เสียง",
     documentsAndFiles: "PDF และไฟล์",
   },
   tools: {
@@ -319,7 +319,7 @@ export const th: TranslationKeys = {
       description: "สร้างแผนภูมิฮิสโตแกรม RGB จากรูปภาพ",
     },
     "lqip-placeholder": {
-      name: "LQIP Placeholder",
+      name: "ตัวยึดตำแหน่ง LQIP",
       description: "สร้างรูปภาพตัวแทนขนาดเล็กคุณภาพต่ำพร้อม base64 data URI",
     },
     "sprite-sheet": {
@@ -1513,9 +1513,9 @@ export const th: TranslationKeys = {
       errorFailed: "จับภาพหน้าเว็บไม่สำเร็จ",
       placeholder: "ใส่ URL แล้วคลิกจับภาพ",
       presets: {
-        desktop: "Desktop",
-        tablet: "Tablet",
-        mobile: "Mobile",
+        desktop: "เดสก์ท็อป",
+        tablet: "แท็บเล็ต",
+        mobile: "มือถือ",
         custom: "กำหนดเอง",
       },
     },
@@ -1812,7 +1812,7 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังสร้าง GIF",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "พรีเซ็ต",
       width: "ความกว้าง (px)",
       height: "ความสูง (px)",
       hint: "เว้นมิติหนึ่งว่างเพื่อรักษาอัตราส่วน",
@@ -1850,7 +1850,7 @@ export const th: TranslationKeys = {
       brightness: "ความสว่าง",
       contrast: "คอนทราสต์",
       saturation: "ความอิ่มตัว",
-      gamma: "Gamma",
+      gamma: "แกมมา",
       submit: "ใช้",
       submitBatch: "ใช้ ({count} ไฟล์)",
       progressLabel: "กำลังปรับสี",
@@ -2106,7 +2106,7 @@ export const th: TranslationKeys = {
       strip: "ลบข้อมูลเมตาทั้งหมด",
       title: "ชื่อเรื่อง",
       artist: "ศิลปิน",
-      album: "Album",
+      album: "อัลบั้ม",
       submit: "ใช้ข้อมูลเมตา",
       submitBatch: "ใช้ข้อมูลเมตา ({count} ไฟล์)",
       progressLabel: "กำลังใช้ข้อมูลเมตา",
@@ -2209,7 +2209,7 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังเข้ารหัส",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "รหัสผ่าน",
       submit: "ปลดล็อก",
       submitBatch: "ปลดล็อก ({count} ไฟล์)",
       progressLabel: "กำลังถอดรหัส",
@@ -2925,7 +2925,7 @@ export const th: TranslationKeys = {
       runsColumn: "ครั้ง",
       userColumn: "ผู้ใช้",
       bytesInColumn: "ไบต์เข้า",
-      poolColumn: "Pool",
+      poolColumn: "พูล",
       p50Column: "p50",
       p95Column: "p95",
       storageHeading: "พื้นที่จัดเก็บไลบรารี",

@@ -878,7 +878,7 @@ export const sv: TranslationKeys = {
       gpsCleared: "GPS rensat",
       gpsAdded: "GPS tillagt",
       datesShifted: "datum flyttade",
-      submit: "Tilllämpa metadata",
+      submit: "Tillämpa metadata",
       progressLabel: "Skriver metadata",
     },
     "bulk-rename": {
@@ -978,8 +978,8 @@ export const sv: TranslationKeys = {
       green: "Grön",
       blue: "Blå",
       resetAll: "Återställ allt",
-      submit: "Tilllämpa",
-      submitBatch: "Tilllämpa ({count} filer)",
+      submit: "Tillämpa",
+      submitBatch: "Tillämpa ({count} filer)",
       progressLabel: "Justerar färger",
     },
     sharpening: {
@@ -1536,9 +1536,9 @@ export const sv: TranslationKeys = {
       errorFailed: "Kunde inte fånga sidan",
       placeholder: "Ange en URL och klicka på Fånga",
       presets: {
-        desktop: "Desktop",
-        tablet: "Tablet",
-        mobile: "Mobile",
+        desktop: "Skrivbord",
+        tablet: "Surfplatta",
+        mobile: "Mobil",
         custom: "Anpassad",
       },
     },
@@ -1605,7 +1605,7 @@ export const sv: TranslationKeys = {
       paddingColor: "Utfyllnadsfärg",
       cornerRadius: "Hornradie",
       shadow: "Skugga",
-      shadowBlur: "Skuggostarpa",
+      shadowBlur: "Skugg-oskärpa",
       shadowOffsetX: "Skuggoffset X",
       shadowOffsetY: "Skuggoffset Y",
       shadowColor: "Skuggfärg",
@@ -1835,7 +1835,7 @@ export const sv: TranslationKeys = {
       progressLabel: "Skapar GIF",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "Förinställning",
       width: "Bredd (px)",
       height: "Höjd (px)",
       hint: "Lämna en dimension tom för att behålla bildförhållandet",
@@ -2232,7 +2232,7 @@ export const sv: TranslationKeys = {
       progressLabel: "Krypterar",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "Lösenord",
       submit: "Lås upp",
       submitBatch: "Lås upp ({count} filer)",
       progressLabel: "Dekrypterar",
@@ -2677,7 +2677,7 @@ export const sv: TranslationKeys = {
   settings: {
     heading: "Inställningar",
     nav: {
-      general: "Allmäntt",
+      general: "Allmänt",
       systemSettings: "Systeminställningar",
       security: "Säkerhet",
       people: "Personer",
@@ -2692,7 +2692,7 @@ export const sv: TranslationKeys = {
       about: "Om",
     },
     general: {
-      heading: "Allmäntt",
+      heading: "Allmänt",
       description: "Användarinställningar och visningsinställningar.",
       loading: "Laddar...",
       logOut: "Logga ut",
@@ -2826,7 +2826,7 @@ export const sv: TranslationKeys = {
       resetPasswordButton: "Återställ lösenord",
       resetPasswordWarning:
         "Detta ogiltigförklarar alla sessioner och API-nycklar för denna användare.",
-      resetSuccess: "Lösenord återställtt",
+      resetSuccess: "Lösenord återställt",
       resetFailed: "Kunde inte återställa lösenord",
       tableHeaderUser: "Användare",
       tableHeaderRole: "Roll",
@@ -2952,7 +2952,7 @@ export const sv: TranslationKeys = {
       toolColumn: "Verktyg",
       runsColumn: "Körningar",
       userColumn: "Användare",
-      bytesInColumn: "Bytes in",
+      bytesInColumn: "Indata",
       poolColumn: "Pool",
       p50Column: "p50",
       p95Column: "p95",

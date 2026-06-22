@@ -68,7 +68,7 @@ export const fr: TranslationKeys = {
   },
   modalities: {
     image: "Image",
-    video: "Video",
+    video: "Vidéo",
     audio: "Audio",
     documentsAndFiles: "PDF & fichiers",
   },
@@ -1493,7 +1493,7 @@ export const fr: TranslationKeys = {
       downloadDiff: "Télécharger la différence",
     },
     "find-duplicates": {
-      preset: "Preset",
+      preset: "Préréglage",
       exact: "Exact",
       similar: "Similaire",
       loose: "Large",
@@ -1551,8 +1551,8 @@ export const fr: TranslationKeys = {
       errorFailed: "Impossible de capturer la page",
       placeholder: "Saisissez une URL et cliquez sur Capturer",
       presets: {
-        desktop: "Desktop",
-        tablet: "Tablet",
+        desktop: "Bureau",
+        tablet: "Tablette",
         mobile: "Mobile",
         custom: "Personnalisé",
       },
@@ -1630,7 +1630,7 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajout de la bordure",
     },
     beautify: {
-      preset: "Preset",
+      preset: "Préréglage",
       backgroundType: "Type de fond",
       solidColor: "Couleur unie",
       linearGradient: "Dégradé linéaire",
@@ -1720,7 +1720,7 @@ export const fr: TranslationKeys = {
       progressLabel: "Conversion du SVG",
     },
     vectorize: {
-      preset: "Preset",
+      preset: "Préréglage",
       logo: "Logo",
       illustration: "Illustration",
       photo: "Photo",
@@ -1850,7 +1850,7 @@ export const fr: TranslationKeys = {
       progressLabel: "Création du GIF",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "Préréglage",
       width: "Largeur (px)",
       height: "Hauteur (px)",
       hint: "Laissez une dimension vide pour conserver le ratio",
@@ -2247,7 +2247,7 @@ export const fr: TranslationKeys = {
       progressLabel: "Chiffrement",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "Mot de passe",
       submit: "Déverrouiller",
       submitBatch: "Déverrouiller ({count} fichiers)",
       progressLabel: "Déchiffrement",
@@ -2904,7 +2904,7 @@ export const fr: TranslationKeys = {
     roles: {
       heading: "Rôles",
       description:
-        "Gérez les rôles et leurs permissions. Les rôles prédéfinies ne peuvent pas être modifiés.",
+        "Gérez les rôles et leurs permissions. Les rôles prédéfinis ne peuvent pas être modifiés.",
       createButton: "Créer un rôle personnalisé",
       newRoleHeading: "Nouveau rôle",
       roleNamePlaceholder: "Nom du rôle",

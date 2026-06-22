@@ -68,8 +68,8 @@ export const zhTW: TranslationKeys = {
   },
   modalities: {
     image: "圖片",
-    video: "Video",
-    audio: "Audio",
+    video: "影片",
+    audio: "音訊",
     documentsAndFiles: "PDF 與檔案",
   },
   tools: {
@@ -130,7 +130,7 @@ export const zhTW: TranslationKeys = {
       description: "透過AI精準辨識擷取影像中的文字",
     },
     "ocr-pdf": {
-      name: "PDF OCR",
+      name: "PDF 文字辨識",
       description: "使用AI驅動的OCR從PDF文件中擷取文字",
     },
     "blur-faces": {
@@ -1047,7 +1047,7 @@ export const zhTW: TranslationKeys = {
       language: "語言",
       autoDetect: "自動偵測",
       pages: "頁面",
-      pagesPlaceholder: "all, 1-3, 5",
+      pagesPlaceholder: "全部, 1-3, 5",
       pagesHint: "輸入頁碼或範圍（例如 1-3, 5, 8-10）。最多50頁。",
       submit: "擷取文字",
       submitBatch: "擷取文字（{count}個檔案）",
@@ -1398,7 +1398,7 @@ export const zhTW: TranslationKeys = {
       channelStats: "色彩通道統計",
       yes: "是",
       no: "否",
-      na: "N/A",
+      na: "不適用",
       failedToRead: "讀取資訊失敗",
     },
     compare: {
@@ -1440,7 +1440,7 @@ export const zhTW: TranslationKeys = {
       cornerDotStyle: "角點樣式",
       foregroundColor: "前景色",
       bgColor: "背景色",
-      logo: "Logo",
+      logo: "標誌",
       downloadFormat: "下載格式",
       submit: "產生QR碼",
       download: "下載QR碼",
@@ -1466,9 +1466,9 @@ export const zhTW: TranslationKeys = {
       errorFailed: "擷取頁面失敗",
       placeholder: "輸入 URL 後點擊擷取",
       presets: {
-        desktop: "Desktop",
-        tablet: "Tablet",
-        mobile: "Mobile",
+        desktop: "桌面版",
+        tablet: "平板",
+        mobile: "行動版",
         custom: "自訂",
       },
     },
@@ -1636,7 +1636,7 @@ export const zhTW: TranslationKeys = {
     },
     vectorize: {
       preset: "預設",
-      logo: "Logo",
+      logo: "標誌",
       illustration: "插畫",
       photo: "照片",
       sketch: "素描",
@@ -1765,7 +1765,7 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在建立 GIF",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "預設",
       width: "寬度 (px)",
       height: "高度 (px)",
       hint: "留空其中一個尺寸以保持長寬比",
@@ -2059,7 +2059,7 @@ export const zhTW: TranslationKeys = {
       strip: "移除所有中繼資料",
       title: "標題",
       artist: "演出者",
-      album: "Album",
+      album: "專輯",
       submit: "套用中繼資料",
       submitBatch: "套用中繼資料（{count} 個檔案）",
       progressLabel: "正在套用中繼資料",
@@ -2162,7 +2162,7 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在加密",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "密碼",
       submit: "解鎖",
       submitBatch: "解鎖（{count} 個檔案）",
       progressLabel: "正在解密",
@@ -2875,7 +2875,7 @@ export const zhTW: TranslationKeys = {
       runsColumn: "執行次數",
       userColumn: "使用者",
       bytesInColumn: "輸入位元組",
-      poolColumn: "Pool",
+      poolColumn: "處理池",
       p50Column: "p50",
       p95Column: "p95",
       storageHeading: "檔案庫儲存空間",
@@ -3165,7 +3165,7 @@ export const zhTW: TranslationKeys = {
     toolsUsed: "已使用的工具",
     none: "無",
     delete: "刪除",
-    pipeline: "Pipeline",
+    pipeline: "自動化流程",
     download: "下載",
   },
   dropzone: {

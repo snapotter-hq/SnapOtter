@@ -68,8 +68,8 @@ export const ko: TranslationKeys = {
   },
   modalities: {
     image: "이미지",
-    video: "Video",
-    audio: "Audio",
+    video: "동영상",
+    audio: "오디오",
     documentsAndFiles: "PDF & 파일",
   },
   tools: {
@@ -562,7 +562,7 @@ export const ko: TranslationKeys = {
       description: "균일한 여백으로 모든 페이지 크롭",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "PDF 모아찍기",
       description: "한 장에 여러 페이지 배치",
     },
     "booklet-pdf": {
@@ -1480,9 +1480,9 @@ export const ko: TranslationKeys = {
       errorFailed: "페이지 캡처에 실패했습니다",
       placeholder: "URL을 입력하고 캡처를 클릭하세요",
       presets: {
-        desktop: "Desktop",
-        tablet: "Tablet",
-        mobile: "Mobile",
+        desktop: "데스크톱",
+        tablet: "태블릿",
+        mobile: "모바일",
         custom: "사용자 지정",
       },
     },
@@ -1779,7 +1779,7 @@ export const ko: TranslationKeys = {
       progressLabel: "GIF 생성 중",
     },
     "resize-video": {
-      preset: "Preset",
+      preset: "프리셋",
       width: "너비 (px)",
       height: "높이 (px)",
       hint: "가로세로 비율을 유지하려면 한 값을 비워두세요",
@@ -1817,7 +1817,7 @@ export const ko: TranslationKeys = {
       brightness: "밝기",
       contrast: "대비",
       saturation: "채도",
-      gamma: "Gamma",
+      gamma: "감마",
       submit: "적용",
       submitBatch: "적용 ({count}개 파일)",
       progressLabel: "색상 조정 중",
@@ -2073,7 +2073,7 @@ export const ko: TranslationKeys = {
       strip: "모든 메타데이터 제거",
       title: "제목",
       artist: "아티스트",
-      album: "Album",
+      album: "앨범",
       submit: "메타데이터 적용",
       submitBatch: "메타데이터 적용 ({count}개 파일)",
       progressLabel: "메타데이터 적용 중",
@@ -2176,7 +2176,7 @@ export const ko: TranslationKeys = {
       progressLabel: "암호화 중",
     },
     "unlock-pdf": {
-      password: "Password",
+      password: "비밀번호",
       submit: "잠금 해제",
       submitBatch: "잠금 해제 ({count}개 파일)",
       progressLabel: "복호화 중",
@@ -2896,7 +2896,7 @@ export const ko: TranslationKeys = {
       runsColumn: "실행 횟수",
       userColumn: "사용자",
       bytesInColumn: "입력 바이트",
-      poolColumn: "Pool",
+      poolColumn: "풀",
       p50Column: "p50",
       p95Column: "p95",
       storageHeading: "라이브러리 저장소",
@@ -3190,7 +3190,7 @@ export const ko: TranslationKeys = {
     toolsUsed: "사용한 도구",
     none: "없음",
     delete: "삭제",
-    pipeline: "Pipeline",
+    pipeline: "파이프라인",
     download: "다운로드",
   },
   dropzone: {
