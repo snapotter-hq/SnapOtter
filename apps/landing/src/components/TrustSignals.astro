@@ -1,43 +1,9 @@
 ---
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  return n.toString();
-}
+import { formatCompact, getImagePulls, getStarCount } from "@/lib/stats";
 
-let starCount = 0;
-try {
-  const res = await fetch("https://api.github.com/repos/snapotter-hq/snapotter", {
-    headers: { Accept: "application/vnd.github.v3+json" },
-  });
-  if (res.ok) {
-    const data = await res.json();
-    starCount = data.stargazers_count ?? 0;
-  }
-} catch {
-  starCount = 0;
-}
-
-// Docker Hub pull count (public API, refreshed at build time)
-let dockerHubPulls = 0;
-try {
-  const res = await fetch("https://hub.docker.com/v2/repositories/snapotter/snapotter/");
-  if (res.ok) {
-    const data = await res.json();
-    dockerHubPulls = data.pull_count ?? 0;
-  }
-} catch {
-  dockerHubPulls = 0;
-}
-
-// GHCR (ghcr.io) has no public pull-count API, so this is a manual figure (update as it grows).
-const GHCR_PULLS = 28_800;
-const dockerForTotal = dockerHubPulls > 0 ? dockerHubPulls : 89_100;
-const totalPulls = dockerForTotal + GHCR_PULLS;
-const pullsDisplay =
-  totalPulls >= 1_000_000
-    ? `${Math.floor(totalPulls / 100_000) / 10}M+`
-    : `${Math.floor(totalPulls / 100_000) * 100}K+`;
+// Fetched at build time; refreshed by the scheduled landing rebuild.
+const starCount = await getStarCount();
+const { display: pullsDisplay } = await getImagePulls();
 
 const stats = [
   {
@@ -46,7 +12,7 @@ const stats = [
     sublabel: "Across 5 file modalities",
   },
   {
-    value: starCount > 0 ? formatNumber(starCount) : "1.6k",
+    value: formatCompact(starCount),
     label: "GitHub Stars",
     sublabel: "Open-source & growing",
   },

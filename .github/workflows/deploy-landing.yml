@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "apps/landing/**"
+  # Daily rebuild so the build-time GitHub stars / Docker Hub pull-count fetches
+  # refresh even when no landing files changed.
+  schedule:
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -24,6 +28,10 @@ jobs:
 
       - name: Build Landing Page
         run: pnpm --filter @snapotter/landing build
+        env:
+          # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
+          # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy apps/landing/dist --project-name snapotter-landing --branch main --commit-dirty=true
