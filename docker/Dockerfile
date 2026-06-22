@@ -46,6 +46,10 @@ COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./pa
 COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
+# pnpm patchedDependencies (package.json) needs the patch files present before
+# install, or `pnpm install` aborts with ENOENT on the patch.
+COPY patches/ ./patches/
+
 # Install ALL dependencies (dev + prod needed for building)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
     pnpm install --frozen-lockfile
@@ -306,6 +310,10 @@ COPY packages/image-engine/package.json packages/image-engine/tsconfig.json ./pa
 COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./packages/media-engine/
 COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
+
+# pnpm patchedDependencies (package.json) needs the patch files present before
+# install, or `pnpm install` aborts with ENOENT on the patch.
+COPY patches/ ./patches/
 
 # Install production dependencies (tsx is now in prod deps)
 # Skip the root prepare script (husky is a devDep, not available in prod)
