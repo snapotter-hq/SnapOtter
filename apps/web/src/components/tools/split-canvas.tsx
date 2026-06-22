@@ -1,5 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ZoomToolbar } from "@/components/common/zoom-toolbar";
+import { useZoomPan } from "@/hooks/use-zoom-pan";
 import { useFileStore } from "@/stores/file-store";
 import { useSplitStore } from "@/stores/split-store";
 
@@ -72,6 +74,20 @@ export function SplitCanvas() {
   useEffect(() => {
     updateDisplaySize();
   }, [grid.columns, grid.rows, updateDisplaySize]);
+
+  const zoomSizes =
+    displaySize && imageDimensions
+      ? {
+          natural: { w: imageDimensions.width, h: imageDimensions.height },
+          fitted: { w: displaySize.width, h: displaySize.height },
+        }
+      : null;
+  const zp = useZoomPan({
+    sizes: zoomSizes,
+    viewportRef: containerRef,
+    resetKey: src ?? undefined,
+    enableDragPan: true,
+  });
 
   if (!src) return null;
 
@@ -169,8 +185,17 @@ export function SplitCanvas() {
   const showDimLabels = cols * rows <= 25;
 
   return (
-    <div ref={containerRef} className="relative w-full h-full flex items-center justify-center">
-      <div className="relative inline-block max-w-full max-h-full">
+    <div
+      ref={containerRef}
+      data-testid="zoom-viewport"
+      className="relative w-full h-full flex items-center justify-center overflow-hidden touch-none"
+      {...zp.bindGestures()}
+    >
+      <div
+        data-testid="zoom-content"
+        className="relative inline-block max-w-full max-h-full"
+        style={{ transform: zp.transform, transformOrigin: "center center" }}
+      >
         <img
           ref={imgRef}
           src={src}
@@ -260,6 +285,21 @@ export function SplitCanvas() {
           </div>
         )}
       </div>
+
+      {displaySize && (
+        <ZoomToolbar
+          percent={zp.percent}
+          canZoomIn={zp.canZoomIn}
+          canZoomOut={zp.canZoomOut}
+          canActualSize={zp.canActualSize}
+          handToolActive={zp.handToolActive}
+          onZoomIn={zp.zoomIn}
+          onZoomOut={zp.zoomOut}
+          onFit={zp.fit}
+          onActualSize={zp.actualSize}
+          onToggleHandTool={zp.toggleHandTool}
+        />
+      )}
 
       {/* Image info bar */}
       {imageDimensions && (
