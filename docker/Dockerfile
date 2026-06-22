@@ -8,7 +8,7 @@
 # Stage 0: Static FFmpeg/FFprobe binaries
 # ============================================
 # Multi-arch (amd64 + arm64) static builds for video/audio processing.
-FROM mwader/static-ffmpeg:8.1.1 AS ffmpeg
+FROM mwader/static-ffmpeg:8.1.2 AS ffmpeg
 
 # ============================================
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
