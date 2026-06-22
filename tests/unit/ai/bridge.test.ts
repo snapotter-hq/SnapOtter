@@ -383,7 +383,10 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);
 
-    const promise = runPythonWithProgress("remove_bg.py", ["/tmp/in.png", "/tmp/out.png"]);
+    // Ungated script name: this test exercises generic spawn-args plumbing, not
+    // a specific bundle. The feature gate on the fallback is covered separately
+    // in tests/unit/ai/feature-gate.test.ts.
+    const promise = runPythonWithProgress("test_script.py", ["/tmp/in.png", "/tmp/out.png"]);
 
     mock.stdout.emit("data", Buffer.from('{"success": true}\n'));
     mock.emitEvent("close", 0, null);
@@ -402,7 +405,7 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     expect(perRequestCall).toBeDefined();
     expect(perRequestCall?.[1]).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("remove_bg.py"),
+        expect.stringContaining("test_script.py"),
         "/tmp/in.png",
         "/tmp/out.png",
       ]),

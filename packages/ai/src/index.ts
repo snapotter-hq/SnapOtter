@@ -16,6 +16,7 @@ export { blurFaces, detectFaces } from "./face-detection.js";
 export { enhanceFaces } from "./face-enhancement.js";
 export type { FaceLandmarkPoint, FaceLandmarks, FaceLandmarksResult } from "./face-landmarks.js";
 export { detectFaceLandmarks } from "./face-landmarks.js";
+export { missingBundleForScript, SCRIPT_BUNDLE_MAP } from "./feature-gate.js";
 export { inpaint } from "./inpainting.js";
 export { noiseRemoval } from "./noise-removal.js";
 export type { PdfOcrOptions, PdfOcrResult } from "./ocr.js";

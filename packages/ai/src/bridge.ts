@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { missingBundleForScript } from "./feature-gate.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -398,6 +399,14 @@ export class PythonDispatcher {
       timeout?: number;
     } = {},
   ): Promise<{ stdout: string; stderr: string }> {
+    // Mirror the dispatcher's feature gate. The persistent dispatcher rejects
+    // scripts whose bundle is not installed (in Python); this fallback spawns
+    // scripts directly, so without the same check it would run them ungated
+    // when the dispatcher is down (e.g. right after a model repair). Reject
+    // with the same message the dispatcher path surfaces.
+    if (missingBundleForScript(scriptName)) {
+      return Promise.reject(new Error("feature_not_installed"));
+    }
     const scriptPath = resolve(PYTHON_DIR, scriptName);
     const timeout =
       options.timeout ??
