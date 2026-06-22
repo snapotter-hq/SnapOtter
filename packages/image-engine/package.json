@@ -15,7 +15,7 @@
   "dependencies": {
     "@snapotter/shared": "workspace:*",
     "exif-reader": "^2.0.3",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
