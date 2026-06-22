@@ -48,9 +48,9 @@ function copyCommand() {
         <strong>157 tools</strong> for image, video, audio, PDF &amp; data, running entirely on your
         hardware. Choose your path below, or get running in one command:
       </p>
-      <div class="cmd">
+      <div class="cmd" title="Click to copy" @click="copyCommand">
         <code>$ {{ command }}</code>
-        <button class="copy" type="button" aria-label="Copy command" @click="copyCommand">{{ copyLabel }}</button>
+        <button class="copy" type="button" aria-label="Copy command" @click.stop="copyCommand">{{ copyLabel }}</button>
       </div>
       <p class="hero-meta">
         <a href="/guide/getting-started">Full install guide</a> ·
@@ -114,9 +114,12 @@ function copyCommand() {
 .eyebrow { font: 600 11px/1 var(--vp-font-family-mono); letter-spacing: .16em; text-transform: uppercase; color: #A85518; margin-bottom: 14px; }
 .hero-title { font-family: var(--so-font-heading); font-size: 42px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 12px; }
 .hero-sub { color: var(--vp-c-text-2); font-size: 17px; max-width: 60ch; margin: 0 auto 20px; }
-.cmd { display: flex; gap: 14px; align-items: center; max-width: 680px; margin: 0 auto; background: #15100B; border: 1px solid #3A2A1E; border-radius: 10px; padding: 13px 16px; text-align: left; }
-.cmd code { flex: 1; min-width: 0; font: 600 13.5px/1.5 var(--vp-font-family-mono); color: #FFD9B0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.copy { flex: none; font: 600 10.5px/1 var(--vp-font-family-mono); color: #cbb9a6; border: 1px solid #4a3a2c; border-radius: 6px; padding: 8px 11px; background: transparent; cursor: pointer; }
+.cmd { display: flex; gap: 14px; align-items: center; max-width: 860px; margin: 0 auto; background: #15100B; border: 1px solid #3A2A1E; border-radius: 10px; padding: 13px 16px; text-align: left; cursor: pointer; transition: border-color .15s, background-color .15s; }
+.cmd:hover { border-color: #5A4636; background: #1B140D; }
+.cmd code { flex: 1; min-width: 0; font: 600 13px/1.5 var(--vp-font-family-mono); color: #FFD9B0; white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+.cmd code::-webkit-scrollbar { display: none; }
+.copy { flex: none; min-width: 62px; text-align: center; font: 600 10.5px/1 var(--vp-font-family-mono); color: #cbb9a6; border: 1px solid #4a3a2c; border-radius: 6px; padding: 8px 11px; background: transparent; cursor: pointer; transition: border-color .15s, color .15s; }
+.copy:hover { border-color: #6a5340; color: #FFD9B0; }
 .hero-meta { margin-top: 12px; font-size: 13px; color: var(--vp-c-text-2); }
 .hero-meta a { color: #A85518; font-weight: 600; }
 .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
