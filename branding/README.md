@@ -2,6 +2,8 @@
 
 Press kit for use in blog posts, articles, reviews, and other publications about SnapOtter. Free to use when referencing SnapOtter.
 
+SnapOtter is an open-source, self-hosted file processing suite with 157 tools across image, video, audio, PDF, and file workflows.
+
 ## Files
 
 | File | Size | Use |
@@ -17,23 +19,26 @@ Press kit for use in blog posts, articles, reviews, and other publications about
 | `social-preview.png` | 1280x640 | OpenGraph / social media preview |
 | `wordmark.svg` | Scalable | "SnapOtter" text mark (dark text) |
 | `wordmark-white.svg` | Scalable | "SnapOtter" text mark (white text, for dark backgrounds) |
-| `banner.svg` | Scalable | Logo + tagline banner on dark background |
-| `dashboard.png` | Screenshot | Full dashboard screenshot for README / marketing |
-| `dashboard_no_detail.png` | Screenshot | Dashboard screenshot without detail panel |
+| `banner.svg` | Scalable | Wordmark + tagline banner on dark background |
+| `dashboard.gif` | Animated | Scrolling tour of all 157 tools across the five modalities (README hero) |
 
 ## Brand Colors
 
 | Name | Hex | Usage |
 |------|-----|-------|
-| Primary Blue | `#3b82f6` | "Otter" in wordmark, buttons, accents |
-| Dark | `#0f172a` | "Snap" in wordmark, dark mode background |
-| Slate | `#94a3b8` | Subtitle/muted text |
-| White | `#ffffff` | Light mode background |
+| Otter Orange | `#E07832` | "Otter" in wordmark, buttons, links, CTAs |
+| Orange Light | `#F09550` | Hover states |
+| Orange Dark | `#C06520` | Text emphasis on light backgrounds |
+| Dark Chocolate | `#1A1210` | Dark sections, banner background |
+| Foreground | `#1A1814` | "Snap" in wordmark, primary text |
+| Cream | `#FAFAF7` | Page / light background |
+| Muted | `#6B6560` | Secondary / subtitle text |
 
 ## Typography
 
-- **Headings / brand name**: Nunito (weight 800)
-- **Body text**: Inter
+- **Headings / brand name**: Bricolage Grotesque (weight 800)
+- **Body text**: Instrument Sans
+- **Code / monospace**: JetBrains Mono
 
 ## Usage Guidelines
 

@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 720 200" fill="none">
-  <rect width="720" height="200" rx="16" fill="#0f172a"/>
-  <text x="220" y="105" font-family="Nunito, Inter, system-ui, sans-serif" font-size="64" font-weight="800" fill="#ffffff">
-    <tspan>Snap</tspan><tspan fill="#3b82f6">Otter</tspan>
+  <rect width="720" height="200" rx="16" fill="#1A1210"/>
+  <text x="360" y="103" text-anchor="middle" font-family="'Bricolage Grotesque', 'Nunito', system-ui, sans-serif" font-size="64" font-weight="800" fill="#F0EBE4">
+    <tspan>Snap</tspan><tspan fill="#E07832">Otter</tspan>
   </text>
-  <text x="220" y="140" font-family="Inter, system-ui, sans-serif" font-size="18" fill="#94a3b8">
-    Self-hosted image processing suite
+  <text x="360" y="140" text-anchor="middle" font-family="'Instrument Sans', 'Inter', system-ui, sans-serif" font-size="18" letter-spacing="0.3" fill="#B0A79B">
+    Self-hosted file processing suite
   </text>
 </svg>
