@@ -15,7 +15,7 @@
     "sharp": "^0.35.1"
   },
   "devDependencies": {
-    "@types/node": "^22.19.21",
+    "@types/node": "^22.20.0",
     "typescript": "^5.7.0"
   },
   "license": "AGPL-3.0"
