@@ -280,7 +280,9 @@ describe("Color-blindness simulation cross-format", () => {
           expect(typeof body.downloadUrl).toBe("string");
           expect(body.processedSize).toBeGreaterThan(0);
           expect(body.originalSize).toBeGreaterThan(0);
-        } else {
+        } else if (res.statusCode >= 400) {
+          // 202 (accepted, async) has no sync body to verify; only error
+          // codes carry a JSON error.
           const body = JSON.parse(res.body);
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
@@ -348,7 +350,9 @@ describe("Beautify cross-format", () => {
           expect(typeof body.downloadUrl).toBe("string");
           expect(body.processedSize).toBeGreaterThan(0);
           expect(body.originalSize).toBeGreaterThan(0);
-        } else {
+        } else if (res.statusCode >= 400) {
+          // 202 (accepted, async) has no sync body to verify; only error
+          // codes carry a JSON error.
           const body = JSON.parse(res.body);
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");

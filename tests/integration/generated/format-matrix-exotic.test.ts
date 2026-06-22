@@ -308,7 +308,9 @@ describe("Exotic format output conversion matrix", () => {
             // Verify output URL contains correct extension
             const ext = outFmt === "jpg" ? ".jpg" : `.${outFmt}`;
             expect(body.downloadUrl).toContain(ext);
-          } else {
+          } else if (res.statusCode >= 400) {
+            // 202 (accepted, async) has no sync body to verify; only error
+            // codes carry a JSON error.
             const body = JSON.parse(res.body);
             expect(body.error).toBeDefined();
             expect(typeof body.error).toBe("string");
