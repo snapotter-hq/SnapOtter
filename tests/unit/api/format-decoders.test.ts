@@ -1,12 +1,30 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { decodeToSharpCompat, needsCliDecode } from "../../../apps/api/src/lib/format-decoders.js";
 import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
+const execFileAsync = promisify(execFile);
+
 function isImageMagickError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   return err.message.includes("No ImageMagick") || err.message.includes("ENOENT");
+}
+
+/**
+ * Whether a CLI tool is on PATH. Distinguishes "not installed" (ENOENT) from
+ * "ran but errored" (e.g. unknown flag) so tests assert strongly where the
+ * tool exists and skip the strong assertion where it does not.
+ */
+async function commandExists(cmd: string): Promise<boolean> {
+  try {
+    await execFileAsync(cmd, ["-version"], { timeout: 5_000 });
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException)?.code !== "ENOENT";
+  }
 }
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
@@ -419,6 +437,45 @@ describe("decodeToSharpCompat - QOI decoder", () => {
     const resized = await sharp(decoded).resize(10, 10).png().toBuffer();
     expect(resized.length).toBeGreaterThan(0);
   });
+});
+
+describe("decodeToSharpCompat - RAW (Camera RAW)", () => {
+  // Regression test for issue #289: DNG decode used to fall through a dead
+  // dcraw_emu tier (wrong output filename) to ImageMagick's ufraw-batch
+  // delegate, which fails on modern DNG. Even where it "worked", it returned
+  // the small embedded preview instead of the full image. The decode chain
+  // must prefer LibRaw (dcraw_emu) so we get full resolution.
+  it("decodes DNG to full resolution, not the embedded preview (issue #289)", async () => {
+    let result: Buffer;
+    try {
+      const input = readFixture(fixtures.image.formats("dng"));
+      result = await decodeToSharpCompat(input, "raw", "dng");
+    } catch (err) {
+      if (isImageMagickError(err)) return; // no RAW decoders available in this env
+      throw err;
+    }
+    const { width, height } = await assertValidImage(result);
+    // sample.dng: embedded preview is 1024x683; the full image is ~3516x2328.
+    // With LibRaw available, decode must yield the full image, not the preview.
+    if (await commandExists("dcraw_emu")) {
+      expect(width).toBeGreaterThanOrEqual(3000);
+      expect(height).toBeGreaterThanOrEqual(2000);
+    }
+  });
+
+  const rawFormats = ["dng", "cr2", "nef", "arw", "orf", "rw2"] as const;
+  for (const ext of rawFormats) {
+    it(`decodes ${ext.toUpperCase()} to a valid image`, async () => {
+      try {
+        const input = readFixture(fixtures.image.formats(ext));
+        const result = await decodeToSharpCompat(input, "raw", ext);
+        await assertValidImage(result);
+      } catch (err) {
+        if (isImageMagickError(err)) return;
+        throw err;
+      }
+    });
+  }
 });
 
 describe("decodeToSharpCompat - EPS size limit", () => {
