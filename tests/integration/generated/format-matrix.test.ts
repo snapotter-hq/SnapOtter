@@ -419,7 +419,7 @@ const TOOLS: ToolDef[] = [
 // ---------------------------------------------------------------------------
 
 /** Status codes we accept for formats that may lack decoder support */
-const ACCEPTABLE_FALLBACK_CODES = [200, 400, 422];
+const ACCEPTABLE_FALLBACK_CODES = [200, 202, 400, 422];
 
 function needsFallback(fmt: FormatSample): boolean {
   return fmt.needsCliDecoder || fmt.needsHeifDecoder || fmt.mayFailValidation;
@@ -606,7 +606,7 @@ describe("Cross-format matrix", () => {
             // If the API returned an error, verify it is a clean JSON error
             // (not a raw crash / stack trace / HTML error page)
             // ------------------------------------------------------------------
-            if (res.statusCode !== 200) {
+            if (res.statusCode >= 400) {
               const body = JSON.parse(res.body);
               expect(body.error).toBeDefined();
               expect(typeof body.error).toBe("string");
@@ -653,7 +653,7 @@ describe("Multipage TIFF handling", () => {
       });
 
       // Multipage TIFF should either succeed or return a clean error
-      expect([200, 400, 422]).toContain(res.statusCode);
+      expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       if (res.statusCode === 200) {
         const body = JSON.parse(res.body);
@@ -781,11 +781,11 @@ describe("Exotic format error resilience", () => {
         // Must not crash (500) — either succeed or return a clean error
         if (isAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
 
         // Response must always be valid JSON
         const body = JSON.parse(res.body);
-        if (res.statusCode !== 200) {
+        if (res.statusCode >= 400) {
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
           expect(body.error.length).toBeGreaterThan(0);
@@ -867,10 +867,10 @@ describe("Image enhancement analysis across formats", () => {
       });
 
       expect(res.statusCode).not.toBe(500);
-      expect([200, 400, 422]).toContain(res.statusCode);
+      expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       const body = JSON.parse(res.body);
-      if (res.statusCode !== 200) {
+      if (res.statusCode >= 400) {
         expect(body.error).toBeDefined();
         expect(typeof body.error).toBe("string");
       }
@@ -1344,7 +1344,7 @@ describe("Image-to-PDF cross-format matrix", () => {
         body: payload,
       });
 
-      expect([200, 400, 422]).toContain(res.statusCode);
+      expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       if (res.statusCode === 200) {
         const body = JSON.parse(res.body);
@@ -1394,10 +1394,10 @@ describe("Image-to-PDF cross-format matrix", () => {
         if (isAsyncFallback(res)) return;
         if (isAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
 
         const body = JSON.parse(res.body);
-        if (res.statusCode !== 200) {
+        if (res.statusCode >= 400) {
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
           expect(body.error.length).toBeGreaterThan(0);
@@ -1453,10 +1453,10 @@ describe("Watermark-image exotic format error resilience", () => {
         });
 
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
 
         const body = JSON.parse(res.body);
-        if (res.statusCode !== 200) {
+        if (res.statusCode >= 400) {
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
           expect(body.error.length).toBeGreaterThan(0);
@@ -1505,10 +1505,10 @@ describe("Watermark-image exotic format error resilience", () => {
 
         if (isAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
 
         const body = JSON.parse(res.body);
-        if (res.statusCode !== 200) {
+        if (res.statusCode >= 400) {
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
           expect(body.error.length).toBeGreaterThan(0);

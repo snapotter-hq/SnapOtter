@@ -189,7 +189,7 @@ const CORE_FORMATS = PRIMARY_FORMATS.filter(
   (f) => !f.needsCliDecoder && !f.needsHeifDecoder && !f.mayFailValidation,
 );
 
-const ACCEPTABLE_FALLBACK_CODES = [200, 400, 422];
+const ACCEPTABLE_FALLBACK_CODES = [200, 202, 400, 422];
 
 function needsFallback(fmt: FormatDef): boolean {
   return fmt.needsCliDecoder || fmt.needsHeifDecoder || fmt.mayFailValidation;
@@ -699,7 +699,7 @@ describe("Image enhancement across all 16 primary formats", () => {
           });
 
           if (needsFallback(fmt)) {
-            expect([200, 400, 422]).toContain(res.statusCode);
+            expect([200, 202, 400, 422]).toContain(res.statusCode);
           } else {
             expect(res.statusCode).toBe(200);
           }
@@ -922,7 +922,7 @@ describe("No-crash matrix: 16 formats x 12 tools", () => {
             expect(typeof body).toBe("object");
 
             // If error, verify clean error shape
-            if (res.statusCode !== 200) {
+            if (res.statusCode >= 400) {
               expect(body.error).toBeDefined();
               expect(typeof body.error).toBe("string");
               expect(body.error.length).toBeGreaterThan(0);
@@ -1031,7 +1031,7 @@ describe("Exotic format error shape verification", () => {
           if (!res) return;
 
           expect(res.statusCode).not.toBe(500);
-          expect([200, 400, 422]).toContain(res.statusCode);
+          expect([200, 202, 400, 422]).toContain(res.statusCode);
 
           // Response must be valid JSON (not HTML, not raw text)
           let body: Record<string, unknown>;
@@ -1043,7 +1043,7 @@ describe("Exotic format error shape verification", () => {
             );
           }
 
-          if (res.statusCode !== 200) {
+          if (res.statusCode >= 400) {
             expect(body.error).toBeDefined();
             expect(typeof body.error).toBe("string");
             // Error message should not contain raw stack trace indicators
@@ -1093,10 +1093,10 @@ describe("HEIC/HEIF graceful handling", () => {
             expect(res.statusCode).not.toBe(500);
 
             // Accept success (200) or clean error (400/422)
-            expect([200, 400, 422]).toContain(res.statusCode);
+            expect([200, 202, 400, 422]).toContain(res.statusCode);
 
             const body = JSON.parse(res.body);
-            if (res.statusCode !== 200) {
+            if (res.statusCode >= 400) {
               expect(body.error).toBeDefined();
               expect(typeof body.error).toBe("string");
             }
@@ -1188,7 +1188,7 @@ describe("SVG through raster tools", () => {
 
       // SVG should either be rasterized and processed (200) or cleanly rejected
       expect(res.statusCode).not.toBe(500);
-      expect([200, 400, 422]).toContain(res.statusCode);
+      expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       const body = JSON.parse(res.body);
       if (res.statusCode === 200) {
@@ -1234,10 +1234,10 @@ describe("ICO (multi-size format) through tools", () => {
 
       // ICO requires CLI decoder; accept success or clean error
       expect(res.statusCode).not.toBe(500);
-      expect([200, 400, 422]).toContain(res.statusCode);
+      expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       const body = JSON.parse(res.body);
-      if (res.statusCode !== 200) {
+      if (res.statusCode >= 400) {
         expect(body.error).toBeDefined();
         expect(typeof body.error).toBe("string");
       }

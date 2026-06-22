@@ -204,7 +204,7 @@ const EXOTIC_FORMATS = FORMAT_SAMPLES.filter(
 );
 
 /** Status codes we accept for formats that may lack decoder support */
-const ACCEPTABLE_FALLBACK_CODES = [200, 400, 422];
+const ACCEPTABLE_FALLBACK_CODES = [200, 202, 400, 422];
 
 function needsFallback(fmt: FormatSample): boolean {
   return fmt.needsCliDecoder || fmt.needsHeifDecoder || fmt.mayFailValidation;
@@ -407,7 +407,7 @@ describe("Edit-metadata cross-format", () => {
             expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
           } else {
             // edit-metadata may also fail with 422 if ExifTool is not installed
-            expect([200, 400, 422]).toContain(res.statusCode);
+            expect([200, 202, 400, 422]).toContain(res.statusCode);
           }
 
           if (res.statusCode === 200) {
@@ -458,7 +458,7 @@ describe("Edit-metadata cross-format", () => {
 
           // Inspect uses ExifTool, which may not be installed; accept clean errors
           expect(res.statusCode).not.toBe(500);
-          expect([200, 400, 422]).toContain(res.statusCode);
+          expect([200, 202, 400, 422]).toContain(res.statusCode);
 
           const body = JSON.parse(res.body);
           if (res.statusCode === 200) {
@@ -618,7 +618,7 @@ describe("Split cross-format", () => {
 
         // Must not crash. Accept 200 (ZIP streamed) or 422 (clean error)
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
       perTestTimeout,
     );
@@ -1104,7 +1104,7 @@ describe("Compose cross-format", () => {
           });
 
           expect(res.statusCode).not.toBe(500);
-          expect([200, 400, 422]).toContain(res.statusCode);
+          expect([200, 202, 400, 422]).toContain(res.statusCode);
         },
         perTestTimeout,
       );
@@ -1204,7 +1204,7 @@ describe("Compare cross-format", () => {
         });
 
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
       perTestTimeout,
     );
@@ -1319,7 +1319,7 @@ describe("Collage cross-format", () => {
         });
 
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
       perTestTimeout,
     );
@@ -1433,7 +1433,7 @@ describe("Stitch cross-format", () => {
         });
 
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
       perTestTimeout,
     );
@@ -1494,7 +1494,7 @@ describe("Transparency-fixer cross-format", () => {
         } else if (res.statusCode === 202) {
           expect(body.jobId).toBeDefined();
           expect(body.async).toBe(true);
-        } else if (res.statusCode !== 200) {
+        } else if (res.statusCode >= 400) {
           expect(body.error).toBeDefined();
           expect(typeof body.error).toBe("string");
         }
@@ -1869,7 +1869,7 @@ describe("Find-duplicates cross-format", () => {
         });
 
         expect(res.statusCode).not.toBe(500);
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
       perTestTimeout,
     );

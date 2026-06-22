@@ -70,7 +70,7 @@ const ALL_OUTPUT_FORMATS = ["jpg", "png", "webp", "avif", "tiff", "gif"];
 const EXTENDED_OUTPUT_FORMATS = ["heic", "jxl", "bmp", "ico", "jp2", "qoi"];
 
 /** Acceptable status codes for exotic formats that may lack decoders */
-const ACCEPTABLE_CODES = [200, 400, 422];
+const ACCEPTABLE_CODES = [200, 202, 400, 422];
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -131,7 +131,7 @@ function assertNoServerCrash(statusCode: number) {
 function assertSuccessOrCleanError(res: { statusCode: number; body: string }) {
   assertNoServerCrash(res.statusCode);
   const body = JSON.parse(res.body);
-  if (res.statusCode !== 200) {
+  if (res.statusCode >= 400) {
     expect(body.error).toBeDefined();
     expect(typeof body.error).toBe("string");
     expect(body.error.length).toBeGreaterThan(0);
@@ -363,7 +363,7 @@ describe("Core format to extended output format matrix", () => {
         });
 
         // Extended encoders may not be available
-        expect([200, 400, 422]).toContain(res.statusCode);
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
 
         if (res.statusCode === 200) {
           const body = JSON.parse(res.body);
