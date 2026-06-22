@@ -16,7 +16,10 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("Erase Object tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/erase-object");
+    await page.goto("/image/erase-object");
+    // Guard against route rot: a wrong/404 route must fail loudly, not silently skip
+    // (skipping on a missing submit button previously masked the route being broken).
+    await expect(page.getByRole("heading", { name: "404" })).toHaveCount(0);
     try {
       await page.getByTestId("erase-object-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {
@@ -48,7 +51,7 @@ test.describe("Erase Object tool", () => {
     loggedInPage: page,
   }) => {
     await skipIfFeatureNotInstalled(page);
-    await uploadFile(page, fixturePath("test-200x150.png"));
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
     // Submit should still be disabled because no strokes have been painted
     await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
@@ -91,7 +94,7 @@ test.describe("Erase Object tool", () => {
     await skipIfFeatureNotInstalled(page);
 
     // Upload first file
-    await uploadFile(page, fixturePath("test-200x150.png"));
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
     // Paint a stroke on the first file
     const canvas = page.locator("canvas");
@@ -111,7 +114,7 @@ test.describe("Erase Object tool", () => {
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: /Add more/i }).click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(fixturePath("test-200x150.png"));
+    await fileChooser.setFiles(fixturePath("image/valid/test-200x150.png"));
     await page.waitForTimeout(500);
 
     // Switch to second file (click thumbnail or file entry)
@@ -135,7 +138,7 @@ test.describe("Erase Object tool", () => {
     await skipIfFeatureNotInstalled(page);
 
     // Upload first file
-    await uploadFile(page, fixturePath("test-200x150.png"));
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
     // Paint on first file
     const canvas = page.locator("canvas");
@@ -155,7 +158,7 @@ test.describe("Erase Object tool", () => {
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: /Add more/i }).click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(fixturePath("test-200x150.png"));
+    await fileChooser.setFiles(fixturePath("image/valid/test-200x150.png"));
     await page.waitForTimeout(500);
 
     // Switch to second file and paint
