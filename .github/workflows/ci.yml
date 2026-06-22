@@ -28,6 +28,13 @@ concurrency:
 permissions:
   contents: read
 
+# Testcontainers' ryuk reaper is redundant here (tests/global-setup.ts explicitly
+# stops its containers and CI runners are ephemeral), and its image pull from Docker
+# Hub is a recurring flake source (HTTP 500 on registry-1.docker.io). Disable it so a
+# registry hiccup pulling ryuk cannot fail the suite.
+env:
+  TESTCONTAINERS_RYUK_DISABLED: "true"
+
 jobs:
   lint:
     name: Lint
@@ -50,7 +57,7 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -58,6 +65,17 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
 
       - uses: ./.github/actions/setup
+      - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
+        run: |
+          for img in postgres:17-alpine redis:8-alpine; do
+            ok=
+            for attempt in 1 2 3 4 5; do
+              if docker pull "$img"; then ok=1; break; fi
+              echo "::warning::docker pull $img failed (attempt $attempt/5); retrying in $((attempt * 5))s"
+              sleep "$((attempt * 5))"
+            done
+            [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
+          done
       - run: pnpm vitest run tests/unit/ --reporter=verbose
 
   test-integration:
@@ -90,6 +108,17 @@ jobs:
           fi
 
       - uses: ./.github/actions/setup
+      - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
+        run: |
+          for img in postgres:17-alpine redis:8-alpine; do
+            ok=
+            for attempt in 1 2 3 4 5; do
+              if docker pull "$img"; then ok=1; break; fi
+              echo "::warning::docker pull $img failed (attempt $attempt/5); retrying in $((attempt * 5))s"
+              sleep "$((attempt * 5))"
+            done
+            [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
+          done
       - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/4
 
   test-e2e-smoke:

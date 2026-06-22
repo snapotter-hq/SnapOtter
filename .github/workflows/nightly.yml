@@ -10,6 +10,9 @@ permissions:
 
 env:
   SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf
+  # See ci.yml: ryuk's Docker Hub pull is a recurring flake source; disable the reaper
+  # (tests/global-setup.ts stops its containers explicitly; runners are ephemeral).
+  TESTCONTAINERS_RYUK_DISABLED: "true"
 
 jobs:
   e2e-full:
@@ -253,6 +256,17 @@ jobs:
             sudo sed -i 's/<policy domain="coder" rights="none" pattern="PS"/<policy domain="coder" rights="read" pattern="PS"/' "$POLICY_FILE"
           fi
       - uses: ./.github/actions/setup
+      - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
+        run: |
+          for img in postgres:17-alpine redis:8-alpine; do
+            ok=
+            for attempt in 1 2 3 4 5; do
+              if docker pull "$img"; then ok=1; break; fi
+              echo "::warning::docker pull $img failed (attempt $attempt/5); retrying in $((attempt * 5))s"
+              sleep "$((attempt * 5))"
+            done
+            [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
+          done
       - name: Run integration suite with full matrix and fuzz enabled
         run: pnpm vitest run tests/integration/ --reporter=verbose
         env:
