@@ -46,7 +46,10 @@ export function useZoomPan({
   const panRef = useRef(pan);
   const sizesRef = useRef(sizes);
   const pointerOverRef = useRef(false);
-  const isPanModeRef = useRef(false);
+  // Synchronous mirrors of pan-mode state so the gesture's drag handler reads the
+  // current value immediately (a passive effect lags fast keydown->pointerdown input).
+  const spaceHeldRef = useRef(false);
+  const handToolRef = useRef(false);
   const panStartRef = useRef<{ pan: Point; cx: number; cy: number } | null>(null);
   const pinchRef = useRef<{ base: number; ox: number; oy: number } | null>(null);
 
@@ -61,9 +64,6 @@ export function useZoomPan({
   useEffect(() => {
     sizesRef.current = sizes;
   }, [sizes]);
-  useEffect(() => {
-    isPanModeRef.current = isPanMode;
-  }, [isPanMode]);
 
   // Reset when the image changes (not on resize).
   const resetSignal = resetKey ?? (sizes ? `${sizes.natural.w}x${sizes.natural.h}` : "none");
@@ -72,6 +72,7 @@ export function useZoomPan({
     setZoom(MIN_ZOOM);
     setPan({ x: 0, y: 0 });
     setHandToolActive(false);
+    handToolRef.current = false;
   }, [resetSignal]);
 
   const viewportSize = useCallback((): Size => {
@@ -107,7 +108,10 @@ export function useZoomPan({
     const s = sizesRef.current;
     if (s) applyZoom(actualSizeZoom(s));
   }, [applyZoom]);
-  const toggleHandTool = useCallback(() => setHandToolActive((v) => !v), []);
+  const toggleHandTool = useCallback(() => {
+    handToolRef.current = !handToolRef.current;
+    setHandToolActive(handToolRef.current);
+  }, []);
   const zoomAtPoint = useCallback(
     (clientX: number, clientY: number, factor: number) =>
       applyZoom(zoomRef.current * factor, { x: clientX, y: clientY }),
@@ -149,11 +153,15 @@ export function useZoomPan({
     const down = (e: KeyboardEvent) => {
       if (e.key === " " && pointerOverRef.current && !isTyping()) {
         e.preventDefault();
+        spaceHeldRef.current = true;
         setSpaceHeld(true);
       }
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === " ") setSpaceHeld(false);
+      if (e.key === " ") {
+        spaceHeldRef.current = false;
+        setSpaceHeld(false);
+      }
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -180,6 +188,9 @@ export function useZoomPan({
     {
       onHover: ({ hovering }) => {
         pointerOverRef.current = !!hovering;
+      },
+      onMove: () => {
+        pointerOverRef.current = true;
       },
       onWheel: ({ event, delta: [, dy] }) => {
         event.preventDefault();
@@ -208,7 +219,7 @@ export function useZoomPan({
         if (last) pinchRef.current = null;
       },
       onDrag: ({ first, last, xy: [px, py] }) => {
-        if (!isPanModeRef.current) return;
+        if (!(spaceHeldRef.current || handToolRef.current)) return;
         if (first) beginPan(px, py);
         movePan(px, py);
         if (last) endPan();
