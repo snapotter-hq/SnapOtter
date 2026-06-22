@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
-import { FEATURE_BUNDLES, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import * as tar from "tar";
 
 // ── Paths ───────────────────────────────────────────────────────────────
@@ -127,9 +127,22 @@ export function isFeatureInstalled(bundleId: string): boolean {
 }
 
 export function isToolInstalled(toolId: string): boolean {
-  const bundleId = TOOL_BUNDLE_MAP[toolId];
-  if (!bundleId) return true;
-  return isFeatureInstalled(bundleId);
+  const required = getRequiredBundlesForTool(toolId);
+  if (required.length === 0) return true;
+  return required.every((bundleId) => isFeatureInstalled(bundleId));
+}
+
+/**
+ * The first required bundle for a tool that is not yet installed, or null when
+ * the tool needs no bundle or all of them are installed. A tool can require
+ * more than one bundle (see TOOL_EXTRA_BUNDLES), so this is what tells the user
+ * exactly which feature to install next.
+ */
+export function getFirstMissingBundleForTool(toolId: string): string | null {
+  for (const bundleId of getRequiredBundlesForTool(toolId)) {
+    if (!isFeatureInstalled(bundleId)) return bundleId;
+  }
+  return null;
 }
 
 // ── Install status mutations ────────────────────────────────────────────

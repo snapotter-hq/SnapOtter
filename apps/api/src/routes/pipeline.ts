@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, FEATURE_BUNDLES, TOOLS } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -26,7 +26,7 @@ import { trackEvent } from "../lib/analytics.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import { formatZodErrors } from "../lib/errors.js";
-import { isToolInstalled } from "../lib/feature-status.js";
+import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
@@ -361,12 +361,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         }
 
         // Guard: check if the tool's AI feature bundle is installed
-        if (!isToolInstalled(resolvedToolId)) {
-          const bundle = getBundleForTool(resolvedToolId);
+        const missingBundleId = getFirstMissingBundleForTool(resolvedToolId);
+        if (missingBundleId) {
+          const bundle = FEATURE_BUNDLES[missingBundleId];
           return reply.status(501).send({
             error: `Step ${i + 1} (${step.toolId}): Feature "${bundle?.name}" is not installed`,
             code: "FEATURE_NOT_INSTALLED",
-            feature: TOOL_BUNDLE_MAP[resolvedToolId],
+            feature: missingBundleId,
             featureName: bundle?.name ?? resolvedToolId,
           });
         }
@@ -787,12 +788,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           });
         }
 
-        if (!isToolInstalled(resolvedToolId)) {
-          const bundle = getBundleForTool(resolvedToolId);
+        const missingBundleId = getFirstMissingBundleForTool(resolvedToolId);
+        if (missingBundleId) {
+          const bundle = FEATURE_BUNDLES[missingBundleId];
           return reply.status(501).send({
             error: `Step ${i + 1} (${step.toolId}): Feature "${bundle?.name}" is not installed`,
             code: "FEATURE_NOT_INSTALLED",
-            feature: TOOL_BUNDLE_MAP[resolvedToolId],
+            feature: missingBundleId,
             featureName: bundle?.name ?? resolvedToolId,
           });
         }

@@ -197,6 +197,29 @@ describe("useFeaturesStore", () => {
 
       expect(useFeaturesStore.getState().isToolInstalled("remove-background")).toBe(false);
     });
+
+    // passport-photo needs background-removal AND face-detection (issue #327).
+    it("returns false for passport-photo when only background-removal is installed", () => {
+      useFeaturesStore.setState({
+        bundles: [
+          makeBundleState({ id: "background-removal", status: "installed" }),
+          makeBundleState({ id: "face-detection", status: "not_installed" }),
+        ],
+      });
+
+      expect(useFeaturesStore.getState().isToolInstalled("passport-photo")).toBe(false);
+    });
+
+    it("returns true for passport-photo only when both required bundles are installed", () => {
+      useFeaturesStore.setState({
+        bundles: [
+          makeBundleState({ id: "background-removal", status: "installed" }),
+          makeBundleState({ id: "face-detection", status: "installed" }),
+        ],
+      });
+
+      expect(useFeaturesStore.getState().isToolInstalled("passport-photo")).toBe(true);
+    });
   });
 
   describe("getBundleForTool()", () => {
@@ -220,6 +243,16 @@ describe("useFeaturesStore", () => {
       useFeaturesStore.setState({ bundles: [] });
       const result = useFeaturesStore.getState().getBundleForTool("remove-background");
       expect(result).toBeNull();
+    });
+
+    it("points at the first missing required bundle for a multi-bundle tool", () => {
+      const bg = makeBundleState({ id: "background-removal", status: "installed" });
+      const face = makeBundleState({ id: "face-detection", status: "not_installed" });
+      useFeaturesStore.setState({ bundles: [bg, face] });
+
+      // passport-photo needs both; background-removal is installed, so the
+      // prompt should ask for face-detection.
+      expect(useFeaturesStore.getState().getBundleForTool("passport-photo")).toEqual(face);
     });
   });
 

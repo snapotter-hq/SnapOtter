@@ -3,18 +3,13 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
-import {
-  getBundleForTool,
-  PASSPORT_SPECS,
-  PRINT_LAYOUTS,
-  TOOL_BUNDLE_MAP,
-} from "@snapotter/shared";
+import { FEATURE_BUNDLES, PASSPORT_SPECS, PRINT_LAYOUTS } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { isToolInstalled } from "../../lib/feature-status.js";
+import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -134,12 +129,15 @@ export function registerPassportPhoto(app: FastifyInstance) {
     "/api/v1/tools/image/passport-photo/analyze",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "passport-photo";
-      if (!isToolInstalled(toolId)) {
-        const bundle = getBundleForTool(toolId);
+      // Passport Photo needs two bundles (face-detection + background-removal);
+      // report whichever one the user still has to install.
+      const missingBundleId = getFirstMissingBundleForTool(toolId);
+      if (missingBundleId) {
+        const bundle = FEATURE_BUNDLES[missingBundleId];
         return reply.status(501).send({
           error: "Feature not installed",
           code: "FEATURE_NOT_INSTALLED",
-          feature: TOOL_BUNDLE_MAP[toolId],
+          feature: missingBundleId,
           featureName: bundle?.name ?? toolId,
           estimatedSize: bundle?.estimatedSize ?? "unknown",
         });
@@ -313,12 +311,13 @@ export function registerPassportPhoto(app: FastifyInstance) {
     "/api/v1/tools/image/passport-photo",
     async (_request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "passport-photo";
-      if (!isToolInstalled(toolId)) {
-        const bundle = getBundleForTool(toolId);
+      const missingBundleId = getFirstMissingBundleForTool(toolId);
+      if (missingBundleId) {
+        const bundle = FEATURE_BUNDLES[missingBundleId];
         return reply.status(501).send({
           error: "Feature not installed",
           code: "FEATURE_NOT_INSTALLED",
-          feature: TOOL_BUNDLE_MAP[toolId],
+          feature: missingBundleId,
           featureName: bundle?.name ?? toolId,
           estimatedSize: bundle?.estimatedSize ?? "unknown",
         });

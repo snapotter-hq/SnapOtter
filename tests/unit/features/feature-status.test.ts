@@ -254,6 +254,39 @@ describe("Feature status queries", () => {
     mod.markUninstalled("face-detection");
     expect(mod.isToolInstalled("blur-faces")).toBe(false);
   });
+
+  // passport-photo needs TWO bundles: background-removal (its primary) and
+  // face-detection (for face-landmark detection). Installing only one must not
+  // report the tool as ready. This is the bug behind issue #327.
+  it("isToolInstalled is false for passport-photo when only background-removal is installed", () => {
+    mod.markInstalled("background-removal", "1.0.0", []);
+    expect(mod.isToolInstalled("passport-photo")).toBe(false);
+  });
+
+  it("isToolInstalled is true for passport-photo only when both bundles are installed", () => {
+    mod.markInstalled("background-removal", "1.0.0", []);
+    mod.markInstalled("face-detection", "1.0.0", []);
+    expect(mod.isToolInstalled("passport-photo")).toBe(true);
+  });
+
+  it("getFirstMissingBundleForTool names face-detection when only background-removal is installed", () => {
+    mod.markInstalled("background-removal", "1.0.0", []);
+    expect(mod.getFirstMissingBundleForTool("passport-photo")).toBe("face-detection");
+  });
+
+  it("getFirstMissingBundleForTool returns the primary bundle first when nothing is installed", () => {
+    expect(mod.getFirstMissingBundleForTool("passport-photo")).toBe("background-removal");
+  });
+
+  it("getFirstMissingBundleForTool returns null when all required bundles are installed", () => {
+    mod.markInstalled("background-removal", "1.0.0", []);
+    mod.markInstalled("face-detection", "1.0.0", []);
+    expect(mod.getFirstMissingBundleForTool("passport-photo")).toBeNull();
+  });
+
+  it("getFirstMissingBundleForTool returns null for non-AI tools", () => {
+    expect(mod.getFirstMissingBundleForTool("resize")).toBeNull();
+  });
 });
 
 describe("Model verification via getFeatureStates", () => {

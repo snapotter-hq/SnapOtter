@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getBundleForTool, TOOL_BUNDLE_MAP, TOOLS, toolSection } from "@snapotter/shared";
+import { FEATURE_BUNDLES, TOOLS, toolSection } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -26,7 +26,7 @@ import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import { formatZodErrors } from "../lib/errors.js";
-import { isToolInstalled } from "../lib/feature-status.js";
+import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
@@ -79,13 +79,14 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: `Tool "${toolId}" not found` });
       }
 
-      // Guard: check if the tool's AI feature bundle is installed
-      if (!isToolInstalled(toolId)) {
-        const bundle = getBundleForTool(toolId);
+      // Guard: check that every AI feature bundle the tool needs is installed
+      const missingBundleId = getFirstMissingBundleForTool(toolId);
+      if (missingBundleId) {
+        const bundle = FEATURE_BUNDLES[missingBundleId];
         return reply.status(501).send({
           error: "Feature not installed",
           code: "FEATURE_NOT_INSTALLED",
-          feature: TOOL_BUNDLE_MAP[toolId],
+          feature: missingBundleId,
           featureName: bundle?.name ?? toolId,
           estimatedSize: bundle?.estimatedSize ?? "unknown",
         });

@@ -93,3 +93,28 @@ export function getBundleForTool(toolId: string): FeatureBundleInfo | null {
 export function getToolsForBundle(bundleId: string): string[] {
   return FEATURE_BUNDLES[bundleId]?.enablesTools ?? [];
 }
+
+/**
+ * Tools that need AI models from MORE THAN ONE feature bundle.
+ *
+ * The "primary" bundle (the one whose `enablesTools` lists the tool) is in
+ * TOOL_BUNDLE_MAP. Any ADDITIONAL bundles the tool's processing requires are
+ * listed here. Example: Passport Photo removes the background (its primary
+ * `background-removal` bundle) but first runs face-landmark detection, which
+ * is gated to the separate `face-detection` bundle.
+ */
+export const TOOL_EXTRA_BUNDLES: Record<string, string[]> = {
+  "passport-photo": ["face-detection"],
+};
+
+/**
+ * Every feature bundle a tool needs installed before it can run: its primary
+ * bundle plus any extras from TOOL_EXTRA_BUNDLES. Order is [primary, ...extras],
+ * deduped. Returns [] for tools that need no AI bundle.
+ */
+export function getRequiredBundlesForTool(toolId: string): string[] {
+  const primary = TOOL_BUNDLE_MAP[toolId];
+  if (!primary) return [];
+  const extras = TOOL_EXTRA_BUNDLES[toolId] ?? [];
+  return [...new Set([primary, ...extras])];
+}

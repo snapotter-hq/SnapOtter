@@ -1,7 +1,19 @@
 import type { FeatureBundleState } from "@snapotter/shared";
-import { TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { TOOL_BUNDLE_MAP, TOOL_EXTRA_BUNDLES } from "@snapotter/shared";
 import { create } from "zustand";
 import { apiGet, apiPost } from "@/lib/api";
+
+/**
+ * Every bundle a tool needs: its primary bundle plus any extras. Computed from
+ * the exported maps (not the shared helper) so unit tests that mock
+ * TOOL_BUNDLE_MAP still drive this logic. A tool can need more than one bundle
+ * (e.g. passport-photo needs background-removal AND face-detection).
+ */
+function requiredBundlesForTool(toolId: string): string[] {
+  const primary = TOOL_BUNDLE_MAP[toolId];
+  if (!primary) return [];
+  return [...new Set([primary, ...(TOOL_EXTRA_BUNDLES[toolId] ?? [])])];
+}
 
 interface BundleProgress {
   percent: number;
@@ -197,16 +209,24 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     refresh: refreshBundles,
 
     isToolInstalled: (toolId: string) => {
-      const bundleId = TOOL_BUNDLE_MAP[toolId];
-      if (!bundleId) return true;
-      const bundle = get().bundles.find((b) => b.id === bundleId);
-      return bundle?.status === "installed";
+      const required = requiredBundlesForTool(toolId);
+      if (required.length === 0) return true;
+      return required.every(
+        (bundleId) => get().bundles.find((b) => b.id === bundleId)?.status === "installed",
+      );
     },
 
     getBundleForTool: (toolId: string) => {
-      const bundleId = TOOL_BUNDLE_MAP[toolId];
-      if (!bundleId) return null;
-      return get().bundles.find((b) => b.id === bundleId) ?? null;
+      const required = requiredBundlesForTool(toolId);
+      if (required.length === 0) return null;
+      const bundles = get().bundles;
+      // Point the user at the first bundle they still need to install; fall
+      // back to the primary bundle once everything required is installed.
+      for (const bundleId of required) {
+        const bundle = bundles.find((b) => b.id === bundleId);
+        if (bundle && bundle.status !== "installed") return bundle;
+      }
+      return bundles.find((b) => b.id === required[0]) ?? null;
     },
 
     installBundle: async (bundleId: string) => {

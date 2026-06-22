@@ -1,7 +1,7 @@
 import {
+  getRequiredBundlesForTool,
   PYTHON_SIDECAR_TOOLS,
   SECTIONS,
-  TOOL_BUNDLE_MAP,
   TOOLS,
   toolSection,
 } from "@snapotter/shared";
@@ -226,9 +226,17 @@ export function ToolPage() {
   const fetchFeatures = useFeaturesStore((s) => s.fetch);
   const featureBundle = useMemo(() => {
     if (!toolId) return null;
-    const bundleId = TOOL_BUNDLE_MAP[toolId];
-    if (!bundleId) return null;
-    return featureBundles.find((b) => b.id === bundleId) ?? null;
+    const required = getRequiredBundlesForTool(toolId);
+    if (required.length === 0) return null;
+    // A tool can need more than one bundle (e.g. passport-photo needs
+    // background-removal AND face-detection). Surface the first one that is
+    // still missing so the install prompt asks for what's actually needed;
+    // once everything is installed, fall back to the primary bundle.
+    for (const bundleId of required) {
+      const bundle = featureBundles.find((b) => b.id === bundleId);
+      if (bundle && bundle.status !== "installed") return bundle;
+    }
+    return featureBundles.find((b) => b.id === required[0]) ?? null;
   }, [toolId, featureBundles]);
   const toolInstalled = featureBundle ? featureBundle.status === "installed" : !isAiTool;
   const showSizeComparison = toolId === "compress" || toolId === "optimize-for-web";
