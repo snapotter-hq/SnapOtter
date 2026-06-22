@@ -3373,6 +3373,7 @@ export const ja: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Previous image",
     nextImage: "Next image",
     imageArea: "Image area",

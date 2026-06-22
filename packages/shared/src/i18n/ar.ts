@@ -3401,6 +3401,7 @@ export const ar: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "الملف السابق",
     nextImage: "الملف التالي",
     imageArea: "منطقة المعاينة",

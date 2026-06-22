@@ -3413,6 +3413,7 @@ export const sv: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Foregaende fil",
     nextImage: "Nasta fil",
     imageArea: "Forhandsvisningsomrade",

@@ -3424,6 +3424,7 @@ export const tr: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Önceki dosya",
     nextImage: "Sonraki dosya",
     imageArea: "Önizleme alanı",

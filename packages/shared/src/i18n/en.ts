@@ -3368,6 +3368,7 @@ export const en = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Previous file",
     nextImage: "Next file",
     imageArea: "Preview area",

@@ -3418,6 +3418,7 @@ export const ru: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Предыдущий файл",
     nextImage: "Следующий файл",
     imageArea: "Область предпросмотра",

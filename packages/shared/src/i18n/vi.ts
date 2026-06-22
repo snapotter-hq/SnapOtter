@@ -3413,6 +3413,7 @@ export const vi: TranslationKeys = {
     zoomOut: "Zoom out",
     fitToView: "Fit to view",
     actualSize: "Actual size",
+    pan: "Pan",
     previousImage: "Tệp trước",
     nextImage: "Tệp tiếp theo",
     imageArea: "Vùng xem trước",
