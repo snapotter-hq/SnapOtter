@@ -18,7 +18,7 @@
   <a href="https://github.com/sponsors/snapotter-hq"><img src="https://img.shields.io/badge/Sponsor-pink?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
-![SnapOtter - Dashboard](branding/dashboard.png)
+![SnapOtter - Dashboard](branding/dashboard.gif)
 
 ## Key Features
 

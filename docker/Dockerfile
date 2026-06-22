@@ -46,6 +46,10 @@ COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./pa
 COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
+# pnpm patchedDependencies (package.json) needs the patch files present before
+# install, or `pnpm install` aborts with ENOENT on the patch.
+COPY patches/ ./patches/
+
 # Install ALL dependencies (dev + prod needed for building)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
     pnpm install --frozen-lockfile
@@ -307,6 +311,10 @@ COPY packages/media-engine/package.json packages/media-engine/tsconfig.json ./pa
 COPY packages/doc-engine/package.json packages/doc-engine/tsconfig.json ./packages/doc-engine/
 COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 
+# pnpm patchedDependencies (package.json) needs the patch files present before
+# install, or `pnpm install` aborts with ENOENT on the patch.
+COPY patches/ ./patches/
+
 # Install production dependencies (tsx is now in prod deps)
 # Skip the root prepare script (husky is a devDep, not available in prod)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store/v3 \
@@ -393,10 +401,22 @@ ENV PYTHONWARNINGS=default \
 
 # Create non-root user for runtime
 RUN groupadd -r snapotter && useradd -r -g snapotter -d /app -s /sbin/nologin snapotter
-RUN chown -R snapotter:snapotter /app /data /tmp/workspace /opt/venv
+# /app and /opt/venv are read-only at runtime -> owned by snapotter.
+# /data and /tmp/workspace are written at runtime: make them group-0 (root group)
+# owned and group-writable with the setgid bit so the app can still write when the
+# container is launched under an arbitrary/foreign UID (Kubernetes runAsUser,
+# OpenShift, TrueNAS), which always lands in the root (GID 0) supplementary group.
+# The root entrypoint re-chowns these to snapotter for the default gosu path.
+RUN chown -R snapotter:snapotter /app /opt/venv && \
+    chmod -R a+rX /opt/venv && \
+    chown -R snapotter:0 /data /tmp/workspace && \
+    chmod -R g+rwX /data /tmp/workspace && \
+    find /data /tmp/workspace -type d -exec chmod g+s {} +
 
-# Entrypoint fixes volume permissions then drops to snapotter via gosu
+# Entrypoint fixes volume permissions then drops to snapotter via gosu.
+# entrypoint-lib.sh holds the writability helpers it sources at startup.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint-lib.sh /usr/local/bin/entrypoint-lib.sh
 COPY docker/wait-for-postgres.mjs /app/docker/wait-for-postgres.mjs
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

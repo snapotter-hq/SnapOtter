@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+# Shared permission helpers (dir_writable, ensure_writable). Lives beside this
+# script in the image; sourcing only defines functions (no side effects).
+. /usr/local/bin/entrypoint-lib.sh
+
 # --- Docker secret file convention (_FILE suffix) ---
 # For each supported var, if VAR_FILE is set, read the secret from that file
 # path into VAR. This lets users mount Docker/Kubernetes secrets instead of
@@ -44,6 +48,20 @@ resolve_file_env SNAPOTTER_LICENSE_KEY
 export AUTH_ENABLED="${AUTH_ENABLED:-true}"
 export DEFAULT_USERNAME="${DEFAULT_USERNAME:-admin}"
 export DEFAULT_PASSWORD="${DEFAULT_PASSWORD:-admin}"
+
+# Writable directories the runtime needs: WS = processing scratch, DD = data
+# root (holds files, logs, and the AI venv/models). Honor env overrides.
+WS="${WORKSPACE_PATH:-/tmp/workspace}"
+DD="${DATA_DIR:-/data}"
+
+# When NOT starting as root we cannot chown mounted volumes (TrueNAS, Kubernetes
+# runAsUser / OpenShift). Verify up front that the volumes are writable by this
+# user and fail fast with actionable guidance -- otherwise the venv bootstrap
+# and the app below would die later with a cryptic EACCES.
+if [ "$(id -u)" != "0" ]; then
+  mkdir -p "$DD/files" "$DD/logs" "$DD/ai/models" "$DD/ai/pip-cache" "$DD/ai/venv" "$WS" 2>/dev/null || true
+  ensure_writable "$WS" "$DD" || exit 1
+fi
 
 # Clean up any interrupted bootstrap from a previous start
 AI_VENV="/data/ai/venv"
@@ -174,6 +192,13 @@ if [ "$(id -u)" = "0" ]; then
   # /app and /opt/venv are read-only at runtime -- no chown needed.
   chown -R snapotter:snapotter /data /tmp/workspace 2>&1 || \
     echo "WARNING: Could not fix volume permissions. Use named volumes (not Windows bind mounts) to avoid this. See docs for details." >&2
+
+  # Root can write anywhere, so verify as the unprivileged snapotter user that
+  # actually runs the app. This catches root-squashed or foreign-owned mounts
+  # where the chown above silently failed, and fails fast with guidance.
+  if ! gosu snapotter sh -c '. /usr/local/bin/entrypoint-lib.sh; ensure_writable "$@"' _ "$WS" "$DD"; then
+    exit 1
+  fi
 
   print_banner
   exec gosu snapotter "$@"
