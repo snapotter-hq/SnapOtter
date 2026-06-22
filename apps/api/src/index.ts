@@ -25,6 +25,7 @@ import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.j
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { getSettingString } from "./lib/settings-helpers.js";
+import { assertStorageWritable } from "./lib/storage-writable.js";
 import { requirePermission } from "./permissions.js";
 import {
   authMiddleware,
@@ -86,6 +87,18 @@ try {
   process.exit(1);
 }
 console.log("Redis connected");
+
+// Verify the local storage directories are writable before serving. A non-root
+// container launched against a volume it cannot write (TrueNAS, Kubernetes
+// runAsUser / OpenShift, or a bind mount owned by another user) would otherwise
+// boot "healthy" and fail with a cryptic EACCES on the first file operation.
+try {
+  await assertStorageWritable();
+  console.log("Storage directories writable");
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  process.exit(1);
+}
 
 // Auto-import 1.x SQLite database on first boot (before default user creation)
 if (env.SQLITE_MIGRATE_PATH) {

@@ -393,10 +393,22 @@ ENV PYTHONWARNINGS=default \
 
 # Create non-root user for runtime
 RUN groupadd -r snapotter && useradd -r -g snapotter -d /app -s /sbin/nologin snapotter
-RUN chown -R snapotter:snapotter /app /data /tmp/workspace /opt/venv
+# /app and /opt/venv are read-only at runtime -> owned by snapotter.
+# /data and /tmp/workspace are written at runtime: make them group-0 (root group)
+# owned and group-writable with the setgid bit so the app can still write when the
+# container is launched under an arbitrary/foreign UID (Kubernetes runAsUser,
+# OpenShift, TrueNAS), which always lands in the root (GID 0) supplementary group.
+# The root entrypoint re-chowns these to snapotter for the default gosu path.
+RUN chown -R snapotter:snapotter /app /opt/venv && \
+    chmod -R a+rX /opt/venv && \
+    chown -R snapotter:0 /data /tmp/workspace && \
+    chmod -R g+rwX /data /tmp/workspace && \
+    find /data /tmp/workspace -type d -exec chmod g+s {} +
 
-# Entrypoint fixes volume permissions then drops to snapotter via gosu
+# Entrypoint fixes volume permissions then drops to snapotter via gosu.
+# entrypoint-lib.sh holds the writability helpers it sources at startup.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint-lib.sh /usr/local/bin/entrypoint-lib.sh
 COPY docker/wait-for-postgres.mjs /app/docker/wait-for-postgres.mjs
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

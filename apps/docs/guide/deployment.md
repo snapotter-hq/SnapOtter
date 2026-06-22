@@ -365,6 +365,38 @@ environment:
   - PGID=1000    # Your host GID (run: id -g)
 ```
 
+### Storage permissions
+
+SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error.
+
+How permissions are handled depends on how the container is launched:
+
+**Default (starts as root, drops to `snapotter`)** — the entrypoint starts as root, fixes ownership of the mounted volumes, then drops to the unprivileged `snapotter` user via `gosu`. Named volumes work with no configuration. For bind mounts, set `PUID`/`PGID` to your host user (above) so the files it writes are owned by you.
+
+**Kubernetes / OpenShift (non-root via `runAsUser`)** — launched directly as a non-root user, the container cannot chown the volumes itself, so the orchestrator must make them writable. Set `fsGroup`:
+
+```yaml
+securityContext:
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999        # makes mounted volumes writable by the pod
+```
+
+The image's writable directories are group-owned by GID 0 and group-writable, so a pod running with an **arbitrary UID** plus the root supplementary group (the OpenShift default) can write with no `chown`.
+
+**TrueNAS Scale (and other "foreign UID" setups)** — TrueNAS runs apps as a non-root user (often `568:568`) and mounts host datasets owned by a different user, so neither the entrypoint nor `fsGroup` makes them writable on its own. Choose one:
+
+- **Run the app as root** (recommended) — leave the app's user unset or set it to `0`, and let the default entrypoint fix permissions and drop to `snapotter`.
+- **Run as UID `999`** — set the app's user/group to `999:999` (SnapOtter's built-in `snapotter` user) so it matches the image's ownership.
+- **`chown` the host dataset** to the UID the container runs as, from the TrueNAS shell:
+
+  ```bash
+  # Use the UID from the startup error (or run `id` inside the container)
+  chown -R 568:568 /mnt/<pool>/<dataset>
+  ```
+
+The startup error names the exact UID to use, so the quickest path is to start the app once, read the message, then `chown` (or adjust the user) accordingly.
+
 ## Environment Variables
 
 | Variable | Default | Description |

@@ -177,7 +177,7 @@ Docker Compose secrets (without Swarm) require Compose v2.23 or later.
 
 ## Kubernetes Deployment
 
-The entrypoint detects when the container is already running as non-root (e.g., via Kubernetes `runAsUser`) and skips the gosu privilege drop automatically.
+The entrypoint detects when the container is already running as non-root (e.g., via Kubernetes `runAsUser`) and skips the gosu privilege drop automatically. In that case it cannot chown the mounted volumes itself, so it verifies they are writable and exits early with actionable guidance if they are not — see [Storage permissions](/guide/deployment#storage-permissions) for `fsGroup` and foreign-UID setups (TrueNAS, OpenShift).
 
 **Recommended Pod SecurityContext:**
 
