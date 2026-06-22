@@ -191,9 +191,19 @@ try {
 // Start the cooperative cancellation listener (Redis pub/sub)
 await startCancelListener();
 
-// Set up AI feature directories and recover from interrupted installs
+// Set up AI feature directories and recover from interrupted installs. Both are
+// best-effort and must never block boot: ensureAiDirs swallows its own errors,
+// and recovery (clearing stale locks and partial downloads) is wrapped here so a
+// malformed installed.json or unreadable models dir degrades to a warning rather
+// than a fatal startup crash (Sentry NODE-12).
 ensureAiDirs();
-recoverInterruptedInstalls();
+try {
+  recoverInterruptedInstalls();
+} catch (err) {
+  console.warn(
+    `[feature-status] Interrupted-install recovery failed (continuing): ${(err as Error).message}`,
+  );
+}
 
 function parseTrustProxy(value: string): boolean | number | string {
   if (value === "true") return true;
@@ -209,6 +219,12 @@ const app = Fastify({
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
   routerOptions: { maxParamLength: 500 },
+  // Self-hosted boots can be slow: venv bootstrap, AI-model verification, and
+  // SPA static serving all touch disk, and some deployments sit on slow or
+  // contended volumes. avvio's default 10s pluginTimeout fataled boot at
+  // '@fastify/static' on those hosts (Sentry NODE-14). 60s tolerates slow
+  // startup I/O while still surfacing a genuinely deadlocked plugin.
+  pluginTimeout: 60_000,
 });
 
 // Image processing (especially AI batch) can run for tens of minutes.

@@ -120,6 +120,61 @@ describe("installed.json management", () => {
   });
 });
 
+// Regression for NODE-12 (Sentry): installed.json that is *valid JSON* but
+// whose shape lacks a usable `bundles` object (e.g. "{}", '{"bundles":null}',
+// a top-level array, or an older format) used to crash at boot with
+// "Cannot convert undefined or null to object" via Object.keys(data.bundles) in
+// recoverInterruptedInstalls, `bundleId in data.bundles` in isFeatureInstalled,
+// and installed.bundles[...] in getFeatureStates. readInstalled() must coerce
+// any unusable shape to { bundles: {} } so these never throw.
+describe("malformed installed.json shape (NODE-12 regression)", () => {
+  const BAD_SHAPES: Array<[string, string]> = [
+    ["object with no bundles key", JSON.stringify({})],
+    ["bundles is null", JSON.stringify({ bundles: null })],
+    ["bundles is an array", JSON.stringify({ bundles: [] })],
+    ["bundles is a string", JSON.stringify({ bundles: "nope" })],
+    ["top-level array", JSON.stringify([{ ocr: {} }])],
+    ["top-level number", JSON.stringify(42)],
+    ["top-level null", JSON.stringify(null)],
+    ["unrelated shape", JSON.stringify({ version: 2, installed: ["ocr"] })],
+  ];
+
+  for (const [label, contents] of BAD_SHAPES) {
+    it(`recoverInterruptedInstalls does not throw when installed.json is ${label}`, () => {
+      // A present manifest is what drives the Object.keys(data.bundles) loop.
+      writeTestManifest({ "background-removal": { models: [] } });
+      writeFileSync(installedPath, contents);
+      mod.invalidateCache();
+      expect(() => mod.recoverInterruptedInstalls()).not.toThrow();
+    });
+
+    it(`isFeatureInstalled returns false (no throw) when installed.json is ${label}`, () => {
+      writeFileSync(installedPath, contents);
+      mod.invalidateCache();
+      expect(() => mod.isFeatureInstalled("background-removal")).not.toThrow();
+      expect(mod.isFeatureInstalled("background-removal")).toBe(false);
+    });
+
+    it(`getFeatureStates reports all not_installed (no throw) when installed.json is ${label}`, () => {
+      writeFileSync(installedPath, contents);
+      mod.invalidateCache();
+      expect(() => mod.getFeatureStates()).not.toThrow();
+      expect(mod.getFeatureStates().every((s) => s.status === "not_installed")).toBe(true);
+    });
+  }
+
+  it("still reads a valid bundles object after rejecting bad shapes", () => {
+    writeFileSync(
+      installedPath,
+      JSON.stringify({
+        bundles: { ocr: { version: "1.0.0", installedAt: "2026-01-01T00:00:00.000Z", models: [] } },
+      }),
+    );
+    mod.invalidateCache();
+    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+  });
+});
+
 describe("Cache behavior", () => {
   it("isFeatureInstalled reads from cache on second call", () => {
     mod.markInstalled("ocr", "1.0.0", []);

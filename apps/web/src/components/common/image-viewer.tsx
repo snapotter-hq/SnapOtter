@@ -1,6 +1,7 @@
 import { useGesture } from "@use-gesture/react";
 import { FileImage, Maximize, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { type Point, resolvePanStart } from "@/components/common/image-viewer-drag";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
@@ -148,12 +149,9 @@ export function ImageViewer({
       },
       onDrag: ({ movement: [mx, my], first, memo }) => {
         if (fitModeRef.current !== "actual") return;
-        if (first) {
-          memo = { ...panOffset };
-        }
-        const start = memo as { x: number; y: number };
+        const start = resolvePanStart(first, memo as Point | undefined, panOffset);
         setPanOffset({ x: start.x + mx, y: start.y + my });
-        return memo;
+        return start;
       },
     },
     {

@@ -91,6 +91,25 @@ interface InstalledData {
 
 let installedCache: InstalledData | null = null;
 
+/**
+ * Coerce a parsed installed.json into a well-formed InstalledData. The file can
+ * be valid JSON but the wrong shape (`{}`, `{"bundles": null}`, a bare array,
+ * a number, or an older format) which would otherwise crash callers that do
+ * `Object.keys(data.bundles)`, `id in data.bundles`, or `data.bundles[id]`
+ * (seen in production as a fatal boot TypeError, "Cannot convert undefined or
+ * null to object"). Any unusable shape degrades to an empty install set,
+ * matching the corrupt-JSON fallback below.
+ */
+function normalizeInstalled(parsed: unknown): InstalledData {
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    const bundles = (parsed as { bundles?: unknown }).bundles;
+    if (typeof bundles === "object" && bundles !== null && !Array.isArray(bundles)) {
+      return parsed as InstalledData;
+    }
+  }
+  return { bundles: {} };
+}
+
 function readInstalled(): InstalledData {
   if (installedCache) return installedCache;
 
@@ -101,7 +120,7 @@ function readInstalled(): InstalledData {
 
   try {
     const raw = readFileSync(INSTALLED_PATH, "utf-8");
-    installedCache = JSON.parse(raw) as InstalledData;
+    installedCache = normalizeInstalled(JSON.parse(raw));
   } catch {
     console.warn("[feature-status] installed.json is corrupt or unreadable, treating as empty");
     installedCache = { bundles: {} };
