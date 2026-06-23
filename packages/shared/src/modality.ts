@@ -134,3 +134,42 @@ export function detectModalityFromMime(mime: string): Modality {
   }
   return "file";
 }
+
+const MODALITY_EXTENSION_SETS: [Modality, readonly string[]][] = [
+  ["image", IMAGE_INPUTS],
+  ["video", VIDEO_INPUTS],
+  ["audio", AUDIO_INPUTS],
+  ["document", DOCUMENT_INPUTS],
+  ["file", FILE_INPUTS],
+];
+
+/** Owning modality for a file extension (with or without leading dot), or null. */
+export function modalityForExtension(ext: string): Modality | null {
+  const norm = (ext.startsWith(".") ? ext : `.${ext}`).toLowerCase();
+  for (const [modality, set] of MODALITY_EXTENSION_SETS) {
+    if (set.includes(norm)) return modality;
+  }
+  return null;
+}
+
+/** The modality a tool consumes. Derived from acceptedInputs so tools whose `modality`
+ *  differs from their real input (gif-to-video, images-to-video) are correct. */
+export function toolInputModality(tool: {
+  modality: Modality;
+  acceptedInputs: string[];
+}): Modality {
+  const first = tool.acceptedInputs[0];
+  if (first) {
+    const m = modalityForExtension(first);
+    if (m) return m;
+  }
+  return tool.modality;
+}
+
+/** The modality a tool produces. Uses the explicit override, else the tool modality. */
+export function toolOutputModality(tool: {
+  modality: Modality;
+  outputModality?: Modality;
+}): Modality {
+  return tool.outputModality ?? tool.modality;
+}
