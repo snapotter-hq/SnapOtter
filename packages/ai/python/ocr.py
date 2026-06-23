@@ -33,6 +33,60 @@ PADDLE_LANG_MAP = {
     "zh": "ch", "ja": "japan", "ko": "korean",
 }
 
+# Bundled PaddleOCR models (shipped by the OCR feature bundle into MODELS_PATH).
+# Pinning the constructor at these dirs keeps OCR fully offline / air-gapped and
+# skips slow HuggingFace model resolution on first use. PP-OCRv5 server rec
+# covers Chinese+English; latin covers en/de/fr/es; plus a dedicated Korean rec.
+PADDLE_DET_MODEL = "PP-OCRv5_server_det"
+PADDLE_TEXTLINE_MODEL = "PP-LCNet_x1_0_textline_ori"
+PADDLE_REC_MODEL = {
+    "ch": "PP-OCRv5_server_rec",
+    "en": "latin_PP-OCRv5_mobile_rec",
+    "latin": "latin_PP-OCRv5_mobile_rec",
+    "korean": "korean_PP-OCRv5_mobile_rec",
+}
+
+
+def _bundled_paddle_kwargs(paddle_lang):
+    """Build PaddleOCR kwargs that use the bundled models in MODELS_PATH.
+
+    Only pins a component when its model is actually present on disk, so a
+    partial bundle (or an unbundled language such as Japanese) falls back to
+    PaddleOCR's default resolution for that component. The doc-orientation and
+    doc-unwarping models are not bundled and not needed for plain OCR, so they
+    are disabled to avoid a runtime HuggingFace download.
+    """
+    models_dir = os.environ.get("MODELS_PATH", "/data/ai/models")
+
+    def model_dir(name):
+        if not name:
+            return None
+        path = os.path.join(models_dir, name)
+        return path if os.path.isdir(path) else None
+
+    kwargs = {"use_doc_orientation_classify": False, "use_doc_unwarping": False}
+
+    det = model_dir(PADDLE_DET_MODEL)
+    if det:
+        kwargs["text_detection_model_name"] = PADDLE_DET_MODEL
+        kwargs["text_detection_model_dir"] = det
+
+    rec_name = PADDLE_REC_MODEL.get(paddle_lang)
+    rec = model_dir(rec_name)
+    if rec:
+        kwargs["text_recognition_model_name"] = rec_name
+        kwargs["text_recognition_model_dir"] = rec
+
+    textline = model_dir(PADDLE_TEXTLINE_MODEL)
+    if textline:
+        kwargs["textline_orientation_model_name"] = PADDLE_TEXTLINE_MODEL
+        kwargs["textline_orientation_model_dir"] = textline
+        kwargs["use_textline_orientation"] = True
+    else:
+        kwargs["use_textline_orientation"] = False
+
+    return kwargs
+
 
 def auto_detect_language(input_path):
     """Detect the predominant script in the image using Tesseract multi-lang.
@@ -139,11 +193,17 @@ def run_paddleocr_v5(input_path, language):
         device = "gpu:0" if gpu_available() else "cpu"
 
         emit_progress(20, "Loading")
+        mk = _bundled_paddle_kwargs(paddle_lang)
+        # When a bundled recognizer is pinned, the model selects the script, so
+        # we omit lang (this is the proven fully-offline path). Only fall back to
+        # lang-based (online) resolution when no bundled rec exists (e.g. ja).
+        if "text_recognition_model_dir" not in mk:
+            mk["lang"] = paddle_lang
         ocr = PaddleOCR(
-            lang=paddle_lang,
             device=device,
             ocr_version="PP-OCRv5",
             enable_mkldnn=False,
+            **mk,
         )
         emit_progress(30, "Scanning")
         results = ocr.predict(input=input_path)
