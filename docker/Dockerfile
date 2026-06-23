@@ -166,7 +166,12 @@ RUN curl -fsSL --retry 3 --retry-delay 5 "https://github.com/strukturag/libheif/
 # Pin tags to specific major.minor for reproducible builds.
 # ============================================
 FROM node:22-bookworm@sha256:e0d149b4727ac0c20d9774e801e423d7a946a0bffced886f42cfe9cd3c67820a AS base-linux-arm64
-FROM nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04@sha256:070f8f2672df1b05b84c0409a5fd1d54ddfd646e5b9d8dee7878131271b563fc AS base-linux-amd64
+# CUDA base must match the AI bundles' wheels (torch/paddle/onnxruntime-gpu are all
+# cu126) and the libcublas-12-6 install below. It also sets the NVIDIA_REQUIRE_CUDA
+# driver gate enforced by nvidia-container-toolkit at container start: a 12.6 base
+# needs driver R560+, vs 12.9 which needs R575+ and fails to start on common
+# production drivers (e.g. 570.x / CUDA 12.8). Keep this at 12.6.x.
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04@sha256:8aef630a54bc5c5146ae5ce68e6af5caa3df0fb690bb91544175c91f307e4356 AS base-linux-amd64
 
 # Node.js donor: provides Node binaries for the CUDA amd64 image without
 # relying on NodeSource apt repos or Ubuntu mirrors (which are flaky on CI).
