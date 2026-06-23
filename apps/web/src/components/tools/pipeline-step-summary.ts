@@ -122,6 +122,34 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       }
       return "";
     }
+    case "trim-audio": {
+      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
+      return "";
+    }
+    case "volume-adjust": {
+      if (settings.gainDb != null) return `${settings.gainDb} dB`;
+      return "";
+    }
+    case "audio-speed": {
+      if (settings.factor != null) return `${settings.factor}x`;
+      return "";
+    }
+    case "pitch-shift": {
+      if (settings.semitones != null) return `${settings.semitones} st`;
+      return "";
+    }
+    case "audio-channels": {
+      if (settings.mode) return String(settings.mode);
+      return "";
+    }
+    case "ringtone-maker": {
+      if (settings.durationS != null) return `${settings.durationS}s`;
+      return "";
+    }
+    case "audio-metadata": {
+      if (settings.strip) return "Strip";
+      return "";
+    }
     default:
       return "";
   }

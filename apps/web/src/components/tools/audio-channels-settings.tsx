@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -68,6 +68,52 @@ export function AudioChannelsSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface AudioChannelsControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function AudioChannelsControls({ settings: initial, onChange }: AudioChannelsControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["audio-channels"];
+  const [mode, setMode] = useState<ChannelMode>("stereo-to-mono");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.mode != null) setMode(initial.mode as ChannelMode);
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ mode });
+  }, [mode]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="acp-mode" className="text-xs text-muted-foreground">
+          {s.mode}
+        </label>
+        <select
+          id="acp-mode"
+          value={mode}
+          onChange={(e) => setMode(e.target.value as ChannelMode)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="stereo-to-mono">{s["stereo-to-mono"]}</option>
+          <option value="mono-to-stereo">{s["mono-to-stereo"]}</option>
+          <option value="swap">{s.swap}</option>
+        </select>
+      </div>
     </div>
   );
 }

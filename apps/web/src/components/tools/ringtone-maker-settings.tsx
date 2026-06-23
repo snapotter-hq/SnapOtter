@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -83,6 +83,68 @@ export function RingtoneMakerSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface RingtoneMakerControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function RingtoneMakerControls({ settings: initial, onChange }: RingtoneMakerControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["ringtone-maker"];
+  const [startS, setStartS] = useState(0);
+  const [durationS, setDurationS] = useState(30);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.startS != null) setStartS(Number(initial.startS));
+    if (initial.durationS != null) setDurationS(Number(initial.durationS));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ startS, durationS });
+  }, [startS, durationS]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rmp-start" className="text-xs text-muted-foreground">
+          {s["start-s"]}
+        </label>
+        <input
+          id="rmp-start"
+          type="number"
+          min={0}
+          step={0.5}
+          value={startS}
+          onChange={(e) => setStartS(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="rmp-duration" className="text-xs text-muted-foreground">
+          {s["duration-s"]}
+        </label>
+        <input
+          id="rmp-duration"
+          type="number"
+          min={1}
+          max={30}
+          step={0.5}
+          value={durationS}
+          onChange={(e) => setDurationS(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -67,6 +67,52 @@ export function PitchShiftSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface PitchShiftControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function PitchShiftControls({ settings: initial, onChange }: PitchShiftControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["pitch-shift"];
+  const [semitones, setSemitones] = useState(3);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.semitones != null) setSemitones(Number(initial.semitones));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ semitones });
+  }, [semitones]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="psp-semi" className="text-xs text-muted-foreground">
+          {s.semitones}
+        </label>
+        <input
+          id="psp-semi"
+          type="number"
+          min={-12}
+          max={12}
+          step={1}
+          value={semitones}
+          onChange={(e) => setSemitones(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
     </div>
   );
 }

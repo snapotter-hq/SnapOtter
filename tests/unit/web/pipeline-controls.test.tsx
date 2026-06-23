@@ -65,3 +65,13 @@ describe("RotateVideoControls", async () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ transform: "cw90" }));
   });
 });
+
+describe("AudioChannelsControls", async () => {
+  const { AudioChannelsControls } = await import("@/components/tools/audio-channels-settings");
+
+  it("emits valid defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<AudioChannelsControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ mode: "stereo-to-mono" }));
+  });
+});

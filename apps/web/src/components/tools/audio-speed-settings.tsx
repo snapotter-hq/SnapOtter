@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -66,6 +66,52 @@ export function AudioSpeedSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface AudioSpeedControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function AudioSpeedControls({ settings: initial, onChange }: AudioSpeedControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["audio-speed"];
+  const [factor, setFactor] = useState(1.5);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.factor != null) setFactor(Number(initial.factor));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ factor });
+  }, [factor]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="asp-factor" className="text-xs text-muted-foreground">
+          {s.factor}
+        </label>
+        <input
+          id="asp-factor"
+          type="number"
+          min={0.25}
+          max={4}
+          step={0.25}
+          value={factor}
+          onChange={(e) => setFactor(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
     </div>
   );
 }

@@ -93,6 +93,27 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "watermark-video": lazy(() =>
     import("./watermark-video-settings").then((m) => ({ default: m.WatermarkVideoControls })),
   ),
+  "trim-audio": lazy(() =>
+    import("./trim-audio-settings").then((m) => ({ default: m.TrimAudioControls })),
+  ),
+  "volume-adjust": lazy(() =>
+    import("./volume-adjust-settings").then((m) => ({ default: m.VolumeAdjustControls })),
+  ),
+  "audio-speed": lazy(() =>
+    import("./audio-speed-settings").then((m) => ({ default: m.AudioSpeedControls })),
+  ),
+  "pitch-shift": lazy(() =>
+    import("./pitch-shift-settings").then((m) => ({ default: m.PitchShiftControls })),
+  ),
+  "audio-channels": lazy(() =>
+    import("./audio-channels-settings").then((m) => ({ default: m.AudioChannelsControls })),
+  ),
+  "ringtone-maker": lazy(() =>
+    import("./ringtone-maker-settings").then((m) => ({ default: m.RingtoneMakerControls })),
+  ),
+  "audio-metadata": lazy(() =>
+    import("./audio-metadata-settings").then((m) => ({ default: m.AudioMetadataControls })),
+  ),
 };
 
 const COLOR_TOOL_IDS = new Set(["adjust-colors"]);
