@@ -77,3 +77,6 @@ pentest-results/
 # Stryker mutation testing
 .stryker-tmp/
 packages/image-engine/reports/
+
+# Local AI run scratch scripts
+run-ai-*.py
