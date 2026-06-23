@@ -84,6 +84,11 @@ services:
       - SETGID
       - DAC_OVERRIDE
       - FOWNER
+      # KILL lets tini (PID 1, root) forward SIGTERM to the gosu-dropped
+      # snapotter process on shutdown. Without it, root minus CAP_KILL cannot
+      # signal a different-UID process, so docker stop is ungraceful
+      # ("[FATAL tini] forwarding signal: Operation not permitted" -> SIGKILL).
+      - KILL
     # NOTE: security_opt: [no-new-privileges:true] is intentionally omitted.
     # gosu requires setuid to drop from root to the snapotter user.
     # Mitigation: cap_drop: ALL limits available capabilities after privilege drop.
