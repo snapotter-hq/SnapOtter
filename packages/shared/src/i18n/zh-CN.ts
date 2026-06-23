@@ -3131,6 +3131,7 @@ export const zhCN: TranslationKeys = {
     searchToolsPlaceholder: "搜索工具...",
     step: "步骤",
     modalityWarning: "模态不匹配",
+    modalityWarningTooltip: "此步骤需要 {expected}，但接收到 {received}；运行管道时可能会失败。",
   },
   nav: {
     tools: "工具",

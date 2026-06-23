@@ -3236,6 +3236,8 @@ export const pl: TranslationKeys = {
     searchToolsPlaceholder: "Szukaj narzędzi...",
     step: "Krok",
     modalityWarning: "Niezgodność modalności",
+    modalityWarningTooltip:
+      "Ten krok oczekuje {expected}, ale otrzymuje {received}; może się nie powieść podczas uruchamiania potoku.",
   },
   nav: {
     tools: "Narzędzia",

@@ -3218,6 +3218,8 @@ export const vi: TranslationKeys = {
     searchToolsPlaceholder: "Tìm công cụ...",
     step: "Bước",
     modalityWarning: "Không tương thích loại",
+    modalityWarningTooltip:
+      "Bước này cần {expected} nhưng nhận {received}; có thể không thành công khi bạn chạy quy trình.",
   },
   nav: {
     tools: "Công cụ",

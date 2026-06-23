@@ -3217,6 +3217,8 @@ export const sv: TranslationKeys = {
     searchToolsPlaceholder: "Sök verktyg...",
     step: "Steg",
     modalityWarning: "Modalitetsfel",
+    modalityWarningTooltip:
+      "Det här steget förväntar sig {expected} men tar emot {received}; det kan misslyckas när du kör pipelinen.",
   },
   nav: {
     tools: "Verktyg",

@@ -3169,6 +3169,8 @@ export const en = {
     searchToolsPlaceholder: "Search tools...",
     step: "Step",
     modalityWarning: "Modality mismatch",
+    modalityWarningTooltip:
+      "This step expects {expected} but receives {received}; it may fail when you run the pipeline.",
   },
   nav: {
     tools: "Tools",

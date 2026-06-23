@@ -3239,6 +3239,8 @@ export const de: TranslationKeys = {
     searchToolsPlaceholder: "Werkzeuge suchen...",
     step: "Schritt",
     modalityWarning: "Modalitätskonflikt",
+    modalityWarningTooltip:
+      "Dieser Schritt erwartet {expected}, erhält aber {received}; er kann beim Ausführen der Pipeline fehlschlagen.",
   },
   nav: {
     tools: "Werkzeuge",

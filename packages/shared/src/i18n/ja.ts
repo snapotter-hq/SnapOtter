@@ -3172,6 +3172,8 @@ export const ja: TranslationKeys = {
     searchToolsPlaceholder: "ツールを検索...",
     step: "ステップ",
     modalityWarning: "モダリティ不一致",
+    modalityWarningTooltip:
+      "このステップは {expected} を想定していますが {received} を受け取ります。パイプラインの実行時に失敗する可能性があります。",
   },
   nav: {
     tools: "ツール",

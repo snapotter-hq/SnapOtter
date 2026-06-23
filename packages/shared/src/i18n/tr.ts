@@ -3230,6 +3230,8 @@ export const tr: TranslationKeys = {
     searchToolsPlaceholder: "Araç ara...",
     step: "Adım",
     modalityWarning: "Modalite uyumsuzluğu",
+    modalityWarningTooltip:
+      "Bu adım {expected} bekliyor ancak {received} alıyor; işlem hattını çalıştırdığınızda başarısız olabilir.",
   },
   nav: {
     tools: "Araçlar",

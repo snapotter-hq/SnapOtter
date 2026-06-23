@@ -3221,6 +3221,8 @@ export const id: TranslationKeys = {
     searchToolsPlaceholder: "Cari alat...",
     step: "Langkah",
     modalityWarning: "Ketidakcocokan modalitas",
+    modalityWarningTooltip:
+      "Langkah ini mengharapkan {expected} tetapi menerima {received}; mungkin gagal saat Anda menjalankan pipeline.",
   },
   nav: {
     tools: "Alat",

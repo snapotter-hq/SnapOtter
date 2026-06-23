@@ -3229,6 +3229,8 @@ export const nl: TranslationKeys = {
     searchToolsPlaceholder: "Tools zoeken...",
     step: "Stap",
     modalityWarning: "Modaliteitsmismatch",
+    modalityWarningTooltip:
+      "Deze stap verwacht {expected} maar ontvangt {received}; mogelijk mislukt deze bij het uitvoeren van de pipeline.",
   },
   nav: {
     tools: "Tools",

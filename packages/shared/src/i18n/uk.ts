@@ -3226,6 +3226,8 @@ export const uk: TranslationKeys = {
     searchToolsPlaceholder: "Пошук інструментів...",
     step: "Крок",
     modalityWarning: "Невідповідність модальності",
+    modalityWarningTooltip:
+      "Цей крок очікує {expected}, але отримує {received}; він може завершитися помилкою під час запуску конвеєра.",
   },
   nav: {
     tools: "Інструменти",

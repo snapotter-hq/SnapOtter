@@ -3155,6 +3155,8 @@ export const ko: TranslationKeys = {
     searchToolsPlaceholder: "도구 검색...",
     step: "단계",
     modalityWarning: "모달리티 불일치",
+    modalityWarningTooltip:
+      "이 단계는 {expected}을(를) 기대하지만 {received}을(를) 받습니다. 파이프라인을 실행하면 실패할 수 있습니다.",
   },
   nav: {
     tools: "도구",

@@ -3228,6 +3228,8 @@ export const ptBR: TranslationKeys = {
     searchToolsPlaceholder: "Buscar ferramentas...",
     step: "Passo",
     modalityWarning: "Incompatibilidade de modalidade",
+    modalityWarningTooltip:
+      "Esta etapa espera {expected}, mas recebe {received}; pode falhar ao executar o pipeline.",
   },
   nav: {
     tools: "Ferramentas",

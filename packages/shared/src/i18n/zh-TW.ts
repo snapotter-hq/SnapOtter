@@ -3130,6 +3130,7 @@ export const zhTW: TranslationKeys = {
     searchToolsPlaceholder: "搜尋工具...",
     step: "步驟",
     modalityWarning: "模態不相符",
+    modalityWarningTooltip: "此步驟需要 {expected}，但收到 {received}；執行管線時可能會失敗。",
   },
   nav: {
     tools: "工具",

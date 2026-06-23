@@ -3181,6 +3181,7 @@ export const th: TranslationKeys = {
     searchToolsPlaceholder: "ค้นหาเครื่องมือ...",
     step: "ขั้นตอน",
     modalityWarning: "ประเภทไม่ตรงกัน",
+    modalityWarningTooltip: "ขั้นตอนนี้คาดหวัง {expected} แต่ได้รับ {received} อาจล้มเหลวเมื่อคุณเรียกใช้ไปป์ไลน์",
   },
   nav: {
     tools: "เครื่องมือ",

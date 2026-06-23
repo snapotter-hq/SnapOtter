@@ -3224,6 +3224,8 @@ export const ru: TranslationKeys = {
     searchToolsPlaceholder: "Поиск инструментов...",
     step: "Шаг",
     modalityWarning: "Несоответствие модальности",
+    modalityWarningTooltip:
+      "Этот шаг ожидает {expected}, но получает {received}; он может завершиться ошибкой при запуске конвейера.",
   },
   nav: {
     tools: "Инструменты",

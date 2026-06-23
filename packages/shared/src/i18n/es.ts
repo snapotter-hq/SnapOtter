@@ -3221,6 +3221,8 @@ export const es: TranslationKeys = {
     searchToolsPlaceholder: "Buscar herramientas...",
     step: "Paso",
     modalityWarning: "Incompatibilidad de modalidad",
+    modalityWarningTooltip:
+      "Este paso espera {expected} pero recibe {received}; puede fallar al ejecutar la canalización.",
   },
   nav: {
     tools: "Herramientas",

@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { type Modality, TOOLS } from "@snapotter/shared";
 import { AlertTriangle, GripVertical, Workflow, X } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { computeStepWarnings, type StepWarning } from "@/lib/pipeline-compat";
 import { getToolName } from "@/lib/tool-i18n";
@@ -122,7 +123,10 @@ function SortableStep({
           {/* Modality mismatch warning */}
           {warning && (
             <span
-              title={`This step expects ${warning.expects} but receives ${warning.receives}. It may fail when you run the pipeline.`}
+              title={format(t.automate.modalityWarningTooltip, {
+                expected: warning.expects,
+                received: warning.receives,
+              })}
               className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 ms-1"
             >
               <AlertTriangle className="h-3 w-3" />
