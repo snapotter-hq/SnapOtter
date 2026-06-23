@@ -116,3 +116,15 @@ describe("NupPdfControls", async () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ perSheet: 2 }));
   });
 });
+
+describe("ChartMakerControls", async () => {
+  const { ChartMakerControls } = await import("@/components/tools/chart-maker-settings");
+
+  it("emits valid defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<ChartMakerControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "bar", width: 960, height: 540 }),
+    );
+  });
+});

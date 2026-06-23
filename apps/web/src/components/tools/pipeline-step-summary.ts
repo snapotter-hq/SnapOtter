@@ -197,6 +197,10 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.quality != null) return `Quality ${settings.quality}`;
       return "";
     }
+    case "chart-maker": {
+      if (settings.kind) return String(settings.kind);
+      return "";
+    }
     default:
       return "";
   }

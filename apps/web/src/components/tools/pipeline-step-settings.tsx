@@ -155,6 +155,9 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "compress-pdf": lazy(() =>
     import("./compress-settings").then((m) => ({ default: m.CompressControls })),
   ),
+  "chart-maker": lazy(() =>
+    import("./chart-maker-settings").then((m) => ({ default: m.ChartMakerControls })),
+  ),
 };
 
 const COLOR_TOOL_IDS = new Set(["adjust-colors"]);
