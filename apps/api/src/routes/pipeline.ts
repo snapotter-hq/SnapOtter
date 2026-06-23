@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ANALYTICS_EVENTS, FEATURE_BUNDLES, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, FEATURE_BUNDLES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
@@ -111,12 +111,22 @@ function buildPipelineFlowTree(opts: {
   parsedSteps: ParsedStep[];
   uploadKey: string;
   filename: string;
+  pipelinePool: Pool;
   clientJobId?: string;
   parentId?: string;
   totalFiles?: number;
 }): { tree: FlowJob; stepJobIds: string[] } {
-  const { jobId, userId, parsedSteps, uploadKey, filename, clientJobId, parentId, totalFiles } =
-    opts;
+  const {
+    jobId,
+    userId,
+    parsedSteps,
+    uploadKey,
+    filename,
+    pipelinePool,
+    clientJobId,
+    parentId,
+    totalFiles,
+  } = opts;
   const totalSteps = parsedSteps.length;
   const stepJobIds = parsedSteps.map((_: unknown, i: number) => `${jobId}-s${i}`);
 
@@ -166,17 +176,18 @@ function buildPipelineFlowTree(opts: {
     };
   }
 
-  // Finalize parent: runs on image pool (lightweight DB reads + one object copy;
-  // keeps the flow tree single-queue except batch parents; system pool is reserved for crons + batch manifest assembly)
+  // Finalize parent: runs on the pipeline's modality pool (lightweight DB reads
+  // + one object copy; steps already run on their own per-step pools; system
+  // pool is reserved for crons + batch manifest assembly)
   const tree: FlowJob = {
     name: "pipeline-finalize",
-    queueName: queueName("image"),
+    queueName: queueName(pipelinePool),
     data: {
       kind: "pipeline-finalize",
       jobId,
       toolId: "pipeline",
       userId,
-      pool: "image" as Pool,
+      pool: pipelinePool,
       totalSteps,
       clientJobId,
       parentId,
@@ -197,7 +208,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
    * POST /api/v1/pipeline/execute
    *
    * Accepts multipart with:
-   *   - A file part (the image to process)
+   *   - A file part (the file to process)
    *   - A "pipeline" field containing JSON: { steps: [{ toolId, settings }, ...] }
    *
    * Enqueues a BullMQ FlowProducer tree (nested children for sequential
@@ -431,6 +442,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         });
       }
 
+      // Derive the pipeline's pool from the first step's modality so the
+      // finalize job and parent row land on the correct queue.
+      const firstModality =
+        TOOLS.find((t) => t.id === parsedSteps[0].resolvedToolId)?.modality ?? "image";
+      const pipelinePool: Pool = MODALITY_POOL[firstModality];
+
       // Build the nested FlowJob tree
       const { tree, stepJobIds } = buildPipelineFlowTree({
         jobId,
@@ -438,6 +455,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         parsedSteps,
         uploadKey,
         filename,
+        pipelinePool,
         clientJobId: clientJobId ?? jobId,
       });
 
@@ -461,7 +479,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         id: jobId,
         userId,
         toolId: "pipeline",
-        pool: "image",
+        pool: pipelinePool,
         type: "pipeline",
         status: "queued",
         inputRefs: [],
@@ -476,7 +494,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       // Wait for the finalize job (pipelines block to completion)
       try {
-        const result = await waitForJob("image", jobId, 10 * 60_000);
+        const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
 
         if (!result) {
           trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
@@ -875,6 +893,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       // validator.
       const batchModality =
         TOOLS.find((t) => t.id === pipeline.steps[0]?.toolId)?.modality ?? "image";
+      const batchPipelinePool: Pool = MODALITY_POOL[batchModality];
       const pipelineBatchScratch = join(
         tmpdir(),
         "snapotter-scratch",
@@ -968,6 +987,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           parsedSteps,
           uploadKey,
           filename: processFilename,
+          pipelinePool: batchPipelinePool,
           parentId,
           totalFiles: files.length,
         });
@@ -990,7 +1010,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           id: perFileJobId,
           userId,
           toolId: "pipeline",
-          pool: "image",
+          pool: batchPipelinePool,
           type: "pipeline-finalize",
           status: "queued",
           inputRefs: [],
