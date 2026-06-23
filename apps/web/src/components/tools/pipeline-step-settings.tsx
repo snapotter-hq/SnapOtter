@@ -48,6 +48,9 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "noise-removal": lazy(() =>
     import("./noise-removal-settings").then((m) => ({ default: m.NoiseRemovalControls })),
   ),
+  "convert-audio": lazy(() =>
+    import("./convert-audio-settings").then((m) => ({ default: m.ConvertAudioControls })),
+  ),
 };
 
 const COLOR_TOOL_IDS = new Set(["adjust-colors"]);

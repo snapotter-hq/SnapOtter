@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -91,6 +91,73 @@ export function ConvertAudioSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface ConvertAudioControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function ConvertAudioControls({ settings: initial, onChange }: ConvertAudioControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["convert-audio"];
+  const [outFormat, setOutFormat] = useState<AudioFormat>("mp3");
+  const [bitrateKbps, setBitrateKbps] = useState(192);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.format != null) setOutFormat(initial.format as AudioFormat);
+    if (initial.bitrateKbps != null) setBitrateKbps(Number(initial.bitrateKbps));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ format: outFormat, bitrateKbps });
+  }, [outFormat, bitrateKbps]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="ca-format" className="text-xs text-muted-foreground">
+          {s.format}
+        </label>
+        <select
+          id="ca-format"
+          value={outFormat}
+          onChange={(e) => setOutFormat(e.target.value as AudioFormat)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="mp3">MP3</option>
+          <option value="wav">WAV</option>
+          <option value="ogg">OGG</option>
+          <option value="flac">FLAC</option>
+          <option value="m4a">M4A</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="ca-bitrate" className="text-xs text-muted-foreground">
+          {s.bitrate}
+        </label>
+        <select
+          id="ca-bitrate"
+          value={bitrateKbps}
+          onChange={(e) => setBitrateKbps(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          {BITRATE_OPTIONS.map((br) => (
+            <option key={br} value={br}>
+              {br} kbps
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
