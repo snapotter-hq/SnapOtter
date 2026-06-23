@@ -354,6 +354,14 @@ export function AutomatePage() {
     URL.revokeObjectURL(url);
   }, [batchZipBlob, batchZipFilename]);
 
+  const handleDownloadSingle = useCallback(() => {
+    if (!processedUrl) return;
+    const a = document.createElement("a");
+    a.href = processedUrl;
+    a.download = currentEntry?.processedFilename ?? "result";
+    a.click();
+  }, [processedUrl, currentEntry]);
+
   const handleImageKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
@@ -629,6 +637,15 @@ export function AutomatePage() {
               <button
                 type="button"
                 onClick={handleDownloadAll}
+                className="px-4 py-2.5 rounded-lg border border-primary text-primary"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            )}
+            {hasProcessed && !batchZipBlob && processedUrl && (
+              <button
+                type="button"
+                onClick={handleDownloadSingle}
                 className="px-4 py-2.5 rounded-lg border border-primary text-primary"
               >
                 <Download className="h-4 w-4" />
@@ -932,6 +949,16 @@ export function AutomatePage() {
                 >
                   <Download className="h-4 w-4" />
                   {t.automate.downloadZip}
+                </button>
+              )}
+              {hasProcessed && !batchZipBlob && processedUrl && (
+                <button
+                  type="button"
+                  onClick={handleDownloadSingle}
+                  className="px-4 py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center gap-2 hover:bg-primary/5"
+                >
+                  <Download className="h-4 w-4" />
+                  {t.common.download}
                 </button>
               )}
 
