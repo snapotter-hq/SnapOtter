@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
 import { missingBundleForScript } from "./feature-gate.js";
+import { acquireVenvLock } from "./venv-lock.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -624,23 +625,30 @@ export class PythonDispatcher {
       return this.runPerRequest(scriptName, args, options);
     };
 
-    if (!span) return doRun();
+    const runWithSpan = (): Promise<{ stdout: string; stderr: string }> => {
+      if (!span) return doRun();
+      return doRun().then(
+        (result) => {
+          span.end();
+          return result;
+        },
+        (err) => {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          span.recordException(err instanceof Error ? err : new Error(String(err)));
+          span.end();
+          throw err;
+        },
+      );
+    };
 
-    return doRun().then(
-      (result) => {
-        span.end();
-        return result;
-      },
-      (err) => {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        span.recordException(err instanceof Error ? err : new Error(String(err)));
-        span.end();
-        throw err;
-      },
-    );
+    // Serialize against bundle installs that mutate the shared venv: a job that
+    // dlopens native libs (torch / onnxruntime CUDA) while pip rewrites them
+    // segfaults the sidecar. acquireVenvLock() resolves immediately unless an
+    // install is in progress, in which case the job waits for it to finish.
+    return acquireVenvLock().then((release) => runWithSpan().finally(release));
   }
 }
 

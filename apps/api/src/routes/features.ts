@@ -20,7 +20,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
-import { shutdownDispatcher } from "@snapotter/ai";
+import { acquireVenvLock, shutdownDispatcher } from "@snapotter/ai";
 import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { trackEvent } from "../lib/analytics.js";
@@ -167,6 +167,19 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       const installStartTime = Date.now();
       const reqRef = request;
 
+      // Hold the venv lock across the whole install so no AI tool job loads
+      // native libs from the venv while pip is rewriting them (that segfaults
+      // the sidecar). This awaits any in-flight AI job before the installer
+      // starts; the lock is released when the installer process exits.
+      const releaseVenv = await acquireVenvLock();
+      let venvReleased = false;
+      const releaseVenvOnce = () => {
+        if (!venvReleased) {
+          venvReleased = true;
+          releaseVenv();
+        }
+      };
+
       const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
         stdio: ["ignore", "pipe", "pipe"],
         env: {
@@ -219,6 +232,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       });
 
       child.on("close", (code) => {
+        releaseVenvOnce();
         releaseInstallLock();
 
         if (code === 0) {
@@ -275,6 +289,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       });
 
       child.on("error", (err) => {
+        releaseVenvOnce();
         releaseInstallLock();
         const errorMsg = `Failed to spawn install process: ${err.message}`;
         setInstallProgress(bundleId, null, errorMsg);

@@ -29,3 +29,4 @@ export { seamCarve } from "./seam-carving.js";
 export type { TranscribeOptions, TranscriptionResult, TranscriptSegment } from "./transcription.js";
 export { transcribeAudio } from "./transcription.js";
 export { upscale } from "./upscaling.js";
+export { acquireVenvLock } from "./venv-lock.js";
