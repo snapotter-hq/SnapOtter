@@ -3216,6 +3216,7 @@ export const sv: TranslationKeys = {
     noStepsHeading: "Inga steg ännu",
     searchToolsPlaceholder: "Sök verktyg...",
     step: "Steg",
+    modalityWarning: "Modalitetsfel",
   },
   nav: {
     tools: "Verktyg",

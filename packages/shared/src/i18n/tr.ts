@@ -3229,6 +3229,7 @@ export const tr: TranslationKeys = {
     noStepsHeading: "Henüz adım yok",
     searchToolsPlaceholder: "Araç ara...",
     step: "Adım",
+    modalityWarning: "Modalite uyumsuzluğu",
   },
   nav: {
     tools: "Araçlar",

@@ -3194,6 +3194,7 @@ export const hi: TranslationKeys = {
     noStepsHeading: "अभी तक कोई चरण नहीं",
     searchToolsPlaceholder: "टूल खोजें...",
     step: "स्टेप",
+    modalityWarning: "मोडैलिटी मेल नहीं खाती",
   },
   nav: {
     tools: "टूल्स",

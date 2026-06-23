@@ -3228,6 +3228,7 @@ export const nl: TranslationKeys = {
     noStepsHeading: "Nog geen stappen",
     searchToolsPlaceholder: "Tools zoeken...",
     step: "Stap",
+    modalityWarning: "Modaliteitsmismatch",
   },
   nav: {
     tools: "Tools",

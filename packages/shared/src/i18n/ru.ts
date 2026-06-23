@@ -3223,6 +3223,7 @@ export const ru: TranslationKeys = {
     noStepsHeading: "Шагов пока нет",
     searchToolsPlaceholder: "Поиск инструментов...",
     step: "Шаг",
+    modalityWarning: "Несоответствие модальности",
   },
   nav: {
     tools: "Инструменты",

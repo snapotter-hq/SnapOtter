@@ -3171,6 +3171,7 @@ export const ja: TranslationKeys = {
     noStepsHeading: "ステップがありません",
     searchToolsPlaceholder: "ツールを検索...",
     step: "ステップ",
+    modalityWarning: "モダリティ不一致",
   },
   nav: {
     tools: "ツール",

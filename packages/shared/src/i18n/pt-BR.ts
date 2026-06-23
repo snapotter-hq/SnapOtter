@@ -3227,6 +3227,7 @@ export const ptBR: TranslationKeys = {
     noStepsHeading: "Nenhuma etapa ainda",
     searchToolsPlaceholder: "Buscar ferramentas...",
     step: "Passo",
+    modalityWarning: "Incompatibilidade de modalidade",
   },
   nav: {
     tools: "Ferramentas",

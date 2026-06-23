@@ -3130,6 +3130,7 @@ export const zhCN: TranslationKeys = {
     noStepsHeading: "暂无步骤",
     searchToolsPlaceholder: "搜索工具...",
     step: "步骤",
+    modalityWarning: "模态不匹配",
   },
   nav: {
     tools: "工具",

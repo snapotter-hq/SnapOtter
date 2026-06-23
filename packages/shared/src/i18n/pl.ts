@@ -3235,6 +3235,7 @@ export const pl: TranslationKeys = {
     noStepsHeading: "Brak kroków",
     searchToolsPlaceholder: "Szukaj narzędzi...",
     step: "Krok",
+    modalityWarning: "Niezgodność modalności",
   },
   nav: {
     tools: "Narzędzia",

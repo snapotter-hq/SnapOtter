@@ -3154,6 +3154,7 @@ export const ko: TranslationKeys = {
     noStepsHeading: "단계가 없습니다",
     searchToolsPlaceholder: "도구 검색...",
     step: "단계",
+    modalityWarning: "모달리티 불일치",
   },
   nav: {
     tools: "도구",

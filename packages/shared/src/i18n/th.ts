@@ -3180,6 +3180,7 @@ export const th: TranslationKeys = {
     noStepsHeading: "ยังไม่มีขั้นตอน",
     searchToolsPlaceholder: "ค้นหาเครื่องมือ...",
     step: "ขั้นตอน",
+    modalityWarning: "ประเภทไม่ตรงกัน",
   },
   nav: {
     tools: "เครื่องมือ",

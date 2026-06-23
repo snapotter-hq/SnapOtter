@@ -3243,6 +3243,7 @@ export const fr: TranslationKeys = {
     noStepsHeading: "Aucune étape pour le moment",
     searchToolsPlaceholder: "Rechercher des outils...",
     step: "Étape",
+    modalityWarning: "Incompatibilité de modalité",
   },
   nav: {
     tools: "Outils",

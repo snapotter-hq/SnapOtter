@@ -3168,6 +3168,7 @@ export const en = {
     noStepsHeading: "No steps yet",
     searchToolsPlaceholder: "Search tools...",
     step: "Step",
+    modalityWarning: "Modality mismatch",
   },
   nav: {
     tools: "Tools",

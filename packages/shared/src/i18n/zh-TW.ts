@@ -3129,6 +3129,7 @@ export const zhTW: TranslationKeys = {
     noStepsHeading: "尚無步驟",
     searchToolsPlaceholder: "搜尋工具...",
     step: "步驟",
+    modalityWarning: "模態不相符",
   },
   nav: {
     tools: "工具",

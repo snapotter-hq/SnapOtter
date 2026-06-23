@@ -3238,6 +3238,7 @@ export const de: TranslationKeys = {
     noStepsHeading: "Noch keine Schritte",
     searchToolsPlaceholder: "Werkzeuge suchen...",
     step: "Schritt",
+    modalityWarning: "Modalitätskonflikt",
   },
   nav: {
     tools: "Werkzeuge",

@@ -1,3 +1,4 @@
+import { modalityForExtension } from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronDown,
@@ -103,6 +104,12 @@ export function AutomatePage() {
   const hasMultiple = entries.length > 1;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < entries.length - 1;
+
+  const firstEntry = entries[0];
+  const uploadedModality = firstEntry
+    ? (modalityForExtension(firstEntry.file.name.slice(firstEntry.file.name.lastIndexOf("."))) ??
+      firstEntry.modality)
+    : null;
 
   useEffect(() => {
     (async () => {
@@ -575,6 +582,7 @@ export function AutomatePage() {
             <PipelineBuilder
               steps={steps}
               expandedStepId={expandedStepId}
+              uploadedModality={uploadedModality}
               onRemoveStep={removeStep}
               onReorderSteps={reorderSteps}
               onUpdateSettings={updateStepSettings}
@@ -877,6 +885,7 @@ export function AutomatePage() {
               <PipelineBuilder
                 steps={steps}
                 expandedStepId={expandedStepId}
+                uploadedModality={uploadedModality}
                 onRemoveStep={removeStep}
                 onReorderSteps={reorderSteps}
                 onUpdateSettings={updateStepSettings}

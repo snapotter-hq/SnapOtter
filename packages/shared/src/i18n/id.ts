@@ -3220,6 +3220,7 @@ export const id: TranslationKeys = {
     noStepsHeading: "Belum ada langkah",
     searchToolsPlaceholder: "Cari alat...",
     step: "Langkah",
+    modalityWarning: "Ketidakcocokan modalitas",
   },
   nav: {
     tools: "Alat",

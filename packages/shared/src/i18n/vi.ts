@@ -3217,6 +3217,7 @@ export const vi: TranslationKeys = {
     noStepsHeading: "Chưa có bước nào",
     searchToolsPlaceholder: "Tìm công cụ...",
     step: "Bước",
+    modalityWarning: "Không tương thích loại",
   },
   nav: {
     tools: "Công cụ",
