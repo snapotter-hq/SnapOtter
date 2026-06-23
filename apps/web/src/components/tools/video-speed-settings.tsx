@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -77,6 +77,63 @@ export function VideoSpeedSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface VideoSpeedControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function VideoSpeedControls({ settings: initial, onChange }: VideoSpeedControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["video-speed"];
+  const [factor, setFactor] = useState(2);
+  const [keepPitch, setKeepPitch] = useState(true);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.factor != null) setFactor(Number(initial.factor));
+    if (initial.keepPitch != null) setKeepPitch(Boolean(initial.keepPitch));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ factor, keepPitch });
+  }, [factor, keepPitch]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="vsp-factor" className="text-xs text-muted-foreground">
+          {s.factor}
+        </label>
+        <input
+          id="vsp-factor"
+          type="number"
+          min={0.25}
+          max={4}
+          step={0.25}
+          value={factor}
+          onChange={(e) => setFactor(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          checked={keepPitch}
+          onChange={(e) => setKeepPitch(e.target.checked)}
+          className="rounded"
+        />
+        {s.keepPitch}
+      </label>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -87,6 +87,70 @@ export function CompressVideoSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface CompressVideoControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function CompressVideoControls({ settings: initial, onChange }: CompressVideoControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["compress-video"];
+  const [quality, setQuality] = useState<Quality>("balanced");
+  const [resolution, setResolution] = useState<Resolution>("original");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.quality != null) setQuality(initial.quality as Quality);
+    if (initial.resolution != null) setResolution(initial.resolution as Resolution);
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ quality, resolution });
+  }, [quality, resolution]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="cpvp-quality" className="text-xs text-muted-foreground">
+          {s.quality}
+        </label>
+        <select
+          id="cpvp-quality"
+          value={quality}
+          onChange={(e) => setQuality(e.target.value as Quality)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="light">{s.light}</option>
+          <option value="balanced">{s.balanced}</option>
+          <option value="strong">{s.strong}</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="cpvp-resolution" className="text-xs text-muted-foreground">
+          {s.resolution}
+        </label>
+        <select
+          id="cpvp-resolution"
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value as Resolution)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="original">{s.original}</option>
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+          <option value="480p">480p</option>
+        </select>
+      </div>
     </div>
   );
 }

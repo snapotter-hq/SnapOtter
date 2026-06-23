@@ -61,6 +61,67 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.format) return String(settings.format).toUpperCase();
       return "";
     }
+    case "convert-video": {
+      if (settings.format) return String(settings.format).toUpperCase();
+      return "";
+    }
+    case "compress-video": {
+      if (settings.quality) return String(settings.quality);
+      return "";
+    }
+    case "trim-video": {
+      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
+      return "";
+    }
+    case "video-to-gif": {
+      if (settings.fps) return `${settings.fps} fps`;
+      return "";
+    }
+    case "video-to-webp": {
+      if (settings.quality != null) return `Q${settings.quality}`;
+      return "";
+    }
+    case "resize-video": {
+      if (settings.preset && settings.preset !== "custom") return String(settings.preset);
+      if (settings.width && settings.height) return `${settings.width}x${settings.height}`;
+      if (settings.width) return `${settings.width}px wide`;
+      if (settings.height) return `${settings.height}px tall`;
+      return "";
+    }
+    case "crop-video": {
+      if (settings.width && settings.height) return `${settings.width}x${settings.height}`;
+      return "";
+    }
+    case "rotate-video": {
+      if (settings.transform) return String(settings.transform);
+      return "";
+    }
+    case "change-fps": {
+      if (settings.fps) return `${settings.fps} fps`;
+      return "";
+    }
+    case "video-color": {
+      return "Adjusted";
+    }
+    case "video-speed": {
+      if (settings.factor) return `${settings.factor}x`;
+      return "";
+    }
+    case "aspect-pad": {
+      if (settings.target) return String(settings.target);
+      return "";
+    }
+    case "blur-pad": {
+      if (settings.target) return String(settings.target);
+      return "";
+    }
+    case "watermark-video": {
+      if (settings.text) {
+        const txt = String(settings.text);
+        return txt.length > 25 ? `${txt.slice(0, 24)}...` : txt;
+      }
+      return "";
+    }
     default:
       return "";
   }

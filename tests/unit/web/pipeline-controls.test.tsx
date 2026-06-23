@@ -43,3 +43,25 @@ describe("ConvertAudioControls", () => {
     );
   });
 });
+
+describe("TrimVideoControls", async () => {
+  const { TrimVideoControls } = await import("@/components/tools/trim-video-settings");
+
+  it("emits valid defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<TrimVideoControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ startS: 0, endS: 0, precise: false }),
+    );
+  });
+});
+
+describe("RotateVideoControls", async () => {
+  const { RotateVideoControls } = await import("@/components/tools/rotate-video-settings");
+
+  it("emits valid defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<RotateVideoControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ transform: "cw90" }));
+  });
+});

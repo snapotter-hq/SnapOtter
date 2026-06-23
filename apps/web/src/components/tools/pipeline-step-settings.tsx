@@ -51,6 +51,48 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "convert-audio": lazy(() =>
     import("./convert-audio-settings").then((m) => ({ default: m.ConvertAudioControls })),
   ),
+  "convert-video": lazy(() =>
+    import("./convert-video-settings").then((m) => ({ default: m.ConvertVideoControls })),
+  ),
+  "compress-video": lazy(() =>
+    import("./compress-video-settings").then((m) => ({ default: m.CompressVideoControls })),
+  ),
+  "trim-video": lazy(() =>
+    import("./trim-video-settings").then((m) => ({ default: m.TrimVideoControls })),
+  ),
+  "video-to-gif": lazy(() =>
+    import("./video-to-gif-settings").then((m) => ({ default: m.VideoToGifControls })),
+  ),
+  "video-to-webp": lazy(() =>
+    import("./video-to-webp-settings").then((m) => ({ default: m.VideoToWebpControls })),
+  ),
+  "resize-video": lazy(() =>
+    import("./resize-video-settings").then((m) => ({ default: m.ResizeVideoControls })),
+  ),
+  "crop-video": lazy(() =>
+    import("./crop-video-settings").then((m) => ({ default: m.CropVideoControls })),
+  ),
+  "rotate-video": lazy(() =>
+    import("./rotate-video-settings").then((m) => ({ default: m.RotateVideoControls })),
+  ),
+  "change-fps": lazy(() =>
+    import("./change-fps-settings").then((m) => ({ default: m.ChangeFpsControls })),
+  ),
+  "video-color": lazy(() =>
+    import("./video-color-settings").then((m) => ({ default: m.VideoColorControls })),
+  ),
+  "video-speed": lazy(() =>
+    import("./video-speed-settings").then((m) => ({ default: m.VideoSpeedControls })),
+  ),
+  "aspect-pad": lazy(() =>
+    import("./aspect-pad-settings").then((m) => ({ default: m.AspectPadControls })),
+  ),
+  "blur-pad": lazy(() =>
+    import("./blur-pad-settings").then((m) => ({ default: m.BlurPadControls })),
+  ),
+  "watermark-video": lazy(() =>
+    import("./watermark-video-settings").then((m) => ({ default: m.WatermarkVideoControls })),
+  ),
 };
 
 const COLOR_TOOL_IDS = new Set(["adjust-colors"]);

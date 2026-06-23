@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -110,6 +110,95 @@ export function CropVideoSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface CropVideoControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function CropVideoControls({ settings: initial, onChange }: CropVideoControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["crop-video"];
+  const [width, setWidth] = useState(0);
+  const [height, setHeight] = useState(0);
+  const [x, setX] = useState(0);
+  const [y, setY] = useState(0);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.width != null) setWidth(Number(initial.width));
+    if (initial.height != null) setHeight(Number(initial.height));
+    if (initial.x != null) setX(Number(initial.x));
+    if (initial.y != null) setY(Number(initial.y));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ width, height, x, y });
+  }, [width, height, x, y]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="crvp-width" className="text-xs text-muted-foreground">
+          {s.width}
+        </label>
+        <input
+          id="crvp-width"
+          type="number"
+          min={0}
+          value={width}
+          onChange={(e) => setWidth(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="crvp-height" className="text-xs text-muted-foreground">
+          {s.height}
+        </label>
+        <input
+          id="crvp-height"
+          type="number"
+          min={0}
+          value={height}
+          onChange={(e) => setHeight(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="crvp-x" className="text-xs text-muted-foreground">
+          {s.x}
+        </label>
+        <input
+          id="crvp-x"
+          type="number"
+          min={0}
+          value={x}
+          onChange={(e) => setX(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="crvp-y" className="text-xs text-muted-foreground">
+          {s.y}
+        </label>
+        <input
+          id="crvp-y"
+          type="number"
+          min={0}
+          value={y}
+          onChange={(e) => setY(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
     </div>
   );
 }

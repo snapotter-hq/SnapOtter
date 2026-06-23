@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -70,6 +70,54 @@ export function RotateVideoSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface RotateVideoControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function RotateVideoControls({ settings: initial, onChange }: RotateVideoControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["rotate-video"];
+  const [transform, setTransform] = useState<Transform>("cw90");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.transform != null) setTransform(initial.transform as Transform);
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ transform });
+  }, [transform]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rtvp-transform" className="text-xs text-muted-foreground">
+          {s.transform}
+        </label>
+        <select
+          id="rtvp-transform"
+          value={transform}
+          onChange={(e) => setTransform(e.target.value as Transform)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="cw90">{s.cw90}</option>
+          <option value="ccw90">{s.ccw90}</option>
+          <option value="180">{s.rotate180}</option>
+          <option value="hflip">{s.hflip}</option>
+          <option value="vflip">{s.vflip}</option>
+        </select>
+      </div>
     </div>
   );
 }

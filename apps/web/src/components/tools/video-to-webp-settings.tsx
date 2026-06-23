@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -111,6 +111,97 @@ export function VideoToWebpSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface VideoToWebpControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function VideoToWebpControls({ settings: initial, onChange }: VideoToWebpControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["video-to-webp"];
+  const [fps, setFps] = useState(12);
+  const [width, setWidth] = useState(480);
+  const [quality, setQuality] = useState(75);
+  const [loop, setLoop] = useState(true);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.fps != null) setFps(Number(initial.fps));
+    if (initial.width != null) setWidth(Number(initial.width));
+    if (initial.quality != null) setQuality(Number(initial.quality));
+    if (initial.loop != null) setLoop(Boolean(initial.loop));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ fps, width, quality, loop });
+  }, [fps, width, quality, loop]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="v2wp-fps" className="text-xs text-muted-foreground">
+          {s.fps}
+        </label>
+        <input
+          id="v2wp-fps"
+          type="number"
+          min={1}
+          max={30}
+          step={1}
+          value={fps}
+          onChange={(e) => setFps(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="v2wp-width" className="text-xs text-muted-foreground">
+          {s.width}
+        </label>
+        <input
+          id="v2wp-width"
+          type="number"
+          min={16}
+          max={1920}
+          step={1}
+          value={width}
+          onChange={(e) => setWidth(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="v2wp-quality" className="text-xs text-muted-foreground">
+          {s.quality}
+        </label>
+        <input
+          id="v2wp-quality"
+          type="number"
+          min={1}
+          max={100}
+          step={1}
+          value={quality}
+          onChange={(e) => setQuality(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          checked={loop}
+          onChange={(e) => setLoop(e.target.checked)}
+          className="rounded"
+        />
+        {s.loop}
+      </label>
     </div>
   );
 }

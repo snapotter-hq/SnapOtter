@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -115,6 +115,99 @@ export function ResizeVideoSettings() {
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
+      )}
+    </div>
+  );
+}
+
+export interface ResizeVideoControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function ResizeVideoControls({ settings: initial, onChange }: ResizeVideoControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["resize-video"];
+  const [preset, setPreset] = useState<Preset>("custom");
+  const [width, setWidth] = useState<number | "">("");
+  const [height, setHeight] = useState<number | "">("");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.preset != null) setPreset(initial.preset as Preset);
+    if (initial.width != null) setWidth(Number(initial.width));
+    if (initial.height != null) setHeight(Number(initial.height));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    const out: Record<string, unknown> = { preset };
+    if (preset === "custom") {
+      if (width !== "") out.width = width;
+      if (height !== "") out.height = height;
+    }
+    onChangeRef.current?.(out);
+  }, [preset, width, height]);
+
+  const isCustom = preset === "custom";
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rvp-preset" className="text-xs text-muted-foreground">
+          {s.preset}
+        </label>
+        <select
+          id="rvp-preset"
+          value={preset}
+          onChange={(e) => setPreset(e.target.value as Preset)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value="custom">Custom</option>
+          <option value="2160p">2160p (4K)</option>
+          <option value="1440p">1440p (2K)</option>
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+          <option value="480p">480p</option>
+          <option value="360p">360p</option>
+        </select>
+      </div>
+      {isCustom && (
+        <>
+          <div>
+            <label htmlFor="rvp-width" className="text-xs text-muted-foreground">
+              {s.width}
+            </label>
+            <input
+              id="rvp-width"
+              type="number"
+              min={16}
+              max={7680}
+              value={width}
+              onChange={(e) => setWidth(e.target.value === "" ? "" : Number(e.target.value))}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="rvp-height" className="text-xs text-muted-foreground">
+              {s.height}
+            </label>
+            <input
+              id="rvp-height"
+              type="number"
+              min={16}
+              max={4320}
+              value={height}
+              onChange={(e) => setHeight(e.target.value === "" ? "" : Number(e.target.value))}
+              className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+            />
+          </div>
+        </>
       )}
     </div>
   );

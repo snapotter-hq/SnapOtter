@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -117,6 +117,103 @@ export function VideoColorSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface VideoColorControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function VideoColorControls({ settings: initial, onChange }: VideoColorControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["video-color"];
+  const [brightness, setBrightness] = useState(0);
+  const [contrast, setContrast] = useState(1);
+  const [saturation, setSaturation] = useState(1);
+  const [gamma, setGamma] = useState(1);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.brightness != null) setBrightness(Number(initial.brightness));
+    if (initial.contrast != null) setContrast(Number(initial.contrast));
+    if (initial.saturation != null) setSaturation(Number(initial.saturation));
+    if (initial.gamma != null) setGamma(Number(initial.gamma));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ brightness, contrast, saturation, gamma });
+  }, [brightness, contrast, saturation, gamma]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="vcp-brightness" className="text-xs text-muted-foreground">
+          {s.brightness}
+        </label>
+        <input
+          id="vcp-brightness"
+          type="number"
+          min={-1}
+          max={1}
+          step={0.05}
+          value={brightness}
+          onChange={(e) => setBrightness(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="vcp-contrast" className="text-xs text-muted-foreground">
+          {s.contrast}
+        </label>
+        <input
+          id="vcp-contrast"
+          type="number"
+          min={0}
+          max={4}
+          step={0.1}
+          value={contrast}
+          onChange={(e) => setContrast(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="vcp-saturation" className="text-xs text-muted-foreground">
+          {s.saturation}
+        </label>
+        <input
+          id="vcp-saturation"
+          type="number"
+          min={0}
+          max={3}
+          step={0.1}
+          value={saturation}
+          onChange={(e) => setSaturation(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="vcp-gamma" className="text-xs text-muted-foreground">
+          {s.gamma}
+        </label>
+        <input
+          id="vcp-gamma"
+          type="number"
+          min={0.1}
+          max={10}
+          step={0.1}
+          value={gamma}
+          onChange={(e) => setGamma(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
     </div>
   );
 }

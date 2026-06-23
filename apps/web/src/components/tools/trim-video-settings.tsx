@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -96,6 +96,78 @@ export function TrimVideoSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface TrimVideoControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function TrimVideoControls({ settings: initial, onChange }: TrimVideoControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["trim-video"];
+  const [startS, setStartS] = useState(0);
+  const [endS, setEndS] = useState(0);
+  const [precise, setPrecise] = useState(false);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.startS != null) setStartS(Number(initial.startS));
+    if (initial.endS != null) setEndS(Number(initial.endS));
+    if (initial.precise != null) setPrecise(Boolean(initial.precise));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ startS, endS, precise });
+  }, [startS, endS, precise]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="tvp-start" className="text-xs text-muted-foreground">
+          {s.start}
+        </label>
+        <input
+          id="tvp-start"
+          type="number"
+          min={0}
+          step={0.1}
+          value={startS}
+          onChange={(e) => setStartS(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div>
+        <label htmlFor="tvp-end" className="text-xs text-muted-foreground">
+          {s.end}
+        </label>
+        <input
+          id="tvp-end"
+          type="number"
+          min={0}
+          step={0.1}
+          value={endS}
+          onChange={(e) => setEndS(Number(e.target.value))}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          checked={precise}
+          onChange={(e) => setPrecise(e.target.checked)}
+          className="rounded"
+        />
+        {s.precise}
+      </label>
     </div>
   );
 }
