@@ -15,6 +15,19 @@ export interface RemoveBackgroundOptions {
 const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
 const OOM_FALLBACK_MODEL = "u2net";
 
+/**
+ * onnxruntime / CUDA surface allocation failures with several different
+ * messages ("out of memory", "Failed to allocate memory for requested buffer",
+ * CUBLAS_STATUS_ALLOC_FAILED, bad_alloc). Match them all so the lighter-model
+ * fallback actually triggers instead of failing the job.
+ */
+export function isMemoryAllocError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc/i.test(
+    err.message,
+  );
+}
+
 export async function removeBackground(
   inputBuffer: Buffer,
   outputDir: string,
@@ -80,7 +93,7 @@ async function runAndParse(
     }
     return readFile(outputPath);
   } catch (err) {
-    const isOom = err instanceof Error && err.message.includes("out of memory");
+    const isOom = isMemoryAllocError(err);
     const canFallback = isOom && options.model !== OOM_FALLBACK_MODEL;
 
     if (!canFallback) throw err;

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeBackground } from "@snapotter/ai";
+import { isMemoryAllocError, removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -104,7 +104,7 @@ async function processTransparencyFix(
       onProgress,
     );
   } catch (err) {
-    const isOom = err instanceof Error && err.message.includes("out of memory");
+    const isOom = isMemoryAllocError(err);
     if (!isOom) throw err;
 
     onProgress?.(5, `Retrying with fallback model (${FALLBACK_MODEL})`);

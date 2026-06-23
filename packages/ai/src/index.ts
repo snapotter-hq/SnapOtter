@@ -1,4 +1,4 @@
-export { removeBackground } from "./background-removal.js";
+export { isMemoryAllocError, removeBackground } from "./background-removal.js";
 export type { DispatcherStatus } from "./bridge.js";
 export {
   getDispatcherStatus,
