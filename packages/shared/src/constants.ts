@@ -146,6 +146,7 @@ export const TOOLS: Tool[] = [
     route: "/image-to-pdf",
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
+    outputModality: "document",
     executionHint: "fast",
   },
   {
@@ -247,6 +248,7 @@ export const TOOLS: Tool[] = [
     route: "/ocr",
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
+    outputModality: "file",
     executionHint: "long",
   },
   {
@@ -258,6 +260,7 @@ export const TOOLS: Tool[] = [
     route: "/ocr-pdf",
     modality: "document",
     acceptedInputs: [".pdf"],
+    outputModality: "file",
     executionHint: "long",
   },
   {
@@ -390,6 +393,7 @@ export const TOOLS: Tool[] = [
     route: "/transcribe-audio",
     modality: "audio",
     acceptedInputs: AUDIO_INPUTS,
+    outputModality: "file",
     executionHint: "long",
   },
   {
@@ -401,6 +405,7 @@ export const TOOLS: Tool[] = [
     route: "/auto-subtitles",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "file",
     executionHint: "long",
   },
   {
@@ -791,6 +796,7 @@ export const TOOLS: Tool[] = [
     route: "/pdf-to-image",
     modality: "document",
     acceptedInputs: [".pdf"],
+    outputModality: "image",
     executionHint: "fast",
   },
   // Video
@@ -847,6 +853,7 @@ export const TOOLS: Tool[] = [
     route: "/video-to-gif",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "image",
     executionHint: "long",
   },
   {
@@ -1001,6 +1008,7 @@ export const TOOLS: Tool[] = [
     route: "/video-to-webp",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "image",
     executionHint: "fast",
   },
   {
@@ -1012,6 +1020,7 @@ export const TOOLS: Tool[] = [
     route: "/video-to-frames",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "file",
     executionHint: "fast",
   },
   {
@@ -1067,6 +1076,7 @@ export const TOOLS: Tool[] = [
     route: "/extract-subtitles",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "file",
     executionHint: "fast",
   },
   {
@@ -1123,6 +1133,7 @@ export const TOOLS: Tool[] = [
     route: "/extract-audio",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    outputModality: "audio",
     executionHint: "fast",
   },
   {
@@ -1266,6 +1277,7 @@ export const TOOLS: Tool[] = [
     route: "/waveform-image",
     modality: "audio",
     acceptedInputs: AUDIO_INPUTS,
+    outputModality: "image",
     executionHint: "fast",
   },
   {
@@ -1565,6 +1577,7 @@ export const TOOLS: Tool[] = [
     route: "/pdf-to-text",
     modality: "document",
     acceptedInputs: [".pdf"],
+    outputModality: "file",
     executionHint: "fast",
   },
   {
@@ -1679,6 +1692,7 @@ export const TOOLS: Tool[] = [
     route: "/chart-maker",
     modality: "file",
     acceptedInputs: [".csv", ".json"],
+    outputModality: "image",
     executionHint: "fast",
   },
   {

@@ -9,6 +9,8 @@ export interface Tool {
   route: string;
   modality: Modality;
   acceptedInputs: string[];
+  /** Modality of this tool's output, when it differs from `modality`. Defaults to `modality`. */
+  outputModality?: Modality;
   executionHint: "fast" | "long";
   maxInputSizeMB?: number;
   shortcut?: string;
