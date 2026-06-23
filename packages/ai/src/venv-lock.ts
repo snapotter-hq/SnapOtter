@@ -1,34 +1,87 @@
 /**
- * Mutual exclusion between Python-venv mutation and venv reads.
+ * Read/write lock between AI tool jobs (readers) and bundle installs (writers).
  *
- * An AI feature bundle install rewrites files under the shared venv's
- * site-packages (pip + copytree of *.so), while AI tool jobs dlopen native
- * libraries (torch / onnxruntime CUDA) from that same venv. Loading a shared
- * object while it is being overwritten segfaults the sidecar, so installs and
- * AI jobs must never run concurrently.
+ * A bundle install rewrites the shared venv's site-packages (pip + copytree of
+ * *.so), while AI tool jobs dlopen native libraries (torch / onnxruntime CUDA)
+ * from that same venv. Loading a shared object while it is being overwritten
+ * segfaults the sidecar, so an install must not overlap with any AI job.
  *
- * Both sides run in the same Node process (the Fastify route spawns the
- * installer; in-process BullMQ workers run the jobs), so a module-level async
- * mutex is sufficient and is shared via Node's module cache.
+ * AI jobs may run concurrently with each other -- the persistent dispatcher
+ * multiplexes requests by id -- so they are shared readers; only an install
+ * needs exclusivity, so it is the writer. Writer-preferring, so an install is
+ * not starved by a steady stream of jobs.
  *
- * FIFO, non-reentrant. `acquireVenvLock()` resolves to a release function once
- * the lock is held; always call it (it is idempotent). In the common case
- * (no install running) acquisition resolves on the next microtask.
+ * Both sides live in the same Node process (the Fastify route spawns the
+ * installer; in-process BullMQ workers run the jobs), so a module-level lock
+ * shared via Node's module cache is sufficient.
+ *
+ * Readers have a synchronous fast path (tryAcquireVenvRead) so a job's work
+ * begins in the same tick when no install is active or pending -- exactly as
+ * before this lock existed. Every acquire returns a release function; always
+ * call it (it is idempotent).
  */
-let tail: Promise<void> = Promise.resolve();
+type Release = () => void;
 
-export function acquireVenvLock(): Promise<() => void> {
-  let release!: () => void;
-  let released = false;
-  const gate = new Promise<void>((resolve) => {
-    release = () => {
-      if (!released) {
-        released = true;
-        resolve();
-      }
-    };
+let readers = 0;
+let writerActive = false;
+const writeWaiters: Array<() => void> = [];
+const readWaiters: Array<() => void> = [];
+
+function readRelease(): Release {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    readers--;
+    if (readers === 0 && writeWaiters.length > 0) {
+      writerActive = true;
+      writeWaiters.shift()?.();
+    }
+  };
+}
+
+function writeRelease(): Release {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    writerActive = false;
+    if (writeWaiters.length > 0) {
+      writerActive = true;
+      writeWaiters.shift()?.();
+    } else {
+      const granted = readWaiters.splice(0);
+      for (const grant of granted) grant();
+    }
+  };
+}
+
+/** AI-job (reader) sync fast path; null if an install is active or waiting. */
+export function tryAcquireVenvRead(): Release | null {
+  if (writerActive || writeWaiters.length > 0) return null;
+  readers++;
+  return readRelease();
+}
+
+/** AI-job (reader) acquire; waits while an install holds or is awaiting the lock. */
+export function acquireVenvRead(): Promise<Release> {
+  const r = tryAcquireVenvRead();
+  if (r) return Promise.resolve(r);
+  return new Promise<Release>((resolve) => {
+    readWaiters.push(() => {
+      readers++;
+      resolve(readRelease());
+    });
   });
-  const prev = tail;
-  tail = prev.then(() => gate);
-  return prev.then(() => release);
+}
+
+/** Bundle-install (writer) exclusive acquire; waits for in-flight AI jobs. */
+export function acquireVenvLock(): Promise<Release> {
+  if (!writerActive && readers === 0 && writeWaiters.length === 0) {
+    writerActive = true;
+    return Promise.resolve(writeRelease());
+  }
+  return new Promise<Release>((resolve) => {
+    writeWaiters.push(() => resolve(writeRelease()));
+  });
 }
