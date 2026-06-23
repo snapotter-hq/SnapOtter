@@ -84,21 +84,27 @@ describe("Pipeline multimodal pool routing", () => {
     expect(parent?.pool).toBe("docs");
   });
 
-  it("routes an audio pipeline's parent job to the media pool", async () => {
-    const res = await executePipeline(app, AUDIO_FIXTURE, "a2.mp3", [
-      { toolId: "convert-audio", settings: { format: "mp3", bitrateKbps: 192 } },
-    ]);
+  // Needs ffmpeg: convert-audio must process for the response to carry the jobId
+  // we look up. The docs-pool test above already proves the modality->pool
+  // derivation (docs, not the old hardcoded "image") in environments without ffmpeg.
+  it.skipIf(!ffmpegAvailable())(
+    "routes an audio pipeline's parent job to the media pool",
+    async () => {
+      const res = await executePipeline(app, AUDIO_FIXTURE, "a2.mp3", [
+        { toolId: "convert-audio", settings: { format: "mp3", bitrateKbps: 192 } },
+      ]);
 
-    const body = res.json();
-    const jobId = body.jobId ?? body.id;
-    expect(jobId).toBeDefined();
+      const body = res.json();
+      const jobId = body.jobId ?? body.id;
+      expect(jobId).toBeDefined();
 
-    const parent = await db.query.jobs.findFirst({
-      where: eq(schema.jobs.id, jobId),
-    });
-    expect(parent).toBeDefined();
-    expect(parent?.pool).toBe("media");
-  });
+      const parent = await db.query.jobs.findFirst({
+        where: eq(schema.jobs.id, jobId),
+      });
+      expect(parent).toBeDefined();
+      expect(parent?.pool).toBe("media");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
