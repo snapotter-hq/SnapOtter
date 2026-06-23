@@ -3,7 +3,7 @@
 </p>
 
 > [!NOTE]
-> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 157 tools across image, video, audio, documents, and data. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
+> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 157 tools across image, video, audio, documents, and files. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
 
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
@@ -27,7 +27,7 @@
   - **Video (29):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, and more
   - **Audio (17):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, and more
   - **Documents / PDF (37):** merge, split, compress, convert (Word/Excel/PowerPoint/EPUB), protect/unlock, redact, watermark, page numbers, OCR, and more
-  - **Data (10):** CSV/JSON/XML/YAML conversion, CSV merge/split, chart maker, ZIP create/extract
+  - **Files (10):** CSV/JSON/XML/YAML conversion, CSV merge/split, chart maker, ZIP create/extract
 - **Image editor:** Layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware
 - **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
