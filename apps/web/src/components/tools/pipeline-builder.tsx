@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type Modality, TOOLS } from "@snapotter/shared";
-import { AlertTriangle, FileImage, GripVertical, X } from "lucide-react";
+import { AlertTriangle, GripVertical, Workflow, X } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { ICON_MAP } from "@/lib/icon-map";
 import { computeStepWarnings, type StepWarning } from "@/lib/pipeline-compat";
@@ -71,7 +71,7 @@ function SortableStep({
   const tool = TOOLS.find((t) => t.id === step.toolId);
   if (!tool) return null;
 
-  const Icon = (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
+  const Icon = (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? Workflow;
   const summary = getSettingsSummary(step.toolId, step.settings);
 
   return (
@@ -196,7 +196,7 @@ export function PipelineBuilder({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="p-4 rounded-full bg-muted/50 mb-4">
-          <FileImage className="h-8 w-8 text-muted-foreground" />
+          <Workflow className="h-8 w-8 text-muted-foreground" />
         </div>
         <h3 className="text-sm font-medium text-foreground mb-1">{t.automate.noStepsHeading}</h3>
         <p className="text-sm text-muted-foreground max-w-[240px]">{t.automate.addToolsPrompt}</p>

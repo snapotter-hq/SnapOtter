@@ -6,8 +6,12 @@ import {
   ChevronRight,
   ChevronUp,
   Download,
-  FileImage,
+  FileArchive,
+  FileAudio,
+  FileText,
+  FileVideo,
   FolderOpen,
+  Image as ImageIcon,
   Layers,
   Play,
   Plus,
@@ -45,6 +49,21 @@ const MediaPlayerView = lazy(() =>
 const WaveformPlayer = lazy(() =>
   import("@/components/common/waveform-player").then((m) => ({ default: m.WaveformPlayer })),
 );
+
+function previewIcon(kind: string) {
+  switch (kind) {
+    case "image":
+      return ImageIcon;
+    case "video":
+      return FileVideo;
+    case "audio":
+      return FileAudio;
+    case "document":
+      return FileText;
+    default:
+      return FileArchive;
+  }
+}
 
 export function AutomatePage() {
   const { t } = useTranslation();
@@ -362,7 +381,7 @@ export function AutomatePage() {
     a.click();
   }, [processedUrl, currentEntry]);
 
-  const handleImageKeyDown = useCallback(
+  const handleNavKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -468,7 +487,10 @@ export function AutomatePage() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center p-6 max-w-xs">
           <div className="mx-auto w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
-            <FileImage className="h-7 w-7 text-muted-foreground" />
+            {(() => {
+              const Icon = previewIcon(kind);
+              return <Icon className="h-7 w-7 text-muted-foreground" />;
+            })()}
           </div>
           <p className="font-medium text-foreground mb-1">{fname}</p>
           <p className="text-xs text-muted-foreground">
@@ -552,7 +574,7 @@ export function AutomatePage() {
             {hasFile && hasProcessed && originalBlobUrl && (
               <div className="mb-3 rounded-lg border border-border overflow-hidden">
                 <div className="relative h-48">{renderPipelinePreview("result")}</div>
-                {processedSize != null && currentEntry?.previewKind === "image" && (
+                {processedSize != null && (
                   <div className="flex items-center justify-between px-3 py-1.5 border-t border-border text-xs text-muted-foreground">
                     <span className="truncate">{selectedFileName ?? files[0].name}</span>
                     <span>
@@ -1047,7 +1069,7 @@ export function AutomatePage() {
                 <section
                   aria-label={t.a11y.imageArea}
                   className="flex-1 flex flex-col overflow-hidden min-h-0"
-                  onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
+                  onKeyDown={hasMultiple ? handleNavKeyDown : undefined}
                   tabIndex={hasMultiple ? 0 : undefined}
                 >
                   <div className="flex-1 relative flex items-center justify-center px-6 py-2 min-h-0">
