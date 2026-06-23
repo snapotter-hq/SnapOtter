@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -83,6 +83,67 @@ export function RotatePdfSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface RotatePdfControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function RotatePdfControls({ settings: initial, onChange }: RotatePdfControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["rotate-pdf"];
+  const [angle, setAngle] = useState<Angle>(90);
+  const [range, setRange] = useState("1-z");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.angle != null) setAngle(Number(initial.angle) as Angle);
+    if (initial.range != null) setRange(String(initial.range));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ angle, range });
+  }, [angle, range]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rpdc-angle" className="text-xs text-muted-foreground">
+          {s.angle}
+        </label>
+        <select
+          id="rpdc-angle"
+          value={angle}
+          onChange={(e) => setAngle(Number(e.target.value) as Angle)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          <option value={90}>90</option>
+          <option value={180}>180</option>
+          <option value={270}>270</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="rpdc-range" className="text-xs text-muted-foreground">
+          {s.range}
+        </label>
+        <input
+          id="rpdc-range"
+          type="text"
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+        <p className="text-[10px] text-muted-foreground mt-0.5">{s.rangeHint}</p>
+      </div>
     </div>
   );
 }

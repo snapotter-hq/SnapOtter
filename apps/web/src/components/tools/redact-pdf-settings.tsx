@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -83,6 +83,67 @@ export function RedactPdfSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface RedactPdfControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function RedactPdfControls({ settings: initial, onChange }: RedactPdfControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["redact-pdf"];
+  const [termsText, setTermsText] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (Array.isArray(initial.terms)) setTermsText((initial.terms as string[]).join(", "));
+    if (initial.caseSensitive != null) setCaseSensitive(Boolean(initial.caseSensitive));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    const terms = termsText
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    onChangeRef.current?.({ terms, caseSensitive });
+  }, [termsText, caseSensitive]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rdc-terms" className="text-xs text-muted-foreground">
+          {s.terms}
+        </label>
+        <input
+          id="rdc-terms"
+          type="text"
+          value={termsText}
+          onChange={(e) => setTermsText(e.target.value)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          id="rdc-case"
+          type="checkbox"
+          checked={caseSensitive}
+          onChange={(e) => setCaseSensitive(e.target.checked)}
+          className="rounded border-border"
+        />
+        <label htmlFor="rdc-case" className="text-xs text-muted-foreground">
+          {s.caseSensitive}
+        </label>
+      </div>
     </div>
   );
 }

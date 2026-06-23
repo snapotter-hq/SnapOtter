@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -86,6 +86,57 @@ export function ConvertDocumentSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface ConvertDocumentControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function ConvertDocumentControls({
+  settings: initial,
+  onChange,
+}: ConvertDocumentControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["convert-document"];
+  const [outFormat, setOutFormat] = useState<DocFormat>("docx");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.format != null) setOutFormat(initial.format as DocFormat);
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ format: outFormat });
+  }, [outFormat]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="cdc-format" className="text-xs text-muted-foreground">
+          {s.format}
+        </label>
+        <select
+          id="cdc-format"
+          value={outFormat}
+          onChange={(e) => setOutFormat(e.target.value as DocFormat)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        >
+          {ALL_FORMATS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

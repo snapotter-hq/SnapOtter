@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -64,6 +64,50 @@ export function RemovePagesSettings() {
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
         </button>
       )}
+    </div>
+  );
+}
+
+export interface RemovePagesControlsProps {
+  settings?: Record<string, unknown>;
+  onChange?: (settings: Record<string, unknown>) => void;
+}
+
+export function RemovePagesControls({ settings: initial, onChange }: RemovePagesControlsProps) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["remove-pages"];
+  const [pages, setPages] = useState("");
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initial || initializedRef.current) return;
+    initializedRef.current = true;
+    if (initial.pages != null) setPages(String(initial.pages));
+  }, [initial]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.({ pages });
+  }, [pages]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="rpc-pages" className="text-xs text-muted-foreground">
+          {s.pages}
+        </label>
+        <input
+          id="rpc-pages"
+          type="text"
+          value={pages}
+          onChange={(e) => setPages(e.target.value)}
+          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
+        />
+        <p className="text-[10px] text-muted-foreground mt-0.5">{s.pagesHint}</p>
+      </div>
     </div>
   );
 }

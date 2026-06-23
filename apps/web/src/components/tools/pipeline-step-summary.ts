@@ -150,6 +150,53 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.strip) return "Strip";
       return "";
     }
+    case "rotate-pdf": {
+      if (settings.angle != null) return `${settings.angle}°`;
+      return "";
+    }
+    case "convert-document":
+    case "convert-presentation":
+    case "convert-spreadsheet":
+    case "epub-convert": {
+      if (settings.format) return String(settings.format).toUpperCase();
+      return "";
+    }
+    case "extract-pages": {
+      return String(settings.range || "");
+    }
+    case "remove-pages": {
+      return String(settings.pages || "");
+    }
+    case "organize-pdf": {
+      return String(settings.order || "");
+    }
+    case "nup-pdf": {
+      if (settings.perSheet != null) return `${settings.perSheet}-up`;
+      return "";
+    }
+    case "watermark-pdf": {
+      if (settings.text) {
+        const txt = String(settings.text);
+        return txt.length > 25 ? `${txt.slice(0, 24)}...` : txt;
+      }
+      return "";
+    }
+    case "redact-pdf": {
+      const terms = settings.terms as string[] | undefined;
+      if (terms && terms.length > 0) return `${terms.length} terms`;
+      return "";
+    }
+    case "pdf-metadata": {
+      if (settings.title || settings.author || settings.subject || settings.keywords)
+        return "Metadata";
+      return "";
+    }
+    case "compress-pdf": {
+      if (settings.mode === "targetSize" && settings.targetSizeKb)
+        return `Target ${settings.targetSizeKb} KB`;
+      if (settings.quality != null) return `Quality ${settings.quality}`;
+      return "";
+    }
     default:
       return "";
   }

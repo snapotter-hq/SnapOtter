@@ -114,6 +114,47 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "audio-metadata": lazy(() =>
     import("./audio-metadata-settings").then((m) => ({ default: m.AudioMetadataControls })),
   ),
+  "rotate-pdf": lazy(() =>
+    import("./rotate-pdf-settings").then((m) => ({ default: m.RotatePdfControls })),
+  ),
+  "convert-document": lazy(() =>
+    import("./convert-document-settings").then((m) => ({ default: m.ConvertDocumentControls })),
+  ),
+  "convert-presentation": lazy(() =>
+    import("./convert-presentation-settings").then((m) => ({
+      default: m.ConvertPresentationControls,
+    })),
+  ),
+  "convert-spreadsheet": lazy(() =>
+    import("./convert-spreadsheet-settings").then((m) => ({
+      default: m.ConvertSpreadsheetControls,
+    })),
+  ),
+  "extract-pages": lazy(() =>
+    import("./extract-pages-settings").then((m) => ({ default: m.ExtractPagesControls })),
+  ),
+  "remove-pages": lazy(() =>
+    import("./remove-pages-settings").then((m) => ({ default: m.RemovePagesControls })),
+  ),
+  "organize-pdf": lazy(() =>
+    import("./organize-pdf-settings").then((m) => ({ default: m.OrganizePdfControls })),
+  ),
+  "nup-pdf": lazy(() => import("./nup-pdf-settings").then((m) => ({ default: m.NupPdfControls }))),
+  "watermark-pdf": lazy(() =>
+    import("./watermark-pdf-settings").then((m) => ({ default: m.WatermarkPdfControls })),
+  ),
+  "redact-pdf": lazy(() =>
+    import("./redact-pdf-settings").then((m) => ({ default: m.RedactPdfControls })),
+  ),
+  "pdf-metadata": lazy(() =>
+    import("./pdf-metadata-settings").then((m) => ({ default: m.PdfMetadataControls })),
+  ),
+  "epub-convert": lazy(() =>
+    import("./epub-convert-settings").then((m) => ({ default: m.EpubConvertControls })),
+  ),
+  "compress-pdf": lazy(() =>
+    import("./compress-settings").then((m) => ({ default: m.CompressControls })),
+  ),
 };
 
 const COLOR_TOOL_IDS = new Set(["adjust-colors"]);

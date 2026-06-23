@@ -75,3 +75,44 @@ describe("AudioChannelsControls", async () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ mode: "stereo-to-mono" }));
   });
 });
+
+describe("RotatePdfControls", async () => {
+  const { RotatePdfControls } = await import("@/components/tools/rotate-pdf-settings");
+
+  it("emits valid defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<RotatePdfControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ angle: 90, range: "1-z" }));
+  });
+});
+
+describe("RedactPdfControls", async () => {
+  const { RedactPdfControls } = await import("@/components/tools/redact-pdf-settings");
+
+  it("emits empty terms array on mount", () => {
+    const onChange = vi.fn();
+    render(<RedactPdfControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ terms: [], caseSensitive: false }),
+    );
+  });
+
+  it("splits comma-separated input into terms array", async () => {
+    const onChange = vi.fn();
+    render(<RedactPdfControls onChange={onChange} />);
+    const input = screen.getByRole("textbox");
+    await userEvent.type(input, "foo, bar, baz");
+    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+    expect(lastCall.terms).toEqual(["foo", "bar", "baz"]);
+  });
+});
+
+describe("NupPdfControls", async () => {
+  const { NupPdfControls } = await import("@/components/tools/nup-pdf-settings");
+
+  it("emits perSheet as a number on mount", () => {
+    const onChange = vi.fn();
+    render(<NupPdfControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ perSheet: 2 }));
+  });
+});
