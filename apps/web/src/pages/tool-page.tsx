@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_EVENTS,
   getRequiredBundlesForTool,
   PYTHON_SIDECAR_TOOLS,
   SECTIONS,
@@ -263,6 +264,13 @@ export function ToolPage() {
   useEffect(() => {
     if (tool) {
       recordRecentTool(tool.id);
+      import("@/lib/analytics").then(({ track }) => {
+        track(ANALYTICS_EVENTS.TOOL_OPENED, {
+          tool_id: tool.id,
+          modality: tool.modality,
+          category: tool.category,
+        });
+      });
     }
   }, [tool]);
 

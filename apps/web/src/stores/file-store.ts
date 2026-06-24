@@ -1,4 +1,4 @@
-import { detectModalityFromMime, type Modality } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, detectModalityFromMime, type Modality } from "@snapotter/shared";
 import { create } from "zustand";
 import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
 
@@ -166,6 +166,9 @@ export const useFileStore = create<FileState>((set, get) => ({
   // -- Actions --------------------------------------------------------------
 
   setFiles: (files) => {
+    import("@/lib/analytics").then(({ track }) => {
+      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    });
     revokeEntries(get().entries);
     const entries = files.map(createEntry);
     set({
@@ -203,6 +206,9 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   addFiles: (files) => {
+    import("@/lib/analytics").then(({ track }) => {
+      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    });
     const oldLen = get().entries.length;
     const newEntries = files.map(createEntry);
     const entries = [...get().entries, ...newEntries];

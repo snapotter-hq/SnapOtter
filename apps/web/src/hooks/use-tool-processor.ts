@@ -1,4 +1,4 @@
-import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders, parseApiError } from "@/lib/api";
@@ -242,6 +242,14 @@ export function useToolProcessor(toolId: string) {
         setError("No files selected");
         return;
       }
+
+      import("@/lib/analytics").then(({ track }) => {
+        track(ANALYTICS_EVENTS.TOOL_STARTED, {
+          tool_id: toolId,
+          is_batch: false,
+          file_count: files.length,
+        });
+      });
 
       const capturedIndex = useFileStore.getState().selectedIndex;
 
@@ -521,6 +529,15 @@ export function useToolProcessor(toolId: string) {
         setError("No files selected");
         return;
       }
+
+      import("@/lib/analytics").then(({ track }) => {
+        track(ANALYTICS_EVENTS.TOOL_STARTED, {
+          tool_id: toolId,
+          is_batch: true,
+          file_count: files.length,
+        });
+      });
+
       if (files.length === 1) {
         processFiles(files, settings);
         return;

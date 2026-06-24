@@ -1,5 +1,5 @@
 import type { Tool } from "@snapotter/shared";
-import { CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import { ChevronDown, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -84,6 +84,16 @@ export function HomePage() {
   }, [disabledTools, experimentalEnabled, loaded]);
 
   const searchResults = useFuseSearch(visibleTools, search);
+
+  useEffect(() => {
+    if (!search || search.length < 2) return;
+    const timer = setTimeout(() => {
+      import("@/lib/analytics").then(({ track }) => {
+        track(ANALYTICS_EVENTS.SEARCH, { query: search, results_count: searchResults.length });
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [search, searchResults.length]);
 
   const tabTools = useMemo(() => {
     if (activeTab === "all") return visibleTools;

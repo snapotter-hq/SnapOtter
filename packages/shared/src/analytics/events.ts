@@ -1,8 +1,16 @@
 export const ANALYTICS_EVENTS = {
   TOOL_USED: "tool_used",
+  TOOL_OPENED: "tool_opened",
+  FILE_ADDED: "file_added",
+  TOOL_STARTED: "tool_started",
+  TOOL_CLIENT_ERROR: "tool_client_error",
+  RESULT_DOWNLOADED: "result_downloaded",
+  RESULT_SAVED: "result_saved",
   SEARCH: "search",
   PIPELINE_EXECUTED: "pipeline_executed",
   AI_BUNDLE_ACTION: "ai_bundle_action",
+  AI_BUNDLE_PROMPTED: "ai_bundle_prompted",
+  BATCH_PROCESSED: "batch_processed",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];

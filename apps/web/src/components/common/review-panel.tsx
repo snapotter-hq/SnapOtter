@@ -1,3 +1,4 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, FolderPlus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -71,6 +72,9 @@ export function ReviewPanel({
   }, [originalSize, fileSize]);
 
   const handleDownload = () => {
+    import("@/lib/analytics").then(({ track }) => {
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {});
+    });
     triggerDownload(downloadUrl, filename);
   };
 
