@@ -79,7 +79,10 @@ const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 if (endpoint) {
   try {
     const enterprise = await import("@snapotter/enterprise");
-    const licenseKey = process.env.LICENSE_KEY ?? "";
+    // The rest of the app reads SNAPOTTER_LICENSE_KEY (env.ts / index.ts). Accept
+    // either here so distributed_tracing activates with the same key as every other
+    // enterprise feature; LICENSE_KEY kept as an override for preload-only setups.
+    const licenseKey = process.env.LICENSE_KEY ?? process.env.SNAPOTTER_LICENSE_KEY ?? "";
     if (licenseKey) {
       enterprise.initEnterprise(licenseKey);
     }

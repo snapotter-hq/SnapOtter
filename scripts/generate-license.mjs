@@ -4,8 +4,20 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const PRIVATE_KEY_PATH = ".license-signing-key";
 
+// Keep in sync with PLAN_FEATURES in packages/enterprise/src/license.ts.
+// isFeatureEnabled() checks the signed license's own `features` array, so a stale
+// list here silently leaves gated features 403ing even with a valid enterprise key.
 const PLAN_FEATURES = {
-  team: ["saml_sso", "s3_storage", "multi_tenancy"],
+  team: [
+    "saml_sso",
+    "s3_storage",
+    "multi_tenancy",
+    "audit_export",
+    "siem_forwarding",
+    "sso_enforcement",
+    "upgrade_management",
+    "admin_alerts",
+  ],
   enterprise: [
     "saml_sso",
     "s3_storage",
@@ -15,6 +27,17 @@ const PLAN_FEATURES = {
     "audit_export",
     "mfa",
     "per_tool_permissions",
+    "siem_forwarding",
+    "tamper_resistant_audit",
+    "legal_hold",
+    "gdpr_lifecycle",
+    "team_retention_overrides",
+    "sso_enforcement",
+    "ip_allowlist",
+    "config_export_import",
+    "upgrade_management",
+    "admin_alerts",
+    "distributed_tracing",
   ],
 };
 
