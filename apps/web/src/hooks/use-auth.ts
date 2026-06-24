@@ -10,9 +10,6 @@ interface AuthState {
   mfaRequired: boolean;
   role: string | null;
   permissions: string[];
-  analyticsEnabled: boolean | null;
-  analyticsConsentShownAt: number | null;
-  analyticsConsentRemindAt: number | null;
   oidcEnabled: boolean;
   oidcProviderName: string | null;
   samlEnabled: boolean;
@@ -48,9 +45,6 @@ export function useAuth() {
     mfaRequired: false,
     role: null,
     permissions: [],
-    analyticsEnabled: null,
-    analyticsConsentShownAt: null,
-    analyticsConsentRemindAt: null,
     oidcEnabled: false,
     oidcProviderName: null,
     samlEnabled: false,
@@ -78,9 +72,6 @@ export function useAuth() {
               mfaRequired: false,
               role: "admin",
               permissions: ANON_ADMIN_PERMISSIONS,
-              analyticsEnabled: null,
-              analyticsConsentShownAt: null,
-              analyticsConsentRemindAt: null,
               oidcEnabled: false,
               oidcProviderName: null,
               samlEnabled: false,
@@ -110,9 +101,6 @@ export function useAuth() {
               mfaRequired: session.user?.mfaRequired === true,
               role: session.user?.role ?? null,
               permissions: session.user?.permissions ?? [],
-              analyticsEnabled: session.user?.analyticsEnabled ?? null,
-              analyticsConsentShownAt: session.user?.analyticsConsentShownAt ?? null,
-              analyticsConsentRemindAt: session.user?.analyticsConsentRemindAt ?? null,
               oidcEnabled: config.oidcEnabled ?? false,
               oidcProviderName: config.oidcProviderName ?? null,
               samlEnabled: config.samlEnabled ?? false,
@@ -132,9 +120,6 @@ export function useAuth() {
               mfaRequired: false,
               role: null,
               permissions: [],
-              analyticsEnabled: null,
-              analyticsConsentShownAt: null,
-              analyticsConsentRemindAt: null,
               oidcEnabled: config.oidcEnabled ?? false,
               oidcProviderName: config.oidcProviderName ?? null,
               samlEnabled: config.samlEnabled ?? false,

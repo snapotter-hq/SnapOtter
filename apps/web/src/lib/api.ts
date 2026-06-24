@@ -60,16 +60,6 @@ export function formatHeaders(init?: HeadersInit): Headers {
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  if (!token) {
-    try {
-      const consent = localStorage.getItem("snapotter-analytics-consent");
-      if (consent === "true" || consent === "false") {
-        headers.set("X-Analytics-Consent", consent);
-      }
-    } catch {
-      // localStorage unavailable
-    }
-  }
   return headers;
 }
 
