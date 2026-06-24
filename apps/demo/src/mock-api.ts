@@ -88,14 +88,12 @@ const STATE_KEY = "snapotter-demo-state";
 
 function loadState(): {
   passwordChanged: boolean;
-  analyticsEnabled: boolean | null;
-  analyticsConsentShownAt: number | null;
 } {
   try {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return { passwordChanged: false, analyticsEnabled: null, analyticsConsentShownAt: null };
+  return { passwordChanged: false };
 }
 
 function saveState(patch: Partial<ReturnType<typeof loadState>>) {
@@ -134,9 +132,6 @@ function matchRoute(url: string, method: string): Response | null {
         role: "admin",
         permissions: PERMISSIONS,
         mustChangePassword: !state.passwordChanged,
-        analyticsEnabled: state.analyticsEnabled,
-        analyticsConsentShownAt: state.analyticsConsentShownAt,
-        analyticsConsentRemindAt: null,
         loginMethod: "local",
         hasLocalPassword: true,
       },
@@ -177,11 +172,6 @@ function matchRoute(url: string, method: string): Response | null {
       sampleRate: 0,
       instanceId: "demo-instance",
     });
-  }
-
-  if (path === "/api/v1/user/analytics" && method === "PUT") {
-    saveState({ analyticsEnabled: true, analyticsConsentShownAt: Date.now() });
-    return json({ ok: true });
   }
 
   if (path.startsWith("/api/v1/tools/") && method === "POST") {
