@@ -1,4 +1,4 @@
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -184,7 +184,11 @@ export async function putGenericObjectStream(
     params: {
       Bucket: cfg().bucket,
       Key: genericKey(key),
-      Body: source as unknown as Readable,
+      // @aws-sdk/lib-storage Upload only accepts string|Uint8Array|Buffer|Readable|
+      // ReadableStream|Blob. A bare AsyncIterable (the counter() generator from
+      // object-storage.putObjectStream) is none of those, so S3 uploads failed with
+      // "Body Data is unsupported format". Wrap it in a real Node Readable.
+      Body: Readable.from(source),
     },
   });
   await upload.done();

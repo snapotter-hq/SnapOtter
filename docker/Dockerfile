@@ -357,6 +357,13 @@ COPY apps/api/static ./apps/api/static
 
 # Copy workspace packages source (referenced by API at runtime)
 COPY packages/shared/src ./packages/shared/src
+# The builder stage ran scripts/bake-analytics.mjs to bake the analytics config
+# (driven by SNAPOTTER_ANALYTICS). The line above re-copies the committed baked.ts
+# from the build context, which would clobber that bake and leave the API runtime
+# with analytics permanently off -- so SNAPOTTER_ANALYTICS had no effect on the API
+# (and, since the SPA reads /api/v1/config/analytics, no effect anywhere). Pull the
+# baked version from the builder so the build arg actually controls runtime analytics.
+COPY --from=builder /app/packages/shared/src/analytics/baked.ts ./packages/shared/src/analytics/baked.ts
 COPY packages/image-engine/src ./packages/image-engine/src
 COPY packages/media-engine/src ./packages/media-engine/src
 COPY packages/doc-engine/src ./packages/doc-engine/src

@@ -625,6 +625,22 @@ if (await shouldRunStartupCleanup()) {
 // Start BullMQ worker pools (after route registration so the tool registry is full)
 startWorkers();
 
+// Reconcile orphaned job rows. A jobs row created without a tool_id/pool (e.g. an
+// SSE-progress placeholder for a clientJobId whose client then disconnected) is
+// never enqueued to BullMQ, so unlike a genuinely interrupted job (which BullMQ's
+// stalled-detection requeues) it would sit in 'processing'/'queued' forever --
+// inflating the per-user concurrent-job count and the upgrade-check in-flight gate.
+// Only rows with an empty tool_id are touched, so real jobs are never affected.
+void db
+  .execute(
+    sql`UPDATE jobs SET status = 'failed', error = '{"message":"Orphaned job reconciled at startup"}'::jsonb, completed_at = now() WHERE status IN ('processing','queued') AND (tool_id IS NULL OR tool_id = '')`,
+  )
+  .then((r) => {
+    const n = (r as { rowCount?: number }).rowCount ?? 0;
+    if (n > 0) app.log.info({ count: n }, "Reconciled orphaned job rows at startup");
+  })
+  .catch((err) => app.log.warn({ err }, "Orphaned-job reconciliation failed"));
+
 // Warm the per-pool QueueEvents consumers so the first synchronous tool request
 // after boot does not pay the lazy-connect cost (and cannot miss a fast job's
 // completion event). Non-blocking: a slow/unreachable Redis must not stall boot;

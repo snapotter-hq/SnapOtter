@@ -690,20 +690,10 @@ function SystemSection() {
           {t.settings.dataRetention.title}
         </h4>
       </div>
-      <SettingRow
-        label={t.settings.dataRetention.fileMaxAgeHours}
-        description={t.settings.dataRetention.fileMaxAgeHoursDesc}
-      >
-        <input
-          type="number"
-          value={settings.tempFileMaxAgeHours || "72"}
-          onChange={(e) => updateSetting("tempFileMaxAgeHours", e.target.value)}
-          aria-label={t.settings.dataRetention.fileMaxAgeHours}
-          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={1}
-          max={8760}
-        />
-      </SettingRow>
+      {/* NOTE: the temp-file TTL (tempFileMaxAgeHours) is configured once under
+          File Management above. A second control here bound the same key with a
+          different default, so editing either silently overwrote the other.
+          Data Retention keeps only the DB-row retention controls below. */}
       <SettingRow
         label={t.settings.dataRetention.jobsRetentionDays}
         description={t.settings.dataRetention.jobsRetentionDaysDesc}
