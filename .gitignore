@@ -72,7 +72,7 @@ tests/benchmark/bench-limits-results-mac.jsonl
 scripts/setup-cloudflare-email.sh
 apps/videos
 remotion/
-demo
+/demo
 pentest-results/
 # Stryker mutation testing
 .stryker-tmp/
