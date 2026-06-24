@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, type TestApp } from "../test-server.js";
+import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
 
@@ -64,9 +64,14 @@ describe("GET /api/v1/config/analytics", () => {
 
 describe("PUT /api/v1/user/analytics (removed)", () => {
   it("returns 404 (endpoint no longer exists)", async () => {
+    // Authenticate first: the global auth preHandler answers unauthenticated
+    // requests with 401 before routing, so only an authenticated request can
+    // reach Fastify's not-found handler and prove the route is gone.
+    const token = await loginAsAdmin(testApp.app);
     const res = await testApp.app.inject({
       method: "PUT",
       url: "/api/v1/user/analytics",
+      headers: { authorization: `Bearer ${token}` },
       payload: { enabled: true },
     });
     expect(res.statusCode).toBe(404);

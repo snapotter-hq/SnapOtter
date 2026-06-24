@@ -8,17 +8,9 @@ export interface MigrationResult {
 }
 
 // columns storing epoch-seconds integers in 1.x
-const TS = new Set([
-  "created_at",
-  "updated_at",
-  "expires_at",
-  "completed_at",
-  "last_used_at",
-  "analytics_consent_shown_at",
-  "analytics_consent_remind_at",
-]);
+const TS = new Set(["created_at", "updated_at", "expires_at", "completed_at", "last_used_at"]);
 // columns storing 0/1 booleans in 1.x
-const BOOL = new Set(["must_change_password", "analytics_enabled", "is_builtin"]);
+const BOOL = new Set(["must_change_password", "is_builtin"]);
 // per-table columns whose values must be cast to jsonb in the INSERT
 const JSONB: Record<string, Set<string>> = {
   jobs: new Set(["settings", "input_refs", "output_refs", "progress", "error"]),

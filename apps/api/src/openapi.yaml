@@ -6440,49 +6440,6 @@ paths:
                   instanceId:
                     type: string
 
-  /api/v1/user/analytics:
-    put:
-      operationId: updateAnalyticsConsent
-      tags: [Analytics]
-      summary: Update user analytics consent
-      description: |
-        Set the authenticated user's analytics consent preference, or snooze
-        the consent prompt for 7 days with remindLater.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                enabled:
-                  type: boolean
-                  description: Whether the user consents to analytics
-                remindLater:
-                  type: boolean
-                  description: Snooze the consent prompt for 7 days
-      responses:
-        "200":
-          description: Consent updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  analyticsEnabled:
-                    type: boolean
-                    nullable: true
-        "401":
-          description: Authentication required
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UnauthorizedError"
-
   # ─── Features ────────────────────────────────────────────────────────────
 
   /api/v1/features:

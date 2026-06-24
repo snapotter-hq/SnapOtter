@@ -13,8 +13,7 @@ function buildFixtureSqlite(path: string): void {
     CREATE TABLE users (id text PRIMARY KEY, username text NOT NULL, password_hash text,
       role text NOT NULL DEFAULT 'user', team text NOT NULL DEFAULT 'Default',
       must_change_password integer NOT NULL DEFAULT 1, auth_provider text NOT NULL DEFAULT 'local',
-      external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL,
-      analytics_enabled integer, analytics_consent_shown_at integer, analytics_consent_remind_at integer);
+      external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE teams (id text PRIMARY KEY, name text NOT NULL, created_at integer NOT NULL);
     CREATE TABLE settings ("key" text PRIMARY KEY, value text NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE roles (id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
@@ -40,8 +39,8 @@ function buildFixtureSqlite(path: string): void {
   `);
   const now = 1750000000; // seconds epoch, as 1.x stored
   s.prepare(
-    "INSERT INTO users (id, username, password_hash, must_change_password, created_at, updated_at, analytics_enabled, analytics_consent_shown_at) VALUES (?,?,?,?,?,?,?,?)",
-  ).run("u1", "alice", "hash", 0, now, now, 1, null);
+    "INSERT INTO users (id, username, password_hash, must_change_password, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+  ).run("u1", "alice", "hash", 0, now, now);
   s.prepare("INSERT INTO teams (id, name, created_at) VALUES (?,?,?)").run("t1", "Legal", now);
   s.prepare('INSERT INTO settings ("key", value, updated_at) VALUES (?,?,?)').run(
     "cookieSecret",
@@ -98,8 +97,6 @@ describe("migrate-from-sqlite", () => {
     const [user] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u1'`)).rows;
     expect(user.username).toBe("alice");
     expect(user.must_change_password).toBe(false); // 0 became boolean false
-    expect(user.analytics_enabled).toBe(true); // 1 became boolean true
-    expect(user.analytics_consent_shown_at).toBeNull(); // explicit NULL preserved
     expect(new Date(user.created_at as string).getTime()).toBe(1750000000 * 1000); // seconds became timestamptz
     const [pipeline] = (await db.execute(sql`SELECT * FROM pipelines WHERE id = 'p1'`)).rows;
     expect((pipeline.steps as Array<{ toolId: string }>)[0].toolId).toBe("compress"); // text JSON became jsonb
@@ -160,8 +157,7 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       CREATE TABLE users (id text PRIMARY KEY, username text NOT NULL, password_hash text,
         role text NOT NULL DEFAULT 'user', team text NOT NULL DEFAULT 'Default',
         must_change_password integer NOT NULL DEFAULT 1, auth_provider text NOT NULL DEFAULT 'local',
-        external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL,
-        analytics_enabled integer, analytics_consent_shown_at integer, analytics_consent_remind_at integer);
+        external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL);
       CREATE TABLE teams (id text PRIMARY KEY, name text NOT NULL, created_at integer NOT NULL);
       CREATE TABLE settings ("key" text PRIMARY KEY, value text NOT NULL, updated_at integer NOT NULL);
       CREATE TABLE roles (id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
@@ -193,9 +189,8 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     // ── Users: multiple users with diverse boolean/null combos ──
     const insU = s.prepare(
       `INSERT INTO users (id, username, password_hash, role, team, must_change_password,
-        auth_provider, external_id, email, created_at, updated_at,
-        analytics_enabled, analytics_consent_shown_at, analytics_consent_remind_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        auth_provider, external_id, email, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     );
     insU.run(
       "u-admin",
@@ -209,9 +204,6 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       "admin@example.com",
       t1,
       t1,
-      1,
-      t1,
-      null,
     );
     insU.run(
       "u-editor",
@@ -225,9 +217,6 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       null,
       t2,
       t2,
-      0,
-      null,
-      null,
     );
     insU.run(
       "u-oidc",
@@ -240,9 +229,6 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       "ext-id-123",
       "sso@corp.com",
       t3,
-      t3,
-      null,
-      null,
       t3,
     );
 
@@ -478,29 +464,26 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     expect(result.tables.user_files).toBe(4);
   });
 
-  it("boolean conversions: 0 -> false, 1 -> true, NULL -> null", async () => {
+  it("boolean conversions: 0 -> false, 1 -> true", async () => {
     const users = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
-    // u-admin: must_change_password=0 -> false, analytics_enabled=1 -> true
+    // u-admin: must_change_password=0 -> false
     const admin = users.find((u) => u.id === "u-admin");
     expect(admin?.must_change_password).toBe(false);
-    expect(admin?.analytics_enabled).toBe(true);
-    // u-editor: must_change_password=1 -> true, analytics_enabled=0 -> false
+    // u-editor: must_change_password=1 -> true
     const editor = users.find((u) => u.id === "u-editor");
     expect(editor?.must_change_password).toBe(true);
-    expect(editor?.analytics_enabled).toBe(false);
-    // u-oidc: analytics_enabled=NULL -> null
+    // u-oidc: must_change_password=0 -> false
     const oidc = users.find((u) => u.id === "u-oidc");
-    expect(oidc?.analytics_enabled).toBeNull();
+    expect(oidc?.must_change_password).toBe(false);
   });
 
   it("timestamp conversions: epoch seconds -> timestamptz", async () => {
     const [admin] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u-admin'`)).rows;
     expect(new Date(admin.created_at as string).getTime()).toBe(1748000000 * 1000);
-    // NULL timestamps stay null
-    expect(admin.analytics_consent_remind_at).toBeNull();
-    // Non-null timestamp
+    expect(new Date(admin.updated_at as string).getTime()).toBe(1748000000 * 1000);
+    // A different row's distinct timestamp also converts
     const [oidc] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u-oidc'`)).rows;
-    expect(new Date(oidc.analytics_consent_remind_at as string).getTime()).toBe(1748200000 * 1000);
+    expect(new Date(oidc.created_at as string).getTime()).toBe(1748200000 * 1000);
   });
 
   it("JSON column conversions: text -> jsonb", async () => {
