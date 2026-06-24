@@ -188,6 +188,27 @@ try {
   // Enterprise package not available
 }
 
+// S3 storage is a licensed feature (s3_storage). packages/enterprise now ships in
+// every image, so STORAGE_MODE=s3 would otherwise function without any license check.
+// Enforce the gate at boot so an unlicensed deploy fails fast rather than silently
+// writing data to S3 it isn't entitled to use.
+if (env.STORAGE_MODE === "s3") {
+  let s3Licensed = false;
+  try {
+    const { isFeatureEnabled } = await import("@snapotter/enterprise");
+    s3Licensed = isFeatureEnabled("s3_storage");
+  } catch {
+    s3Licensed = false;
+  }
+  if (!s3Licensed) {
+    console.error(
+      "[FATAL] STORAGE_MODE=s3 requires a license that includes the s3_storage feature. " +
+        "Set a valid SNAPOTTER_LICENSE_KEY (team or enterprise plan) or use STORAGE_MODE=local.",
+    );
+    process.exit(1);
+  }
+}
+
 // Start the cooperative cancellation listener (Redis pub/sub)
 await startCancelListener();
 

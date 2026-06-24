@@ -22,6 +22,9 @@ const ALL_PERMISSIONS: Permission[] = [
   "features:manage",
   "system:health",
   "audit:read",
+  "compliance:manage",
+  "webhooks:manage",
+  "security:manage",
 ];
 
 const roleNameField = z

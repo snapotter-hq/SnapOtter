@@ -2590,6 +2590,10 @@ const PERMISSION_GROUPS = [
     label: "System",
     permissions: ["features:manage", "system:health", "audit:read"],
   },
+  {
+    label: "Enterprise Administration",
+    permissions: ["security:manage", "compliance:manage", "webhooks:manage"],
+  },
 ];
 
 function RolesSection() {

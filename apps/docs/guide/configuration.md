@@ -33,7 +33,7 @@ All configuration is done through environment variables. Every variable has a se
 
 | Variable | Default | Description |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` or `s3`. Only local storage is currently implemented. |
+| `STORAGE_MODE` | `local` | `local` or `s3`. S3/MinIO requires a license with the s3_storage feature. |
 | `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL connection string. |
 | `REDIS_URL` | `redis://redis:6379` | Redis connection string (used for BullMQ job queues). |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |

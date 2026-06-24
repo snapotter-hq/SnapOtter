@@ -15,3 +15,10 @@ numpy==1.26.4
 Pillow==12.2.0
 opencv-python-headless==4.10.0.84
 codeformer-pip==0.0.4
+
+# OpenTelemetry: enables the innermost sidecar.<script> span when
+# OTEL_EXPORTER_OTLP_ENDPOINT is set (enterprise distributed_tracing). Pure-Python,
+# no numpy/scipy deps, so safe for the numpy==1.26.4-locked stack.
+opentelemetry-api==1.27.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0

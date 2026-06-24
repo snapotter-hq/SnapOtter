@@ -1,4 +1,4 @@
-import { en } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster, toast } from "sonner";
@@ -8,7 +8,7 @@ import { RouteAnnouncer } from "./components/common/route-announcer";
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
-import { initAnalytics } from "./lib/analytics";
+import { initAnalytics, track } from "./lib/analytics";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -48,6 +48,8 @@ class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Uncaught render error:", error, info.componentStack);
+    // Mirror the crash to PostHog (error class only, no PII). track() is best-effort.
+    track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, { error_name: error.name });
     import("@sentry/react")
       .then((Sentry) => {
         Sentry.captureException(error, {

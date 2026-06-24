@@ -15,6 +15,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
+import { getSettingNumber } from "../lib/settings-helpers.js";
 import { runAuditArchive } from "./audit-archive.js";
 import { getQueue } from "./queues.js";
 import { runSiemForward } from "./siem-forward.js";
@@ -275,15 +276,20 @@ async function retentionSweep(): Promise<void> {
     WHERE u.legal_hold = true OR t.legal_hold = true
   )`;
 
-  if (env.JOBS_RETENTION_DAYS > 0) {
+  // The Data Retention settings UI writes jobsRetentionDays / auditRetentionDays to
+  // the DB. Honor those (the env vars are the fallback default), mirroring how the
+  // temp-file sweep reads tempFileMaxAgeHours; otherwise the UI controls are no-ops.
+  const jobsRetentionDays = await getSettingNumber("jobsRetentionDays", env.JOBS_RETENTION_DAYS);
+  if (jobsRetentionDays > 0) {
     await db.execute(
       sql`DELETE FROM jobs
-        WHERE created_at < now() - ${env.JOBS_RETENTION_DAYS} * interval '1 day'
+        WHERE created_at < now() - ${jobsRetentionDays} * interval '1 day'
         AND status IN ('completed', 'failed', 'canceled')
         AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
     );
   }
-  if (env.AUDIT_RETENTION_DAYS > 0) {
+  const auditRetentionDays = await getSettingNumber("auditRetentionDays", env.AUDIT_RETENTION_DAYS);
+  if (auditRetentionDays > 0) {
     const tamperResult = await db
       .select({ value: schema.settings.value })
       .from(schema.settings)
@@ -296,7 +302,7 @@ async function retentionSweep(): Promise<void> {
     if (!isTamperResistant) {
       await db.execute(
         sql`DELETE FROM audit_log
-          WHERE created_at < now() - ${env.AUDIT_RETENTION_DAYS} * interval '1 day'
+          WHERE created_at < now() - ${auditRetentionDays} * interval '1 day'
           AND (actor_id IS NULL OR actor_id NOT IN ${heldUsersSubquery})`,
       );
     }
