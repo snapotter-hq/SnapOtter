@@ -86,7 +86,9 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
         // Generator dead-ends (un-derivable sub-schema or every value failing
         // a refinement) mean this tool cannot be fuzzed generically; the
         // pairwise matrix still covers it. Real property failures rethrow.
-        if (/Unable to generate valid values|precondition/i.test(message)) return;
+        // fast-check v4 phrases this as "too many pre-condition failures"
+        // (hyphenated), so match both spellings.
+        if (/Unable to generate valid values|pre-?condition/i.test(message)) return;
         throw err;
       }
       expect(true).toBe(true);

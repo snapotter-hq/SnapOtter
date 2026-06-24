@@ -70,6 +70,10 @@ WORKDIR /app
 
 # Copy workspace config first (for layer caching)
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.json vitest.config.ts ./
+# patchedDependencies (gray-matter) needs the patch files present at install
+# time, otherwise pnpm exits with ENOENT (exit 254). The prod Dockerfile copies
+# these too; the test image was missing them.
+COPY patches/ ./patches/
 
 # Copy all package.json files
 COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.config.ts ./apps/web/
@@ -82,12 +86,6 @@ COPY packages/ai/package.json packages/ai/tsconfig.json ./packages/ai/
 COPY packages/enterprise/package.json packages/enterprise/tsconfig.json ./packages/enterprise/
 
 # Install ALL dependencies (including devDependencies for testing).
-# Registry hiccups during the container build surface as a hard exit 254
-# (interrupted fetch / integrity check). Harden the install with more retries
-# and a longer network timeout so a transient blip doesn't fail the whole job.
-RUN pnpm config set fetch-retries 5 \
- && pnpm config set fetch-retry-maxtimeout 120000 \
- && pnpm config set network-timeout 600000
 RUN pnpm install --frozen-lockfile
 
 # Copy source code

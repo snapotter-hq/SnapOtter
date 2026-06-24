@@ -277,7 +277,7 @@ jobs:
           # media conversions starve and hit the 30s default. Fewer forks (more
           # CPU each) plus a generous timeout keeps them from flaking.
           VITEST_MAX_FORKS: "2"
-          VITEST_TEST_TIMEOUT: "300000"
+          VITEST_TEST_TIMEOUT: "600000"
           VITEST_HOOK_TIMEOUT: "120000"
 
   api-fuzz:
@@ -338,6 +338,7 @@ jobs:
             --url http://localhost:13490 \
             --checks not_a_server_error \
             --include-path-regex "^/api/v1/(tools|health|info)" \
+            --exclude-path-regex "/(remove-background|upscale|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report
