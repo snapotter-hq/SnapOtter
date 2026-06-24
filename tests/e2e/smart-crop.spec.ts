@@ -16,7 +16,7 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("Smart Crop tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/smart-crop");
+    await page.goto("/image/smart-crop");
     try {
       await page.getByTestId("smart-crop-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

@@ -13,7 +13,7 @@ test.describe("Semantic HTML - Landmarks", () => {
   });
 
   test("tool page has exactly one main landmark", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await expect(page.locator("main")).toHaveCount(1);
   });
 
@@ -22,7 +22,7 @@ test.describe("Semantic HTML - Landmarks", () => {
   });
 
   test("tool page has a sidebar landmark (aside)", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await expect(page.locator("aside")).toBeVisible();
   });
 });
@@ -57,7 +57,7 @@ test.describe("Semantic HTML - Buttons", () => {
   });
 
   test("all visible buttons on tool page have accessible names", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const buttons = page.getByRole("button");
@@ -111,7 +111,7 @@ test.describe("Semantic HTML - Form Inputs", () => {
 
 test.describe("Semantic HTML - Form Inputs on Tool Pages", () => {
   test("QR generate form inputs have associated labels", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     // The URL input should be findable by its label
@@ -160,7 +160,7 @@ test.describe("Heading Hierarchy - Tool Pages", () => {
   test("tool page has headings including an h2 for the tool name", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // The tool page should have an h2 heading for the tool name
@@ -309,7 +309,7 @@ test.describe("Dropzone Accessibility", () => {
     loggedInPage: page,
   }) => {
     // Navigate to a tool page to ensure the dropzone is present
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // The upload button is a real <button> element, so it's natively
@@ -333,7 +333,7 @@ test.describe("Dropzone Accessibility", () => {
 // ---------------------------------------------------------------------------
 test.describe("Slider Keyboard Accessibility", () => {
   test("QR size slider responds to arrow keys", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -537,7 +537,7 @@ test.describe("Image Accessibility", () => {
   test("all visible images on tool page have alt text or aria-label", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const images = page.locator("img");
@@ -587,7 +587,7 @@ test.describe("No Duplicate IDs", () => {
   });
 
   test("tool page has no duplicate element IDs", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const duplicates = await page.evaluate(() => {
@@ -872,7 +872,7 @@ test.describe("Focus After Login", () => {
 
 test.describe("Focus After File Upload", () => {
   test("after file upload, focus moves toward settings panel", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // After upload, the settings panel and process button should be visible
@@ -886,7 +886,7 @@ test.describe("Focus After File Upload", () => {
   });
 
   test("after processing completes, download link is reachable", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -1077,7 +1077,7 @@ test.describe("Slider ARIA Attributes", () => {
   test("QR size slider has min, max, and current value attributes", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -1096,7 +1096,7 @@ test.describe("Slider ARIA Attributes", () => {
   });
 
   test("compress quality slider has type=range with min/max", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
 
     const slider = page.locator("input[type='range']").first();
@@ -1117,7 +1117,7 @@ test.describe("Slider ARIA Attributes", () => {
 // ---------------------------------------------------------------------------
 test.describe("Dropzone Keyboard Activation", () => {
   test("Space key on upload button triggers file dialog", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     const uploadBtn = page.getByText("Upload from computer");
@@ -1143,7 +1143,7 @@ test.describe("Dropzone Keyboard Activation", () => {
   });
 
   test("Enter key on upload button triggers file dialog", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     const uploadBtn = page.getByText("Upload from computer");
@@ -1169,7 +1169,7 @@ test.describe("Dropzone Keyboard Activation", () => {
 // ---------------------------------------------------------------------------
 test.describe("Navigation Active Indicator", () => {
   test("active sidebar tool link is visually distinguishable", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // The sidebar should have an active/highlighted link for the current tool
@@ -1448,7 +1448,7 @@ test.describe("Skip-to-Content Link", () => {
   });
 
   test("skip-to-content link is present on tool pages", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // Tab to first focusable element
@@ -1683,7 +1683,7 @@ test.describe("Comprehensive Color Contrast", () => {
   });
 
   test("tool page text elements meet WCAG AA contrast", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const failures = await page.evaluate(
@@ -1777,7 +1777,7 @@ test.describe("Comprehensive Color Contrast", () => {
 // ---------------------------------------------------------------------------
 test.describe("Tab Order", () => {
   test("tab order on tool page follows logical layout", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Collect the positions of focused elements during Tab traversal
@@ -2081,7 +2081,7 @@ test.describe("All Inputs Have Labels", () => {
   test("all visible inputs on tool page have associated labels or aria-label", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const unlabelledInputs = await page.evaluate(() => {
@@ -2132,7 +2132,7 @@ test.describe("All Inputs Have Labels", () => {
 // ---------------------------------------------------------------------------
 test.describe("Dropzone Visual Feedback", () => {
   test("dropzone has descriptive text for screen readers", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // The dropzone section should have descriptive text
@@ -2151,7 +2151,7 @@ test.describe("Dropzone Visual Feedback", () => {
 // ---------------------------------------------------------------------------
 test.describe("Slider Keyboard Accessibility - Extended", () => {
   test("QR size slider responds to ArrowLeft to decrease value", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -2171,7 +2171,7 @@ test.describe("Slider Keyboard Accessibility - Extended", () => {
   });
 
   test("slider Home key jumps to minimum value", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -2187,7 +2187,7 @@ test.describe("Slider Keyboard Accessibility - Extended", () => {
   });
 
   test("slider End key jumps to maximum value", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -2263,7 +2263,7 @@ test.describe("Navigation Keyboard - Extended", () => {
 // ---------------------------------------------------------------------------
 test.describe("QR Generate Page Input Accessibility", () => {
   test("QR generate page size slider has associated label", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     const sizeSlider = page.locator("#qr-size");
@@ -2334,7 +2334,7 @@ test.describe("ARIA Live Regions", () => {
   test("processing status changes are announced via live region", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Check for any aria-live regions on the page
@@ -2364,7 +2364,7 @@ test.describe("ARIA Live Regions", () => {
 // ---------------------------------------------------------------------------
 test.describe("Image Accessibility - QR Generate", () => {
   test("QR preview image has alt text after generation", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     // Enter data to generate QR
@@ -2401,7 +2401,7 @@ test.describe("Image Accessibility - QR Generate", () => {
 // ---------------------------------------------------------------------------
 test.describe("Color Contrast - Tool Page Dark Theme", () => {
   test("tool page meets WCAG AA contrast in dark theme", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Switch to dark theme
@@ -2573,7 +2573,7 @@ test.describe("Tabindex Values", () => {
   });
 
   test("no positive tabindex values on tool page", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const positiveTabindexElements = await page.evaluate(() => {

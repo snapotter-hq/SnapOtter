@@ -72,7 +72,7 @@ test.describe("Page Load Performance", () => {
     await page.goto("about:blank");
 
     const start = Date.now();
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
     const loadTime = Date.now() - start;
 
@@ -88,13 +88,13 @@ test.describe("SPA Navigation Timing", () => {
     loggedInPage: page,
   }) => {
     // Warm up by visiting the target page first so modules are cached
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     const navTime = Date.now() - start;
 
@@ -107,7 +107,7 @@ test.describe("SPA Navigation Timing", () => {
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
     // Wait for the tool name to appear as a signal the route rendered
     await page.locator("h2").filter({ hasText: "Resize" }).waitFor({ state: "visible" });
@@ -119,11 +119,11 @@ test.describe("SPA Navigation Timing", () => {
   test("navigate from /resize to /compress completes within 2000ms", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
     await page.locator("h2").filter({ hasText: "Compress" }).waitFor({ state: "visible" });
     const navTime = Date.now() - start;
@@ -134,11 +134,11 @@ test.describe("SPA Navigation Timing", () => {
   test("navigate from /compress to /convert completes within 2000ms", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("domcontentloaded");
     await page.locator("h2").filter({ hasText: "Convert" }).waitFor({ state: "visible" });
     const navTime = Date.now() - start;
@@ -301,7 +301,7 @@ test.describe("Bundle Efficiency", () => {
       }
     });
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // In dev mode Vite serves unbundled ESM; more requests than production.
@@ -388,7 +388,7 @@ test.describe("Repeated Operations Performance", () => {
   });
 
   test("10x upload/clear cycle stays responsive", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const timings: number[] = [];
@@ -510,17 +510,17 @@ test.describe("Performance Budgets - Route Navigation", () => {
     loggedInPage: page,
   }) => {
     // Warm up both routes so lazy chunks are cached
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // Now measure warmed navigation
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
     await page.locator("h2").filter({ hasText: "Compress" }).waitFor({ state: "visible" });
     const navTime = Date.now() - start;
@@ -531,7 +531,7 @@ test.describe("Performance Budgets - Route Navigation", () => {
 
   test("sidebar click navigation < 500ms (warmed)", async ({ loggedInPage: page }) => {
     // Warm up
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.goto("/");
     await page.waitForLoadState("networkidle");
@@ -553,7 +553,7 @@ test.describe("Performance Budgets - Route Navigation", () => {
 // ---------------------------------------------------------------------------
 test.describe("File Upload Preview Timing", () => {
   test("file upload preview renders within 1000ms", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
@@ -579,7 +579,7 @@ test.describe("Interaction Responsiveness - Live Preview", () => {
   test("compress quality slider updates preview indicator promptly", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // Look for a quality slider or range input
@@ -605,7 +605,7 @@ test.describe("Interaction Responsiveness - Live Preview", () => {
 
 test.describe("Interaction Responsiveness - No Blank Flash", () => {
   test("no white/blank flash during tool-to-tool navigation", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Monitor for blank screens during navigation
@@ -624,11 +624,11 @@ test.describe("Interaction Responsiveness - No Blank Flash", () => {
     }, 50);
 
     // Navigate through several tools
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await page.waitForLoadState("domcontentloaded");
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("domcontentloaded");
 
     clearInterval(checkInterval);
@@ -644,7 +644,7 @@ test.describe("Interaction Responsiveness - No Blank Flash", () => {
     await page.goto("about:blank");
 
     // Navigate and immediately check for content
-    const response = page.goto("/resize");
+    const response = page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // After domcontentloaded, body should have content (either the spinner or the page)
@@ -692,7 +692,7 @@ test.describe("Interaction Responsiveness - Theme Toggle", () => {
 // ---------------------------------------------------------------------------
 test.describe("Performance Budgets - Lazy Load", () => {
   test("tool settings lazy load < 500ms after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const start = Date.now();
@@ -739,7 +739,7 @@ test.describe("DOMContentLoaded Budget - Various Pages", () => {
     await page.goto("about:blank");
 
     const start = Date.now();
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
     const loadTime = Date.now() - start;
 
@@ -895,7 +895,7 @@ test.describe("Memory and Stability - Extended", () => {
     ];
 
     // Upload on the first tool
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await expect(page.getByText(/test-image/i).first()).toBeVisible({ timeout: 5_000 });
 
@@ -906,7 +906,7 @@ test.describe("Memory and Stability - Extended", () => {
     }
 
     // Come back to resize -- state should be clean (no leftover from first upload)
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     // The dropzone should be visible (previous upload state was cleared on nav)
@@ -933,7 +933,7 @@ test.describe("Memory Stability - Heap Measurement", () => {
     ];
 
     // Warm up and take baseline
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const baselineHeap = await page.evaluate(() => {
@@ -1005,7 +1005,7 @@ test.describe("Memory Stability - Heap Measurement", () => {
   });
 
   test("10 upload/clear cycles do not leak memory", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const baselineHeap = await page.evaluate(() => {
@@ -1166,7 +1166,7 @@ test.describe("QR Generate Page Load Budget", () => {
     await page.goto("about:blank");
 
     const start = Date.now();
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
     const loadTime = Date.now() - start;
 
@@ -1177,7 +1177,7 @@ test.describe("QR Generate Page Load Budget", () => {
     await page.goto("about:blank");
 
     const start = Date.now();
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.locator("[data-testid='qr-input-url']").waitFor({ state: "visible" });
     const renderTime = Date.now() - start;
 
@@ -1190,7 +1190,7 @@ test.describe("QR Generate Page Load Budget", () => {
 // ---------------------------------------------------------------------------
 test.describe("Processing Throughput", () => {
   test("resize end-to-end processing completes within 5s", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     await uploadTestImage(page);
@@ -1210,7 +1210,7 @@ test.describe("Processing Throughput", () => {
   });
 
   test("two sequential processes do not degrade in speed", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     await uploadTestImage(page);
@@ -1424,7 +1424,7 @@ test.describe("Console Error Monitoring", () => {
     });
 
     await page.goto("about:blank");
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const realErrors = consoleErrors.filter(
@@ -1449,7 +1449,7 @@ test.describe("Network Request Budget", () => {
       }
     });
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Tool page should not make excessive API calls on load
@@ -1464,7 +1464,7 @@ test.describe("Network Request Budget", () => {
 test.describe("Navigation Timing Consistency", () => {
   test("sequential navigation to same page is consistent", async ({ loggedInPage: page }) => {
     // Warm up
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     const timings: number[] = [];
@@ -1474,7 +1474,7 @@ test.describe("Navigation Timing Consistency", () => {
       await page.waitForLoadState("networkidle");
 
       const start = Date.now();
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await page.waitForLoadState("domcontentloaded");
       timings.push(Date.now() - start);
     }

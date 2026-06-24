@@ -26,7 +26,7 @@ async function removeNoiseAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Noise Removal tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/noise-removal");
+    await page.goto("/image/noise-removal");
     try {
       await page.getByTestId("noise-removal-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

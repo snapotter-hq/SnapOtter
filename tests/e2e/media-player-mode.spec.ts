@@ -7,7 +7,7 @@ test.describe("Media-player display mode (mute-video)", () => {
   test("uploads a video, mutes it, and shows the media player with processed result", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/mute-video");
+    await page.goto("/video/mute-video");
 
     // Upload tiny.mp4 via the file chooser (dropzone click)
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -42,7 +42,7 @@ test.describe("Media-player display mode (mute-video)", () => {
   });
 
   test("media player video element has controls attribute", async ({ loggedInPage: page }) => {
-    await page.goto("/mute-video");
+    await page.goto("/video/mute-video");
 
     // Upload tiny.mp4
     const fileChooserPromise = page.waitForEvent("filechooser");

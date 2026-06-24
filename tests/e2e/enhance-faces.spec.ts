@@ -21,7 +21,7 @@ async function enhanceFacesAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Enhance Faces tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/enhance-faces");
+    await page.goto("/image/enhance-faces");
     try {
       await page.getByTestId("enhance-faces-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

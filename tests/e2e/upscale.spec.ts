@@ -21,7 +21,7 @@ async function upscaleAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Upscale tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/upscale");
+    await page.goto("/image/upscale");
     try {
       await page.getByTestId("upscale-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

@@ -18,7 +18,7 @@ async function submitOcr(page: import("@playwright/test").Page) {
 
 test.describe("OCR / Text Extraction", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/ocr");
+    await page.goto("/image/ocr");
     await page.waitForLoadState("networkidle");
     try {
       await page.getByTestId("ocr-submit").waitFor({ state: "visible", timeout: 15_000 });

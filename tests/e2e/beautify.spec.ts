@@ -6,12 +6,12 @@ import { expect, test, uploadTestImage } from "./helpers";
 
 test.describe("Beautify Screenshot", () => {
   test("renders tool page with settings", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await expect(page.getByText("Beautify Screenshot").first()).toBeVisible();
   });
 
   test("uploads image and shows preview", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -20,7 +20,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("shows preset cards", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
 
     // Quick Presets section is open by default
     await expect(page.getByText("Quick Presets").first()).toBeVisible();
@@ -30,7 +30,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("shows background, frame, spacing, and shadow sections", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
 
     await expect(page.getByText("Background").first()).toBeVisible();
     await expect(page.getByText("Device Frame").first()).toBeVisible();
@@ -39,14 +39,14 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
 
     await expect(page.getByTestId("beautify-submit")).toBeVisible();
   });
 
   test("processes image with default settings", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1500);
 
@@ -64,7 +64,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("applies preset and processes", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1500);
 
@@ -97,7 +97,7 @@ test.describe("Beautify Screenshot", () => {
   // ---------------------------------------------------------------------------
 
   test("live preview shows gradient background on wrapper", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -109,7 +109,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("live preview renders macOS frame chrome", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -118,7 +118,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("switching to Windows frame shows Windows title bar", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -130,7 +130,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("switching to Browser frame shows tab bar and URL bar", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -141,7 +141,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("switching to None frame removes frame preview", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -159,7 +159,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("device frame shows label indicator", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -170,7 +170,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("custom shadow values reflect in preview", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -189,7 +189,7 @@ test.describe("Beautify Screenshot", () => {
   });
 
   test("watermark text appears in preview overlay", async ({ loggedInPage: page }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -212,7 +212,7 @@ test.describe("Beautify Screenshot", () => {
   test("image stays visible for every preset (no zero-height collapse)", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -241,7 +241,7 @@ test.describe("Beautify Screenshot", () => {
   test("image stays visible when watermark is added without a frame", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 
@@ -270,7 +270,7 @@ test.describe("Beautify Screenshot", () => {
   test("image stays visible when watermark is added with a frame", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/beautify");
+    await page.goto("/image/beautify");
     await uploadTestImage(page);
     await page.waitForTimeout(1000);
 

@@ -11,7 +11,7 @@ test.describe("GUI Layout Tools", () => {
   // ========================================================================
   test.describe("Collage", () => {
     test("renders tool page without standard dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
       await expect(page.getByText("Collage").first()).toBeVisible();
 
       // Collage uses custom upload UI, not standard dropzone
@@ -19,7 +19,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows aspect ratio options in Canvas section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       // Canvas section is collapsed by default -- expand it
       await page.getByText("Canvas").click();
@@ -31,7 +31,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows output format selector in Output section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       // Output section is collapsed by default -- expand it
       await page.getByText("Output").click();
@@ -42,34 +42,34 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows background color in Spacing section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       // Spacing & Style section is open by default
       await expect(page.getByText(/background/i).first()).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await expect(page.getByTestId("collage-submit")).toBeVisible();
     });
 
     test("shows gap/spacing slider in Spacing section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       // Spacing & Style section should show gap controls
       await expect(page.getByText(/gap|spacing/i).first()).toBeVisible();
     });
 
     test("submit button is disabled without images", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       const submitBtn = page.getByTestId("collage-submit");
       await expect(submitBtn).toBeDisabled();
     });
 
     test("shows quality slider in Output section for JPEG", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await page.getByText("Output").click();
       await page.getByRole("button", { name: "JPEG" }).first().click();
@@ -83,13 +83,13 @@ test.describe("GUI Layout Tools", () => {
   // ========================================================================
   test.describe("Stitch", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await expect(page.getByText("Stitch").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows direction options after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       // Direction buttons: horizontal, vertical, grid
@@ -99,21 +99,21 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows resize mode options after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByText(/resize mode|fit|original/i).first()).toBeVisible();
     });
 
     test("shows alignment options after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByText(/alignment|align/i).first()).toBeVisible();
     });
 
     test("submit button uses data-testid and has correct label", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("stitch-submit");
@@ -121,7 +121,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("submit disabled without file, enabled with 2+ files", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
 
       const submitBtn = page.getByTestId("stitch-submit");
       await expect(submitBtn).toBeDisabled();
@@ -141,7 +141,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("direction buttons switch active state", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       // Click vertical
@@ -159,7 +159,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows gap slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByText(/gap/i).first()).toBeVisible();
@@ -171,13 +171,13 @@ test.describe("GUI Layout Tools", () => {
   // ========================================================================
   test.describe("Split", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await expect(page.getByText("Image Splitting").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows mode selector (Grid / Tile Size) after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Grid" }).first()).toBeVisible();
@@ -185,7 +185,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows grid presets after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       // Grid presets from split-settings.tsx
@@ -194,7 +194,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("tile size mode shows width and height inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Tile Size" }).first().click();
@@ -203,7 +203,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows output format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       // Output format options
@@ -211,7 +211,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows 3x3 and 4x4 grid presets", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "3x3" }).first()).toBeVisible();
@@ -219,7 +219,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("switching to tile size mode and back to grid works", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Tile Size" }).first().click();
@@ -229,7 +229,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("processes split and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -259,13 +259,13 @@ test.describe("GUI Layout Tools", () => {
   // ========================================================================
   test.describe("Beautify", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
       await expect(page.getByText("Beautify").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows Quick Presets section with preset buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Quick Presets")).toBeVisible();
       await expect(page.getByText("Purple Haze")).toBeVisible();
@@ -277,7 +277,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows Background section with tabs", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Background").first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Gradient" })).toBeVisible();
@@ -287,7 +287,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows Device Frame section with frame types", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Device Frame")).toBeVisible();
       await expect(page.getByRole("button", { name: "macOS" })).toBeVisible();
@@ -297,7 +297,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("frame type shows Light/Dark theme toggle", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       // macOS is default frame -- should show theme toggle
       await expect(page.getByRole("button", { name: "Light" }).first()).toBeVisible();
@@ -307,7 +307,7 @@ test.describe("GUI Layout Tools", () => {
     test("shows Spacing section with padding and border radius sliders", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Spacing")).toBeVisible();
       await expect(page.locator("#beautify-padding")).toBeVisible();
@@ -315,7 +315,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows Shadow section with preset chips", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Shadow").first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Subtle" })).toBeVisible();
@@ -324,7 +324,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("custom shadow shows blur/offset/color controls", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await page.getByRole("button", { name: "Custom" }).first().click();
       await expect(page.locator("#beautify-shadow-blur")).toBeVisible();
@@ -337,7 +337,7 @@ test.describe("GUI Layout Tools", () => {
     test("shows collapsible Export Size section with social presets", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Export Size")).toBeVisible();
       await page.getByText("Export Size").click();
@@ -347,7 +347,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("shows collapsible Watermark section", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Watermark").first()).toBeVisible();
       await page.getByText("Watermark").first().click();
@@ -359,7 +359,7 @@ test.describe("GUI Layout Tools", () => {
     test("submit button disabled without file, enabled with file", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       const submitBtn = page.getByTestId("beautify-submit");
       await expect(submitBtn).toBeDisabled();
@@ -369,7 +369,7 @@ test.describe("GUI Layout Tools", () => {
     });
 
     test("processes beautify and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
       await uploadTestImage(page);
 
       await page.getByTestId("beautify-submit").click();

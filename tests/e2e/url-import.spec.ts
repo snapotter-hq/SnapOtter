@@ -2,13 +2,13 @@ import { expect, test } from "./helpers";
 
 test.describe("URL Image Import", () => {
   test("inline URL input is visible on tool page", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     await expect(page.getByPlaceholder("Paste image URL...")).toBeVisible();
   });
 
   test("bulk import modal opens and closes", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Open the bulk import modal
     await page.getByText("Import multiple URLs...").click();

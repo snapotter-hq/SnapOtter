@@ -12,7 +12,7 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Resize", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await expect(page.getByText("Resize").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
       await expect(page.getByText("Settings").first()).toBeVisible();
@@ -21,7 +21,7 @@ test.describe("GUI Essential Tools", () => {
     test("shows custom size tab with width/height inputs after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       // Custom Size tab is active by default
@@ -33,7 +33,7 @@ test.describe("GUI Essential Tools", () => {
     test("tab switching between Custom Size, Scale, and Presets", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       // Switch to Scale tab
@@ -54,7 +54,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("fit mode buttons work in custom tab", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await expect(page.getByText("Fit Mode")).toBeVisible();
@@ -67,7 +67,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("content-aware toggle reveals advanced options", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       // Toggle content-aware switch (label is a sibling span, not aria-label)
@@ -84,7 +84,7 @@ test.describe("GUI Essential Tools", () => {
     test("submit disabled without dimensions, enabled with width", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       // Submit should be disabled without dimensions
@@ -97,7 +97,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("processes image and shows download link", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("50");
@@ -108,7 +108,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("scale tab processes image at 25%", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.getByText("Scale").click();
@@ -120,7 +120,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("aspect ratio link button toggles", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       // The link/unlink button for aspect ratio should be visible
@@ -131,7 +131,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("download link has correct data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("50");
@@ -144,7 +144,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("width and height inputs accept numeric values", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("200");
@@ -152,7 +152,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("scale percentage quick buttons are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.getByText("Scale").click();
@@ -167,13 +167,13 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Crop", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await expect(page.getByText("Crop").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows aspect ratio presets after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
 
       await expect(page.getByText("Aspect Ratio")).toBeVisible();
@@ -186,7 +186,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("shows position and size inputs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
 
       await expect(page.getByText("Position & Size")).toBeVisible();
@@ -197,7 +197,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("custom aspect ratio reveals input fields", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Custom" }).click();
@@ -207,14 +207,14 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("rule of thirds grid toggle", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
 
       await expect(page.getByText("Rule of Thirds")).toBeVisible();
     });
 
     test("crop submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(500);
 
@@ -222,7 +222,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("aspect ratio presets change the active button", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
 
       // Click 1:1 aspect ratio
@@ -234,7 +234,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("processes crop and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -254,7 +254,7 @@ test.describe("GUI Essential Tools", () => {
     test("tall portrait image (200x4000) fits within viewport without overflow", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
 
       const portraitPath = path.join(
         process.cwd(),
@@ -286,7 +286,7 @@ test.describe("GUI Essential Tools", () => {
     test("extremely tall portrait image (100x6000) fits within viewport without overflow", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
 
       const extremePath = path.join(
         process.cwd(),
@@ -319,13 +319,13 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Rotate", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await expect(page.getByText("Rotate").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows rotate controls after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       // Quick rotate buttons
@@ -335,7 +335,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("shows flip buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await expect(page.getByText("Flip").first()).toBeVisible();
@@ -344,7 +344,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("shows straighten slider", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await expect(page.getByText("Straighten")).toBeVisible();
@@ -352,7 +352,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("angle input updates on rotate-right click", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await page.getByTestId("rotate-right").click();
@@ -364,7 +364,7 @@ test.describe("GUI Essential Tools", () => {
     test("submit disabled without changes, enabled after rotation", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       // Submit should be disabled with no changes
@@ -377,7 +377,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("reset all changes button appears after modification", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await page.getByTestId("rotate-right").click();
@@ -385,7 +385,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("flip horizontal enables submit", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("rotate-submit");
@@ -396,7 +396,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("flip vertical enables submit", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("rotate-submit");
@@ -407,7 +407,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("180 degree button sets correct angle", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "180" }).click();
@@ -417,7 +417,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("straighten slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       const slider = page.locator("#rotate-straighten");
@@ -426,7 +426,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("processes rotation and shows result", async ({ loggedInPage: page }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await page.getByTestId("rotate-right").click();
@@ -447,7 +447,7 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Convert", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await expect(page.getByText("Convert").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -455,7 +455,7 @@ test.describe("GUI Essential Tools", () => {
     test("shows source format and target format selector after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await expect(page.getByText("Source Format")).toBeVisible();
@@ -463,7 +463,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("format selector contains all output formats", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       const select = page.locator("#convert-target-format");
@@ -473,7 +473,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("quality slider appears for lossy formats", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       // Select JPG (lossy)
@@ -486,7 +486,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("quality slider appears for WebP format", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await page.selectOption("#convert-target-format", "webp");
@@ -494,7 +494,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("quality slider appears for AVIF format", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await page.selectOption("#convert-target-format", "avif");
@@ -502,14 +502,14 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("convert-submit")).toBeVisible();
     });
 
     test("quality slider hidden for TIFF lossless format", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await page.selectOption("#convert-target-format", "tiff");
@@ -517,7 +517,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("changing format resets quality slider visibility", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       // Start with JPG (lossy, shows quality)
@@ -534,7 +534,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("processes conversion and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await page.selectOption("#convert-target-format", "webp");
@@ -550,13 +550,13 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Compress", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await expect(page.getByText("Compress").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows compression mode toggle after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       await expect(page.getByText("Compression Mode")).toBeVisible();
@@ -565,7 +565,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("quality mode shows quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; switch to Quality mode first
@@ -576,7 +576,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("target size mode shows size input", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Target Size" }).click();
@@ -584,7 +584,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("quality slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; switch to Quality mode first
@@ -595,7 +595,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("target size mode shows size input and unit", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Target Size" }).click();
@@ -603,14 +603,14 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("compress-submit")).toBeVisible();
     });
 
     test("switching between Quality and Target Size modes", async ({ loggedInPage: page }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; verify its input is visible
@@ -628,7 +628,7 @@ test.describe("GUI Essential Tools", () => {
     test("submit disabled without file, enabled with file in quality mode", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
 
       const submitBtn = page.getByTestId("compress-submit");
       await expect(submitBtn).toBeDisabled();
@@ -642,7 +642,7 @@ test.describe("GUI Essential Tools", () => {
     test("processes compression and shows download with size info", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; switch to Quality mode so submit is enabled
@@ -663,7 +663,7 @@ test.describe("GUI Essential Tools", () => {
     test("resize: undo after processing reverts to upload state", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("50");
@@ -682,7 +682,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("crop: undo after processing returns to crop canvas", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -706,7 +706,7 @@ test.describe("GUI Essential Tools", () => {
     test("rotate: undo after processing returns to rotate controls", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/rotate");
+      await page.goto("/image/rotate");
       await uploadTestImage(page);
 
       await page.getByTestId("rotate-right").click();
@@ -728,7 +728,7 @@ test.describe("GUI Essential Tools", () => {
     test("convert: undo after processing returns to format selector", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
 
       await page.selectOption("#convert-target-format", "webp");
@@ -746,7 +746,7 @@ test.describe("GUI Essential Tools", () => {
     test("compress: undo after processing returns to quality slider", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; switch to Quality mode so submit is enabled
@@ -765,7 +765,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("resize: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await expect(page.locator("#resize-width")).toBeVisible();
@@ -778,17 +778,17 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("navigate away from tool resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("50");
 
       // Navigate to a different tool
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await expect(page.getByText("Crop").first()).toBeVisible();
 
       // Navigate back -- state should be reset
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
   });
@@ -798,7 +798,7 @@ test.describe("GUI Essential Tools", () => {
   // ========================================================================
   test.describe("Result Display Modes", () => {
     test("resize: shows side-by-side display after processing", async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadTestImage(page);
 
       await page.locator("#resize-width").fill("50");
@@ -814,7 +814,7 @@ test.describe("GUI Essential Tools", () => {
     test("compress: shows before-after display with size savings", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compress");
+      await page.goto("/image/compress");
       await uploadTestImage(page);
 
       // Default mode is Target Size; switch to Quality mode so submit is enabled
@@ -873,7 +873,7 @@ test.describe("GUI Essential Tools", () => {
     test("crop canvas renders with ReactCrop component after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -883,7 +883,7 @@ test.describe("GUI Essential Tools", () => {
     });
 
     test("crop handles are visible on the canvas", async ({ loggedInPage: page }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -901,7 +901,7 @@ test.describe("GUI Essential Tools", () => {
     test("dragging on crop canvas updates numeric position inputs", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -937,7 +937,7 @@ test.describe("GUI Essential Tools", () => {
     test("selecting 1:1 aspect ratio constrains crop box proportions", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/crop");
+      await page.goto("/image/crop");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 

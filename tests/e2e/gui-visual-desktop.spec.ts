@@ -234,7 +234,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - resize (empty, no file) ----
   test("resize tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -243,7 +243,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - resize (file uploaded, settings visible) ----
   test("resize tool with file - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.waitForTimeout(500);
 
@@ -255,7 +255,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - compress (before-after result) ----
   test("compress tool before-after result - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // Upload image and wait for auto-processing
@@ -272,7 +272,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - crop (interactive canvas) ----
   test("crop tool interactive canvas - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await page.waitForLoadState("networkidle");
 
     // Upload image to get the interactive crop canvas
@@ -289,7 +289,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - qr-generate (no-dropzone, QR preview) ----
   test("qr-generate tool with preview - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -308,36 +308,12 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - collage (template selection) ----
   test("collage tool template selection - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/collage");
+    await page.goto("/image/collage");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
     // Collage is a no-dropzone tool with template selection UI
     await takeThemedScreenshots(page, "tool-collage-templates");
-  });
-
-  // ---- Analytics consent page ----
-  test.describe("Analytics consent page", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
-
-    test("analytics consent page - light and dark", async ({ page }) => {
-      await page.goto("/analytics-consent");
-      await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(500);
-
-      // Light screenshot
-      await expect(page).toHaveScreenshot("desktop-analytics-consent-light.png", {
-        fullPage: false,
-      });
-
-      // Toggle to dark
-      await page.keyboard.press(`${MOD}+Shift+d`);
-      await page.waitForTimeout(300);
-
-      await expect(page).toHaveScreenshot("desktop-analytics-consent-dark.png", {
-        fullPage: false,
-      });
-    });
   });
 
   // ---- Change password page ----
@@ -393,7 +369,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - convert (empty state) ----
   test("convert tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -402,7 +378,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - convert (file uploaded, format selection visible) ----
   test("convert tool with file - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadTestImage(page);
     await page.waitForTimeout(500);
 
@@ -413,7 +389,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - watermark-text (before-after mode) ----
   test("watermark-text tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/watermark-text");
+    await page.goto("/image/watermark-text");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -422,7 +398,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - border (live-preview mode) ----
   test("border tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/border");
+    await page.goto("/image/border");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -473,7 +449,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - strip-metadata (no-comparison mode) ----
   test("strip-metadata tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/strip-metadata");
+    await page.goto("/image/strip-metadata");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -482,7 +458,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
   // ---- Tool page - info (before-after mode) ----
   test("info tool empty - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/info");
+    await page.goto("/image/info");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 

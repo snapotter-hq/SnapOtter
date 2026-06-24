@@ -183,7 +183,7 @@ test.describe("Keyboard Shortcuts - Work From Any Page", () => {
   });
 
   test("Cmd/Ctrl+Alt+1 navigates to Resize from a tool page", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await expect(page).toHaveURL("/compress");
 
     await page.keyboard.press(`${MOD}+Alt+1`);
@@ -278,7 +278,7 @@ test.describe("Keyboard Shortcuts - Escape Key", () => {
 test.describe("Keyboard Shortcuts - Textarea Suppression", () => {
   test("Cmd/Ctrl+/ does not navigate when focused on textarea", async ({ loggedInPage: page }) => {
     // Navigate to a tool that has a textarea (watermark-text has text input)
-    await page.goto("/watermark-text");
+    await page.goto("/image/watermark-text");
 
     // Find a textarea or contenteditable element on the page
     const textarea = page.locator("textarea").first();
@@ -296,7 +296,7 @@ test.describe("Keyboard Shortcuts - Textarea Suppression", () => {
   test("Cmd/Ctrl+Shift+D does not toggle theme when focused on a textarea", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/watermark-text");
+    await page.goto("/image/watermark-text");
 
     const textarea = page.locator("textarea").first();
     if (await textarea.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -395,7 +395,7 @@ test.describe("Keyboard Accessibility", () => {
 // ---------------------------------------------------------------------------
 test.describe("Keyboard Shortcuts - Cmd+K Cross-Page", () => {
   test("Cmd/Ctrl+K focuses search on a tool page", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     await page.keyboard.press(`${MOD}+k`);
 
@@ -552,7 +552,7 @@ test.describe("Keyboard Shortcuts - Rapid Sequences", () => {
   });
 
   test("Cmd/Ctrl+/ from a tool page navigates to home", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await expect(page).toHaveURL("/compress");
 
     await page.keyboard.press(`${MOD}+/`);

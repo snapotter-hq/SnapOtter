@@ -75,7 +75,7 @@ test.describe("Connection Banner & Disconnection", () => {
   test("toast appears when processing fails due to disconnection", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Block all tool API requests to simulate disconnection during processing
@@ -107,7 +107,7 @@ test.describe("Connection Banner & Disconnection", () => {
   });
 
   test("no crash when attempting to process while disconnected", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Block all API tool endpoints to simulate disconnection
@@ -245,7 +245,7 @@ test.describe("File Upload Validation", () => {
   test("non-image file upload (.txt) is rejected or ignored gracefully", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Create a .txt file via the file chooser
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -407,7 +407,7 @@ test.describe("Add Member Form Validation", () => {
 // ---------------------------------------------------------------------------
 test.describe("QR Generate Form Validation", () => {
   test("download button disabled when text input is empty", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     // The download button should be disabled when no data is entered
@@ -417,7 +417,7 @@ test.describe("QR Generate Form Validation", () => {
   });
 
   test("download button enabled after entering text", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("domcontentloaded");
 
     // Enter data in the URL field (default content type)
@@ -473,7 +473,7 @@ test.describe("Pipeline Save Form Validation", () => {
 // ---------------------------------------------------------------------------
 test.describe("Compress Quality Clamping", () => {
   test("compress quality slider clamps to max value", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
 
     // Find a quality slider/range input
@@ -501,7 +501,7 @@ test.describe("Compress Quality Clamping", () => {
 // ---------------------------------------------------------------------------
 test.describe("Tool Form Validation", () => {
   test("resize process button requires a file to be uploaded", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Before uploading, the resize button should be visible but the dropzone
     // should be shown instead of the process area
@@ -519,7 +519,7 @@ test.describe("Tool Form Validation", () => {
   });
 
   test("compress process button requires a file to be uploaded", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     const compressBtn = page.getByRole("button", { name: "Compress" });
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -550,7 +550,7 @@ test.describe("Toast Behavior", () => {
   });
 
   test("success toast after processing auto-dismisses", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Set a width and process
@@ -579,7 +579,7 @@ test.describe("State Reset on Navigation", () => {
     loggedInPage: page,
   }) => {
     // Upload and process in resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -595,7 +595,7 @@ test.describe("State Reset on Navigation", () => {
     await page.waitForLoadState("networkidle");
 
     // Come back to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // State should be clean: dropzone visible, no download link
@@ -604,7 +604,7 @@ test.describe("State Reset on Navigation", () => {
   });
 
   test("upload, clear, upload again: no orphaned state", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // First upload
     await uploadTestImage(page);
@@ -697,7 +697,7 @@ test.describe("Memory and Stability", () => {
   });
 
   test("10x upload/clear cycle without crash or leak", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     for (let i = 0; i < 10; i++) {
       // Upload
@@ -764,7 +764,7 @@ test.describe("Memory and Stability", () => {
   });
 
   test("10x upload/clear cycle does not leak blob URLs", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     for (let i = 0; i < 10; i++) {
       await uploadTestImage(page);
@@ -791,7 +791,7 @@ test.describe("Server Error Handling", () => {
   test("oversized file beyond limit shows clear error, not crash", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept to return 413 (payload too large)
@@ -822,7 +822,7 @@ test.describe("Server Error Handling", () => {
   });
 
   test("server 500 response shows error, not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept the tool API endpoint to return 500
@@ -853,7 +853,7 @@ test.describe("Server Error Handling", () => {
   });
 
   test("empty file upload (0 bytes) is handled gracefully", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Create a 0-byte file
     const fs = await import("node:fs");
@@ -878,7 +878,7 @@ test.describe("Server Error Handling", () => {
   });
 
   test("server 400 response shows validation error clearly", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept to return 400 with a validation message
@@ -911,7 +911,7 @@ test.describe("Server Error Handling", () => {
   test("auth expiry (401) redirects to login or shows re-auth prompt", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept to return 401 (session expired)
@@ -949,7 +949,7 @@ test.describe("Server Error Handling", () => {
   });
 
   test("rate limit (429) shows throttle message, not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept to return 429 (rate limited)
@@ -980,7 +980,7 @@ test.describe("Server Error Handling", () => {
   });
 
   test("network timeout shows error, not infinite spinner", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept and never respond -- simulates a timeout/hang
@@ -1013,7 +1013,7 @@ test.describe("Tool-Specific Form Validation", () => {
   test("resize with width = 0 does not crash or submit invalid request", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Set width to 0
@@ -1037,7 +1037,7 @@ test.describe("Tool-Specific Form Validation", () => {
   });
 
   test("resize with negative width does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("-100");
@@ -1063,7 +1063,7 @@ test.describe("Toast Notifications", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Trigger a toast by processing an image
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("50");
     await page.getByRole("button", { name: "Resize" }).click();
@@ -1084,7 +1084,7 @@ test.describe("Toast Notifications", () => {
   });
 
   test("error toast appears on processing failure", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Intercept to cause a failure
@@ -1113,7 +1113,7 @@ test.describe("Toast Notifications", () => {
 
   test("toast does not block interactive elements beneath it", async ({ loggedInPage: page }) => {
     // Process to trigger a toast
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("50");
     await page.getByRole("button", { name: "Resize" }).click();
@@ -1138,7 +1138,7 @@ test.describe("Toast Notifications", () => {
   });
 
   test("success toast auto-dismisses within reasonable time", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -1165,7 +1165,7 @@ test.describe("Toast Notifications", () => {
   });
 
   test("multiple toasts stack without overlapping", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Process twice quickly to generate multiple toasts
@@ -1209,7 +1209,7 @@ test.describe("Toast Notifications", () => {
   });
 
   test("toast text is readable (has sufficient size)", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -1243,7 +1243,7 @@ test.describe("Server Error Handling - Service Unavailable", () => {
   test("server 503 response shows maintenance/retry message, not crash", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.route("**/api/v1/tools/image/resize", (route) =>
@@ -1277,7 +1277,7 @@ test.describe("Resize Extreme Dimensions", () => {
   test("resize with extremely large width does not crash browser", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("999999");
@@ -1293,7 +1293,7 @@ test.describe("Resize Extreme Dimensions", () => {
   });
 
   test("resize with fractional width does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50.5");
@@ -1313,7 +1313,7 @@ test.describe("Double-Click Prevention", () => {
   test("rapid double-click on process button does not cause duplicate requests", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -1342,10 +1342,10 @@ test.describe("Double-Click Prevention", () => {
 // ---------------------------------------------------------------------------
 test.describe("Browser History Navigation", () => {
   test("browser back button from tool page does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
 
     await page.goBack();
@@ -1360,10 +1360,10 @@ test.describe("Browser History Navigation", () => {
   });
 
   test("browser forward button after back does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("domcontentloaded");
 
     await page.goBack();
@@ -1411,7 +1411,7 @@ test.describe("Concurrent Error Recovery", () => {
   test("multiple tool endpoints failing simultaneously does not crash", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Block multiple endpoints
@@ -1447,7 +1447,7 @@ test.describe("Processing State Cleanup", () => {
   test("failed processing does not leave orphaned loading state", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.route("**/api/v1/tools/image/resize", (route) =>
@@ -1473,7 +1473,7 @@ test.describe("Processing State Cleanup", () => {
   });
 
   test("successful processing followed by clear resets fully", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -1504,7 +1504,7 @@ test.describe("Processing State Cleanup", () => {
 // ---------------------------------------------------------------------------
 test.describe("Resize Aspect Ratio Lock", () => {
   test("setting only width with lock enabled does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Fill only width, leave height as Auto
@@ -1519,7 +1519,7 @@ test.describe("Resize Aspect Ratio Lock", () => {
   });
 
   test("setting only height with lock enabled does not crash", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Fill only height (second Auto input)
@@ -1557,7 +1557,7 @@ test.describe("Settings Persistence", () => {
     expect(isDarkAfterToggle).not.toBe(isDarkBefore);
 
     // Navigate away and back
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("domcontentloaded");
 
     const isDarkAfterNav = await page.evaluate(() =>

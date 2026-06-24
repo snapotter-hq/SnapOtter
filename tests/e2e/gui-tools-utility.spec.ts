@@ -21,13 +21,13 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("Image Compare", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await expect(page.getByText("Image Compare").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows second image upload prompt after first upload", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
       // Compare tool requires a second image
@@ -35,14 +35,14 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows second image upload button with correct label", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
 
       await expect(page.getByText("Second Image").first()).toBeVisible();
       await expect(page.getByText("Choose second image")).toBeVisible();
     });
 
     test("submit disabled without both images", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
 
       const submitBtn = page.getByTestId("compare-submit");
       await expect(submitBtn).toBeDisabled();
@@ -53,7 +53,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("submit button text says Compare", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
 
       await expect(page.getByTestId("compare-submit")).toHaveText(/Compare/);
     });
@@ -64,13 +64,13 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("Find Duplicates", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await expect(page.getByText("Find Duplicates").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows preset sensitivity buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       // Preset buttons from find-duplicates-settings.tsx
@@ -80,14 +80,14 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows sensitivity threshold slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await expect(page.locator("input[type='range']").first()).toBeVisible();
     });
 
     test("preset click updates threshold slider", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       // Click exact preset
@@ -97,7 +97,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("scan button requires at least 2 files", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       // With only one file, scan should be disabled
@@ -111,13 +111,13 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("Image to Base64", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await expect(page.getByText("Image to Base64").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows output format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       // Output format dropdown (Keep Original, JPEG, PNG, WebP, AVIF)
@@ -125,7 +125,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows all output format buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Keep Original", exact: true })).toBeVisible();
@@ -136,7 +136,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("quality slider appears for lossy formats", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       // Keep Original is default -- no quality slider
@@ -148,7 +148,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows max width and max height inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await expect(page.locator("#b64-max-width")).toBeVisible();
@@ -156,7 +156,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("base64-submit")).toBeVisible();
@@ -164,7 +164,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("quality slider hidden for PNG format", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "PNG", exact: true }).click();
@@ -172,7 +172,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("switching format to AVIF shows quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "AVIF", exact: true }).click();
@@ -185,13 +185,13 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("Barcode Reader", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
       await expect(page.getByText("Barcode").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows scan button after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
@@ -205,7 +205,7 @@ test.describe("GUI Utility Tools", () => {
     test("processes scan and shows result or no-barcode message", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
       await uploadTestImage(page);
 
       await page.getByTestId("barcode-read-submit").click();
@@ -226,7 +226,7 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("QR Code Generator", () => {
     test("renders tool page without dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
       await expect(page.getByText("QR Code").first()).toBeVisible();
 
       // QR generate has no file upload dropzone
@@ -234,7 +234,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows content type tabs", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       // Content type tabs from qr-generate-settings.tsx
       await expect(page.getByText("URL").first()).toBeVisible();
@@ -244,7 +244,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("URL input generates live QR preview", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByTestId("qr-input-url").fill("https://example.com");
       // Canvas or SVG should render in the preview area
@@ -252,7 +252,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("download button enabled after URL input", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByTestId("qr-input-url").fill("https://example.com");
       const downloadBtn = page.getByTestId("qr-generate-download");
@@ -260,7 +260,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("dot style options visible", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       // Dot type style buttons from qr-generate-settings.tsx
       await expect(page.getByRole("button", { name: "Square" }).first()).toBeVisible();
@@ -269,14 +269,14 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("download format options visible", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await expect(page.getByText("PNG").first()).toBeVisible();
       await expect(page.getByText("SVG").first()).toBeVisible();
     });
 
     test("WiFi tab shows network inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("WiFi").first().click();
       // WiFi tab should show SSID and password inputs
@@ -284,7 +284,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("vCard tab shows contact fields", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("vCard").first().click();
       // vCard tab should show name input
@@ -292,7 +292,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("Text tab shows text input", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("Text").first().click();
       // Text tab should have a textarea or input
@@ -300,7 +300,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows error correction dropdown with four levels", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       const select = page.locator("#qr-error-correction");
       await expect(select).toBeVisible();
@@ -309,25 +309,25 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows size slider", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await expect(page.locator("#qr-size")).toBeVisible();
     });
 
     test("shows corner square style buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await expect(page.getByText("Corner Square")).toBeVisible();
     });
 
     test("shows corner dot style buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await expect(page.getByText("Corner Dot")).toBeVisible();
     });
 
     test("Email tab shows to/subject/body fields", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("Email").first().click();
       await expect(page.locator("#qr-email-to")).toBeVisible();
@@ -335,14 +335,14 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("Phone tab shows phone input", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("Phone").first().click();
       await expect(page.locator("#qr-phone")).toBeVisible();
     });
 
     test("SMS tab shows phone and message inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/qr-generate");
+      await page.goto("/image/qr-generate");
 
       await page.getByText("SMS").first().click();
       await expect(page.locator("#qr-sms-phone")).toBeVisible();
@@ -354,13 +354,13 @@ test.describe("GUI Utility Tools", () => {
   // ========================================================================
   test.describe("Bulk Rename", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await expect(page.getByText("Bulk Rename").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows pattern input with default value after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.locator("#bulk-rename-pattern")).toBeVisible();
@@ -368,7 +368,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows pattern variables help text", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.getByText("{{index}}")).toBeVisible();
@@ -377,21 +377,21 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("shows start index input", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.locator("#bulk-rename-start-index")).toBeVisible();
     });
 
     test("shows preview of renamed files after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.getByText("Preview")).toBeVisible();
     });
 
     test("submit button uses data-testid and shows file count", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("bulk-rename-submit");
@@ -400,7 +400,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("changing pattern updates preview", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await page.locator("#bulk-rename-pattern").fill("photo-{{index}}");
@@ -410,7 +410,7 @@ test.describe("GUI Utility Tools", () => {
     });
 
     test("start index input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       const startIndex = page.locator("#bulk-rename-start-index");

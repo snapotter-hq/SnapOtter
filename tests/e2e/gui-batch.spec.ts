@@ -21,7 +21,7 @@ test.describe("Multi-file upload", () => {
   test("upload 2 files via file chooser and both appear in Files section", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -37,7 +37,7 @@ test.describe("Multi-file upload", () => {
   test("upload 3+ files and all are listed with filenames and sizes", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -55,7 +55,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("'+ Add more' adds files to existing set", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload initial file
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -79,7 +79,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("'Clear all' removes all files and returns to dropzone", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload files
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -101,7 +101,7 @@ test.describe("Multi-file upload", () => {
   test("ThumbnailStrip shows at bottom with clickable thumbnails", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -124,7 +124,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("Previous/Next arrows cycle through images", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -163,7 +163,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("counter badge shows N/M format", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -177,7 +177,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("upload 5 files and all are listed", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload initial 3 files
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -204,7 +204,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("upload 5 files shows count with filenames and sizes", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload initial 3 files
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -237,7 +237,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("upload 3+ files via drag-and-drop and all appear", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const dropzone = page.locator("[class*='border-dashed']").first();
 
@@ -268,7 +268,7 @@ test.describe("Multi-file upload", () => {
   });
 
   test("selecting thumbnail updates main viewer image", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -310,7 +310,7 @@ test.describe("Batch processing", () => {
   test("upload 3 images, process resize, all 3 results available", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -339,7 +339,7 @@ test.describe("Batch processing", () => {
   });
 
   test("'Download All' button visible for batch results", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload multiple images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -366,7 +366,7 @@ test.describe("Batch processing", () => {
   });
 
   test("navigate through batch results with Previous/Next", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -401,7 +401,7 @@ test.describe("Batch processing", () => {
   });
 
   test("each batch result has download link", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -445,7 +445,7 @@ test.describe("Batch processing", () => {
   });
 
   test("spinner appears during batch processing", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -480,7 +480,7 @@ test.describe("Batch processing", () => {
   });
 
   test("'Download All' triggers ZIP download", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -512,7 +512,7 @@ test.describe("Batch processing", () => {
   });
 
   test("undo on one image does not affect others", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -551,7 +551,7 @@ test.describe("Batch processing", () => {
   test("per-image undo isolation: undoing image 1 preserves image 2 result", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -616,7 +616,7 @@ test.describe("Mixed formats", () => {
   test("upload JPEG + PNG + WebP and all are accepted and shown", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -638,7 +638,7 @@ test.describe("Mixed formats", () => {
   });
 
   test("mixed JPEG + PNG + WebP batch processes correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -679,7 +679,7 @@ test.describe("Mixed formats", () => {
   test("upload JPEG + PNG + WebP + HEIC mixed batch and all are accepted", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     const dropzone = page.locator("[class*='border-dashed']").first();
@@ -707,7 +707,7 @@ test.describe("Mixed formats", () => {
 // ---------------------------------------------------------------------------
 test.describe("Batch processing - Compress tool", () => {
   test("batch compress 2 images with quality mode", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -742,7 +742,7 @@ test.describe("Batch processing - Compress tool", () => {
   });
 
   test("batch compress 3 images and Download All ZIP available", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -773,7 +773,7 @@ test.describe("Batch processing - Compress tool", () => {
 
 test.describe("Batch processing - Convert tool", () => {
   test("batch convert 2 images to WebP format", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -804,7 +804,7 @@ test.describe("Batch processing - Convert tool", () => {
   });
 
   test("batch convert 3 images and all results navigable", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -842,7 +842,7 @@ test.describe("Batch processing - Convert tool", () => {
 
 test.describe("Batch processing - Rotate tool", () => {
   test("batch rotate 2 images by 90 degrees", async ({ loggedInPage: page }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
 
     // Upload 2 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -879,7 +879,7 @@ test.describe("Batch processing - Rotate tool", () => {
   test("batch rotate 3 images with flip and Download All available", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");

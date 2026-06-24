@@ -76,7 +76,7 @@ test.describe("Visual regression: Tool pages", () => {
 
   test("resize tool - desktop (empty state)", async ({ loggedInPage: page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -88,7 +88,7 @@ test.describe("Visual regression: Tool pages", () => {
 
   test("resize tool - desktop (with file uploaded)", async ({ loggedInPage: page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.waitForTimeout(500);
 
@@ -102,7 +102,7 @@ test.describe("Visual regression: Tool pages", () => {
 
   test("resize tool - mobile (empty state)", async ({ loggedInPage: page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -114,7 +114,7 @@ test.describe("Visual regression: Tool pages", () => {
 
   test("compress tool - desktop (empty state)", async ({ loggedInPage: page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -126,7 +126,7 @@ test.describe("Visual regression: Tool pages", () => {
 
   test("convert tool - desktop (empty state)", async ({ loggedInPage: page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 

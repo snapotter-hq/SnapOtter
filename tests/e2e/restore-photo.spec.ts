@@ -21,7 +21,7 @@ async function restoreAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Restore Photo tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/restore-photo");
+    await page.goto("/image/restore-photo");
     try {
       await page.getByTestId("restore-photo-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

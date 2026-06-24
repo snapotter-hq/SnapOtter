@@ -110,7 +110,7 @@ test.describe("Favicon download button", () => {
   test("favicon shows download button instead of auto-downloading", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/favicon");
+    await page.goto("/image/favicon");
 
     // Upload a test image
     const fileChooserPromise = page.waitForEvent("filechooser");

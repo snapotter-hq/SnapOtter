@@ -74,7 +74,7 @@ async function uploadFiles(page: import("@playwright/test").Page, files: string[
 // ===========================================================================
 test.describe("Multi-file upload - drag-and-drop", () => {
   test("drag-and-drop 2 files onto dropzone registers both", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const dropzone = page.locator("[class*='border-dashed']").first();
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
@@ -101,7 +101,7 @@ test.describe("Multi-file upload - drag-and-drop", () => {
   });
 
   test("drag-and-drop 5 files and all appear with thumbnails", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
 
     const dropzone = page.locator("[class*='border-dashed']").first();
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
@@ -140,7 +140,7 @@ test.describe("Multi-file upload - file info display", () => {
   test("selecting each thumbnail shows correct filename in info area", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await expect(page.getByText("Files (3)")).toBeVisible();
@@ -163,7 +163,7 @@ test.describe("Multi-file upload - file info display", () => {
   });
 
   test("file size is displayed for each file when selected", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG]);
 
     await expect(page.getByText("Files (2)")).toBeVisible();
@@ -182,7 +182,7 @@ test.describe("Multi-file upload - file info display", () => {
   test("counter badge updates when files are added via Add more", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload 1 file initially
     await uploadFiles(page, [FIXTURE_JPG]);
@@ -209,7 +209,7 @@ test.describe("Multi-file upload - file info display", () => {
   });
 
   test("ThumbnailStrip not shown for single file", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG]);
 
     await expect(page.getByText("Files (1)")).toBeVisible();
@@ -221,7 +221,7 @@ test.describe("Multi-file upload - file info display", () => {
   });
 
   test("Clear all then re-upload works correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Upload initial files
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG]);
@@ -248,7 +248,7 @@ test.describe("Batch processing - results verification", () => {
   test("batch resize 3 images and each result has distinct download link", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await expect(page.getByText("Files (3)")).toBeVisible();
@@ -287,7 +287,7 @@ test.describe("Batch processing - results verification", () => {
   test("batch process button shows correct file count for different tool", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await expect(page.getByText("Files (3)")).toBeVisible();
@@ -300,7 +300,7 @@ test.describe("Batch processing - results verification", () => {
   test("batch results preserve file count after processing completes", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG]);
 
     await expect(page.getByText("Files (2)")).toBeVisible();
@@ -319,7 +319,7 @@ test.describe("Batch processing - results verification", () => {
   });
 
   test("Download All ZIP contains correct filename", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -348,7 +348,7 @@ test.describe("Batch processing - results verification", () => {
 // ===========================================================================
 test.describe("Batch processing - undo behavior", () => {
   test("undo after batch keeps all files loaded", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -377,7 +377,7 @@ test.describe("Batch processing - undo behavior", () => {
   });
 
   test("after undo, can re-process the batch", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG]);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -420,7 +420,7 @@ test.describe("Mixed format batch - HEIC", () => {
   test("JPEG + PNG + WebP + HEIC batch process resize all successfully", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP, FIXTURE_HEIC]);
 
     await expect(page.getByText("Files (4)")).toBeVisible();
@@ -451,7 +451,7 @@ test.describe("Mixed format batch - HEIC", () => {
   test("HEIC files show thumbnails in strip alongside other formats", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_HEIC]);
 
     await expect(page.getByText("Files (2)")).toBeVisible();
@@ -903,7 +903,7 @@ test.describe("Cross-tool file carrying - extended", () => {
     loggedInPage: page,
   }) => {
     // Upload and process on resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50");
@@ -915,7 +915,7 @@ test.describe("Cross-tool file carrying - extended", () => {
     }
 
     // Navigate away
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // No stale download links should leak
@@ -928,11 +928,11 @@ test.describe("Cross-tool file carrying - extended", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     // Navigate to compress
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // Go back to resize
@@ -968,12 +968,12 @@ test.describe("Cross-tool file carrying - extended", () => {
     loggedInPage: page,
   }) => {
     // Upload on resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
     await expect(page.getByText(/test-image/i).first()).toBeVisible();
 
     // Navigate directly to a different tool
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await page.waitForLoadState("networkidle");
 
     // No stale processed state
@@ -988,7 +988,7 @@ test.describe("Multi-file navigation - edge cases", () => {
   test("Previous not visible on first image, Next not visible on last", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG]);
 
     await expect(page.getByText("1 / 2")).toBeVisible();
@@ -1013,7 +1013,7 @@ test.describe("Multi-file navigation - edge cases", () => {
   test("thumbnail click updates counter badge to correct position", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     await expect(page.getByText("1 / 3")).toBeVisible();
@@ -1037,7 +1037,7 @@ test.describe("Multi-file navigation - edge cases", () => {
   test("selected thumbnail has active styling (outline-primary)", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFiles(page, [FIXTURE_JPG, FIXTURE_PNG, FIXTURE_WEBP]);
 
     // First thumbnail should be selected by default

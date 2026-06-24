@@ -11,13 +11,13 @@ test.describe("GUI Metadata Tools", () => {
   // ========================================================================
   test.describe("Strip Metadata", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await expect(page.getByText("Remove Metadata").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows strip options after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       // Remove All checkbox is checked by default
@@ -32,7 +32,7 @@ test.describe("GUI Metadata Tools", () => {
     test("individual strip options disabled when Remove All is checked", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       // With Remove All checked, individual checkboxes should be disabled
@@ -44,7 +44,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("unchecking Remove All enables individual options", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       // Uncheck Remove All
@@ -63,7 +63,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("auto-inspects metadata on upload", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       // Should show "Current Metadata" heading or "Reading metadata..." or "No metadata found"
@@ -77,7 +77,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("processes strip and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       await page.getByTestId("strip-metadata-submit").click();
@@ -92,13 +92,13 @@ test.describe("GUI Metadata Tools", () => {
   // ========================================================================
   test.describe("Edit Metadata", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await expect(page.getByText("Edit Metadata").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows form fields after upload and inspection", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
 
       // Wait for inspection to complete
@@ -112,7 +112,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("shows collapsible sections", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -123,7 +123,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("date mode toggle between Edit and Shift", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -134,7 +134,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("GPS section shows clear GPS checkbox", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -146,7 +146,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("edits artist field and processes", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -158,7 +158,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("shows changes summary when fields are modified", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -167,7 +167,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("shows copyright and description fields", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -176,7 +176,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -189,13 +189,13 @@ test.describe("GUI Metadata Tools", () => {
   // ========================================================================
   test.describe("Image Info", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await expect(page.getByText("Image Info").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows Read Info button after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("info-submit")).toBeVisible();
@@ -203,7 +203,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("displays image metadata after Read Info", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadTestImage(page);
 
       await page.getByTestId("info-submit").click();
@@ -218,7 +218,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("shows channel stats histogram after Read Info", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadTestImage(page);
 
       await page.getByTestId("info-submit").click();
@@ -228,7 +228,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("no download link for info tool (read-only)", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadTestImage(page);
 
       await page.getByTestId("info-submit").click();
@@ -239,7 +239,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
 
       const submitBtn = page.getByTestId("info-submit");
       await expect(submitBtn).toBeDisabled();
@@ -256,7 +256,7 @@ test.describe("GUI Metadata Tools", () => {
     test("strip-metadata: undo after processing returns to settings", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       await page.getByTestId("strip-metadata-submit").click();
@@ -273,7 +273,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("edit-metadata: undo after processing returns to form", async ({ loggedInPage: page }) => {
-      await page.goto("/edit-metadata");
+      await page.goto("/image/edit-metadata");
       await uploadTestImage(page);
       await page.waitForSelector('[id="em-artist"]', { timeout: 10_000 });
 
@@ -290,7 +290,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("strip-metadata: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/strip-metadata");
+      await page.goto("/image/strip-metadata");
       await uploadTestImage(page);
 
       await expect(page.getByText("Remove All Metadata")).toBeVisible();
@@ -301,7 +301,7 @@ test.describe("GUI Metadata Tools", () => {
     });
 
     test("navigate away from info tool resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadTestImage(page);
 
       await page.getByTestId("info-submit").click();
@@ -310,8 +310,8 @@ test.describe("GUI Metadata Tools", () => {
       await expect(page.getByText("Dimensions").first()).toBeVisible({ timeout: 15_000 });
 
       // Navigate away and back
-      await page.goto("/resize");
-      await page.goto("/info");
+      await page.goto("/image/resize");
+      await page.goto("/image/info");
 
       // Should be back at dropzone
       await expect(page.getByText("Upload from computer")).toBeVisible();

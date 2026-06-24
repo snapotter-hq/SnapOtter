@@ -4,7 +4,7 @@ import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 test.describe("Color Blindness Simulation tool", () => {
   test("upload -> simulate -> download cycle", async ({ loggedInPage: page }) => {
-    await page.goto("/color-blindness");
+    await page.goto("/image/color-blindness");
     await expect(page.getByText("Color Blindness Simulation").first()).toBeVisible();
 
     await uploadTestImage(page);
@@ -39,7 +39,7 @@ test.describe("Color Blindness Simulation tool", () => {
   });
 
   test("shows type description when selection changes", async ({ loggedInPage: page }) => {
-    await page.goto("/color-blindness");
+    await page.goto("/image/color-blindness");
     await uploadTestImage(page);
 
     const dropdown = page.locator("#cb-simulation-type");

@@ -14,7 +14,7 @@ test.describe("Document display mode (rotate-pdf)", () => {
   test("uploads a PDF, rotates it, and shows the document canvas with processed result", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/rotate-pdf");
+    await page.goto("/pdf/rotate-pdf");
 
     // Upload test-3page.pdf via file chooser
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -48,7 +48,7 @@ test.describe("Document display mode (rotate-pdf)", () => {
   test("document viewer shows page navigation for multi-page PDF", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/rotate-pdf");
+    await page.goto("/pdf/rotate-pdf");
 
     // Upload test-3page.pdf
     const fileChooserPromise = page.waitForEvent("filechooser");

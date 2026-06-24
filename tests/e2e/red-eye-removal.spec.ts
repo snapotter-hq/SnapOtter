@@ -16,7 +16,7 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("Red Eye Removal tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/red-eye-removal");
+    await page.goto("/image/red-eye-removal");
     try {
       await page
         .getByTestId("red-eye-removal-submit")

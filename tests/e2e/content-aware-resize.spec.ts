@@ -36,7 +36,7 @@ test.describe("Content-Aware Resize", () => {
   test("direct /content-aware-resize route loads tool page (regression #131)", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/content-aware-resize");
+    await page.goto("/image/content-aware-resize");
 
     // Must NOT show "Tool not found"
     await expect(page.getByText("Tool not found")).not.toBeVisible();
@@ -50,12 +50,12 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("direct route submit disabled without file", async ({ loggedInPage: page }) => {
-    await page.goto("/content-aware-resize");
+    await page.goto("/image/content-aware-resize");
     await expect(page.getByTestId("content-aware-resize-submit")).toBeDisabled();
   });
 
   test("direct route submit enables with width and file", async ({ loggedInPage: page }) => {
-    await page.goto("/content-aware-resize");
+    await page.goto("/image/content-aware-resize");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
     const widthInput = page.locator("input[placeholder='Auto']").first();
@@ -65,7 +65,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("content-aware toggle reveals seam carving controls", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     await expect(page.getByText("Content-aware")).toBeVisible();
 
@@ -85,7 +85,7 @@ test.describe("Content-Aware Resize", () => {
   test("standard resize tabs hidden when content-aware is active", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Standard tabs visible before toggle
     await expect(page.getByRole("button", { name: "Custom" })).toBeVisible();
@@ -97,14 +97,14 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("submit disabled without file", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
 
     await expect(page.getByTestId("resize-submit")).toBeDisabled();
   });
 
   test("submit disabled without dimensions or square mode", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
 
@@ -118,7 +118,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("submit enables with width specified", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
 
@@ -129,7 +129,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("submit enables with square mode checked", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
 
@@ -139,7 +139,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("square mode disables width and height inputs", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
 
     await page.getByText("Resize to square").click();
@@ -152,7 +152,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("smoothing slider has correct range", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
 
     const slider = page.locator("#blur-radius");
@@ -161,7 +161,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("edge sensitivity slider has correct range", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
 
     const slider = page.locator("#sobel-threshold");
@@ -170,7 +170,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("PNG - content-aware resize processes and shows result", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
 
@@ -187,7 +187,7 @@ test.describe("Content-Aware Resize", () => {
   });
 
   test("HEIC input with content-aware resize", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.heic"));
 

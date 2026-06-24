@@ -12,7 +12,7 @@ async function uploadViaButton(page: import("@playwright/test").Page) {
 
 test.describe("Image to PDF - Target File Size", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/image-to-pdf");
+    await page.goto("/image/image-to-pdf");
     await page.waitForLoadState("networkidle");
   });
 

@@ -166,13 +166,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Sharpening", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await expect(page.getByText("Sharpening").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows method selector with three options", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Adaptive" })).toBeVisible();
@@ -181,7 +181,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("shows presets in adaptive mode", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       // Adaptive mode is default
@@ -193,7 +193,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("noise reduction buttons visible", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "off" })).toBeVisible();
@@ -203,7 +203,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("advanced controls toggle reveals extra sliders", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByText("Advanced Controls").click();
@@ -213,7 +213,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("switching to unsharp mask shows amount slider", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Unsharp Mask" }).click();
@@ -221,7 +221,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("switching to high-pass shows radius slider", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "High-Pass" }).click();
@@ -230,7 +230,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("selecting a preset enables submit", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       // Adaptive mode with Medium preset should enable submit
@@ -239,7 +239,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("processes sharpening and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByTestId("sharpening-submit").click();
@@ -254,13 +254,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Color Palette", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await expect(page.getByText("Color Palette").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows Extract Colors button after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       const btn = page.getByTestId("color-palette-submit");
@@ -269,7 +269,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("submit button is enabled with file uploaded", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("color-palette-submit");
@@ -277,7 +277,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("extracts colors and displays palette", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       await page.getByTestId("color-palette-submit").click();
@@ -288,7 +288,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("submit button text says Extract Colors", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("color-palette-submit")).toHaveText(/Extract Colors/);
@@ -300,13 +300,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Replace Color", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await expect(page.getByText("Replace").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows source and target color pickers after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await expect(page.locator("#replace-source-color")).toBeVisible();
@@ -314,7 +314,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("tolerance slider visible", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await expect(page.locator("#replace-tolerance")).toBeVisible();
@@ -323,7 +323,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("make transparent checkbox hides target color", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       // Check Make transparent
@@ -338,7 +338,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("tolerance slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       const slider = page.locator("#replace-tolerance");
@@ -347,14 +347,14 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("replace-color-submit")).toBeVisible();
     });
 
     test("processes color replacement and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await page.getByTestId("replace-color-submit").click();
@@ -369,13 +369,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Image Enhancement", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await expect(page.getByText("Image Enhancement").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows enhancement mode and controls after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       // Wait for analysis to complete
@@ -385,7 +385,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("shows all six enhancement mode buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByText("Enhancement Mode")).toBeVisible({ timeout: 10_000 });
@@ -398,7 +398,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("shows intensity slider with percentage", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByText("Intensity")).toBeVisible({ timeout: 10_000 });
@@ -408,7 +408,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("switching enhancement mode changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByText("Enhancement Mode")).toBeVisible({ timeout: 10_000 });
@@ -418,21 +418,21 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("shows Deep Enhance AI toggle", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByText("Deep Enhance (AI)")).toBeVisible({ timeout: 10_000 });
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("image-enhancement-submit")).toBeVisible({ timeout: 10_000 });
     });
 
     test("processes enhancement and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       // Wait for analysis
@@ -454,13 +454,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ========================================================================
   test.describe("Color Blindness Simulator", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await expect(page.getByText("Color Blindness").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows simulation type dropdown after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       await expect(page.locator("#cb-simulation-type")).toBeVisible();
@@ -469,7 +469,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("dropdown has grouped options (Red-Green, Blue-Yellow, Monochromatic)", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       const select = page.locator("#cb-simulation-type");
@@ -479,7 +479,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("shows description text for selected type", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       // Default is deuteranomaly -- should show description
@@ -487,7 +487,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("changing simulation type updates description", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       await page.selectOption("#cb-simulation-type", "achromatopsia");
@@ -497,7 +497,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("submit button disabled without file, enabled with file", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
 
       const submitBtn = page.getByTestId("color-blindness-submit");
       await expect(submitBtn).toBeDisabled();
@@ -508,7 +508,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     });
 
     test("processes simulation and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       await page.getByTestId("color-blindness-submit").click();
@@ -545,7 +545,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("sharpening: undo after processing returns to method selector", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByTestId("sharpening-submit").click();
@@ -562,7 +562,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("replace-color: undo after processing returns to color pickers", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await page.getByTestId("replace-color-submit").click();
@@ -580,7 +580,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
     test("color-blindness: undo after processing returns to type selector", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       await page.getByTestId("color-blindness-submit").click();
@@ -612,7 +612,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
 
       await page.locator("#color-slider-brightness").fill("30");
 
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await page.goto("/image/adjust-colors");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();

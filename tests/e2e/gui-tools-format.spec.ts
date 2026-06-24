@@ -13,18 +13,18 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("SVG to Raster", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
       await expect(page.getByText("SVG to Raster").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows settings section", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
       await expect(page.getByText("Settings").first()).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
       // SVG tool needs an SVG file; just verify the submit testid exists on the page
       await expect(page.getByTestId("svg-to-raster-submit")).toBeVisible();
     });
@@ -32,14 +32,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     test("shows sizing mode buttons (Scale Factor / Custom Size)", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await expect(page.getByRole("button", { name: "Scale Factor" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Custom Size" })).toBeVisible();
     });
 
     test("shows DPI preset buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await expect(page.getByRole("button", { name: "72" })).toBeVisible();
       await expect(page.getByRole("button", { name: "96" })).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows format buttons (png, jpg, webp, avif, etc.)", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await expect(page.getByRole("button", { name: /^png$/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /^jpg$/i })).toBeVisible();
@@ -56,14 +56,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows background mode buttons (Transparent / Color)", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await expect(page.getByRole("button", { name: "Transparent" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Color" })).toBeVisible();
     });
 
     test("color mode shows color presets when selected", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "Color" }).click();
       // Should show white and black color buttons
@@ -72,7 +72,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("custom size mode shows width and height inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "Custom Size" }).click();
       await expect(page.locator("#svg-custom-width")).toBeVisible();
@@ -80,7 +80,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("scale factor mode shows scale presets", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       // Scale presets require an SVG file to detect dimensions; upload a test SVG
       const fileChooserPromise = page.waitForEvent("filechooser");
@@ -97,7 +97,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       const submitBtn = page.getByTestId("svg-to-raster-submit");
       await expect(submitBtn).toBeDisabled();
@@ -109,13 +109,13 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("Vectorize", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await expect(page.getByText("Image to SVG").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows preset buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       // Presets from vectorize-settings.tsx
@@ -126,7 +126,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows color mode toggle after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       // Color mode: B&W / Color from vectorize-settings.tsx
@@ -134,7 +134,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows detail level buttons (low, medium, high)", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: /^low$/i })).toBeVisible();
@@ -143,7 +143,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows smoothing buttons (none, polygon, spline)", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: /^none$/i })).toBeVisible();
@@ -152,14 +152,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows invert colors toggle", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByText("Invert Colors")).toBeVisible();
     });
 
     test("switching to color mode shows color precision slider", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       // Logo preset defaults to B&W -- switch to illustration for color mode
@@ -169,7 +169,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("B&W mode shows threshold slider", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       // Logo preset defaults to B&W
@@ -178,21 +178,21 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows custom preset button", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: /^custom$/i })).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("vectorize-submit")).toBeVisible();
     });
 
     test("processes vectorize and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /vectorize/i }).click();
@@ -209,13 +209,13 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("GIF Tools", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await expect(page.getByText("GIF").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows mode selector tabs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       // Mode tabs from gif-tools-settings.tsx
@@ -224,12 +224,12 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows settings section", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await expect(page.getByText("Settings").first()).toBeVisible();
     });
 
     test("shows all six mode tabs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Resize" }).first()).toBeVisible();
@@ -242,7 +242,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("resize mode shows pixel and percentage tabs", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       // Resize is default mode
@@ -251,7 +251,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("resize pixel mode shows width and height inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.locator("#gif-width")).toBeVisible();
@@ -259,7 +259,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("optimize mode shows colors and dither sliders", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Optimize" }).first().click();
@@ -269,7 +269,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("rotate mode shows angle buttons and flip controls", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Rotate" }).first().click();
@@ -280,7 +280,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows loop control section", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.getByText("Loop")).toBeVisible();
@@ -290,7 +290,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("speed mode shows speed factor controls", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
 
       // Speed mode requires an animated GIF (disabled for static images)
       const fileChooserPromise = page.waitForEvent("filechooser");
@@ -306,7 +306,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("extract mode shows extract controls", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
 
       // Extract mode requires an animated GIF (disabled for static images)
       const fileChooserPromise = page.waitForEvent("filechooser");
@@ -324,7 +324,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     test("custom loop count input appears when Custom is selected", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Custom" }).click();
@@ -333,14 +333,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("gif-tools-submit")).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
 
       const submitBtn = page.getByTestId("gif-tools-submit");
       await expect(submitBtn).toBeDisabled();
@@ -355,13 +355,13 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("Image to PDF", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
       await expect(page.getByText("Image to PDF").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows page size and orientation controls", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await expect(page.getByText("Page Size")).toBeVisible();
       await expect(page.getByText("Orientation")).toBeVisible();
@@ -370,13 +370,13 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows submit button with page count", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await expect(page.getByTestId("image-to-pdf-submit")).toBeVisible();
     });
 
     test("shows page size dropdown with options", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       const select = page.locator("#image-to-pdf-page-size");
       await expect(select).toBeVisible();
@@ -385,14 +385,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("changing page size selects new value", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await page.selectOption("#image-to-pdf-page-size", "Letter");
       await expect(page.locator("#image-to-pdf-page-size")).toHaveValue("Letter");
     });
 
     test("shows margin slider", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       const slider = page.locator("#image-to-pdf-margin");
       await expect(slider).toBeVisible();
@@ -400,7 +400,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows target file size input", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await expect(page.getByTestId("image-to-pdf-target-size-value")).toBeVisible();
       await expect(page.getByTestId("image-to-pdf-target-size-unit")).toBeVisible();
@@ -409,14 +409,14 @@ test.describe("GUI Format & Conversion Tools", () => {
     test("orientation buttons toggle between portrait and landscape", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await page.getByRole("button", { name: "Landscape" }).click();
       await page.getByRole("button", { name: "Portrait" }).click();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       const submitBtn = page.getByTestId("image-to-pdf-submit");
       await expect(submitBtn).toBeDisabled();
@@ -426,7 +426,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("processes image to PDF and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
       await uploadTestImage(page);
 
       await page.getByTestId("image-to-pdf-submit").click();
@@ -441,7 +441,7 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("PDF to Image", () => {
     test("renders tool page without standard dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
       await expect(page.getByText("PDF to Image").first()).toBeVisible();
 
       // PDF to Image uses no-dropzone display mode with custom file input
@@ -449,27 +449,27 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows format options", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       // Format options from pdf-to-image-settings.tsx
       await expect(page.getByText(/format/i).first()).toBeVisible();
     });
 
     test("shows DPI presets", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       // DPI buttons from pdf-to-image-settings.tsx
       await expect(page.getByText(/dpi|resolution/i).first()).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByTestId("pdf-to-image-submit")).toBeVisible();
     });
 
     test("shows all format buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByText("Output Format")).toBeVisible();
       await expect(page.getByRole("button", { name: "PNG" }).first()).toBeVisible();
@@ -478,7 +478,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows DPI preset buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByText("Resolution (DPI)")).toBeVisible();
       await expect(page.getByRole("button", { name: "72" }).first()).toBeVisible();
@@ -488,7 +488,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows color mode buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByText("Color Mode")).toBeVisible();
       await expect(page.getByRole("button", { name: "Color" }).first()).toBeVisible();
@@ -497,25 +497,25 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows pages input field", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.locator("#pdf-pages")).toBeVisible();
     });
 
     test("shows PDF upload area", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByText("Drop a PDF here or click to select")).toBeVisible();
     });
 
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByTestId("pdf-to-image-submit")).toBeDisabled();
     });
 
     test("shows Custom DPI button", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await expect(page.getByRole("button", { name: "Custom" }).first()).toBeVisible();
     });
@@ -526,20 +526,20 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("Favicon Generator", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await expect(page.getByText("Favicon").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows generate button after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: /generate/i }).first()).toBeVisible();
     });
 
     test("shows generated sizes list", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
 
       await expect(page.getByText("Generated Sizes")).toBeVisible();
       await expect(page.getByText("favicon-16x16.png")).toBeVisible();
@@ -550,21 +550,21 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows manifest and HTML snippet mention", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
 
       await expect(page.getByText("manifest.json")).toBeVisible();
       await expect(page.getByText("HTML snippet")).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("favicon-submit")).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
 
       const submitBtn = page.getByTestId("favicon-submit");
       await expect(submitBtn).toBeDisabled();
@@ -574,7 +574,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("processes favicon generation and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
       await page.getByTestId("favicon-submit").click();
@@ -591,13 +591,13 @@ test.describe("GUI Format & Conversion Tools", () => {
   // ========================================================================
   test.describe("Optimize for Web", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await expect(page.getByText("Optimize for Web").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // Format buttons from optimize-for-web-settings.tsx
@@ -605,21 +605,21 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows quality slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await expect(page.getByText(/quality/i).first()).toBeVisible();
     });
 
     test("shows strip metadata checkbox after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await expect(page.getByText(/strip metadata|remove metadata/i).first()).toBeVisible();
     });
 
     test("shows all five format buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -632,7 +632,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("quality slider hidden for PNG format", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -642,7 +642,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("quality slider visible for WebP format", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -652,7 +652,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("shows collapsible Max Dimensions section", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await expect(page.getByText("Max Dimensions")).toBeVisible();
@@ -664,7 +664,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("strip metadata toggle is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       const toggle = page.locator("#strip-meta");
@@ -677,7 +677,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("submit button is enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // The optimize-for-web submit is a form submit button (no data-testid)
@@ -687,7 +687,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
 
       // The optimize-for-web submit is a form submit button (no data-testid)
       const submitBtn = page.locator("button[type='submit']");
@@ -695,7 +695,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("quality slider value changes for JPEG format", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -707,7 +707,7 @@ test.describe("GUI Format & Conversion Tools", () => {
     });
 
     test("processes optimization and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       // The optimize-for-web submit is a form submit button (no data-testid)

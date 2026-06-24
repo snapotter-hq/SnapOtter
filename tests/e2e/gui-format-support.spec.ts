@@ -28,7 +28,7 @@ test.describe("Format upload and resize processing", () => {
   ];
   for (const [label, fileName] of formats) {
     test(`${label} uploads and resizes`, async ({ loggedInPage: page }) => {
-      await page.goto("/resize");
+      await page.goto("/image/resize");
       await uploadFixture(page, fixtureFormat(fileName));
       await page.locator("input[placeholder='Auto']").first().fill("25");
       await page.getByRole("button", { name: "Resize" }).click();
@@ -39,7 +39,7 @@ test.describe("Format upload and resize processing", () => {
     });
   }
   test("HEIC uploads and resizes", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadFixture(page, fixtureImage("test-200x150.heic"));
     await page.locator("input[placeholder='Auto']").first().fill("25");
     await page.getByRole("button", { name: "Resize" }).click();
@@ -54,7 +54,7 @@ test.describe("Convert tool - new output formats", () => {
   test.describe.configure({ timeout: 60_000 });
   for (const fmt of ["bmp", "ico", "jp2", "qoi", "jxl"]) {
     test(`converts PNG to ${fmt.toUpperCase()}`, async ({ loggedInPage: page }) => {
-      await page.goto("/convert");
+      await page.goto("/image/convert");
       await uploadTestImage(page);
       await page.selectOption("#convert-target-format", fmt);
       await page.getByRole("button", { name: /convert/i }).click();
@@ -80,7 +80,7 @@ test.describe("Convert tool - new output formats", () => {
 
 test.describe("Convert tool - format dropdown", () => {
   test("contains all 13 output formats", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForSelector("#convert-target-format", { timeout: 10_000 });
     const options = await page
       .locator("#convert-target-format option")
@@ -108,7 +108,7 @@ test.describe("Convert tool - format dropdown", () => {
 test.describe("HEIC-to-JPG conversion", () => {
   test.describe.configure({ timeout: 60_000 });
   test("uploads HEIC, converts to JPG", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadFixture(page, fixtureImage("test-200x150.heic"));
     await expect(page.getByText(/heic/i).first()).toBeVisible({ timeout: 10_000 });
     await page.selectOption("#convert-target-format", "jpg");
@@ -133,7 +133,7 @@ test.describe("Exotic format upload acceptance", () => {
   ];
   for (const [label, fileName] of exoticFormats) {
     test(`${label} uploads to info without crashing`, async ({ loggedInPage: page }) => {
-      await page.goto("/info");
+      await page.goto("/image/info");
       await uploadFixture(page, fixtureFormat(fileName));
       await page.getByRole("button", { name: /read info/i }).click();
       await waitForProcessing(page);

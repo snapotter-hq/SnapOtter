@@ -15,13 +15,13 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("AI Canvas Expand", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await expect(page.getByText("Canvas Expand").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows quality tier buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await expect(page.getByText("Quality")).toBeVisible();
@@ -31,7 +31,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shows aspect ratio preset buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await expect(page.getByText("Extend to aspect ratio")).toBeVisible();
@@ -44,7 +44,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shows per-side extension pixel inputs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await expect(page.getByText("Extend by (pixels)")).toBeVisible();
@@ -55,7 +55,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("per-side inputs accept numeric values", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await page.locator("#cac-top").fill("50");
@@ -72,7 +72,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit disabled without extension values", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("ai-canvas-expand-submit");
@@ -80,7 +80,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit enabled after setting extension values", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await page.locator("#cac-top").fill("20");
@@ -88,7 +88,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
 
       const submitBtn = page.getByTestId("ai-canvas-expand-submit");
       await expect(submitBtn).toBeDisabled();
@@ -97,7 +97,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("clicking aspect ratio preset populates extension values", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       // Click 16:9 preset -- should populate left/right or top/bottom values
@@ -115,7 +115,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("shows new size display after setting extension values", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await page.locator("#cac-top").fill("50");
@@ -123,7 +123,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("switching quality tier changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await page.getByTestId("tier-fast").click();
@@ -132,7 +132,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("tier description updates when switching tiers", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
       await uploadTestImage(page);
 
       await page.getByTestId("tier-fast").click();
@@ -148,7 +148,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Meme Generator Expanded", () => {
     test("gallery phase shows template selection guidance", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
 
       await expect(
         page.getByText("Select a template from the gallery or upload your own image"),
@@ -156,7 +156,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shows upload your own image option", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
 
       // Upload button should exist for custom images
       await expect(
@@ -168,12 +168,12 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("no standard dropzone in meme generator", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
       await expect(page.getByText("Upload from computer")).not.toBeVisible();
     });
 
     test("no settings heading visible in gallery phase", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
       // In gallery phase, settings sidebar should show guidance text
       await expect(
         page.getByText("Select a template from the gallery or upload your own image"),
@@ -186,7 +186,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Compare Expanded", () => {
     test("shows second image file input", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
 
       await expect(page.locator("#compare-second-image")).toBeAttached();
     });
@@ -194,7 +194,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("second image upload button shows filename after selection", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
 
       // Set second image via file input
       const testFixture = path.join(
@@ -212,7 +212,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit disabled with only first image uploaded", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("compare-submit");
@@ -220,7 +220,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit enabled with both images uploaded", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
       const testFixture = path.join(
@@ -238,7 +238,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("processes comparison and shows similarity result", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
       const testFixture = path.join(
@@ -259,7 +259,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shows download diff image link after comparison", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
       const testFixture = path.join(
@@ -286,14 +286,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Find Duplicates Expanded", () => {
     test("shows detection mode label", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await expect(page.getByText("Detection Mode")).toBeVisible();
     });
 
     test("shows sensitivity label and slider range", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await expect(page.getByText("Sensitivity")).toBeVisible();
@@ -302,7 +302,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("exact preset shows correct description", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /exact/i }).first().click();
@@ -312,7 +312,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("similar preset shows correct description", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await page
@@ -325,7 +325,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("loose preset shows correct description", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /loose/i }).first().click();
@@ -335,7 +335,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("scan button shows file count when 2+ files uploaded", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
 
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
@@ -353,7 +353,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("threshold slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
       const slider = page.locator("#dup-threshold");
@@ -369,19 +369,19 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Barcode Read Expanded", () => {
     test("shows scan description text", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       await expect(page.getByText(/QR codes, barcodes.*Code 128/)).toBeVisible();
     });
 
     test("shows thorough scan checkbox", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       await expect(page.getByText("Thorough scan")).toBeVisible();
     });
 
     test("thorough scan checkbox is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       const checkbox = page
         .locator("label")
@@ -395,7 +395,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       const submitBtn = page.getByTestId("barcode-read-submit");
       await expect(submitBtn).toBeDisabled();
@@ -405,20 +405,20 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit button text says Scan Barcodes", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("barcode-read-submit")).toHaveText(/Scan Barcodes/);
     });
 
     test("shows Options section label", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       await expect(page.getByText("Options")).toBeVisible();
     });
 
     test("shows multi-file scan count in submit button", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
 
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
@@ -439,7 +439,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Image to Base64 Expanded", () => {
     test("switching format to WebP shows quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "WebP", exact: true }).click();
@@ -447,7 +447,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("max width input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.locator("#b64-max-width").fill("500");
@@ -455,7 +455,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("max height input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.locator("#b64-max-height").fill("400");
@@ -463,21 +463,21 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("submit button is enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("base64-submit")).toBeEnabled();
     });
 
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
 
       const submitBtn = page.getByTestId("base64-submit");
       await expect(submitBtn).toBeDisabled();
     });
 
     test("processes base64 conversion and shows results", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await page.getByTestId("base64-submit").click();
@@ -493,7 +493,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("format switching resets quality visibility correctly", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       // JPEG shows quality
@@ -519,14 +519,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Bulk Rename Expanded", () => {
     test("shows timestamp variable in help text", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.getByText("{{date}}")).toBeVisible();
     });
 
     test("pattern input is interactive and updates value", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       const patternInput = page.locator("#bulk-rename-pattern");
@@ -536,7 +536,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("start index defaults to 1", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.locator("#bulk-rename-start-index")).toHaveValue("1");
@@ -545,7 +545,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("submit button disabled without file, enabled with file", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
 
       const submitBtn = page.getByTestId("bulk-rename-submit");
       await expect(submitBtn).toBeDisabled();
@@ -555,7 +555,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("processes bulk rename and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await page.getByTestId("bulk-rename-submit").click();
@@ -572,14 +572,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("canvas section shows width and height inputs when expanded", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await page.getByText("Canvas").click();
       await expect(page.getByText(/width/i).first()).toBeVisible();
     });
 
     test("spacing section shows gap slider", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       // Spacing section should show gap/spacing controls
       const gapSlider = page.locator("input[type='range']").first();
@@ -587,13 +587,13 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shows corner radius slider in spacing section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await expect(page.getByText(/corner|radius/i).first()).toBeVisible();
     });
 
     test("output section shows format and quality controls", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await page.getByText("Output").click();
       await expect(page.getByRole("button", { name: "PNG" }).first()).toBeVisible();
@@ -602,7 +602,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("JPEG format shows quality slider in output section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await page.getByText("Output").click();
       await page.getByRole("button", { name: "JPEG" }).first().click();
@@ -610,7 +610,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("PNG format hides quality slider in output section", async ({ loggedInPage: page }) => {
-      await page.goto("/collage");
+      await page.goto("/image/collage");
 
       await page.getByText("Output").click();
       await page.getByRole("button", { name: "JPEG" }).first().click();
@@ -626,21 +626,21 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Stitch Expanded", () => {
     test("shows background color control after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByText(/background/i).first()).toBeVisible();
     });
 
     test("shows output format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByText(/output format|format/i).first()).toBeVisible();
     });
 
     test("processes stitch with 2 files and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
 
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
@@ -659,7 +659,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("vertical direction is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await page
@@ -669,7 +669,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("grid direction is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await page.getByText(/grid/i).first().click();
@@ -681,14 +681,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Color Palette Expanded", () => {
     test("submit disabled without file", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
 
       const submitBtn = page.getByTestId("color-palette-submit");
       await expect(submitBtn).toBeDisabled();
     });
 
     test("processes extraction and shows color swatches", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       await page.getByTestId("color-palette-submit").click();
@@ -698,7 +698,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after extraction returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       await page.getByTestId("color-palette-submit").click();
@@ -712,7 +712,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/color-palette");
+      await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("color-palette-submit")).toBeVisible();
@@ -728,7 +728,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Beautify Expanded", () => {
     test("clicking preset updates settings", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await page.getByText("Purple Haze").click();
       await page.getByText("Flamingo").click();
@@ -736,14 +736,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("solid background tab shows color picker", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await page.getByRole("button", { name: "Solid" }).click();
       await expect(page.locator("input[type='color']").first()).toBeVisible();
     });
 
     test("none background tab hides background controls", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       // Multiple sections (background, shadow, frame) each have a "None"
       // option; the background tabs are the first group.
@@ -751,13 +751,13 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("iPhone frame option is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       await page.getByRole("button", { name: "iPhone" }).click();
     });
 
     test("None frame option is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       // Check if "None" frame button exists in Device Frame section
       const noneBtn = page.getByRole("button", { name: "None" }).first();
@@ -767,7 +767,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("padding slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       const slider = page.locator("#beautify-padding");
       await expect(slider).toBeVisible();
@@ -775,7 +775,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("border radius slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       const slider = page.locator("#beautify-border-radius");
       await expect(slider).toBeVisible();
@@ -783,7 +783,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("shadow None preset is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
 
       // Shadow section has a "None" option
       const noneBtn = page.getByRole("button", { name: "None" });
@@ -793,7 +793,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after processing returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
       await uploadTestImage(page);
 
       await page.getByTestId("beautify-submit").click();
@@ -808,7 +808,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("beautify-submit")).toBeVisible();
@@ -819,13 +819,13 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/beautify");
+      await page.goto("/image/beautify");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("beautify-submit")).toBeVisible();
 
-      await page.goto("/resize");
-      await page.goto("/beautify");
+      await page.goto("/image/resize");
+      await page.goto("/image/beautify");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -838,7 +838,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("custom grid rows and columns inputs visible in grid mode", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       // Grid mode should show rows/cols or the preset buttons
@@ -846,7 +846,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("tile size mode shows pixel dimension inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Tile Size" }).first().click();
@@ -854,14 +854,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("4x4 grid preset is clickable", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "4x4" }).first().click();
     });
 
     test("undo after processing returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
       await page.waitForTimeout(1000);
 
@@ -888,7 +888,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("GIF Tools Expanded", () => {
     test("resize percentage mode shows percentage input", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Percentage" }).click();
@@ -897,7 +897,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("resize pixel mode width input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.locator("#gif-width").fill("200");
@@ -905,7 +905,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("optimize mode colors slider has correct range", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Optimize" }).first().click();
@@ -915,7 +915,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("optimize mode effort slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Optimize" }).first().click();
@@ -925,21 +925,21 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("loop infinite button is default selected", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Infinite" })).toBeVisible();
     });
 
     test("loop once button is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Once" }).click();
     });
 
     test("rotate mode angle 90 button visible", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Rotate" }).first().click();
@@ -952,7 +952,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("SVG to Raster Expanded", () => {
     test("clicking Color background shows color presets", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "Color" }).click();
       await expect(page.locator("button[aria-label='White background']")).toBeVisible();
@@ -960,7 +960,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("custom size mode shows aspect ratio lock button", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "Custom Size" }).click();
       await expect(page.locator("#svg-custom-width")).toBeVisible();
@@ -968,7 +968,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("custom size width accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "Custom Size" }).click();
       await page.locator("#svg-custom-width").fill("512");
@@ -976,7 +976,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("DPI presets are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: "72" }).click();
       await page.getByRole("button", { name: "150" }).click();
@@ -984,7 +984,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("format buttons switch between png, jpg, webp", async ({ loggedInPage: page }) => {
-      await page.goto("/svg-to-raster");
+      await page.goto("/image/svg-to-raster");
 
       await page.getByRole("button", { name: /^png$/i }).click();
       await page.getByRole("button", { name: /^jpg$/i }).click();
@@ -997,7 +997,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Vectorize Expanded", () => {
     test("logo preset sets B&W mode by default", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       // Logo is default -- should show threshold slider (B&W mode)
@@ -1005,7 +1005,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("photo preset enables color mode", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /^photo$/i }).click();
@@ -1013,14 +1013,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("sketch preset is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /^sketch$/i }).click();
     });
 
     test("detail level buttons are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /^low$/i }).click();
@@ -1029,7 +1029,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("smoothing buttons are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /^polygon$/i }).click();
@@ -1038,7 +1038,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after vectorize returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: /vectorize/i }).click();
@@ -1059,7 +1059,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Optimize for Web Expanded", () => {
     test("AVIF format shows quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       const settings = page.locator(".w-72");
@@ -1068,7 +1068,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("JXL format shows quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       const settings = page.locator(".w-72");
@@ -1079,7 +1079,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     test("max dimensions section shows width and height inputs when expanded", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await page.getByText("Max Dimensions").click();
@@ -1088,7 +1088,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("max width input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await page.getByText("Max Dimensions").click();
@@ -1097,7 +1097,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after optimization returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
       await page.locator("button[type='submit']").click();
@@ -1113,11 +1113,11 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/optimize-for-web");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/optimize-for-web");
+      await page.goto("/image/resize");
+      await page.goto("/image/optimize-for-web");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -1128,21 +1128,21 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Image to PDF Expanded", () => {
     test("A3 page size is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await page.selectOption("#image-to-pdf-page-size", "A3");
       await expect(page.locator("#image-to-pdf-page-size")).toHaveValue("A3");
     });
 
     test("A5 page size is selectable", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       await page.selectOption("#image-to-pdf-page-size", "A5");
       await expect(page.locator("#image-to-pdf-page-size")).toHaveValue("A5");
     });
 
     test("margin slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       const slider = page.locator("#image-to-pdf-margin");
       await expect(slider).toBeVisible();
@@ -1150,7 +1150,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("target file size value input accepts values", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
 
       const sizeInput = page.getByTestId("image-to-pdf-target-size-value");
       await sizeInput.fill("500");
@@ -1158,7 +1158,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after processing returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-pdf");
+      await page.goto("/image/image-to-pdf");
       await uploadTestImage(page);
 
       await page.getByTestId("image-to-pdf-submit").click();
@@ -1178,7 +1178,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("PDF to Image Expanded", () => {
     test("custom DPI shows input field when clicked", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await page.getByRole("button", { name: "Custom" }).first().click();
       // Custom DPI should show an input
@@ -1186,14 +1186,14 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("pages input accepts range values", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await page.locator("#pdf-pages").fill("1-5");
       await expect(page.locator("#pdf-pages")).toHaveValue("1-5");
     });
 
     test("color mode buttons are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await page.getByRole("button", { name: "Grayscale" }).first().click();
       await page.getByRole("button", { name: "B&W" }).first().click();
@@ -1201,7 +1201,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("format buttons are interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await page.getByRole("button", { name: "JPEG" }).first().click();
       await page.getByRole("button", { name: "WebP" }).first().click();
@@ -1209,7 +1209,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("DPI buttons switch active state", async ({ loggedInPage: page }) => {
-      await page.goto("/pdf-to-image");
+      await page.goto("/pdf/pdf-to-image");
 
       await page.getByRole("button", { name: "72" }).first().click();
       await page.getByRole("button", { name: "300" }).first().click();
@@ -1222,7 +1222,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Favicon Expanded", () => {
     test("shows generated icon sizes in list", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
 
       // Current generated set (mstile was dropped from FAVICON_SIZES)
       await expect(page.getByText("android-chrome-512x512.png")).toBeVisible();
@@ -1230,7 +1230,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("undo after favicon generation returns to settings", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
       await page.getByTestId("favicon-submit").click();
@@ -1245,7 +1245,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("favicon-submit")).toBeVisible();
@@ -1256,11 +1256,11 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("navigate away from favicon resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/favicon");
+      await page.goto("/image/favicon");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/favicon");
+      await page.goto("/image/resize");
+      await page.goto("/image/favicon");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -1271,7 +1271,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Undo and State Reset (expanded tools)", () => {
     test("image-to-base64: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("base64-submit")).toBeVisible();
@@ -1282,7 +1282,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("barcode-read: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("barcode-read-submit")).toBeVisible();
@@ -1293,7 +1293,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("bulk-rename: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("bulk-rename-submit")).toBeVisible();
@@ -1304,7 +1304,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("stitch: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/stitch");
+      await page.goto("/image/stitch");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("stitch-submit")).toBeVisible();
@@ -1315,7 +1315,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("split: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/split");
+      await page.goto("/image/split");
       await uploadTestImage(page);
 
       await page.getByText("Clear all").click();
@@ -1324,7 +1324,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("gif-tools: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/gif-tools");
+      await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("gif-tools-submit")).toBeVisible();
@@ -1335,7 +1335,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("vectorize: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/vectorize");
+      await page.goto("/image/vectorize");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("vectorize-submit")).toBeVisible();
@@ -1346,7 +1346,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("replace-color: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/replace-color");
+      await page.goto("/image/replace-color");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("replace-color-submit")).toBeVisible();
@@ -1357,7 +1357,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("sharpening: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/sharpening");
+      await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("sharpening-submit")).toBeVisible();
@@ -1368,7 +1368,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("color-blindness: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/color-blindness");
+      await page.goto("/image/color-blindness");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("color-blindness-submit")).toBeVisible();
@@ -1379,23 +1379,23 @@ test.describe("GUI Expanded Tool Coverage", () => {
     });
 
     test("image-enhancement: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/image-enhancement");
+      await page.goto("/image/image-enhancement");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("image-enhancement-submit")).toBeVisible({ timeout: 10_000 });
 
-      await page.goto("/resize");
-      await page.goto("/image-enhancement");
+      await page.goto("/image/resize");
+      await page.goto("/image/image-enhancement");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("compare: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/compare");
+      await page.goto("/image/compare");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/compare");
+      await page.goto("/image/resize");
+      await page.goto("/image/compare");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -1406,7 +1406,7 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // ========================================================================
   test.describe("Navigate Away Resets (expanded tools)", () => {
     test("ai-canvas-expand: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/ai-canvas-expand");
 
       // On servers without the AI bundle the page shows an install prompt
       // instead of a dropzone; there is no state to reset.
@@ -1420,48 +1420,48 @@ test.describe("GUI Expanded Tool Coverage", () => {
 
       await page.locator("#cac-top").fill("20");
 
-      await page.goto("/resize");
-      await page.goto("/ai-canvas-expand");
+      await page.goto("/image/resize");
+      await page.goto("/image/ai-canvas-expand");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("barcode-read: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/barcode-read");
+      await page.goto("/image/barcode-read");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/barcode-read");
+      await page.goto("/image/resize");
+      await page.goto("/image/barcode-read");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("bulk-rename: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/bulk-rename");
+      await page.goto("/image/bulk-rename");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/bulk-rename");
+      await page.goto("/image/resize");
+      await page.goto("/image/bulk-rename");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("find-duplicates: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/find-duplicates");
+      await page.goto("/image/find-duplicates");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/find-duplicates");
+      await page.goto("/image/resize");
+      await page.goto("/image/find-duplicates");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("image-to-base64: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/image-to-base64");
+      await page.goto("/image/image-to-base64");
       await uploadTestImage(page);
 
-      await page.goto("/resize");
-      await page.goto("/image-to-base64");
+      await page.goto("/image/resize");
+      await page.goto("/image/image-to-base64");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });

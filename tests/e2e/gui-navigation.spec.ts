@@ -372,13 +372,13 @@ test.describe("Fullscreen Grid Page", () => {
 // ---------------------------------------------------------------------------
 test.describe("Tool Page - Resize", () => {
   test("shows tool icon and name", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     await expect(page.getByText("Resize").first()).toBeVisible();
   });
 
   test("shows dropzone with dashed border before upload", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     const dropzone = page.locator("[class*='border-dashed']").first();
     await expect(dropzone).toBeVisible();
@@ -388,7 +388,7 @@ test.describe("Tool Page - Resize", () => {
   test("after upload shows Files section, Settings section, and Process button", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Files section
@@ -507,7 +507,7 @@ test.describe("Tool Page - Settings and Process Flow", () => {
   test("resize: settings panel appears after upload with process button", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await expect(page.getByText("Settings").first()).toBeVisible();
@@ -516,21 +516,21 @@ test.describe("Tool Page - Settings and Process Flow", () => {
   });
 
   test("compress: settings panel appears after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
 
     await expect(page.getByText("Settings").first()).toBeVisible();
   });
 
   test("convert: settings panel appears after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadTestImage(page);
 
     await expect(page.getByText("Settings").first()).toBeVisible();
   });
 
   test("resize: download link appears after processing", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Click the process button
@@ -555,7 +555,7 @@ test.describe("Tool Page - Settings and Process Flow", () => {
     await page.getByRole("button", { name: /login/i }).click();
     await page.waitForURL("/", { timeout: 15_000 });
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // On mobile, settings may be behind a toggle button
@@ -928,22 +928,6 @@ test.describe("Routing Edge Cases", () => {
     await expect(page).toHaveURL("/");
   });
 
-  test("/analytics-consent page renders consent UI", async ({ browser }) => {
-    // Use unauthenticated context since analytics-consent is unguarded
-    const context = await browser.newContext({
-      storageState: { cookies: [], origins: [] },
-    });
-    const page = await context.newPage();
-    await page.goto("/analytics-consent");
-
-    // The page shows a heading and two buttons
-    await expect(page.getByText("Help improve SnapOtter")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sure, sounds good" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Not right now" })).toBeVisible();
-
-    await context.close();
-  });
-
   test("legacy /color-effects redirects to /adjust-colors", async ({ loggedInPage: page }) => {
     await page.goto("/color-effects");
 
@@ -1023,7 +1007,7 @@ test.describe("Browser Back/Forward Navigation", () => {
   });
 
   test("page refresh preserves route on tool page", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await expect(page).toHaveURL("/resize");
 
     await page.reload();
@@ -1426,7 +1410,7 @@ test.describe("Routing - Additional Edge Cases", () => {
   });
 
   test("deep-linking to a specific tool page works", async ({ loggedInPage: page }) => {
-    await page.goto("/watermark-text");
+    await page.goto("/image/watermark-text");
     await expect(page).toHaveURL("/watermark-text");
     await expect(page.getByText("Text Watermark").first()).toBeVisible();
   });

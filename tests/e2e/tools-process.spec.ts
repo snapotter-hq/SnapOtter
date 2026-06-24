@@ -7,7 +7,7 @@ import { expect, getTestHeicPath, test, uploadTestImage, waitForProcessing } fro
 
 test.describe("Tool processing (core tools)", () => {
   test("resize processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Fill in width (required)
@@ -22,7 +22,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("compress processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
     // Compress has defaults, just click
     await page.getByRole("button", { name: "Compress" }).click();
@@ -33,7 +33,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("convert processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadTestImage(page);
     // Convert has a default format, just click
     await page.getByRole("button", { name: /convert/i }).click();
@@ -44,7 +44,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("rotate processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await uploadTestImage(page);
     // Click the clockwise 90° rotation button and wait for state to propagate
     await page.getByTestId("rotate-right").click();
@@ -61,7 +61,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("crop processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await uploadTestImage(page);
     // Wait for image to load in the crop canvas
     await page.waitForTimeout(1000);
@@ -80,7 +80,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("strip-metadata processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/strip-metadata");
+    await page.goto("/image/strip-metadata");
     await uploadTestImage(page);
     await page.getByRole("button", { name: /remove metadata/i }).click();
     await waitForProcessing(page);
@@ -90,7 +90,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("edit-metadata processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/edit-metadata");
+    await page.goto("/image/edit-metadata");
     await uploadTestImage(page);
 
     // Wait for inspect to complete and form to populate
@@ -121,7 +121,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("image-enhancement processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/image-enhancement");
+    await page.goto("/image/image-enhancement");
     await uploadTestImage(page);
     // Wait for analysis to complete (badges appear)
     await expect(
@@ -136,7 +136,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("border processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/border");
+    await page.goto("/image/border");
     await uploadTestImage(page);
     // Default border width is 10px and color is #000000, should be valid
     // Button text is "Apply Border" in border-settings.tsx
@@ -151,7 +151,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("info shows image metadata", async ({ loggedInPage: page }) => {
-    await page.goto("/info");
+    await page.goto("/image/info");
     await uploadTestImage(page);
     await page.getByRole("button", { name: /read info/i }).click();
     await waitForProcessing(page);
@@ -162,7 +162,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("qr-generate creates QR code without file upload", async ({ loggedInPage: page }) => {
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     // Fill in URL input (client-side generation, live preview)
     await page.getByTestId("qr-input-url").fill("https://example.com");
     // Verify the live preview rendered (canvas or svg inside the preview area)
@@ -173,7 +173,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("vectorize processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/vectorize");
+    await page.goto("/image/vectorize");
     await uploadTestImage(page);
     await page.getByRole("button", { name: /vectorize/i }).click();
     await waitForProcessing(page);
@@ -183,7 +183,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("watermark-text processes image", async ({ loggedInPage: page }) => {
-    await page.goto("/watermark-text");
+    await page.goto("/image/watermark-text");
     await uploadTestImage(page);
     // Fill in watermark text
     const textInput = page.locator("input[type='text'], textarea").first();
@@ -196,7 +196,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("convert HEIC to JPG", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     const heicPath = getTestHeicPath();
 
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -216,7 +216,7 @@ test.describe("Tool processing (core tools)", () => {
   });
 
   test("convert PNG to HEIC", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadTestImage(page);
 
     // Select HEIC output format

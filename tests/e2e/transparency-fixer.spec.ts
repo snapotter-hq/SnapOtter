@@ -31,7 +31,7 @@ async function fixTransparencyAndWait(page: import("@playwright/test").Page) {
 
 test.describe("PNG Transparency Fixer tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/transparency-fixer");
+    await page.goto("/image/transparency-fixer");
     try {
       await page
         .getByTestId("transparency-fixer-submit")

@@ -14,7 +14,7 @@ test.describe("QA Fixes Verification", () => {
   });
 
   test("tool page loads correctly", async ({ page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     // Should see resize tool content
     await expect(page.locator("text=Resize").first()).toBeVisible({ timeout: 10_000 });
@@ -98,7 +98,7 @@ test.describe("QA Fixes Verification", () => {
   });
 
   test("dropzone uses i18n strings (no hardcoded 'or')", async ({ page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     // The dropzone should be visible with upload button
     const uploadBtn = page.locator("text=Upload").first();

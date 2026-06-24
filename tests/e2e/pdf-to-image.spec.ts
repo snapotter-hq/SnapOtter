@@ -12,7 +12,7 @@ const PDF_FIXTURE = path.join(
 
 test.describe("PDF to Image tool", () => {
   test("shows page thumbnails after uploading a PDF", async ({ loggedInPage: page }) => {
-    await page.goto("/pdf-to-image");
+    await page.goto("/pdf/pdf-to-image");
 
     // Upload PDF via file input
     const fileInput = page.locator("input[type='file'][accept='application/pdf']");
@@ -26,7 +26,7 @@ test.describe("PDF to Image tool", () => {
   });
 
   test("converts a PDF page to an image and shows results", async ({ loggedInPage: page }) => {
-    await page.goto("/pdf-to-image");
+    await page.goto("/pdf/pdf-to-image");
 
     // Upload PDF
     const fileInput = page.locator("input[type='file'][accept='application/pdf']");
@@ -51,7 +51,7 @@ test.describe("PDF to Image tool", () => {
   });
 
   test("can select and deselect pages via thumbnails", async ({ loggedInPage: page }) => {
-    await page.goto("/pdf-to-image");
+    await page.goto("/pdf/pdf-to-image");
 
     // Upload PDF
     const fileInput = page.locator("input[type='file'][accept='application/pdf']");

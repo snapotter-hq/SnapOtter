@@ -16,7 +16,7 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("AI Canvas Expand", () => {
   test("standalone /ai-canvas-expand route loads", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
 
     await expect(page.getByText("Tool not found")).not.toBeVisible();
     await expect(page.getByText("AI Canvas Expand")).toBeVisible();
@@ -25,21 +25,21 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("standalone submit disabled without file", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
     await expect(page.getByTestId("ai-canvas-expand-submit")).toBeDisabled();
   });
 
   test("standalone submit disabled when all extensions are zero", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
     await expect(page.getByTestId("ai-canvas-expand-submit")).toBeDisabled();
   });
 
   test("standalone submit enables with extension set", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
     await page.locator("#cac-top").fill("50");
@@ -48,7 +48,7 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("standalone aspect ratio preset fills extension values", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
     await page.waitForTimeout(500);
@@ -65,7 +65,7 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("standalone shows new size display", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
     await page.waitForTimeout(500);
@@ -76,7 +76,7 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("tier buttons render with Balanced selected by default", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
 
     await expect(page.getByTestId("tier-fast")).toBeVisible();
     await expect(page.getByTestId("tier-balanced")).toBeVisible();
@@ -87,7 +87,7 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("clicking tier button changes selection", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
 
     await page.getByTestId("tier-fast").click();
     await expect(page.getByTestId("tier-fast")).toHaveClass(/bg-primary/);
@@ -97,7 +97,7 @@ test.describe("AI Canvas Expand", () => {
   });
 
   test("tier description updates on selection", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
 
     await expect(page.getByText("Good quality, moderate speed")).toBeVisible();
 
@@ -108,7 +108,7 @@ test.describe("AI Canvas Expand", () => {
   // ── Processing (requires AI sidecar) ────────────────────────────────
 
   test("processes image (AI sidecar required)", async ({ loggedInPage: page }) => {
-    await page.goto("/ai-canvas-expand");
+    await page.goto("/image/ai-canvas-expand");
 
     if (!(await isAiSidecarRunning(page))) {
       test.skip(true, "AI sidecar not running");

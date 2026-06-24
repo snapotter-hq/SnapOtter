@@ -32,7 +32,7 @@ async function removeBgAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Remove Background tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/remove-background");
+    await page.goto("/image/remove-background");
     try {
       await page
         .getByTestId("remove-background-submit")

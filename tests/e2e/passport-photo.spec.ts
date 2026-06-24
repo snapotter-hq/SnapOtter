@@ -16,7 +16,7 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("Passport Photo tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/passport-photo");
+    await page.goto("/image/passport-photo");
     try {
       // Wait for the page to load -- the country dropdown is always present
       await page.getByText("Country").waitFor({ state: "visible", timeout: 15_000 });

@@ -3,7 +3,7 @@ import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 test.describe("Essential Tools", () => {
   // ── Resize ────────────────────────────────────────────────────────────
   test("resize tool page renders correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
 
     // Tool header
     await expect(page.getByText("Resize").first()).toBeVisible();
@@ -13,7 +13,7 @@ test.describe("Essential Tools", () => {
   });
 
   test("resize tool shows settings after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Should show settings panel with width/height inputs
@@ -23,7 +23,7 @@ test.describe("Essential Tools", () => {
   });
 
   test("resize tool processes an image", async ({ loggedInPage: page }) => {
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await uploadTestImage(page);
 
     // Set width (required for resize)
@@ -39,52 +39,52 @@ test.describe("Essential Tools", () => {
 
   // ── Crop ──────────────────────────────────────────────────────────────
   test("crop tool page renders correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await expect(page.getByText("Crop").first()).toBeVisible();
     await expect(page.getByText("Upload from computer")).toBeVisible();
   });
 
   test("crop tool shows settings after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await uploadTestImage(page);
     await expect(page.getByText("Settings").first()).toBeVisible();
   });
 
   // ── Rotate & Flip ────────────────────────────────────────────────────
   test("rotate tool page renders correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await expect(page.getByText("Rotate").first()).toBeVisible();
     await expect(page.getByText("Upload from computer")).toBeVisible();
   });
 
   test("rotate tool shows settings after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/rotate");
+    await page.goto("/image/rotate");
     await uploadTestImage(page);
     await expect(page.getByText("Settings").first()).toBeVisible();
   });
 
   // ── Convert ───────────────────────────────────────────────────────────
   test("convert tool page renders correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await expect(page.getByText("Convert").first()).toBeVisible();
     await expect(page.getByText("Upload from computer")).toBeVisible();
   });
 
   test("convert tool shows format selector after upload", async ({ loggedInPage: page }) => {
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await uploadTestImage(page);
     await expect(page.getByText("Settings").first()).toBeVisible();
   });
 
   // ── Compress ──────────────────────────────────────────────────────────
   test("compress tool page renders correctly", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await expect(page.getByText("Compress").first()).toBeVisible();
     await expect(page.getByText("Upload from computer")).toBeVisible();
   });
 
   test("compress tool processes an image", async ({ loggedInPage: page }) => {
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
 
     // Use submit button to avoid matching "Processed:" text

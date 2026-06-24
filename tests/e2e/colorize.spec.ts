@@ -21,7 +21,7 @@ async function colorizeAndWait(page: import("@playwright/test").Page) {
 
 test.describe("Colorize tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/colorize");
+    await page.goto("/image/colorize");
     try {
       await page.getByTestId("colorize-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

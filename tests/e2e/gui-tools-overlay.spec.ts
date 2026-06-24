@@ -14,13 +14,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   test.describe("Watermark Text", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await expect(page.getByText("Text Watermark").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows watermark text input and settings after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-text")).toBeVisible();
@@ -29,14 +29,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("font size slider visible", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-font-size")).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
 
       const submitBtn = page.getByTestId("watermark-text-submit");
       await expect(submitBtn).toBeDisabled();
@@ -46,21 +46,21 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows color picker for watermark text", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-color")).toBeVisible();
     });
 
     test("shows opacity slider", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-opacity")).toBeVisible();
     });
 
     test("shows position dropdown with all options", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       const select = page.locator("#watermark-text-position");
@@ -70,14 +70,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows rotation slider", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-rotation")).toBeVisible();
     });
 
     test("opacity slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       const slider = page.locator("#watermark-text-opacity");
@@ -86,7 +86,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("font size slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       const slider = page.locator("#watermark-text-font-size");
@@ -95,7 +95,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("changing text input updates value", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await page.locator("#watermark-text-text").fill("My Custom Text");
@@ -103,7 +103,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes watermark and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await page.locator("#watermark-text-text").fill("Test Watermark");
@@ -121,13 +121,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   test.describe("Watermark Image", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await expect(page.getByText("Image Watermark").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows position and opacity controls after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       // Position selector should be visible
@@ -137,7 +137,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows watermark upload area after main image upload", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       // Should see a prompt to upload the watermark/logo image
@@ -145,7 +145,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows position dropdown with five options", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       const select = page.locator("#watermark-image-position");
@@ -155,21 +155,21 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows opacity slider with percentage", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-image-opacity")).toBeVisible();
     });
 
     test("shows scale slider with percentage", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-image-scale")).toBeVisible();
     });
 
     test("submit disabled without watermark file", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-image");
+      await page.goto("/image/watermark-image");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("watermark-image-submit");
@@ -182,13 +182,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   test.describe("Text Overlay", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await expect(page.getByText("Text Overlay").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows text input and font size slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await expect(page.locator("#text-overlay-text")).toBeVisible();
@@ -197,7 +197,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
 
       const submitBtn = page.getByTestId("text-overlay-submit");
       await expect(submitBtn).toBeDisabled();
@@ -207,14 +207,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows text color picker", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await expect(page.locator("#text-overlay-color")).toBeVisible();
     });
 
     test("shows position dropdown with three options", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       const select = page.locator("#text-overlay-position");
@@ -224,14 +224,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows drop shadow checkbox", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await expect(page.getByText("Drop Shadow")).toBeVisible();
     });
 
     test("background box checkbox reveals box color picker", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await expect(page.getByText("Background Box")).toBeVisible();
@@ -251,7 +251,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("font size slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       const slider = page.locator("#text-overlay-font-size");
@@ -260,7 +260,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("changing text input updates value", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await page.locator("#text-overlay-text").fill("Custom Overlay");
@@ -268,7 +268,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes text overlay and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await page.getByTestId("text-overlay-submit").click();
@@ -302,13 +302,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     }
 
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await expect(page.getByText("Image Composition").first()).toBeVisible();
       await expect(page.locator("section[aria-label='File drop zone']")).toBeVisible();
     });
 
     test("shows overlay upload and position controls", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       await expect(page.getByText("X Position")).toBeVisible();
       await expect(page.getByText("Y Position")).toBeVisible();
@@ -318,27 +318,27 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows overlay image upload button", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       await expect(page.getByText("Overlay Image").first()).toBeVisible();
       await expect(page.getByText("Choose overlay image")).toBeVisible();
     });
 
     test("shows X and Y position number inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       await expect(page.locator("#compose-x-position")).toBeVisible();
       await expect(page.locator("#compose-y-position")).toBeVisible();
     });
 
     test("shows opacity slider", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       await expect(page.locator("#compose-opacity")).toBeVisible();
     });
 
     test("blend mode dropdown has all options", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       const select = page.locator("#compose-blend-mode");
       await expect(select).toBeVisible();
@@ -347,7 +347,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("submit disabled without overlay file", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
 
       const submitBtn = page.getByTestId("compose-submit");
@@ -355,7 +355,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("submit enabled after uploading both base and overlay", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
       await uploadOverlayImage(page);
 
@@ -363,7 +363,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes composition and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
       await uploadOverlayImage(page);
 
@@ -374,7 +374,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes with custom position and opacity", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
       await uploadOverlayImage(page);
 
@@ -389,7 +389,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes with multiply blend mode", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
       await uploadOverlayImage(page);
 
@@ -402,14 +402,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("overlay filename shown after selection", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadOverlayImage(page);
 
       await expect(page.getByText("test-image.png")).toBeVisible();
     });
 
     test("shows size info after processing", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
       await uploadOverlayImage(page);
 
@@ -422,7 +422,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes webp overlay on png base", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
 
       const webpPath = path.join(
@@ -442,7 +442,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows error for corrupt overlay file", async ({ loggedInPage: page }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
       await uploadBaseImage(page);
 
       const tmpDir = path.join(process.cwd(), "test-results");
@@ -463,13 +463,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   test.describe("Border", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await expect(page.getByText("Border").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows border preset buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       // Presets from border-settings.tsx
@@ -480,56 +480,56 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows border width and color controls after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.getByText(/border width|width/i).first()).toBeVisible();
     });
 
     test("submit button uses data-testid", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.getByTestId("border-submit")).toBeVisible();
     });
 
     test("shows border width slider", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#border-width")).toBeVisible();
     });
 
     test("shows border color swatches", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#border-color")).toBeVisible();
     });
 
     test("shows padding slider", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#border-padding")).toBeVisible();
     });
 
     test("shows padding color swatches", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#padding-color")).toBeVisible();
     });
 
     test("shows corner radius slider", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#border-corner-radius")).toBeVisible();
     });
 
     test("shadow toggle reveals shadow controls", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       // Shadow toggle switch
@@ -551,7 +551,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("shows all preset buttons", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.getByText("Polaroid").first()).toBeVisible();
@@ -561,7 +561,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("border width slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       const slider = page.locator("#border-width");
@@ -570,7 +570,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("clicking a preset updates border settings", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       // Click Polaroid preset
@@ -580,7 +580,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
 
       const submitBtn = page.getByTestId("border-submit");
       await expect(submitBtn).toBeDisabled();
@@ -590,7 +590,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("processes border and shows download", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await page.getByTestId("border-submit").click();
@@ -607,7 +607,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("watermark-text: undo after processing returns to text input", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await page.locator("#watermark-text-text").fill("Undo Test");
@@ -626,7 +626,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("text-overlay: undo after processing returns to settings", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/text-overlay");
+      await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       await page.getByTestId("text-overlay-submit").click();
@@ -644,7 +644,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("compose: undo after processing returns to position controls", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/compose");
+      await page.goto("/image/compose");
 
       // Use compose-specific upload helpers
       const fileChooserPromise = page.waitForEvent("filechooser");
@@ -671,7 +671,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("border: undo after processing returns to preset buttons", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await page.getByTestId("border-submit").click();
@@ -687,7 +687,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("watermark-text: clear all returns to dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/watermark-text");
+      await page.goto("/image/watermark-text");
       await uploadTestImage(page);
 
       await expect(page.locator("#watermark-text-text")).toBeVisible();
@@ -698,13 +698,13 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("border: navigate away resets state", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       await expect(page.locator("#border-width")).toBeVisible();
 
-      await page.goto("/watermark-text");
-      await page.goto("/border");
+      await page.goto("/image/watermark-text");
+      await page.goto("/image/border");
 
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -715,7 +715,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   test.describe("Border Live Preview", () => {
     test("selecting a preset updates the live preview styling", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       const previewImg = page.locator("img").first();
@@ -734,7 +734,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     });
 
     test("changing border width updates preview in real-time", async ({ loggedInPage: page }) => {
-      await page.goto("/border");
+      await page.goto("/image/border");
       await uploadTestImage(page);
 
       const previewImg = page.locator("img").first();

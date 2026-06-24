@@ -16,7 +16,7 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 
 test.describe("Blur Faces tool", () => {
   async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
-    await page.goto("/blur-faces");
+    await page.goto("/image/blur-faces");
     try {
       await page.getByTestId("blur-faces-submit").waitFor({ state: "visible", timeout: 15_000 });
     } catch {

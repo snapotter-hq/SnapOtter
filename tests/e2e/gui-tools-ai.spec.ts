@@ -16,13 +16,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Remove Background", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await expect(page.getByText("Remove Background").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows subject type buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "People" })).toBeVisible();
@@ -31,7 +31,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows quality tier buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Fast" })).toBeVisible();
@@ -40,7 +40,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("ultra quality visible only for People subject", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // People is default -- Ultra should be visible
@@ -52,7 +52,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows background type buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -67,7 +67,7 @@ test.describe("GUI AI Tools", () => {
     test("color presets appear when Color background is selected", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -81,7 +81,7 @@ test.describe("GUI AI Tools", () => {
     test("gradient presets appear when Gradient background is selected", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -93,7 +93,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("effects section is collapsible", async ({ loggedInPage: page }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // Expand Effects
@@ -105,7 +105,7 @@ test.describe("GUI AI Tools", () => {
     test("submit button disabled without file, enabled with file", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
 
       const submitBtn = page.getByTestId("remove-background-submit");
       await expect(submitBtn).toBeDisabled();
@@ -117,7 +117,7 @@ test.describe("GUI AI Tools", () => {
     test("image background upload button visible when Image background selected", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -129,7 +129,7 @@ test.describe("GUI AI Tools", () => {
     test("switching subject type hides ultra quality for non-People", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/remove-background");
+      await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
       // People is default -- Ultra visible
@@ -146,13 +146,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Upscale", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await expect(page.getByText("Image Upscaling").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows scale factor buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       await expect(page.getByText("Scale Factor")).toBeVisible();
@@ -163,7 +163,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows quality tier buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Fast" })).toBeVisible();
@@ -172,7 +172,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows enhance faces checkbox in non-Fast mode", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       // Balanced is default, should show face enhancement
@@ -180,21 +180,21 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows noise reduction slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       await expect(page.getByText("Noise Reduction")).toBeVisible();
     });
 
     test("shows output format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       await expect(page.locator("#upscale-format")).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
 
       const submitBtn = page.getByTestId("upscale-submit");
       await expect(submitBtn).toBeDisabled();
@@ -204,7 +204,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("face enhance checkbox toggles", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       const checkbox = page
@@ -220,7 +220,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching to Fast hides enhance faces", async ({ loggedInPage: page }) => {
-      await page.goto("/upscale");
+      await page.goto("/image/upscale");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Fast" }).click();
@@ -233,13 +233,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("OCR", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await expect(page.getByText("OCR").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows quality selector buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Fast" })).toBeVisible();
@@ -248,14 +248,14 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows enhance before scanning checkbox after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await uploadTestImage(page);
 
       await expect(page.getByText("Enhance before scanning")).toBeVisible();
     });
 
     test("shows collapsible Language section after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await uploadTestImage(page);
 
       // Language section shows default "Auto-detect"
@@ -270,7 +270,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
 
       const submitBtn = page.getByTestId("ocr-submit");
       await expect(submitBtn).toBeDisabled();
@@ -281,7 +281,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows language dropdown options when expanded", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await uploadTestImage(page);
 
       await page.getByText("Language").click();
@@ -294,7 +294,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching quality tier changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/ocr");
+      await page.goto("/image/ocr");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Best" }).click();
@@ -308,7 +308,7 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Blur Faces", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/blur-faces");
+      await page.goto("/image/blur-faces");
       await expect(page.getByText("Face").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -316,7 +316,7 @@ test.describe("GUI AI Tools", () => {
     test("shows blur radius and sensitivity sliders after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/blur-faces");
+      await page.goto("/image/blur-faces");
       await uploadTestImage(page);
 
       await expect(page.locator("#blur-faces-blur-radius")).toBeVisible();
@@ -331,7 +331,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/blur-faces");
+      await page.goto("/image/blur-faces");
 
       const submitBtn = page.getByTestId("blur-faces-submit");
       await expect(submitBtn).toBeDisabled();
@@ -342,7 +342,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("blur radius slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/blur-faces");
+      await page.goto("/image/blur-faces");
       await uploadTestImage(page);
 
       const slider = page.locator("#blur-faces-blur-radius");
@@ -351,7 +351,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("sensitivity slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/blur-faces");
+      await page.goto("/image/blur-faces");
       await uploadTestImage(page);
 
       const slider = page.locator("#blur-faces-sensitivity");
@@ -365,13 +365,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Enhance Faces", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await expect(page.getByText("Face Enhancement").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows quality tier buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Fast" })).toBeVisible();
@@ -380,7 +380,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows enhancement strength slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       await expect(page.locator("#enhance-faces-strength")).toBeVisible();
@@ -392,7 +392,7 @@ test.describe("GUI AI Tools", () => {
     test("shows only enhance main face checkbox in non-Best mode", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       // Balanced is default, should show main face checkbox
@@ -404,7 +404,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows detection sensitivity slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       await expect(page.locator("#enhance-faces-sensitivity")).toBeVisible();
@@ -412,7 +412,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
 
       const submitBtn = page.getByTestId("enhance-faces-submit");
       await expect(submitBtn).toBeDisabled();
@@ -423,7 +423,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("strength slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       const slider = page.locator("#enhance-faces-strength");
@@ -432,7 +432,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("sensitivity slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/enhance-faces");
+      await page.goto("/image/enhance-faces");
       await uploadTestImage(page);
 
       const slider = page.locator("#enhance-faces-sensitivity");
@@ -446,13 +446,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Erase Object", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await expect(page.getByText("Object Eraser").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows brush size slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       await expect(page.locator("#eraser-brush-size")).toBeVisible();
@@ -462,21 +462,21 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows output format selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       await expect(page.locator("#eraser-format")).toBeVisible();
     });
 
     test("shows paint hint text after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       await expect(page.getByText("Paint over the objects you want to remove")).toBeVisible();
     });
 
     test("submit disabled without strokes", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("erase-object-submit");
@@ -484,7 +484,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("brush size slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       const slider = page.locator("#eraser-brush-size");
@@ -493,7 +493,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("output format selector has options", async ({ loggedInPage: page }) => {
-      await page.goto("/erase-object");
+      await page.goto("/image/erase-object");
       await uploadTestImage(page);
 
       const select = page.locator("#eraser-format");
@@ -509,13 +509,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Smart Crop", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await expect(page.getByText("Smart Crop").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows mode tabs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await expect(page.getByRole("button", { name: "Subject Focus" })).toBeVisible();
@@ -524,7 +524,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows subject focus controls by default", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       // Strategy buttons
@@ -541,7 +541,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("face focus mode shows framing presets", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Face Focus" }).click();
@@ -553,7 +553,7 @@ test.describe("GUI AI Tools", () => {
     test("auto trim mode shows tolerance slider and pad to square", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Auto Trim" }).click();
@@ -563,7 +563,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("social presets tab shows platform presets", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Social Presets" }).click();
@@ -572,7 +572,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
 
       const submitBtn = page.getByTestId("smart-crop-submit");
       await expect(submitBtn).toBeDisabled();
@@ -582,7 +582,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("auto trim mode tolerance slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Auto Trim" }).click();
@@ -592,7 +592,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("subject focus width/height inputs accept values", async ({ loggedInPage: page }) => {
-      await page.goto("/smart-crop");
+      await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
       await page.locator("#sc-width").fill("800");
@@ -607,13 +607,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Colorize", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/colorize");
+      await page.goto("/image/colorize");
       await expect(page.getByText("Colorize").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows AI model selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/colorize");
+      await page.goto("/image/colorize");
       await uploadTestImage(page);
 
       await expect(page.getByText("AI Model")).toBeVisible();
@@ -624,14 +624,14 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows color intensity slider after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/colorize");
+      await page.goto("/image/colorize");
       await uploadTestImage(page);
 
       await expect(page.getByText("Color Intensity")).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/colorize");
+      await page.goto("/image/colorize");
 
       const submitBtn = page.getByTestId("colorize-submit");
       await expect(submitBtn).toBeDisabled();
@@ -642,7 +642,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching AI model changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/colorize");
+      await page.goto("/image/colorize");
       await uploadTestImage(page);
 
       await page.locator("button").filter({ hasText: "Best" }).first().click();
@@ -655,13 +655,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Noise Removal", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await expect(page.getByText("Noise Removal").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows denoising tier buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       await expect(page.getByText("Denoising Tier")).toBeVisible();
@@ -674,7 +674,7 @@ test.describe("GUI AI Tools", () => {
     test("shows strength, detail preservation, and color noise sliders after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       await expect(page.getByText("Strength").first()).toBeVisible();
@@ -683,7 +683,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows output format buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -695,7 +695,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("quality slider appears for lossy formats", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       // Original format is default -- no quality slider
@@ -709,7 +709,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
 
       const submitBtn = page.getByTestId("noise-removal-submit");
       await expect(submitBtn).toBeDisabled();
@@ -720,7 +720,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching denoising tier changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Maximum" }).click();
@@ -728,7 +728,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching to PNG hides quality slider", async ({ loggedInPage: page }) => {
-      await page.goto("/noise-removal");
+      await page.goto("/image/noise-removal");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -743,20 +743,20 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Passport Photo", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await expect(page.getByText("Passport Photo").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows country selector after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       await expect(page.getByText("Country")).toBeVisible();
     });
 
     test("shows DPI input after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       await expect(page.getByText("DPI").first()).toBeVisible();
@@ -764,7 +764,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows background color options after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       await expect(page.getByText("Background Color")).toBeVisible();
@@ -772,7 +772,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows max file size presets after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       await expect(page.getByText("Max File Size")).toBeVisible();
@@ -782,7 +782,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows spec info bar after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       // Spec bar showing dimensions info
@@ -792,7 +792,7 @@ test.describe("GUI AI Tools", () => {
     test("generate button not visible before upload, shown after analysis", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
 
       // Generate button should not exist before upload (it only appears after face analysis)
       await expect(page.getByTestId("passport-photo-generate")).not.toBeVisible();
@@ -806,7 +806,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("clicking max file size preset changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/passport-photo");
+      await page.goto("/image/passport-photo");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "50 KB" }).click();
@@ -820,7 +820,7 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Red Eye Removal", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
       await expect(page.getByText("Red Eye Removal").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -828,7 +828,7 @@ test.describe("GUI AI Tools", () => {
     test("shows sensitivity and correction strength sliders after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
       await uploadTestImage(page);
 
       await expect(page.getByText("Sensitivity").first()).toBeVisible();
@@ -841,7 +841,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows output format buttons after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -853,7 +853,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
 
       const submitBtn = page.getByTestId("red-eye-removal-submit");
       await expect(submitBtn).toBeDisabled();
@@ -864,7 +864,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("sensitivity slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
       await uploadTestImage(page);
 
       const slider = page.locator("input[type='range']").first();
@@ -872,7 +872,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("switching output format changes active button", async ({ loggedInPage: page }) => {
-      await page.goto("/red-eye-removal");
+      await page.goto("/image/red-eye-removal");
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
@@ -888,13 +888,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Restore Photo", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await expect(page.getByText("Photo Restoration").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows feature toggle checkboxes after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       // The component was refactored from mode buttons to individual feature toggles
@@ -905,7 +905,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows feature toggles after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       await expect(page.getByText("Scratch Removal")).toBeVisible();
@@ -917,7 +917,7 @@ test.describe("GUI AI Tools", () => {
     test("face fidelity slider visible when face enhancement is checked", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       // Face enhancement is on by default
@@ -929,7 +929,7 @@ test.describe("GUI AI Tools", () => {
     test("denoise strength slider visible when noise reduction is checked", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       // Noise reduction is on by default
@@ -937,7 +937,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
 
       const submitBtn = page.getByTestId("restore-photo-submit");
       await expect(submitBtn).toBeDisabled();
@@ -948,7 +948,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("unchecking face enhancement hides fidelity slider", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       // Face Enhancement is on by default
@@ -965,7 +965,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("toggling feature checkboxes works", async ({ loggedInPage: page }) => {
-      await page.goto("/restore-photo");
+      await page.goto("/image/restore-photo");
       await uploadTestImage(page);
 
       // Toggle Scratch Removal off and back on
@@ -986,7 +986,7 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("PNG Transparency Fixer", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await expect(page.getByText("PNG Transparency Fixer").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
@@ -994,7 +994,7 @@ test.describe("GUI AI Tools", () => {
     test("shows description text and submit button after upload", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       await expect(page.getByText("Upload a PNG with a fake transparent background")).toBeVisible();
@@ -1003,7 +1003,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("advanced section is collapsed by default", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       // Advanced toggle should be visible
@@ -1017,7 +1017,7 @@ test.describe("GUI AI Tools", () => {
     test("advanced section toggles open with defringe and output format", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       // Open advanced section
@@ -1035,7 +1035,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("defringe slider is interactive", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       // Open advanced section
@@ -1049,7 +1049,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("output format dropdown allows switching to WebP", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       // Open advanced section
@@ -1067,7 +1067,7 @@ test.describe("GUI AI Tools", () => {
     test("submit button disabled without file, enabled with file", async ({
       loggedInPage: page,
     }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
 
       const submitBtn = page.getByTestId("transparency-fixer-submit");
       await expect(submitBtn).toBeDisabled();
@@ -1078,7 +1078,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows multi-file text for batch upload", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       // Upload multiple files
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
@@ -1097,7 +1097,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("output format dropdown has expected options", async ({ loggedInPage: page }) => {
-      await page.goto("/transparency-fixer");
+      await page.goto("/image/transparency-fixer");
       await uploadTestImage(page);
 
       // Open advanced section
@@ -1116,13 +1116,13 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Content-Aware Resize", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await expect(page.getByText("Content-Aware").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
     test("shows width and height inputs after upload", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await expect(page.locator("#car-width")).toBeVisible();
@@ -1130,14 +1130,14 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows resize to square checkbox", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await expect(page.getByText("Resize to square")).toBeVisible();
     });
 
     test("square mode disables width/height inputs", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       // Check Resize to square
@@ -1152,14 +1152,14 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows protect faces checkbox", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await expect(page.getByText("Protect faces")).toBeVisible();
     });
 
     test("shows smoothing slider", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await expect(page.locator("#car-blur-radius")).toBeVisible();
@@ -1167,7 +1167,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows edge sensitivity slider", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await expect(page.locator("#car-sobel-threshold")).toBeVisible();
@@ -1175,7 +1175,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit disabled without dimensions or square mode", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       const submitBtn = page.getByTestId("content-aware-resize-submit");
@@ -1183,7 +1183,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit enabled with width set", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await page.locator("#car-width").fill("80");
@@ -1191,7 +1191,7 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("submit enabled with square mode", async ({ loggedInPage: page }) => {
-      await page.goto("/content-aware-resize");
+      await page.goto("/image/content-aware-resize");
       await uploadTestImage(page);
 
       await page
@@ -1209,7 +1209,7 @@ test.describe("GUI AI Tools", () => {
   // ========================================================================
   test.describe("Meme Generator", () => {
     test("renders tool page without standard dropzone", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
       await expect(page.getByText("Meme").first()).toBeVisible();
 
       // Meme generator uses no-dropzone display mode
@@ -1217,14 +1217,14 @@ test.describe("GUI AI Tools", () => {
     });
 
     test("shows gallery phase with template selection prompt", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
 
       // Gallery phase shows template selection guidance
       await expect(page.getByText(/select a template|upload your own/i).first()).toBeVisible();
     });
 
     test("shows template thumbnails in gallery", async ({ loggedInPage: page }) => {
-      await page.goto("/meme-generator");
+      await page.goto("/image/meme-generator");
 
       // Gallery should show meme template thumbnails or an upload option
       await expect(

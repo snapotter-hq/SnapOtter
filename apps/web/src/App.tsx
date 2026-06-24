@@ -187,6 +187,24 @@ export function App() {
                   <Route path="/files" element={<FilesPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
                   <Route path="/editor" element={<EditorPage />} />
+                  {/* Legacy 1.x color tools were consolidated into adjust-colors;
+                      redirect old bookmarks to the section route. */}
+                  <Route
+                    path="/brightness-contrast"
+                    element={<Navigate to="/image/adjust-colors" replace />}
+                  />
+                  <Route
+                    path="/saturation"
+                    element={<Navigate to="/image/adjust-colors" replace />}
+                  />
+                  <Route
+                    path="/color-channels"
+                    element={<Navigate to="/image/adjust-colors" replace />}
+                  />
+                  <Route
+                    path="/color-effects"
+                    element={<Navigate to="/image/adjust-colors" replace />}
+                  />
                   <Route path="/:section/:toolId" element={<ToolPage />} />
                   <Route path="/" element={<HomePage />} />
                   <Route path="*" element={<NotFoundPage />} />
