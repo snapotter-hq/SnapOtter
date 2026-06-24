@@ -16,7 +16,7 @@ export function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold mb-2">{t.common.privacyPolicy}</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: April 22, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: June 24, 2026</p>
 
         <div className="space-y-6 text-sm leading-relaxed text-muted-foreground">
           <section>
@@ -41,22 +41,16 @@ export function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-2">Product Analytics</h2>
             <p>
-              SnapOtter includes optional, anonymous product analytics. When you choose to
-              participate, the following is collected:
+              SnapOtter uses anonymous analytics to improve reliability and prioritize features.
             </p>
+            <p className="mt-2 font-medium">What is never sent:</p>
             <ul className="list-disc ps-5 mt-2 space-y-1">
-              <li>Which tools you use (e.g., "crop tool used")</li>
-              <li>Error reports without file data</li>
-              <li>App version and performance metrics</li>
-            </ul>
-            <p className="mt-2 font-medium">What is never collected:</p>
-            <ul className="list-disc ps-5 mt-2 space-y-1">
-              <li>Your images, PDFs, and files</li>
-              <li>File names and contents</li>
-              <li>Any personal information or IP addresses</li>
+              <li>Your images, PDFs, videos, or any file contents</li>
+              <li>File names or file paths</li>
+              <li>Personal information or IP addresses</li>
             </ul>
             <p className="mt-2">
-              Analytics data is sent to{" "}
+              Analytics is powered by{" "}
               <a
                 href="https://posthog.com"
                 className="text-primary hover:underline"
@@ -65,7 +59,7 @@ export function PrivacyPolicyPage() {
               >
                 PostHog
               </a>{" "}
-              (usage analytics) and{" "}
+              and{" "}
               <a
                 href="https://sentry.io"
                 className="text-primary hover:underline"
@@ -73,18 +67,9 @@ export function PrivacyPolicyPage() {
                 rel="noopener noreferrer"
               >
                 Sentry
-              </a>{" "}
-              (error tracking) — both open-source projects.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Your Choice</h2>
-            <p>
-              Each user is asked individually on first login whether to participate. You can change
-              your choice anytime in Settings. Server administrators can disable analytics entirely
-              by setting{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">ANALYTICS_ENABLED=false</code>.
+              </a>
+              . You can disable analytics at any time by rebuilding with the flag{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">SNAPOTTER_ANALYTICS=off</code>.
             </p>
           </section>
 
@@ -101,10 +86,9 @@ export function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-2">Third-Party Services</h2>
             <p>
-              All processing happens locally; your files are never sent anywhere. If you opt in to
-              product analytics, anonymous usage data is sent to PostHog and Sentry as described
-              above. AI-powered features run locally using bundled models. No other external
-              services are contacted.
+              All processing happens locally; your files are never sent anywhere. Anonymous usage
+              analytics are powered by PostHog and Sentry as described above. AI-powered features
+              run locally using bundled models. No other external services are contacted.
             </p>
           </section>
 

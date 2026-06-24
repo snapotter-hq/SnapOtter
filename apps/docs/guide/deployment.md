@@ -525,10 +525,35 @@ Semantic-release determines the version from commit history. The `latest` Docker
 
 ## Analytics
 
-The official SnapOtter Docker image includes anonymous usage analytics (PostHog) and crash reporting (Sentry) to help improve the software. No IP addresses, personal identifiers, or file contents are collected.
+SnapOtter uses anonymous analytics to improve reliability and prioritize features. No file contents, file names, personal information, or IP addresses are ever sent.
 
-To disable analytics, build from source with the analytics flag off:
+### What is recorded
+
+- Tool usage patterns (e.g. which tools are used most, success/failure rates)
+- Error reports and performance metrics (stack traces with file paths redacted)
+- App version and browser type
+
+Analytics is powered by [PostHog](https://posthog.com) (usage) and [Sentry](https://sentry.io) (errors).
+
+### Disabling analytics
+
+You can disable analytics at any time by cloning the repository and rebuilding:
 
 ```bash
-docker compose build --build-arg SNAPOTTER_ANALYTICS=off
+git clone https://github.com/snapotter-hq/SnapOtter.git
+cd SnapOtter
+docker compose -f docker/docker-compose.yml build --build-arg SNAPOTTER_ANALYTICS=off
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Or add the build arg to your existing `docker-compose.yml`:
+
+```yaml
+services:
+  snapotter:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        SNAPOTTER_ANALYTICS: "off"
 ```
