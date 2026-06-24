@@ -45,7 +45,12 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
       const Sentry = await import("@sentry/react");
       Sentry.init({
         dsn: config.sentryDsn,
+        release: (await import("@snapotter/shared")).APP_VERSION,
+        environment: "production",
+        tracesSampleRate: config.sampleRate,
         sendDefaultPii: false,
+        autoSessionTracking: true,
+        integrations: [Sentry.browserTracingIntegration()],
         beforeSend(event) {
           if (event.user) {
             delete event.user.email;

@@ -48,6 +48,13 @@ class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Uncaught render error:", error, info.componentStack);
+    import("@sentry/react")
+      .then((Sentry) => {
+        Sentry.captureException(error, {
+          contexts: { react: { componentStack: info.componentStack ?? undefined } },
+        });
+      })
+      .catch(() => {});
   }
 
   render() {
