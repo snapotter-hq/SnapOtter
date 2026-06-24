@@ -36,6 +36,13 @@
       "when": 1781359444186,
       "tag": "0004_handy_warhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782266352290,
+      "tag": "0005_special_exodus",
+      "breakpoints": true
     }
   ]
 }

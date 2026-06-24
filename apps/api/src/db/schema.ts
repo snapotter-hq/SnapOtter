@@ -41,9 +41,6 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   recoveryCodesHash: text("recovery_codes_hash"),
-  analyticsEnabled: boolean("analytics_enabled"),
-  analyticsConsentShownAt: timestamp("analytics_consent_shown_at", { withTimezone: true }),
-  analyticsConsentRemindAt: timestamp("analytics_consent_remind_at", { withTimezone: true }),
 });
 
 export const teams = pgTable("teams", {
