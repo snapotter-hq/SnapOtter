@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "PORT=13490 tsx watch --import ./src/tracing.ts src/index.ts",
+    "dev": "PORT=13490 tsx watch --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts",
     "build": "tsc",
-    "start": "tsx --import ./src/tracing.ts src/index.ts",
+    "start": "tsx --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts",
     "lint": "biome check src/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
