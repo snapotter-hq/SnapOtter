@@ -45,6 +45,10 @@ const settingsSchema = z.object({
 
 type Settings = z.infer<typeof settingsSchema>;
 
+// edit-metadata writes tags in place and streams the ORIGINAL bytes back, so
+// the download's content-type must match the real format, not a default. A
+// previous fallback to image/jpeg made a BMP/PSD/PPM download claim to be a
+// JPEG. Map every format validateImageBuffer can report.
 const MIME_BY_FORMAT: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
@@ -53,6 +57,26 @@ const MIME_BY_FORMAT: Record<string, string> = {
   tiff: "image/tiff",
   gif: "image/gif",
   heif: "image/heif",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  ico: "image/x-icon",
+  cur: "image/x-icon",
+  psd: "image/vnd.adobe.photoshop",
+  jxl: "image/jxl",
+  jp2: "image/jp2",
+  qoi: "image/qoi",
+  dds: "image/vnd.ms-dds",
+  exr: "image/x-exr",
+  dpx: "image/x-dpx",
+  fits: "image/fits",
+  eps: "application/postscript",
+  pbm: "image/x-portable-bitmap",
+  pgm: "image/x-portable-graymap",
+  ppm: "image/x-portable-pixmap",
+  pfm: "image/x-portable-floatmap",
+  tga: "image/x-tga",
+  cr3: "image/x-canon-cr3",
+  raw: "image/x-dcraw",
 };
 
 const BROWSER_PREVIEWABLE = new Set([

@@ -43,13 +43,19 @@ const fixtureFiles = process.env.FULL_MATRIX
 
 const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422, 501]);
 
-/** Content types whose payloads are not raster images (skip pixel decode). */
-const NON_RASTER_OUTPUT = new Set([
-  "application/pdf",
-  "application/json",
-  "application/zip",
-  "image/svg+xml",
-  "text/plain",
+/**
+ * Raster content types this libvips/Sharp build is guaranteed to decode. Used
+ * to decide whether a 200 image response should be pixel-verified. Anything
+ * else (PDF, JSON, ZIP, SVG, or a niche raster like BMP/PSD streamed back
+ * untouched) carries an honest content-type we don't attempt to decode.
+ */
+const SHARP_DECODABLE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/tiff",
+  "image/avif",
 ]);
 
 describe("tool x format matrix (generated)", () => {
@@ -134,19 +140,14 @@ describe("tool x format matrix (generated)", () => {
             headers: { authorization: `Bearer ${adminToken}` },
           });
           expect(dl.statusCode, `${toolId} x ${fixture}: download failed`).toBe(200);
-          const outType = dl.headers["content-type"]?.toString() ?? "";
-          const isRaster =
-            !NON_RASTER_OUTPUT.has(outType.split(";")[0]) && outType.startsWith("image/");
-          const sharpDecodable =
-            isRaster &&
-            ![
-              "image/heic",
-              "image/heif",
-              "image/x-icon",
-              "image/qoi",
-              "image/x-portable-pixmap",
-              "image/x-tga",
-            ].includes(outType.split(";")[0]);
+          const outType = (dl.headers["content-type"]?.toString() ?? "").split(";")[0];
+          // Allowlist of raster types this libvips build is guaranteed to
+          // decode. An allowlist (vs the old denylist) is robust to tools that
+          // legitimately stream back niche formats untouched (e.g. edit-metadata
+          // writing tags in place on a BMP/PSD): those carry an honest
+          // content-type we simply don't pixel-verify, rather than being
+          // misread as a corrupt JPEG.
+          const sharpDecodable = SHARP_DECODABLE_TYPES.has(outType);
           if (sharpDecodable) {
             // The processed output must actually decode; a corrupt "success" is a bug.
             const meta = await sharp(dl.rawPayload).metadata();
