@@ -2696,7 +2696,6 @@ export const nl: TranslationKeys = {
       apiKeys: "API-sleutels",
       aiFeatures: "AI-functies",
       tools: "Gereedschap",
-      productAnalytics: "Productanalyse",
       about: "Over",
     },
     general: {
@@ -3027,15 +3026,6 @@ export const nl: TranslationKeys = {
       auditRetentionDays: "Bewaartermijn auditlog (dagen)",
       auditRetentionDaysDesc:
         "Hoe lang auditlogvermeldingen bewaard blijven. 0 = voor altijd bewaren. Standaard: voor altijd.",
-    },
-    analytics: {
-      heading: "Productanalyse",
-      description: "Deel anonieme gebruiksgegevens om SnapOtter te verbeteren.",
-      privacyNote: "Je bestanden verlaten nooit je netwerk.",
-      disabledByAdmin: "Productanalyse is uitgeschakeld door de serverbeheerder.",
-      enabledLabel: "Analyse ingeschakeld",
-      disabledLabel: "Analyse uitgeschakeld",
-      learnMore: "Meer informatie",
     },
     aiFeatures: {
       title: "AI-functies",
@@ -3388,19 +3378,6 @@ export const nl: TranslationKeys = {
     networkError: "Netwerkfout. Controleer je verbinding.",
     invalidCredentials: "Ongeldige gebruikersnaam of wachtwoord",
     connectionError: "Verbindingsfout",
-  },
-  analytics: {
-    consentTitle: "Help SnapOtter verbeteren",
-    consentDescription:
-      "Anonieme gebruiksstatistieken helpen ons bugs te fixen en tools te bouwen die je echt nodig hebt. Je bestanden blijven op je netwerk.",
-    consentChangeable: "Je kunt dit altijd uitschakelen bij Instellingen.",
-    acceptButton: "Ja, klinkt goed",
-    declineButton: "Nu even niet",
-    settingsTitle: "Productanalyse",
-    settingsDescription: "Deel anonieme gebruiksgegevens om SnapOtter te verbeteren.",
-    settingsPrivacy: "Je bestanden verlaten nooit je netwerk.",
-    settingsDisabledByAdmin: "Productanalyse is uitgeschakeld door de serverbeheerder.",
-    learnMore: "Meer informatie",
   },
   sidebar: {
     tools: "Tools",

@@ -2695,7 +2695,6 @@ export const it: TranslationKeys = {
       apiKeys: "Chiavi API",
       aiFeatures: "Funzionalità AI",
       tools: "Strumenti",
-      productAnalytics: "Analisi del prodotto",
       about: "Informazioni",
     },
     general: {
@@ -3031,15 +3030,6 @@ export const it: TranslationKeys = {
       auditRetentionDays: "Retention log di audit (giorni)",
       auditRetentionDaysDesc:
         "Per quanto tempo conservare le voci del log di audit. 0 = conserva per sempre. Predefinito: per sempre.",
-    },
-    analytics: {
-      heading: "Analisi del prodotto",
-      description: "Condividi dati di utilizzo anonimi per contribuire a migliorare SnapOtter.",
-      privacyNote: "I tuoi file non lasciano mai la tua rete.",
-      disabledByAdmin: "L'analisi del prodotto è stata disattivata dall'amministratore del server.",
-      enabledLabel: "Analisi attivata",
-      disabledLabel: "Analisi disattivata",
-      learnMore: "Scopri di più",
     },
     aiFeatures: {
       title: "Funzionalità IA",
@@ -3392,21 +3382,6 @@ export const it: TranslationKeys = {
     networkError: "Errore di rete. Verifica la tua connessione.",
     invalidCredentials: "Nome utente o password non validi",
     connectionError: "Errore di connessione",
-  },
-  analytics: {
-    consentTitle: "Aiuta a migliorare SnapOtter",
-    consentDescription:
-      "Le statistiche d'uso anonime ci aiutano a correggere bug e creare gli strumenti di cui hai davvero bisogno. I tuoi file restano sulla tua rete.",
-    consentChangeable: "Puoi disattivare questa opzione in qualsiasi momento nelle Impostazioni.",
-    acceptButton: "Certo, va bene",
-    declineButton: "Non ora",
-    settingsTitle: "Analisi del prodotto",
-    settingsDescription:
-      "Condividi dati di utilizzo anonimi per contribuire a migliorare SnapOtter.",
-    settingsPrivacy: "I tuoi file non lasciano mai la tua rete.",
-    settingsDisabledByAdmin:
-      "L'analisi del prodotto è stata disattivata dall'amministratore del server.",
-    learnMore: "Scopri di più",
   },
   sidebar: {
     tools: "Strumenti",

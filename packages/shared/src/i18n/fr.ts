@@ -2704,7 +2704,6 @@ export const fr: TranslationKeys = {
       apiKeys: "Clés API",
       aiFeatures: "Fonctionnalités AI",
       tools: "Outils",
-      productAnalytics: "Analytique produit",
       about: "À propos",
     },
     general: {
@@ -3041,15 +3040,6 @@ export const fr: TranslationKeys = {
       auditRetentionDays: "Rétention du journal d'audit (jours)",
       auditRetentionDaysDesc:
         "Durée de conservation des entrées du journal d'audit. 0 = conserver indéfiniment. Par défaut : indéfiniment.",
-    },
-    analytics: {
-      heading: "Analytique produit",
-      description: "Partagez des données d'utilisation anonymes pour aider à améliorer SnapOtter.",
-      privacyNote: "Vos fichiers ne quittent jamais votre réseau.",
-      disabledByAdmin: "L'analytique produit a été désactivée par l'administrateur du serveur.",
-      enabledLabel: "Analytique activée",
-      disabledLabel: "Analytique désactivée",
-      learnMore: "En savoir plus",
     },
     aiFeatures: {
       title: "Fonctionnalités AI",
@@ -3403,21 +3393,6 @@ export const fr: TranslationKeys = {
     networkError: "Erreur réseau. Vérifiez votre connexion.",
     invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     connectionError: "Erreur de connexion",
-  },
-  analytics: {
-    consentTitle: "Aidez à améliorer SnapOtter",
-    consentDescription:
-      "Les statistiques d'utilisation anonymes nous aident à corriger les bugs et à créer les outils dont vous avez vraiment besoin. Vos fichiers restent sur votre réseau.",
-    consentChangeable: "Vous pouvez désactiver cela à tout moment dans les Paramètres.",
-    acceptButton: "Bien sûr, ça me va",
-    declineButton: "Pas maintenant",
-    settingsTitle: "Analytique produit",
-    settingsDescription:
-      "Partagez des données d'utilisation anonymes pour aider à améliorer SnapOtter.",
-    settingsPrivacy: "Vos fichiers ne quittent jamais votre réseau.",
-    settingsDisabledByAdmin:
-      "L'analytique produit a été désactivée par l'administrateur du serveur.",
-    learnMore: "En savoir plus",
   },
   sidebar: {
     tools: "Outils",

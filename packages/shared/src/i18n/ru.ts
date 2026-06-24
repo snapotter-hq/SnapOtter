@@ -2691,7 +2691,6 @@ export const ru: TranslationKeys = {
       apiKeys: "API-ключи",
       aiFeatures: "AI-функции",
       tools: "Инструменты",
-      productAnalytics: "Аналитика",
       about: "О программе",
     },
     general: {
@@ -3023,15 +3022,6 @@ export const ru: TranslationKeys = {
       auditRetentionDays: "Срок хранения журнала аудита (дни)",
       auditRetentionDaysDesc:
         "Как долго хранить записи журнала аудита. 0 = хранить бессрочно. По умолчанию: бессрочно.",
-    },
-    analytics: {
-      heading: "Аналитика",
-      description: "Отправка анонимных данных об использовании для улучшения SnapOtter.",
-      privacyNote: "Ваши файлы никогда не покидают Ваш компьютер.",
-      disabledByAdmin: "Аналитика отключена администратором сервера.",
-      enabledLabel: "Аналитика включена",
-      disabledLabel: "Аналитика отключена",
-      learnMore: "Подробнее",
     },
     aiFeatures: {
       title: "AI-функции",
@@ -3383,19 +3373,6 @@ export const ru: TranslationKeys = {
     networkError: "Сетевая ошибка. Проверьте подключение.",
     invalidCredentials: "Неверное имя пользователя или пароль",
     connectionError: "Ошибка подключения",
-  },
-  analytics: {
-    consentTitle: "Помогите улучшить SnapOtter",
-    consentDescription:
-      "Анонимная статистика использования помогает нам исправлять ошибки и создавать нужные Вам инструменты. Ваши файлы остаются на Вашем компьютере.",
-    consentChangeable: "Вы можете отключить это в любое время в Настройках.",
-    acceptButton: "Конечно, звучит хорошо",
-    declineButton: "Не сейчас",
-    settingsTitle: "Аналитика",
-    settingsDescription: "Отправка анонимных данных об использовании для улучшения SnapOtter.",
-    settingsPrivacy: "Ваши файлы никогда не покидают Ваш компьютер.",
-    settingsDisabledByAdmin: "Аналитика отключена администратором сервера.",
-    learnMore: "Подробнее",
   },
   sidebar: {
     tools: "Инструменты",

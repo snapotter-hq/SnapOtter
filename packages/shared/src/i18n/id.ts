@@ -2690,7 +2690,6 @@ export const id: TranslationKeys = {
       apiKeys: "Kunci API",
       aiFeatures: "Fitur AI",
       tools: "Alat",
-      productAnalytics: "Analitik Produk",
       about: "Tentang",
     },
     general: {
@@ -3020,15 +3019,6 @@ export const id: TranslationKeys = {
       auditRetentionDays: "Retensi log audit (hari)",
       auditRetentionDaysDesc:
         "Berapa lama menyimpan entri log audit. 0 = simpan selamanya. Default: selamanya.",
-    },
-    analytics: {
-      heading: "Analitik Produk",
-      description: "Bagikan data penggunaan anonim untuk membantu meningkatkan SnapOtter.",
-      privacyNote: "File Anda tidak pernah meninggalkan jaringan Anda.",
-      disabledByAdmin: "Analitik produk telah dinonaktifkan oleh administrator server.",
-      enabledLabel: "Analitik aktif",
-      disabledLabel: "Analitik nonaktif",
-      learnMore: "Pelajari lebih lanjut",
     },
     aiFeatures: {
       title: "Fitur AI",
@@ -3380,19 +3370,6 @@ export const id: TranslationKeys = {
     networkError: "Kesalahan jaringan. Periksa koneksi Anda.",
     invalidCredentials: "Nama pengguna atau kata sandi salah",
     connectionError: "Kesalahan koneksi",
-  },
-  analytics: {
-    consentTitle: "Bantu tingkatkan SnapOtter",
-    consentDescription:
-      "Statistik penggunaan anonim membantu kami memperbaiki bug dan membangun alat yang benar-benar Anda butuhkan. File Anda tetap di jaringan Anda.",
-    consentChangeable: "Anda dapat menonaktifkan ini kapan saja di Pengaturan.",
-    acceptButton: "Tentu, kedengarannya bagus",
-    declineButton: "Nanti saja",
-    settingsTitle: "Analitik Produk",
-    settingsDescription: "Bagikan data penggunaan anonim untuk membantu meningkatkan SnapOtter.",
-    settingsPrivacy: "File Anda tidak pernah meninggalkan jaringan Anda.",
-    settingsDisabledByAdmin: "Analitik produk telah dinonaktifkan oleh administrator server.",
-    learnMore: "Pelajari lebih lanjut",
   },
   sidebar: {
     tools: "Alat",

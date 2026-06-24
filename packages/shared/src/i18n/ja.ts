@@ -2648,7 +2648,6 @@ export const ja: TranslationKeys = {
       apiKeys: "APIキー",
       aiFeatures: "AI機能",
       tools: "ツール",
-      productAnalytics: "プロダクト分析",
       about: "SnapOtterについて",
     },
     general: {
@@ -2972,15 +2971,6 @@ export const ja: TranslationKeys = {
       jobsRetentionDaysDesc: "ジョブメタデータの保持期間。0 = 永久保持。デフォルト: 30日。",
       auditRetentionDays: "監査ログの保持期間（日）",
       auditRetentionDaysDesc: "監査ログエントリの保持期間。0 = 永久保持。デフォルト: 永久。",
-    },
-    analytics: {
-      heading: "プロダクト分析",
-      description: "匿名の使用データを共有してSnapOtterの改善にご協力ください。",
-      privacyNote: "ファイルがネットワーク外に出ることはありません。",
-      disabledByAdmin: "プロダクト分析はサーバー管理者によって無効化されています。",
-      enabledLabel: "分析が有効",
-      disabledLabel: "分析が無効",
-      learnMore: "詳しく見る",
     },
     aiFeatures: {
       title: "AI 機能",
@@ -3332,19 +3322,6 @@ export const ja: TranslationKeys = {
     networkError: "ネットワークエラー。接続を確認してください。",
     invalidCredentials: "ユーザー名またはパスワードが無効です",
     connectionError: "接続エラー",
-  },
-  analytics: {
-    consentTitle: "SnapOtterの改善にご協力ください",
-    consentDescription:
-      "匿名の使用データはバグ修正や本当に必要なツールの開発に役立ちます。ファイルがネットワーク外に出ることはありません。",
-    consentChangeable: "設定からいつでもオフにできます。",
-    acceptButton: "はい、協力します",
-    declineButton: "今はしない",
-    settingsTitle: "プロダクト分析",
-    settingsDescription: "匿名の使用データを共有してSnapOtterの改善にご協力ください。",
-    settingsPrivacy: "ファイルがネットワーク外に出ることはありません。",
-    settingsDisabledByAdmin: "プロダクト分析はサーバー管理者によって無効化されています。",
-    learnMore: "詳しく見る",
   },
   sidebar: {
     tools: "ツール",

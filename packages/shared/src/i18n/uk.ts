@@ -2694,7 +2694,6 @@ export const uk: TranslationKeys = {
       apiKeys: "API-ключі",
       aiFeatures: "AI-функції",
       tools: "Інструменти",
-      productAnalytics: "Аналітика",
       about: "Про програму",
     },
     general: {
@@ -3024,15 +3023,6 @@ export const uk: TranslationKeys = {
       auditRetentionDays: "Зберігання журналу аудиту (дні)",
       auditRetentionDaysDesc:
         "Як довго зберігати записи журналу аудиту. 0 = назавжди. Типово: назавжди.",
-    },
-    analytics: {
-      heading: "Аналітика",
-      description: "Надсилання анонімних даних про використання для поліпшення SnapOtter.",
-      privacyNote: "Ваші файли ніколи не залишають Вашу мережу.",
-      disabledByAdmin: "Аналітику вимкнено адміністратором сервера.",
-      enabledLabel: "Аналітику увімкнено",
-      disabledLabel: "Аналітику вимкнено",
-      learnMore: "Дізнатися більше",
     },
     aiFeatures: {
       title: "AI-функції",
@@ -3385,19 +3375,6 @@ export const uk: TranslationKeys = {
     networkError: "Помилка мережі. Перевірте з'єднання.",
     invalidCredentials: "Невірне ім'я користувача або пароль",
     connectionError: "Помилка з'єднання",
-  },
-  analytics: {
-    consentTitle: "Допоможіть поліпшити SnapOtter",
-    consentDescription:
-      "Анонімна статистика використання допомагає нам виправляти помилки та створювати потрібні Вам інструменти. Ваші файли залишаються у Вашій мережі.",
-    consentChangeable: "Ви можете вимкнути це будь-коли у Налаштуваннях.",
-    acceptButton: "Звісно, добре",
-    declineButton: "Не зараз",
-    settingsTitle: "Аналітика",
-    settingsDescription: "Надсилання анонімних даних про використання для поліпшення SnapOtter.",
-    settingsPrivacy: "Ваші файли ніколи не залишають Вашу мережу.",
-    settingsDisabledByAdmin: "Аналітику вимкнено адміністратором сервера.",
-    learnMore: "Дізнатися більше",
   },
   sidebar: {
     tools: "Інструменти",

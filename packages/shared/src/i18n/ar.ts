@@ -2679,7 +2679,6 @@ export const ar: TranslationKeys = {
       apiKeys: "مفاتيح API",
       aiFeatures: "ميزات AI",
       tools: "الأدوات",
-      productAnalytics: "تحليلات المنتج",
       about: "حول",
     },
     general: {
@@ -3003,15 +3002,6 @@ export const ar: TranslationKeys = {
       auditRetentionDays: "مدة الاحتفاظ بسجل التدقيق (بالأيام)",
       auditRetentionDaysDesc:
         "مدة الاحتفاظ بإدخالات سجل التدقيق. 0 = الاحتفاظ للأبد. الافتراضي: للأبد.",
-    },
-    analytics: {
-      heading: "تحليلات المنتج",
-      description: "مشاركة بيانات الاستخدام المجهولة للمساعدة في تحسين SnapOtter.",
-      privacyNote: "ملفاتك لا تغادر شبكتك أبدًا.",
-      disabledByAdmin: "تم تعطيل تحليلات المنتج بواسطة مسؤول الخادم.",
-      enabledLabel: "التحليلات مفعّلة",
-      disabledLabel: "التحليلات معطّلة",
-      learnMore: "معرفة المزيد",
     },
     aiFeatures: {
       title: "ميزات AI",
@@ -3357,19 +3347,6 @@ export const ar: TranslationKeys = {
     networkError: "خطأ في الشبكة. تحقق من اتصالك.",
     invalidCredentials: "اسم المستخدم أو كلمة المرور غير صحيحة",
     connectionError: "خطأ في الاتصال",
-  },
-  analytics: {
-    consentTitle: "ساعد في تحسين SnapOtter",
-    consentDescription:
-      "إحصائيات الاستخدام المجهولة تساعدنا في إصلاح الأخطاء وبناء الأدوات التي تحتاجها فعلًا. ملفاتك تبقى على شبكتك.",
-    consentChangeable: "يمكنك إيقاف هذا في أي وقت من الإعدادات.",
-    acceptButton: "بالتأكيد، موافق",
-    declineButton: "ليس الآن",
-    settingsTitle: "تحليلات المنتج",
-    settingsDescription: "مشاركة بيانات الاستخدام المجهولة للمساعدة في تحسين SnapOtter.",
-    settingsPrivacy: "ملفاتك لا تغادر شبكتك أبدًا.",
-    settingsDisabledByAdmin: "تم تعطيل تحليلات المنتج بواسطة مسؤول الخادم.",
-    learnMore: "معرفة المزيد",
   },
   sidebar: {
     tools: "الأدوات",

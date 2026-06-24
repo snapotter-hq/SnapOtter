@@ -2688,7 +2688,6 @@ export const sv: TranslationKeys = {
       apiKeys: "API-nycklar",
       aiFeatures: "AI-funktioner",
       tools: "Verktyg",
-      productAnalytics: "Produktanalys",
       about: "Om",
     },
     general: {
@@ -3017,15 +3016,6 @@ export const sv: TranslationKeys = {
       auditRetentionDays: "Bevarande av granskningsloggar (dagar)",
       auditRetentionDaysDesc:
         "Hur länge granskningsloggposter behålls. 0 = behåll för alltid. Standard: för alltid.",
-    },
-    analytics: {
-      heading: "Produktanalys",
-      description: "Dela anonym användningsdata för att förbättra SnapOtter.",
-      privacyNote: "Dina filer lämnar aldrig din dator.",
-      disabledByAdmin: "Produktanalys har inaktiverats av serveradministratören.",
-      enabledLabel: "Analys aktiverad",
-      disabledLabel: "Analys inaktiverad",
-      learnMore: "Läs mer",
     },
     aiFeatures: {
       title: "AI-funktioner",
@@ -3375,19 +3365,6 @@ export const sv: TranslationKeys = {
     networkError: "Nätverksfel. Kontrollera din anslutning.",
     invalidCredentials: "Ogiltigt användarnamn eller lösenord",
     connectionError: "Anslutningsfel",
-  },
-  analytics: {
-    consentTitle: "Hjälp till att förbättra SnapOtter",
-    consentDescription:
-      "Anonym användningsstatistik hjälper oss fixa buggar och bygga verktygen du faktiskt behöver. Dina filer stannar på din dator.",
-    consentChangeable: "Du kan stänga av detta när som helst i Inställningar.",
-    acceptButton: "Visst, låter bra",
-    declineButton: "Inte just nu",
-    settingsTitle: "Produktanalys",
-    settingsDescription: "Dela anonym användningsdata för att förbättra SnapOtter.",
-    settingsPrivacy: "Dina filer lämnar aldrig din dator.",
-    settingsDisabledByAdmin: "Produktanalys har inaktiverats av serveradministratören.",
-    learnMore: "Läs mer",
   },
   sidebar: {
     tools: "Verktyg",

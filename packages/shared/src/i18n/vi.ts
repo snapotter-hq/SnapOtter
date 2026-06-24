@@ -2690,7 +2690,6 @@ export const vi: TranslationKeys = {
       apiKeys: "Khóa API",
       aiFeatures: "Tính năng AI",
       tools: "Công cụ",
-      productAnalytics: "Phân tích sản phẩm",
       about: "Giới thiệu",
     },
     general: {
@@ -3018,15 +3017,6 @@ export const vi: TranslationKeys = {
       auditRetentionDays: "Lưu giữ nhật ký kiểm tra (ngày)",
       auditRetentionDaysDesc:
         "Thời gian giữ các mục nhật ký kiểm tra. 0 = giữ mãi. Mặc định: vĩnh viễn.",
-    },
-    analytics: {
-      heading: "Phân tích sản phẩm",
-      description: "Chia sẻ dữ liệu sử dụng ẩn danh để giúp cải thiện SnapOtter.",
-      privacyNote: "Tệp của bạn không bao giờ rời khỏi mạng của bạn.",
-      disabledByAdmin: "Phân tích sản phẩm đã bị vô hiệu hóa bởi quản trị viên máy chủ.",
-      enabledLabel: "Đã bật phân tích",
-      disabledLabel: "Đã tắt phân tích",
-      learnMore: "Tìm hiểu thêm",
     },
     aiFeatures: {
       title: "Tính năng AI",
@@ -3376,19 +3366,6 @@ export const vi: TranslationKeys = {
     networkError: "Lỗi mạng. Kiểm tra kết nối của bạn.",
     invalidCredentials: "Tên đăng nhập hoặc mật khẩu không đúng",
     connectionError: "Lỗi kết nối",
-  },
-  analytics: {
-    consentTitle: "Giúp cải thiện SnapOtter",
-    consentDescription:
-      "Thống kê sử dụng ẩn danh giúp chúng tôi sửa lỗi và xây dựng các công cụ bạn thực sự cần. Tệp của bạn luôn ở trên mạng của bạn.",
-    consentChangeable: "Bạn có thể tắt bất cứ lúc nào trong Cài đặt.",
-    acceptButton: "Được thôi, nghe hay đấy",
-    declineButton: "Để sau",
-    settingsTitle: "Phân tích sản phẩm",
-    settingsDescription: "Chia sẻ dữ liệu sử dụng ẩn danh để giúp cải thiện SnapOtter.",
-    settingsPrivacy: "Tệp của bạn không bao giờ rời khỏi mạng của bạn.",
-    settingsDisabledByAdmin: "Phân tích sản phẩm đã bị vô hiệu hóa bởi quản trị viên máy chủ.",
-    learnMore: "Tìm hiểu thêm",
   },
   sidebar: {
     tools: "Công cụ",

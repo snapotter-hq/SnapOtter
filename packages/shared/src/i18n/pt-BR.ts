@@ -2692,7 +2692,6 @@ export const ptBR: TranslationKeys = {
       apiKeys: "Chaves API",
       aiFeatures: "Recursos de AI",
       tools: "Ferramentas",
-      productAnalytics: "Analítica do produto",
       about: "Sobre",
     },
     general: {
@@ -3026,15 +3025,6 @@ export const ptBR: TranslationKeys = {
       auditRetentionDays: "Retenção do log de auditoria (dias)",
       auditRetentionDaysDesc:
         "Por quanto tempo manter registros de auditoria. 0 = manter para sempre. Padrão: para sempre.",
-    },
-    analytics: {
-      heading: "Analítica do produto",
-      description: "Compartilhe dados de uso anônimos para ajudar a melhorar o SnapOtter.",
-      privacyNote: "Seus arquivos nunca saem do seu computador.",
-      disabledByAdmin: "A analítica do produto foi desativada pelo administrador do servidor.",
-      enabledLabel: "Analítica ativada",
-      disabledLabel: "Analítica desativada",
-      learnMore: "Saiba mais",
     },
     aiFeatures: {
       title: "Recursos de AI",
@@ -3387,20 +3377,6 @@ export const ptBR: TranslationKeys = {
     networkError: "Erro de rede. Verifique sua conexão.",
     invalidCredentials: "Nome de usuário ou senha inválidos",
     connectionError: "Erro de conexão",
-  },
-  analytics: {
-    consentTitle: "Ajude a melhorar o SnapOtter",
-    consentDescription:
-      "Estatísticas de uso anônimas nos ajudam a corrigir bugs e criar as ferramentas que você realmente precisa. Seus arquivos ficam no seu computador.",
-    consentChangeable: "Você pode desativar isso a qualquer momento nas Configurações.",
-    acceptButton: "Claro, parece bom",
-    declineButton: "Agora não",
-    settingsTitle: "Analítica do produto",
-    settingsDescription: "Compartilhe dados de uso anônimos para ajudar a melhorar o SnapOtter.",
-    settingsPrivacy: "Seus arquivos nunca saem do seu computador.",
-    settingsDisabledByAdmin:
-      "A analítica do produto foi desativada pelo administrador do servidor.",
-    learnMore: "Saiba mais",
   },
   sidebar: {
     tools: "Ferramentas",

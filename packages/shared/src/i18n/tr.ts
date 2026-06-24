@@ -2694,7 +2694,6 @@ export const tr: TranslationKeys = {
       apiKeys: "API Anahtarları",
       aiFeatures: "AI Özellikleri",
       tools: "Araçlar",
-      productAnalytics: "Ürün Analitiği",
       about: "Hakkında",
     },
     general: {
@@ -3027,16 +3026,6 @@ export const tr: TranslationKeys = {
       auditRetentionDays: "Denetim günlüğü saklama süresi (gün)",
       auditRetentionDaysDesc:
         "Denetim günlüğü kayıtlarının saklanma süresi. 0 = süresiz. Varsayılan: süresiz.",
-    },
-    analytics: {
-      heading: "Ürün Analitiği",
-      description:
-        "SnapOtter'ı geliştirmeye yardımcı olmak için anonim kullanım verilerini paylaşın.",
-      privacyNote: "Dosyalarınız asla ağınızdan ayrılmaz.",
-      disabledByAdmin: "Ürün analitiği sunucu yöneticisi tarafından devre dışı bırakıldı.",
-      enabledLabel: "Analitik etkin",
-      disabledLabel: "Analitik devre dışı",
-      learnMore: "Daha fazla bilgi",
     },
     aiFeatures: {
       title: "AI Özellikleri",
@@ -3389,20 +3378,6 @@ export const tr: TranslationKeys = {
     networkError: "Ağ hatası. Bağlantınızı kontrol edin.",
     invalidCredentials: "Geçersiz kullanıcı adı veya parola",
     connectionError: "Bağlantı hatası",
-  },
-  analytics: {
-    consentTitle: "SnapOtter'ı geliştirmeye yardım edin",
-    consentDescription:
-      "Anonim kullanım istatistikleri hataları düzeltmemize ve gerçekten ihtiyaç duyduğunuz araçları oluşturmamıza yardımcı olur. Dosyalarınız ağınızda kalır.",
-    consentChangeable: "Bunu istediğiniz zaman Ayarlar'dan kapatabilirsiniz.",
-    acceptButton: "Elbette, kulağa iyi geliyor",
-    declineButton: "Şimdi değil",
-    settingsTitle: "Ürün Analitiği",
-    settingsDescription:
-      "SnapOtter'ı geliştirmeye yardımcı olmak için anonim kullanım verilerini paylaşın.",
-    settingsPrivacy: "Dosyalarınız asla ağınızdan ayrılmaz.",
-    settingsDisabledByAdmin: "Ürün analitiği sunucu yöneticisi tarafından devre dışı bırakıldı.",
-    learnMore: "Daha fazla bilgi",
   },
   sidebar: {
     tools: "Araçlar",

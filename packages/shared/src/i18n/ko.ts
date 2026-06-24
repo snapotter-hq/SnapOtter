@@ -2632,7 +2632,6 @@ export const ko: TranslationKeys = {
       apiKeys: "API 키",
       aiFeatures: "AI 기능",
       tools: "도구",
-      productAnalytics: "제품 분석",
       about: "정보",
     },
     general: {
@@ -2957,15 +2956,6 @@ export const ko: TranslationKeys = {
       jobsRetentionDaysDesc: "작업 메타데이터 보관 기간입니다. 0 = 영구 보관. 기본값: 30일.",
       auditRetentionDays: "감사 로그 보관 기간(일)",
       auditRetentionDaysDesc: "감사 로그 항목 보관 기간입니다. 0 = 영구 보관. 기본값: 영구 보관.",
-    },
-    analytics: {
-      heading: "제품 분석",
-      description: "익명 사용 데이터를 공유하여 SnapOtter 개선에 도움을 주세요.",
-      privacyNote: "파일은 절대 네트워크 밖으로 나가지 않습니다.",
-      disabledByAdmin: "서버 관리자가 제품 분석을 비활성화했습니다.",
-      enabledLabel: "분석 활성화됨",
-      disabledLabel: "분석 비활성화됨",
-      learnMore: "자세히 알아보기",
     },
     aiFeatures: {
       title: "AI 기능",
@@ -3314,19 +3304,6 @@ export const ko: TranslationKeys = {
     networkError: "네트워크 오류. 연결을 확인하세요.",
     invalidCredentials: "사용자명 또는 비밀번호가 올바르지 않습니다",
     connectionError: "연결 오류",
-  },
-  analytics: {
-    consentTitle: "SnapOtter 개선에 도움을 주세요",
-    consentDescription:
-      "익명 사용 데이터는 버그 수정과 정말 필요한 도구 개발에 도움이 됩니다. 파일은 항상 네트워크 안에 머물러요.",
-    consentChangeable: "설정에서 언제든 끌 수 있어요.",
-    acceptButton: "네, 좋아요",
-    declineButton: "지금은 괜찮아요",
-    settingsTitle: "제품 분석",
-    settingsDescription: "익명 사용 데이터를 공유하여 SnapOtter 개선에 도움을 주세요.",
-    settingsPrivacy: "파일은 절대 네트워크 밖으로 나가지 않습니다.",
-    settingsDisabledByAdmin: "서버 관리자가 제품 분석을 비활성화했습니다.",
-    learnMore: "자세히 알아보기",
   },
   sidebar: {
     tools: "도구",

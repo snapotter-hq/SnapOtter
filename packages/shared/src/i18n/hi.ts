@@ -2676,7 +2676,6 @@ export const hi: TranslationKeys = {
       apiKeys: "API कुंजियां",
       aiFeatures: "AI फीचर्स",
       tools: "टूल्स",
-      productAnalytics: "प्रोडक्ट एनालिटिक्स",
       about: "जानकारी",
     },
     general: {
@@ -2996,15 +2995,6 @@ export const hi: TranslationKeys = {
       jobsRetentionDaysDesc: "जॉब मेटाडेटा कितने समय तक रखें। 0 = हमेशा रखें। डिफ़ॉल्ट: 30 दिन।",
       auditRetentionDays: "ऑडिट लॉग अवधारण (दिन)",
       auditRetentionDaysDesc: "ऑडिट लॉग प्रविष्टियां कितने समय तक रखें। 0 = हमेशा रखें। डिफ़ॉल्ट: हमेशा।",
-    },
-    analytics: {
-      heading: "प्रोडक्ट एनालिटिक्स",
-      description: "SnapOtter को बेहतर बनाने में मदद के लिए गुमनाम उपयोग डेटा शेयर करें।",
-      privacyNote: "आपकी फ़ाइलें कभी आपके नेटवर्क से बाहर नहीं जातीं।",
-      disabledByAdmin: "सर्वर एडमिनिस्ट्रेटर ने प्रोडक्ट एनालिटिक्स अक्षम कर दिया है।",
-      enabledLabel: "एनालिटिक्स सक्रिय",
-      disabledLabel: "एनालिटिक्स निष्क्रिय",
-      learnMore: "और जानें",
     },
     aiFeatures: {
       title: "AI सुविधाएं",
@@ -3352,19 +3342,6 @@ export const hi: TranslationKeys = {
     networkError: "नेटवर्क त्रुटि। अपना कनेक्शन जांचें।",
     invalidCredentials: "गलत यूज़रनेम या पासवर्ड",
     connectionError: "कनेक्शन त्रुटि",
-  },
-  analytics: {
-    consentTitle: "SnapOtter को बेहतर बनाने में मदद करें",
-    consentDescription:
-      "गुमनाम उपयोग आंकड़े हमें बग ठीक करने और आपके काम के टूल्स बनाने में मदद करते हैं। आपकी फ़ाइलें आपके नेटवर्क पर ही रहती हैं।",
-    consentChangeable: "आप इसे कभी भी सेटिंग्स से बंद कर सकते हैं।",
-    acceptButton: "ज़रूर, ठीक लगता है",
-    declineButton: "अभी नहीं",
-    settingsTitle: "प्रोडक्ट एनालिटिक्स",
-    settingsDescription: "SnapOtter को बेहतर बनाने में मदद के लिए गुमनाम उपयोग डेटा शेयर करें।",
-    settingsPrivacy: "आपकी फ़ाइलें कभी आपके नेटवर्क से बाहर नहीं जातीं।",
-    settingsDisabledByAdmin: "सर्वर एडमिनिस्ट्रेटर ने प्रोडक्ट एनालिटिक्स अक्षम कर दिया है।",
-    learnMore: "और जानें",
   },
   sidebar: {
     tools: "टूल्स",

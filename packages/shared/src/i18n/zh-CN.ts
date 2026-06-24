@@ -2617,7 +2617,6 @@ export const zhCN: TranslationKeys = {
       apiKeys: "API 密钥",
       aiFeatures: "AI 功能",
       tools: "工具",
-      productAnalytics: "产品分析",
       about: "关于",
     },
     general: {
@@ -2936,15 +2935,6 @@ export const zhCN: TranslationKeys = {
       jobsRetentionDaysDesc: "任务元数据的保留时长。0 = 永久保留。默认：30 天。",
       auditRetentionDays: "审计日志保留时间（天）",
       auditRetentionDaysDesc: "审计日志条目的保留时长。0 = 永久保留。默认：永久。",
-    },
-    analytics: {
-      heading: "产品分析",
-      description: "分享匿名使用数据，帮助改进 SnapOtter。",
-      privacyNote: "您的文件永远不会离开您的网络。",
-      disabledByAdmin: "产品分析已被服务器管理员禁用。",
-      enabledLabel: "分析已启用",
-      disabledLabel: "分析已禁用",
-      learnMore: "了解更多",
     },
     aiFeatures: {
       title: "AI 功能",
@@ -3286,19 +3276,6 @@ export const zhCN: TranslationKeys = {
     networkError: "网络错误。请检查您的连接。",
     invalidCredentials: "用户名或密码错误",
     connectionError: "连接错误",
-  },
-  analytics: {
-    consentTitle: "帮助改进 SnapOtter",
-    consentDescription:
-      "匿名使用统计帮助我们修复问题并构建您真正需要的工具。您的文件始终留在您的网络中。",
-    consentChangeable: "您可以随时在设置中关闭。",
-    acceptButton: "好的，没问题",
-    declineButton: "暂时不了",
-    settingsTitle: "产品分析",
-    settingsDescription: "分享匿名使用数据，帮助改进 SnapOtter。",
-    settingsPrivacy: "您的文件永远不会离开您的网络。",
-    settingsDisabledByAdmin: "产品分析已被服务器管理员禁用。",
-    learnMore: "了解更多",
   },
   sidebar: {
     tools: "工具",

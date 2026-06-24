@@ -2681,7 +2681,6 @@ export const es: TranslationKeys = {
       apiKeys: "Claves API",
       aiFeatures: "Funciones de AI",
       tools: "Herramientas",
-      productAnalytics: "Analítica del producto",
       about: "Acerca de",
     },
     general: {
@@ -3018,16 +3017,6 @@ export const es: TranslationKeys = {
       auditRetentionDays: "Retención del registro de auditoría (días)",
       auditRetentionDaysDesc:
         "Tiempo de conservación de entradas del registro de auditoría. 0 = conservar siempre. Predeterminado: siempre.",
-    },
-    analytics: {
-      heading: "Analítica del producto",
-      description: "Comparte datos de uso anónimos para ayudar a mejorar SnapOtter.",
-      privacyNote: "Tus archivos nunca salen de tu red.",
-      disabledByAdmin:
-        "La analítica del producto ha sido desactivada por el administrador del servidor.",
-      enabledLabel: "Analítica activada",
-      disabledLabel: "Analítica desactivada",
-      learnMore: "Más información",
     },
     aiFeatures: {
       title: "Funciones de AI",
@@ -3381,20 +3370,6 @@ export const es: TranslationKeys = {
     networkError: "Error de red. Verifica tu conexión.",
     invalidCredentials: "Nombre de usuario o contraseña inválidos",
     connectionError: "Error de conexión",
-  },
-  analytics: {
-    consentTitle: "Ayuda a mejorar SnapOtter",
-    consentDescription:
-      "Las estadísticas de uso anónimas nos ayudan a corregir errores y crear las herramientas que realmente necesitas. Tus archivos se quedan en tu red.",
-    consentChangeable: "Puedes desactivar esto en cualquier momento en Configuración.",
-    acceptButton: "Claro, me parece bien",
-    declineButton: "Ahora no",
-    settingsTitle: "Analítica del producto",
-    settingsDescription: "Comparte datos de uso anónimos para ayudar a mejorar SnapOtter.",
-    settingsPrivacy: "Tus archivos nunca salen de tu red.",
-    settingsDisabledByAdmin:
-      "La analítica del producto ha sido desactivada por el administrador del servidor.",
-    learnMore: "Más información",
   },
   sidebar: {
     tools: "Herramientas",

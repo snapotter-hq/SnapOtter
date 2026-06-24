@@ -2695,7 +2695,6 @@ export const pl: TranslationKeys = {
       apiKeys: "Klucze API",
       aiFeatures: "Funkcje AI",
       tools: "Narzędzia",
-      productAnalytics: "Analityka",
       about: "Informacje",
     },
     general: {
@@ -3033,15 +3032,6 @@ export const pl: TranslationKeys = {
       auditRetentionDays: "Przechowywanie dziennika audytu (dni)",
       auditRetentionDaysDesc:
         "Jak długo przechowywać wpisy dziennika audytu. 0 = zachowaj na zawsze. Domyślnie: na zawsze.",
-    },
-    analytics: {
-      heading: "Analityka",
-      description: "Udostępnianie anonimowych danych o użytkowaniu w celu ulepszenia SnapOtter.",
-      privacyNote: "Państwa pliki nigdy nie opuszczają komputera.",
-      disabledByAdmin: "Analityka została wyłączona przez administratora serwera.",
-      enabledLabel: "Analityka włączona",
-      disabledLabel: "Analityka wyłączona",
-      learnMore: "Dowiedz się więcej",
     },
     aiFeatures: {
       title: "Funkcje AI",
@@ -3395,20 +3385,6 @@ export const pl: TranslationKeys = {
     networkError: "Błąd sieci. Sprawdź połączenie.",
     invalidCredentials: "Nieprawidłowa nazwa użytkownika lub hasło",
     connectionError: "Błąd połączenia",
-  },
-  analytics: {
-    consentTitle: "Pomóż ulepszyć SnapOtter",
-    consentDescription:
-      "Anonimowe statystyki użytkowania pomagają nam naprawiać błędy i tworzyć narzędzia, których naprawdę potrzebujesz. Twoje pliki pozostają na Twoim komputerze.",
-    consentChangeable: "Możesz to wyłączyć w każdej chwili w Ustawieniach.",
-    acceptButton: "Jasne, brzmi dobrze",
-    declineButton: "Nie teraz",
-    settingsTitle: "Analityka",
-    settingsDescription:
-      "Udostępnianie anonimowych danych o użytkowaniu w celu ulepszenia SnapOtter.",
-    settingsPrivacy: "Państwa pliki nigdy nie opuszczają komputera.",
-    settingsDisabledByAdmin: "Analityka została wyłączona przez administratora serwera.",
-    learnMore: "Dowiedz się więcej",
   },
   sidebar: {
     tools: "Narzędzia",

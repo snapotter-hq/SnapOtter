@@ -2644,7 +2644,6 @@ export const en = {
       apiKeys: "API Keys",
       aiFeatures: "AI Features",
       tools: "Tools",
-      productAnalytics: "Product Analytics",
       about: "About",
     },
     general: {
@@ -2989,15 +2988,6 @@ export const en = {
       auditRetentionDaysDesc:
         "How long to keep audit log entries. 0 = keep forever. Default: forever.",
     },
-    analytics: {
-      heading: "Product Analytics",
-      description: "Share anonymous usage data to help improve SnapOtter.",
-      privacyNote: "Your files never leave your network.",
-      disabledByAdmin: "Product analytics has been disabled by the server administrator.",
-      enabledLabel: "Analytics enabled",
-      disabledLabel: "Analytics disabled",
-      learnMore: "Learn more",
-    },
     about: {
       heading: "About",
       appName: "SnapOtter",
@@ -3327,19 +3317,6 @@ export const en = {
     networkError: "Network error. Check your connection.",
     invalidCredentials: "Invalid username or password",
     connectionError: "Connection error",
-  },
-  analytics: {
-    consentTitle: "Help improve SnapOtter",
-    consentDescription:
-      "Anonymous usage stats help us fix bugs and build the tools you actually need. Your files stay on your network.",
-    consentChangeable: "You can turn this off anytime in Settings.",
-    acceptButton: "Sure, sounds good",
-    declineButton: "Not right now",
-    settingsTitle: "Product Analytics",
-    settingsDescription: "Share anonymous usage data to help improve SnapOtter.",
-    settingsPrivacy: "Your files never leave your network.",
-    settingsDisabledByAdmin: "Product analytics has been disabled by the server administrator.",
-    learnMore: "Learn more",
   },
   sidebar: {
     tools: "Tools",

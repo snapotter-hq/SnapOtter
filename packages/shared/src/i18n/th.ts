@@ -2664,7 +2664,6 @@ export const th: TranslationKeys = {
       apiKeys: "คีย์ API",
       aiFeatures: "ฟีเจอร์ AI",
       tools: "เครื่องมือ",
-      productAnalytics: "การวิเคราะห์ผลิตภัณฑ์",
       about: "เกี่ยวกับ",
     },
     general: {
@@ -2984,15 +2983,6 @@ export const th: TranslationKeys = {
       jobsRetentionDaysDesc: "ระยะเวลาเก็บรักษาข้อมูลงาน 0 = เก็บตลอด ค่าเริ่มต้น: 30 วัน",
       auditRetentionDays: "ระยะเวลาเก็บบันทึกตรวจสอบ (วัน)",
       auditRetentionDaysDesc: "ระยะเวลาเก็บรักษารายการบันทึกตรวจสอบ 0 = เก็บตลอด ค่าเริ่มต้น: เก็บตลอด",
-    },
-    analytics: {
-      heading: "การวิเคราะห์ผลิตภัณฑ์",
-      description: "แบ่งปันข้อมูลการใช้งานแบบไม่ระบุตัวตนเพื่อช่วยปรับปรุง SnapOtter",
-      privacyNote: "ไฟล์ของคุณไม่ออกจากเครื่องเด็ดขาด",
-      disabledByAdmin: "ผู้ดูแลเซิร์ฟเวอร์ปิดการวิเคราะห์ผลิตภัณฑ์แล้ว",
-      enabledLabel: "เปิดการวิเคราะห์",
-      disabledLabel: "ปิดการวิเคราะห์",
-      learnMore: "เรียนรู้เพิ่มเติม",
     },
     aiFeatures: {
       title: "ฟีเจอร์ AI",
@@ -3337,19 +3327,6 @@ export const th: TranslationKeys = {
     networkError: "ข้อผิดพลาดเครือข่าย ตรวจสอบการเชื่อมต่อของคุณ",
     invalidCredentials: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
     connectionError: "ข้อผิดพลาดในการเชื่อมต่อ",
-  },
-  analytics: {
-    consentTitle: "ช่วยปรับปรุง SnapOtter",
-    consentDescription:
-      "สถิติการใช้งานแบบไม่ระบุตัวตนช่วยให้เราแก้ไขข้อผิดพลาดและสร้างเครื่องมือที่คุณต้องการจริงๆ ไฟล์ของคุณอยู่บนเครื่องของคุณ",
-    consentChangeable: "คุณสามารถปิดได้ทุกเมื่อในการตั้งค่า",
-    acceptButton: "ได้เลย ฟังดูดี",
-    declineButton: "ไว้ทีหลัง",
-    settingsTitle: "การวิเคราะห์ผลิตภัณฑ์",
-    settingsDescription: "แบ่งปันข้อมูลการใช้งานแบบไม่ระบุตัวตนเพื่อช่วยปรับปรุง SnapOtter",
-    settingsPrivacy: "ไฟล์ของคุณไม่ออกจากเครื่องเด็ดขาด",
-    settingsDisabledByAdmin: "ผู้ดูแลเซิร์ฟเวอร์ปิดการวิเคราะห์ผลิตภัณฑ์แล้ว",
-    learnMore: "เรียนรู้เพิ่มเติม",
   },
   sidebar: {
     tools: "เครื่องมือ",

@@ -2698,7 +2698,6 @@ export const de: TranslationKeys = {
       apiKeys: "API-Schlüssel",
       aiFeatures: "AI-Funktionen",
       tools: "Werkzeuge",
-      productAnalytics: "Produktanalytik",
       about: "Info",
     },
     general: {
@@ -3036,15 +3035,6 @@ export const de: TranslationKeys = {
       auditRetentionDays: "Aufbewahrung von Audit-Protokollen (Tage)",
       auditRetentionDaysDesc:
         "Wie lange Audit-Protokolleinträge aufbewahrt werden. 0 = unbegrenzt. Standard: unbegrenzt.",
-    },
-    analytics: {
-      heading: "Produktanalytik",
-      description: "Anonyme Nutzungsdaten teilen, um SnapOtter zu verbessern.",
-      privacyNote: "Ihre Dateien verlassen niemals Ihr Netzwerk.",
-      disabledByAdmin: "Produktanalytik wurde vom Serveradministrator deaktiviert.",
-      enabledLabel: "Analytik aktiviert",
-      disabledLabel: "Analytik deaktiviert",
-      learnMore: "Mehr erfahren",
     },
     aiFeatures: {
       title: "AI-Funktionen",
@@ -3399,19 +3389,6 @@ export const de: TranslationKeys = {
     networkError: "Netzwerkfehler. Überprüfen Sie Ihre Verbindung.",
     invalidCredentials: "Ungültiger Benutzername oder Passwort",
     connectionError: "Verbindungsfehler",
-  },
-  analytics: {
-    consentTitle: "Helfen Sie, SnapOtter zu verbessern",
-    consentDescription:
-      "Anonyme Nutzungsstatistiken helfen uns, Fehler zu beheben und die Werkzeuge zu entwickeln, die Sie wirklich brauchen. Ihre Dateien bleiben auf Ihrem Netzwerk.",
-    consentChangeable: "Sie können dies jederzeit in den Einstellungen deaktivieren.",
-    acceptButton: "Klar, einverstanden",
-    declineButton: "Jetzt nicht",
-    settingsTitle: "Produktanalytik",
-    settingsDescription: "Anonyme Nutzungsdaten teilen, um SnapOtter zu verbessern.",
-    settingsPrivacy: "Ihre Dateien verlassen niemals Ihr Netzwerk.",
-    settingsDisabledByAdmin: "Produktanalytik wurde vom Serveradministrator deaktiviert.",
-    learnMore: "Mehr erfahren",
   },
   sidebar: {
     tools: "Werkzeuge",

@@ -2615,7 +2615,6 @@ export const zhTW: TranslationKeys = {
       apiKeys: "API金鑰",
       aiFeatures: "AI功能",
       tools: "工具",
-      productAnalytics: "產品分析",
       about: "關於",
     },
     general: {
@@ -2934,15 +2933,6 @@ export const zhTW: TranslationKeys = {
       jobsRetentionDaysDesc: "工作中繼資料的保留時間。0 = 永久保留。預設：30 天。",
       auditRetentionDays: "稽核記錄保留時間（天）",
       auditRetentionDaysDesc: "稽核記錄項目的保留時間。0 = 永久保留。預設：永久保留。",
-    },
-    analytics: {
-      heading: "產品分析",
-      description: "分享匿名使用資料以協助改進SnapOtter。",
-      privacyNote: "您的檔案永遠不會離開您的網路。",
-      disabledByAdmin: "產品分析已被伺服器管理員停用。",
-      enabledLabel: "分析已啟用",
-      disabledLabel: "分析已停用",
-      learnMore: "了解更多",
     },
     aiFeatures: {
       title: "AI 功能",
@@ -3286,19 +3276,6 @@ export const zhTW: TranslationKeys = {
     networkError: "網路錯誤，請檢查您的連線。",
     invalidCredentials: "使用者名稱或密碼無效",
     connectionError: "連線錯誤",
-  },
-  analytics: {
-    consentTitle: "協助改進SnapOtter",
-    consentDescription:
-      "匿名使用資料協助我們修復問題並開發你真正需要的工具。你的檔案始終留在你的網路中。",
-    consentChangeable: "你可以隨時在設定中關閉。",
-    acceptButton: "好的，沒問題",
-    declineButton: "暫時不用",
-    settingsTitle: "產品分析",
-    settingsDescription: "分享匿名使用資料以協助改進SnapOtter。",
-    settingsPrivacy: "您的檔案永遠不會離開您的網路。",
-    settingsDisabledByAdmin: "產品分析已被伺服器管理員停用。",
-    learnMore: "了解更多",
   },
   sidebar: {
     tools: "工具",
