@@ -49,7 +49,6 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         environment: "production",
         tracesSampleRate: config.sampleRate,
         sendDefaultPii: false,
-        autoSessionTracking: true,
         integrations: [Sentry.browserTracingIntegration()],
         beforeSend(event) {
           if (event.user) {

@@ -1,4 +1,4 @@
-import { ANALYTICS_BAKED } from "@snapotter/shared/src/analytics/baked.js";
+import { ANALYTICS_BAKED } from "@snapotter/shared";
 
 if (ANALYTICS_BAKED.enabled && ANALYTICS_BAKED.sentryDsn) {
   try {
@@ -11,7 +11,6 @@ if (ANALYTICS_BAKED.enabled && ANALYTICS_BAKED.sentryDsn) {
       environment: process.env.NODE_ENV || "production",
       tracesSampleRate: ANALYTICS_BAKED.sampleRate,
       sendDefaultPii: false,
-      autoSessionTracking: true,
     });
 
     console.log("[sentry] initialized with performance tracing, release:", APP_VERSION);
