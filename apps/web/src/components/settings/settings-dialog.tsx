@@ -549,7 +549,14 @@ function SystemSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", settings);
+      // GET /v1/settings includes server-managed, read-only keys (instance_id,
+      // cookie_secret) that PUT rejects with 400 READONLY_SETTING. Sending the
+      // whole object back made every admin save fail; only submit editable keys.
+      const readOnlyKeys = new Set(["cookie_secret", "instance_id"]);
+      const editable = Object.fromEntries(
+        Object.entries(settings).filter(([key]) => !readOnlyKeys.has(key)),
+      );
+      await apiPut("/v1/settings", editable);
       if (settings.defaultTheme) {
         const theme = settings.defaultTheme as "light" | "dark" | "system";
         useThemeStore.getState().setTheme(theme);
@@ -1631,6 +1638,10 @@ function PeopleSection() {
                 setShowAddForm(false);
                 setShowGeneratedPw(false);
                 setPwCopied(false);
+                // Reset the field values too, so re-opening the form is clean.
+                setNewUsername("");
+                setNewPassword("");
+                setAddError(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >

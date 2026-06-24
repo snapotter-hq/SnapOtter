@@ -1,65 +1,15 @@
-import { expect, test, uploadTestImage } from "./helpers";
+import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Cross-tool file carrying tests
+// Cross-tool navigation tests
 //
-// When a user uploads a file on the home page and then clicks a quick action
-// or a tool from "All Tools", the file should be carried to the target tool
-// page (no re-upload needed). However, navigating between tool pages via the
-// sidebar should NOT carry the file - the tool page resets on route change.
+// The 2.0 home page is a tool catalog (search + modality tabs + link cards):
+// no upload dropzone, no Quick Actions, no desktop sidebar. Files are uploaded
+// on a tool page. Navigating between tool pages resets the tool page, so no
+// processed state leaks from one tool to the next.
 // ---------------------------------------------------------------------------
 
-test.describe("Cross-tool file carrying", () => {
-  test("upload on home, click resize quick action, resize page has image loaded", async ({
-    loggedInPage: page,
-  }) => {
-    // Upload a file on the home page
-    await uploadTestImage(page);
-
-    // Quick Actions should be visible
-    await expect(page.getByText("Quick Actions").first()).toBeVisible();
-
-    // Click the Resize quick action
-    await page
-      .getByRole("button", { name: /resize/i })
-      .first()
-      .click();
-
-    // Should navigate to /resize
-    await expect(page).toHaveURL("/image/resize");
-
-    // The file should be carried - dropzone should NOT be visible
-    await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
-
-    // File info should show the test image filename
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-  });
-
-  test("upload on home, click compress from All Tools, compress has image", async ({
-    loggedInPage: page,
-  }) => {
-    // Upload a file on the home page
-    await uploadTestImage(page);
-
-    // All Tools section should be visible
-    await expect(page.getByText("All Tools").first()).toBeVisible();
-
-    // Click Compress from the All Tools list
-    await page
-      .getByRole("button", { name: /^Compress$/i })
-      .first()
-      .click();
-
-    // Should navigate to /compress
-    await expect(page).toHaveURL("/image/compress");
-
-    // The file should be carried - dropzone should NOT be visible
-    await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
-
-    // File info should show the test image
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-  });
-
+test.describe("Cross-tool navigation", () => {
   test("upload on resize, navigate to compress via sidebar, image NOT carried", async ({
     loggedInPage: page,
   }) => {
@@ -84,27 +34,25 @@ test.describe("Cross-tool file carrying", () => {
     await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
   });
 
-  test("upload on resize, click sidebar Tools link, navigate to convert, no stale state", async ({
+  test("process on resize, navigate to a different tool, tool page resets", async ({
     loggedInPage: page,
   }) => {
-    // Go to resize and upload a file
+    // Go to resize, upload, and process so a download/processed state exists
     await page.goto("/image/resize");
     await uploadTestImage(page);
+    await page.locator("input[placeholder='Auto']").first().fill("200");
+    await page.getByTestId("resize-submit").click();
+    await waitForProcessing(page);
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
 
-    // Confirm the file is loaded on resize
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-
-    // Click the "Tools" sidebar link to go back to home
-    const sidebar = page.locator("aside");
-    await sidebar.getByText("Tools").click();
-    await page.waitForURL("/");
-
-    // Now navigate to a different tool via URL (simulating a fresh tool visit)
+    // Navigate to a different tool. The tool page resets on toolId change,
+    // so the processed state must not carry over.
     await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
-    // No stale download links should be present from the previous tool
-    await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
+    // Fresh tool page: dropzone shown, no stale download affordance
+    await expect(page.getByText("Upload from computer")).toBeVisible();
+    await expect(page.getByTestId("resize-download")).not.toBeVisible();
   });
 
   test("upload on resize, browser back returns to previous page", async ({
@@ -129,38 +77,5 @@ test.describe("Cross-tool file carrying", () => {
 
     // Should return to the home page
     await expect(page).toHaveURL("/");
-  });
-
-  test("file carry works only via Quick Actions, not via sidebar navigation", async ({
-    loggedInPage: page,
-  }) => {
-    // Upload a file on the home page
-    await uploadTestImage(page);
-
-    // Quick Actions should be visible after upload
-    await expect(page.getByText("Quick Actions").first()).toBeVisible();
-
-    // Click the Resize quick action to carry the file
-    await page
-      .getByRole("button", { name: /resize/i })
-      .first()
-      .click();
-    await expect(page).toHaveURL("/image/resize");
-
-    // File should be carried from home via Quick Action
-    await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-
-    // Now navigate away via sidebar to the home page
-    const sidebar = page.locator("aside");
-    await sidebar.getByText("Tools").click();
-    await page.waitForURL("/");
-
-    // Navigate to compress directly (not via Quick Action)
-    await page.goto("/image/compress");
-    await page.waitForLoadState("networkidle");
-
-    // No processed state should leak between tool pages
-    await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
   });
 });

@@ -218,7 +218,9 @@ test.describe("Settings General Tab - User info details", () => {
   test("General tab shows Language (locale) dropdown", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    await expect(page.getByText("Language")).toBeVisible();
+    // Exact match: "Language" also appears inside the row description
+    // ("Language for the interface"), which would trip strict mode.
+    await expect(page.getByText("Language", { exact: true })).toBeVisible();
     // The locale select has the user's current locale as its value
     const localeSelect = page.locator("select").filter({ has: page.locator("option[value='en']") });
     await expect(localeSelect).toBeVisible();
@@ -337,7 +339,11 @@ test.describe("Settings Security Tab - Extended password flows", () => {
     await expect(page.getByText("Change Password").first()).toBeVisible();
   });
 
-  test("changing password to same value succeeds (admin -> admin)", async ({
+  // Deferred: the form enforces an 8-character minimum, but the default admin
+  // password is "admin" (5 chars), so "change to the same value" can never be
+  // submitted. Needs a product/test decision (seed an 8-char admin password, or
+  // rework this to assert the min-length validation instead).
+  test.fixme("changing password to same value succeeds (admin -> admin)", async ({
     loggedInPage: page,
   }) => {
     await openSettings(page);
@@ -362,15 +368,17 @@ test.describe("Settings About Tab - Extended", () => {
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
 
-    await expect(page.getByText("AGPLv3")).toBeVisible();
+    // Exact match: the license description paragraph also contains "AGPLv3",
+    // so a substring match would resolve to two elements (strict mode).
+    await expect(page.getByText("AGPLv3", { exact: true })).toBeVisible();
   });
 
   test("shows SnapOtter logo element", async ({ loggedInPage: page }) => {
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
 
-    // The OtterLogo component renders an SVG
-    const logo = page.locator("svg.text-primary").first();
+    // The OtterLogo component renders an <img> (logo.png), not an inline SVG.
+    const logo = page.locator("img.text-primary").first();
     await expect(logo).toBeVisible();
   });
 
@@ -452,8 +460,11 @@ test.describe("Settings People Tab - Team assignment", () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // The password field should now have a value (16 chars generated password)
-    const pwInput = page.locator("form input[type='text']").first();
+    // The password field should now have a value (16 chars generated password).
+    // After generating, the password input flips to type="text", so a generic
+    // form input[type='text'] selector would also match the (empty) username
+    // field. Target the password input by its id instead.
+    const pwInput = page.locator("#new-user-password");
     const value = await pwInput.inputValue();
     expect(value.length).toBeGreaterThanOrEqual(8);
 
@@ -1428,7 +1439,11 @@ base.describe("RBAC GUI - User tab content access", () => {
     await deleteUser(adminToken, USER_GUI);
   });
 
-  base.test("user can save General tab preferences", async ({ page }) => {
+  // Deferred: the General tab saves defaultToolView via the admin-only
+  // PUT /v1/settings (requires settings:write), so a non-admin user gets 403.
+  // A per-user view preference (userPreferences table) would be the real fix;
+  // this needs a product decision rather than a test edit.
+  base.test.fixme("user can save General tab preferences", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
 

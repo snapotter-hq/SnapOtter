@@ -63,11 +63,9 @@ test.describe("Full user session", () => {
     await page.getByTestId("rotate-submit").click();
     await waitForProcessing(page);
 
-    // Verify result
-    const downloadBtn = page
-      .getByRole("button", { name: /^download$/i })
-      .or(page.getByRole("link", { name: /download/i }))
-      .first();
+    // Verify result. Rotate has no download link of its own; the generic
+    // review panel renders the download affordance as [data-download-button].
+    const downloadBtn = page.locator("[data-download-button]").first();
     await expect(downloadBtn).toBeVisible({ timeout: 15_000 });
 
     const downloadPromise = page.waitForEvent("download");
@@ -147,11 +145,13 @@ test.describe("Full user session", () => {
     await uploadTestImage(page);
     await expect(page.getByText("Upload from computer")).not.toBeVisible();
 
-    // Compress has sensible defaults, just click process
-    await page.getByRole("button", { name: "Compress" }).click();
+    // Compress defaults to Target Size mode with an empty (invalid) value,
+    // which keeps the submit disabled. Switch to Quality mode first.
+    await page.getByRole("button", { name: "Quality" }).click();
+    await page.getByTestId("compress-submit").click();
     await waitForProcessing(page);
 
-    const downloadBtn = page.getByRole("link", { name: /download/i }).first();
+    const downloadBtn = page.getByTestId("compress-download");
     await expect(downloadBtn).toBeVisible({ timeout: 15_000 });
 
     const downloadPromise = page.waitForEvent("download");
@@ -171,19 +171,21 @@ test.describe("Full user session", () => {
     await page.goto("/image/resize");
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("200");
-    await page.getByRole("button", { name: "Resize" }).click();
+    await page.getByTestId("resize-submit").click();
     await waitForProcessing(page);
 
-    const resizeDownloadBtn = page.getByRole("link", { name: /download/i }).first();
+    const resizeDownloadBtn = page.getByTestId("resize-download");
     await expect(resizeDownloadBtn).toBeVisible({ timeout: 15_000 });
 
     // Step 2: Navigate to compress and process a new image
     await page.goto("/image/compress");
     await uploadTestImage(page);
-    await page.getByRole("button", { name: "Compress" }).click();
+    // Switch to Quality mode so the disabled Target Size default is bypassed.
+    await page.getByRole("button", { name: "Quality" }).click();
+    await page.getByTestId("compress-submit").click();
     await waitForProcessing(page);
 
-    const compressDownloadBtn = page.getByRole("link", { name: /download/i }).first();
+    const compressDownloadBtn = page.getByTestId("compress-download");
     await expect(compressDownloadBtn).toBeVisible({ timeout: 15_000 });
   });
 
@@ -195,9 +197,10 @@ test.describe("Full user session", () => {
     await uploadTestImage(page);
     await page.locator("input[placeholder='Auto']").first().fill("300");
 
-    // Navigate away to home
+    // Navigate away to the home catalog. In 2.0 the home page is a tool
+    // catalog (search + tabs + link cards), not a dropzone.
     await page.goto("/");
-    await expect(page.getByText("Upload from computer")).toBeVisible();
+    await expect(page.locator("[data-search-input]")).toBeVisible();
 
     // Navigate back to resize - the tool should reset (fresh state)
     await page.goto("/image/resize");
