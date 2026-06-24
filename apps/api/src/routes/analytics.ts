@@ -1,4 +1,4 @@
-import { ANALYTICS_BAKED } from "@snapotter/shared/src/analytics/baked.js";
+import { ANALYTICS_BAKED } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";

@@ -350,9 +350,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : dbUser.mustChangePassword,
           permissions: await getPermissions(dbUser.role),
           teamName: teamRow?.name ?? dbUser.team,
-          analyticsEnabled: dbUser.analyticsEnabled ?? null,
-          analyticsConsentShownAt: dbUser.analyticsConsentShownAt?.getTime() ?? null,
-          analyticsConsentRemindAt: dbUser.analyticsConsentRemindAt?.getTime() ?? null,
         },
         expiresAt: expiresAt.toISOString(),
       });
