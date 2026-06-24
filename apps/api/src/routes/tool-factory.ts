@@ -556,6 +556,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           fileId: fileId ?? undefined,
           clientJobId: clientJobId ?? undefined,
           kind: "tool",
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
         });
 
         // Long tools never block the HTTP request (spec 4.5): straight to SSE.

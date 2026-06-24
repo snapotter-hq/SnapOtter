@@ -46,6 +46,7 @@ export interface ToolJobData {
   parentId?: string;
   totalFiles?: number;
   fileIndex?: number;
+  analyticsDistinctId?: string;
   _otel?: { traceparent: string; tracestate?: string };
 }
 

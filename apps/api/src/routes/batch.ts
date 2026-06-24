@@ -304,6 +304,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             inputRefs: [key],
             filename: processFilename,
             settings,
+            analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
           } satisfies ToolJobData,
           // Children swallow failures via return markers, so a retry would
           // never run; attempts: 1 makes that explicit.
@@ -340,6 +341,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           inputRefs: [],
           filename: "",
           settings: { flowChildCount: flowChildren.length },
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
         } satisfies ToolJobData,
         opts: { jobId: parentId, attempts: 1 },
         children: flowChildren,

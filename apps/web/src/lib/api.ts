@@ -1,3 +1,4 @@
+import { getDistinctId } from "@/lib/analytics";
 import { useConnectionStore } from "@/stores/connection-store";
 
 const API_BASE = "/api";
@@ -59,6 +60,10 @@ export function formatHeaders(init?: HeadersInit): Headers {
   const token = getToken();
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+  const distinctId = getDistinctId();
+  if (distinctId) {
+    headers.set("X-PostHog-Distinct-Id", distinctId);
   }
   return headers;
 }

@@ -115,6 +115,7 @@ function buildPipelineFlowTree(opts: {
   clientJobId?: string;
   parentId?: string;
   totalFiles?: number;
+  analyticsDistinctId?: string;
 }): { tree: FlowJob; stepJobIds: string[] } {
   const {
     jobId,
@@ -126,6 +127,7 @@ function buildPipelineFlowTree(opts: {
     clientJobId,
     parentId,
     totalFiles,
+    analyticsDistinctId,
   } = opts;
   const totalSteps = parsedSteps.length;
   const stepJobIds = parsedSteps.map((_: unknown, i: number) => `${jobId}-s${i}`);
@@ -149,6 +151,7 @@ function buildPipelineFlowTree(opts: {
       inputRefs: [uploadKey],
       filename,
       settings: parsedSteps[0].parsedSettings,
+      analyticsDistinctId,
     } satisfies ToolJobData,
     opts: { jobId: stepJobIds[0], attempts: 1 },
   };
@@ -170,6 +173,7 @@ function buildPipelineFlowTree(opts: {
         inputRefs: [],
         filename,
         settings: parsedSteps[i].parsedSettings,
+        analyticsDistinctId,
       } satisfies ToolJobData,
       opts: { jobId: stepJobIds[i], attempts: 1 },
       children: [currentNode],
@@ -195,6 +199,7 @@ function buildPipelineFlowTree(opts: {
       inputRefs: [],
       filename,
       settings: {},
+      analyticsDistinctId,
     } satisfies ToolJobData,
     opts: { jobId, attempts: 1 },
     children: [currentNode],
@@ -457,6 +462,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         filename,
         pipelinePool,
         clientJobId: clientJobId ?? jobId,
+        analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
       });
 
       // Insert all durable rows before adding the flow. enqueueToolJob
@@ -990,6 +996,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           pipelinePool: batchPipelinePool,
           parentId,
           totalFiles: files.length,
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
         });
 
         // Insert step + finalize rows for this file
@@ -1056,6 +1063,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           inputRefs: [],
           filename: "",
           settings: { flowChildCount: perFileChildren.length },
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
         } satisfies ToolJobData,
         opts: { jobId: parentId, attempts: 1 },
         children: perFileChildren,
