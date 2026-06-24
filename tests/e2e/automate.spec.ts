@@ -79,8 +79,10 @@ test.describe("Automate Page", () => {
 
   test("shows empty state message when no steps", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
+    // The empty-state prompt (t.automate.addToolsPrompt) renders in both the canvas
+    // header and the pipeline-builder body when no steps exist, so scope to the first.
     await expect(
-      page.getByText(/add tools from the palette|add steps to build your pipeline/i),
+      page.getByText(/add tools from the palette|add steps to build your pipeline/i).first(),
     ).toBeVisible();
   });
 
@@ -235,16 +237,25 @@ test.describe("Automate Page", () => {
   });
 
   test("executing pipeline shows before/after result", async ({ loggedInPage: page }) => {
+    // A two-step pipeline can exceed the default 30s test budget on a busy
+    // worker pool; give it room.
+    test.setTimeout(90_000);
     await gotoAutomate(page);
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to Target Size mode with an unset (0) size, which is
+    // invalid; switch the step to Quality mode so the pipeline has valid
+    // settings to run.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
-    // Wait for the before/after slider to appear (indicates processing completed)
+    // Wait for the before/after slider to appear (indicates processing
+    // completed). A two-step pipeline runs both child jobs plus a finalize, so
+    // allow a generous window for a busy worker pool.
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
     // Should show Original and Processed labels inside the slider
     await expect(page.getByText("Original").first()).toBeVisible();

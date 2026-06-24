@@ -5,7 +5,7 @@ import { expect, getTestImagePath, test, uploadTestImage, waitForProcessing } fr
 // Helper: resolve fixture image paths
 // ---------------------------------------------------------------------------
 function getFixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
@@ -148,7 +148,7 @@ test.describe("Multi-file upload - file info display", () => {
     // Click first thumbnail
     await page.locator("button[title='test-100x100.jpg']").click();
     await page.waitForTimeout(300);
-    const mainImg = page.locator("section[aria-label='Image area'] img").first();
+    const mainImg = page.locator("section[aria-label='Preview area'] img").first();
     await expect(mainImg).toHaveAttribute("alt", "test-100x100.jpg");
 
     // Click second thumbnail
@@ -172,7 +172,7 @@ test.describe("Multi-file upload - file info display", () => {
     await expect(page.getByText(/KB|B/i).first()).toBeVisible();
 
     // Navigate to second file
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await page.waitForTimeout(300);
 
     // Second file should also show size info
@@ -261,7 +261,7 @@ test.describe("Batch processing - results verification", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -274,12 +274,12 @@ test.describe("Batch processing - results verification", () => {
     await expect(downloadLink.first()).toBeVisible({ timeout: 5_000 });
 
     // Second result should have download
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 3")).toBeVisible();
     await expect(downloadLink.first()).toBeVisible({ timeout: 5_000 });
 
     // Third result should have download
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("3 / 3")).toBeVisible();
     await expect(downloadLink.first()).toBeVisible({ timeout: 5_000 });
   });
@@ -310,7 +310,7 @@ test.describe("Batch processing - results verification", () => {
     await page.getByRole("button", { name: /resize.*2 files/i }).click();
     await waitForProcessing(page, 30_000);
 
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -327,7 +327,7 @@ test.describe("Batch processing - results verification", () => {
     await page.getByRole("button", { name: /resize.*3 files/i }).click();
     await waitForProcessing(page, 30_000);
 
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -356,12 +356,12 @@ test.describe("Batch processing - undo behavior", () => {
     await page.getByRole("button", { name: /resize.*3 files/i }).click();
     await waitForProcessing(page, 30_000);
 
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // Click undo/reset
-    const undoBtn = page.getByRole("button", { name: /^undo$|^reset$/i });
+    // Click the result revert control (relabeled "Adjust settings" in 2.0)
+    const undoBtn = page.getByRole("button", { name: /adjust settings/i });
     if (await undoBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await undoBtn.click();
       await page.waitForTimeout(500);
@@ -386,12 +386,12 @@ test.describe("Batch processing - undo behavior", () => {
     await page.getByRole("button", { name: /resize.*2 files/i }).click();
     await waitForProcessing(page, 30_000);
 
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // Undo
-    const undoBtn = page.getByRole("button", { name: /^undo$|^reset$/i });
+    // Revert via "Adjust settings"
+    const undoBtn = page.getByRole("button", { name: /adjust settings/i });
     if (await undoBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await undoBtn.click();
       await page.waitForTimeout(500);
@@ -406,7 +406,7 @@ test.describe("Batch processing - undo behavior", () => {
       await waitForProcessing(page, 30_000);
 
       // Results should appear again
-      await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+      await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
         timeout: 15_000,
       });
     }
@@ -431,17 +431,17 @@ test.describe("Mixed format batch - HEIC", () => {
     await page.getByRole("button", { name: /resize.*4 files/i }).click();
     await waitForProcessing(page, 45_000);
 
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
     // Navigate through all 4 results
     await expect(page.getByText("1 / 4")).toBeVisible();
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 4")).toBeVisible();
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("3 / 4")).toBeVisible();
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("4 / 4")).toBeVisible();
 
     // Download All should work with mixed formats
@@ -604,11 +604,17 @@ test.describe("Pipeline Builder - process button states", () => {
 // ===========================================================================
 test.describe("Pipeline Builder - execution progress", () => {
   test("3-step pipeline executes and shows before/after result", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
+    // Configure each step as it is added (the new step becomes active). Resize
+    // needs a dimension and Compress needs a valid mode, otherwise the pipeline
+    // rejects the bare defaults (width unset / target size 0).
     await addToolStep(page, "Resize", 1);
+    await page.locator("#resize-width").fill("100");
     await addToolStep(page, "Remove Metadata", 2);
     await addToolStep(page, "Compress", 3);
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
 
     // Upload test file
     const testImagePath = getTestImagePath();
@@ -623,18 +629,22 @@ test.describe("Pipeline Builder - execution progress", () => {
 
     // Wait for the before/after slider to appear
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
-    // Should show Original and Processed labels
-    await expect(page.getByText("Original").first()).toBeVisible();
-    await expect(page.getByText("Processed").first()).toBeVisible();
+    // Should show Original and Processed labels (exact: the resize step's
+    // "Limit to original size" setting also contains "original").
+    await expect(page.getByText("Original", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Processed", { exact: true }).first()).toBeVisible();
   });
 
   test("pipeline execution shows download button in result", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Resize", 1);
+    await page.locator("#resize-width").fill("100");
     await addToolStep(page, "Compress", 2);
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
 
     // Upload test file
     const testImagePath = getTestImagePath();
@@ -647,7 +657,7 @@ test.describe("Pipeline Builder - execution progress", () => {
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
     // Download link/button should be visible
     const downloadBtn = page
@@ -783,6 +793,8 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
 
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to an invalid Target Size of 0; switch to Quality mode.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -804,20 +816,23 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
     await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
 
     // Navigate through all results
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText(/2 \/ 3/).first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText(/3 \/ 3/).first()).toBeVisible();
   });
 
   test("3 images through 2-step pipeline Download All ZIP available", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to an invalid Target Size of 0; switch to Quality mode.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
 
     // Upload 3 images
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -831,7 +846,7 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
     await processBtn.click();
     await waitForProcessing(page, 45_000);
 
-    await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 60_000 });
 
     // Download ZIP should be available
     await expect(page.getByRole("button", { name: /download zip/i })).toBeVisible();
@@ -870,7 +885,7 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
     // Results should be navigable
     await expect(page.getByText(/1 \/ 2/).first()).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText(/2 \/ 2/).first()).toBeVisible();
   });
 });
@@ -879,25 +894,10 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
 // CROSS-TOOL FILE CARRYING: additional scenarios
 // ===========================================================================
 test.describe("Cross-tool file carrying - extended", () => {
-  test("upload on home, click convert from All Tools, file is carried", async ({
-    loggedInPage: page,
-  }) => {
-    await uploadTestImage(page);
-
-    await expect(page.getByText("All Tools").first()).toBeVisible();
-
-    // Click Convert from All Tools list
-    await page
-      .getByRole("button", { name: /^Convert$/i })
-      .first()
-      .click();
-
-    await expect(page).toHaveURL("/convert");
-
-    // File should be carried
-    await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-  });
+  // Removed: "upload on home, click convert from All Tools" and "rotate quick
+  // action carries file". The 2.0 home page is a tool catalog (search + tabs +
+  // tool-card grid) with no upload dropzone and no All Tools / Quick Actions
+  // sections, so the file is now uploaded on a tool page, not the home grid.
 
   test("navigate away from tool page clears processed state but keeps files in store", async ({
     loggedInPage: page,
@@ -937,31 +937,11 @@ test.describe("Cross-tool file carrying - extended", () => {
 
     // Go back to resize
     await page.goBack();
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
 
     // Go forward to compress
     await page.goForward();
-    await expect(page).toHaveURL("/compress");
-  });
-
-  test("uploading on home then clicking rotate quick action carries file", async ({
-    loggedInPage: page,
-  }) => {
-    await uploadTestImage(page);
-
-    await expect(page.getByText("Quick Actions").first()).toBeVisible();
-
-    // Click Rotate quick action
-    await page
-      .getByRole("button", { name: /rotate/i })
-      .first()
-      .click();
-
-    await expect(page).toHaveURL("/rotate");
-
-    // File should be carried
-    await expect(page.getByText("Upload from computer")).not.toBeVisible({ timeout: 3_000 });
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
+    await expect(page).toHaveURL("/image/compress");
   });
 
   test("direct URL navigation does not carry files from previous tool", async ({
@@ -994,20 +974,20 @@ test.describe("Multi-file navigation - edge cases", () => {
     await expect(page.getByText("1 / 2")).toBeVisible();
 
     // Previous should not be visible on first
-    await expect(page.getByRole("button", { name: "Previous image" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous file" })).not.toBeVisible();
 
     // Next should be visible
-    await expect(page.getByRole("button", { name: "Next image" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next file" })).toBeVisible();
 
     // Go to last
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
 
     // Next should not be visible on last
-    await expect(page.getByRole("button", { name: "Next image" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Next file" })).not.toBeVisible();
 
     // Previous should be visible
-    await expect(page.getByRole("button", { name: "Previous image" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous file" })).toBeVisible();
   });
 
   test("thumbnail click updates counter badge to correct position", async ({

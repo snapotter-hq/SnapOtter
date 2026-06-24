@@ -67,32 +67,29 @@ test.describe("Keyboard Shortcuts", () => {
   });
 
   test("shortcuts do not fire when typing in an input field", async ({ loggedInPage: page }) => {
-    // Focus the search input
+    // The Files page has its own search input and a non-home URL, so we can
+    // detect whether a navigation shortcut leaked through while typing.
+    await page.goto("/files");
+    await expect(page).toHaveURL("/files");
+
     const searchInput = page.getByPlaceholder(/search/i).first();
     await searchInput.click();
     await searchInput.fill("");
 
-    // Press Cmd+/ which normally navigates to /
-    // But since we're in an input, it should NOT navigate
-    await page.goto("/fullscreen");
-    await page.waitForTimeout(300);
-
-    const searchOnFullscreen = page.getByPlaceholder(/search/i);
-    await searchOnFullscreen.click();
-
-    // Type the / character while focused on input - this should not navigate
+    // Cmd+/ normally navigates to "/", but while focused on an input it
+    // should be suppressed.
     await page.keyboard.press(`${MOD}+/`);
     await page.waitForTimeout(300);
 
-    // Should still be on fullscreen since the shortcut was suppressed
-    await expect(page).toHaveURL("/fullscreen");
+    // Should still be on /files since the shortcut was suppressed
+    await expect(page).toHaveURL("/files");
   });
 
   test("Cmd/Ctrl+K works even when focused on an input field", async ({ loggedInPage: page }) => {
-    // Navigate to fullscreen which has its own search input
-    await page.goto("/fullscreen");
+    // The Files page has its own search input.
+    await page.goto("/files");
 
-    const searchInput = page.getByPlaceholder(/search/i);
+    const searchInput = page.getByPlaceholder(/search/i).first();
     await searchInput.click();
     await searchInput.fill("test");
 
@@ -111,49 +108,49 @@ test.describe("Keyboard Shortcuts - Tool Navigation", () => {
   test("Cmd/Ctrl+Alt+1 navigates to Resize", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+1`);
 
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
   });
 
   test("Cmd/Ctrl+Alt+2 navigates to Crop", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+2`);
 
-    await expect(page).toHaveURL("/crop");
+    await expect(page).toHaveURL("/image/crop");
   });
 
   test("Cmd/Ctrl+Alt+3 navigates to Compress", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+3`);
 
-    await expect(page).toHaveURL("/compress");
+    await expect(page).toHaveURL("/image/compress");
   });
 
   test("Cmd/Ctrl+Alt+4 navigates to Convert", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+4`);
 
-    await expect(page).toHaveURL("/convert");
+    await expect(page).toHaveURL("/image/convert");
   });
 
   test("Cmd/Ctrl+Alt+5 navigates to Remove Background", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+5`);
 
-    await expect(page).toHaveURL("/remove-background");
+    await expect(page).toHaveURL("/image/remove-background");
   });
 
   test("Cmd/Ctrl+Alt+6 navigates to Watermark Text", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+6`);
 
-    await expect(page).toHaveURL("/watermark-text");
+    await expect(page).toHaveURL("/image/watermark-text");
   });
 
   test("Cmd/Ctrl+Alt+7 navigates to Strip Metadata", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+7`);
 
-    await expect(page).toHaveURL("/strip-metadata");
+    await expect(page).toHaveURL("/image/strip-metadata");
   });
 
   test("Cmd/Ctrl+Alt+8 navigates to Image Info", async ({ loggedInPage: page }) => {
     await page.keyboard.press(`${MOD}+Alt+8`);
 
-    await expect(page).toHaveURL("/info");
+    await expect(page).toHaveURL("/image/info");
   });
 });
 
@@ -184,11 +181,11 @@ test.describe("Keyboard Shortcuts - Work From Any Page", () => {
 
   test("Cmd/Ctrl+Alt+1 navigates to Resize from a tool page", async ({ loggedInPage: page }) => {
     await page.goto("/image/compress");
-    await expect(page).toHaveURL("/compress");
+    await expect(page).toHaveURL("/image/compress");
 
     await page.keyboard.press(`${MOD}+Alt+1`);
 
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
   });
 
   test("Cmd/Ctrl+Shift+D toggles theme from /fullscreen", async ({ loggedInPage: page }) => {
@@ -211,9 +208,9 @@ test.describe("Keyboard Shortcuts - Input Suppression", () => {
   test("Cmd/Ctrl+Shift+D does not toggle theme when focused on search input", async ({
     loggedInPage: page,
   }) => {
-    // Navigate to fullscreen which reliably shows the search input
-    await page.goto("/fullscreen");
-    const searchInput = page.getByPlaceholder(/search/i);
+    // The Files page reliably shows a search input.
+    await page.goto("/files");
+    const searchInput = page.getByPlaceholder(/search/i).first();
     await expect(searchInput).toBeVisible();
     await searchInput.click();
     await searchInput.fill("");
@@ -232,16 +229,16 @@ test.describe("Keyboard Shortcuts - Input Suppression", () => {
   test("Cmd/Ctrl+Alt+1 does not navigate when focused on search input", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/fullscreen");
-    const searchInput = page.getByPlaceholder(/search/i);
+    await page.goto("/files");
+    const searchInput = page.getByPlaceholder(/search/i).first();
     await expect(searchInput).toBeVisible();
     await searchInput.click();
 
     await page.keyboard.press(`${MOD}+Alt+1`);
     await page.waitForTimeout(300);
 
-    // Should still be on fullscreen since shortcut was suppressed
-    await expect(page).toHaveURL("/fullscreen");
+    // Should still be on /files since shortcut was suppressed
+    await expect(page).toHaveURL("/files");
   });
 });
 
@@ -261,7 +258,7 @@ test.describe("Keyboard Shortcuts - Escape Key", () => {
   });
 
   test("Escape closes the help dialog", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Help").click();
+    await page.getByRole("button", { name: "Help", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Help" })).toBeVisible();
 
@@ -289,7 +286,7 @@ test.describe("Keyboard Shortcuts - Textarea Suppression", () => {
       await page.waitForTimeout(300);
 
       // Should still be on watermark-text since shortcut was suppressed in textarea
-      await expect(page).toHaveURL("/watermark-text");
+      await expect(page).toHaveURL("/image/watermark-text");
     }
   });
 
@@ -442,35 +439,8 @@ test.describe("Keyboard Shortcuts - Escape Additional", () => {
     await expect(searchInput).not.toBeFocused();
   });
 
-  test("Escape closes mobile hamburger sidebar overlay", async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 375, height: 667 },
-    });
-    const page = await context.newPage();
-    await page.goto("/login");
-    await page.getByLabel("Username").fill("admin");
-    await page.getByLabel("Password").fill("admin");
-    await page.getByRole("button", { name: /login/i }).click();
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    // Open hamburger menu
-    const topBar = page.locator(".fixed").filter({ hasText: "SnapOtter" }).first();
-    const hamburger = topBar.locator("button").first();
-    await hamburger.click();
-
-    // Sidebar overlay should appear
-    const backdrop = page.locator("[class*='backdrop-blur']").first();
-    await expect(backdrop).toBeVisible();
-
-    // Press Escape to close
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-
-    // Backdrop should be gone
-    await expect(backdrop).not.toBeVisible();
-
-    await context.close();
-  });
+  // Removed: the mobile hamburger sidebar overlay no longer exists in 2.0
+  // (mobile navigation is a fixed bottom nav, not a slide-in sidebar).
 });
 
 // ---------------------------------------------------------------------------
@@ -480,7 +450,7 @@ test.describe("Keyboard Shortcuts - Dialog Input Suppression", () => {
   test("Cmd/Ctrl+/ does not navigate when focused on input inside settings dialog", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/fullscreen");
+    await page.goto("/files");
 
     await openSettings(page);
     await expect(page.getByRole("dialog")).toBeVisible();
@@ -493,8 +463,8 @@ test.describe("Keyboard Shortcuts - Dialog Input Suppression", () => {
       await page.keyboard.press(`${MOD}+/`);
       await page.waitForTimeout(300);
 
-      // Should still be on fullscreen (shortcut suppressed)
-      await expect(page).toHaveURL("/fullscreen");
+      // Should still be on /files (shortcut suppressed)
+      await expect(page).toHaveURL("/files");
     }
   });
 
@@ -553,7 +523,7 @@ test.describe("Keyboard Shortcuts - Rapid Sequences", () => {
 
   test("Cmd/Ctrl+/ from a tool page navigates to home", async ({ loggedInPage: page }) => {
     await page.goto("/image/compress");
-    await expect(page).toHaveURL("/compress");
+    await expect(page).toHaveURL("/image/compress");
 
     await page.keyboard.press(`${MOD}+/`);
 

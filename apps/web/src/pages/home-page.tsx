@@ -195,6 +195,14 @@ function HomeSearchBar({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Escape steps out of the search field: clear a query if present,
+          // otherwise drop focus back to the page.
+          if (e.key === "Escape") {
+            if (value) onChange("");
+            e.currentTarget.blur();
+          }
+        }}
         placeholder={placeholder}
         aria-label={placeholder}
         className="w-full ps-11 pe-20 py-2.5 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-shadow"
