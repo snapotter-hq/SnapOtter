@@ -121,35 +121,116 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 
 ## Video Formats
 
-Video processing is handled by FFmpeg (static build). All common containers and codecs are supported.
+Video decoding and encoding are handled by FFmpeg (static build), so every common container and codec is supported on input.
 
-| Type | Formats |
-|------|---------|
-| **Input** | MP4, MOV, WebM, MKV, AVI, M4V, MTS, M2TS, 3GP, FLV, WMV, MPG, MPEG, TS, OGV |
-| **Output** | MP4 (H.264/H.265), WebM (VP9), MKV, AVI, MOV, GIF, WebP |
+### Input Containers (15)
 
-Subtitle formats supported for embedding and burning: SRT, VTT, ASS.
+| Format | Extensions | Typical codecs | Notes |
+|--------|-----------|----------------|-------|
+| MP4 | .mp4 | H.264, H.265, AV1 | Most widely used container |
+| QuickTime | .mov | H.264, ProRes | Apple capture/editing |
+| WebM | .webm | VP8, VP9, AV1 | Royalty-free web format |
+| Matroska | .mkv | Any | Flexible open container |
+| AVI | .avi | Various | Legacy Microsoft container |
+| M4V | .m4v | H.264 | Apple MP4 variant |
+| AVCHD | .mts | H.264 | Camcorder recordings |
+| BDAV | .m2ts | H.264 | Blu-ray / AVCHD transport stream |
+| 3GP | .3gp | H.264, MPEG-4 | Mobile capture |
+| Flash Video | .flv | H.264, VP6 | Legacy streaming |
+| Windows Media | .wmv | VC-1, WMV | Windows Media |
+| MPEG | .mpg, .mpeg | MPEG-1, MPEG-2 | DVD-era video |
+| MPEG-TS | .ts | MPEG-2, H.264 | Broadcast transport stream |
+| Ogg | .ogv | Theora | Open Ogg video |
+
+### Output Formats
+
+| Format | Extension | Video codec | Produced by |
+|--------|-----------|-------------|-------------|
+| MP4 | .mp4 | H.264 | Convert, compress, and most video tools |
+| QuickTime | .mov | H.264 | Convert Video |
+| WebM | .webm | VP9 | Convert Video |
+| GIF | .gif | - | Video to GIF |
+| WebP | .webp | - | Video to WebP (animated) |
+
+### Subtitles
+
+| Format | Extension | Operations |
+|--------|-----------|-----------|
+| SubRip | .srt | Embed, burn-in, extract, auto-generate |
+| WebVTT | .vtt | Embed, burn-in, extract, auto-generate |
+| ASS / SSA | .ass | Embed, burn-in (supports styling) |
 
 ## Audio Formats
 
-Audio processing is also handled by FFmpeg.
+Audio is also processed by FFmpeg.
 
-| Type | Formats |
-|------|---------|
-| **Input** | MP3, WAV, FLAC, AAC, M4A, OGG, OPUS, WMA, AIFF, AMR, AC3 |
-| **Output** | MP3, WAV, FLAC, AAC, M4A, OGG, OPUS |
+### Input Formats (11)
+
+| Format | Extensions | Compression | Notes |
+|--------|-----------|-------------|-------|
+| MP3 | .mp3 | Lossy | Universal compatibility |
+| WAV | .wav | Uncompressed (PCM) | Studio / editing |
+| FLAC | .flac | Lossless | Open lossless codec |
+| AAC | .aac | Lossy | Raw AAC stream |
+| M4A | .m4a | Lossy (AAC) / Lossless (ALAC) | MPEG-4 audio |
+| Ogg Vorbis | .ogg | Lossy | Open format |
+| Opus | .opus | Lossy | Modern, low-latency |
+| WMA | .wma | Lossy | Windows Media Audio |
+| AIFF | .aiff | Uncompressed (PCM) | Apple uncompressed |
+| AMR | .amr | Lossy | Speech / mobile |
+| AC-3 | .ac3 | Lossy | Dolby Digital |
+
+### Output Formats
+
+| Format | Extension | Codec | Produced by |
+|--------|-----------|-------|-------------|
+| MP3 | .mp3 | LAME | Convert Audio, Extract Audio |
+| WAV | .wav | PCM | Convert Audio, Extract Audio |
+| FLAC | .flac | FLAC (lossless) | Convert Audio |
+| Ogg | .ogg | Vorbis | Convert Audio |
+| M4A | .m4a | AAC | Convert Audio, Extract Audio |
 
 ## Document Formats
 
 Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
 
-| Type | Formats |
-|------|---------|
-| **Input** | PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, ODT, ODS, ODP, RTF, TXT, Markdown, HTML, EPUB |
-| **Output** | PDF, PDF/A, DOCX, HTML, EPUB, images (via PDF to Image) |
+### Input Formats (15)
+
+| Format | Extensions | Engine | Notes |
+|--------|-----------|--------|-------|
+| PDF | .pdf | qpdf, Ghostscript, pdfcpu | Core document format |
+| Word | .docx, .doc | LibreOffice | Microsoft Word |
+| Excel | .xlsx, .xls | LibreOffice | Microsoft Excel |
+| PowerPoint | .pptx, .ppt | LibreOffice | Microsoft PowerPoint |
+| OpenDocument | .odt, .ods, .odp | LibreOffice | Text, sheet, presentation |
+| Rich Text | .rtf | LibreOffice | Cross-app rich text |
+| Plain Text | .txt | LibreOffice, Pandoc | UTF-8 text |
+| Markdown | .md | Pandoc | CommonMark / GFM |
+| HTML | .html | WeasyPrint | Rendered to PDF |
+| EPUB | .epub | Pandoc, LibreOffice | E-book format |
+
+### Output Formats
+
+| Format | Extensions | Produced by |
+|--------|-----------|-------------|
+| PDF | .pdf | Word/Excel/PowerPoint to PDF, Markdown to PDF, HTML to PDF |
+| PDF/A | .pdf | PDF/A Convert (archival) |
+| Word | .docx, .odt, .rtf, .txt | Convert Document, PDF to Word, Markdown to Word |
+| Presentation | .pptx, .odp | Convert Presentation |
+| Spreadsheet | .xlsx, .ods, .csv | Convert Spreadsheet |
+| HTML | .html | Markdown to HTML |
+| EPUB | .epub | Convert to EPUB |
+| Images | .png, .jpg | PDF to Image |
 
 ## File Formats
 
-| Type | Formats |
-|------|---------|
-| **Input/Output** | CSV, JSON, XML, YAML, ZIP, Excel (XLSX) |
+Data and archive tools convert between structured formats and bundle files.
+
+| Format | Extensions | Conversions |
+|--------|-----------|-------------|
+| CSV | .csv | To/from JSON and Excel; split and merge; from XML |
+| JSON | .json | To/from CSV, XML, and YAML |
+| XML | .xml | To/from JSON; to CSV |
+| YAML | .yaml, .yml | To/from JSON |
+| Excel | .xlsx | To/from CSV |
+| ZIP | .zip | Create archives, extract contents |
