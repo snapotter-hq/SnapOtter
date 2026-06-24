@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libraw-dev \
     libjxl-tools \
     ghostscript \
+    qpdf \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \

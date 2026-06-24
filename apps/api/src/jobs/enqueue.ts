@@ -18,6 +18,23 @@ import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } fro
 
 const queueEventsMap = new Map<Pool, QueueEvents>();
 
+/**
+ * Recursively strip NUL (U+0000) bytes from a value. Postgres rejects NUL in
+ * text/jsonb ("invalid byte sequence for encoding UTF8: 0x00"), so a tool whose
+ * settings contain a NUL (e.g. a fuzzed string field) would 500 on the jobs
+ * insert. NUL is never meaningful in tool settings, so drop it.
+ */
+function stripNulBytes<T>(value: T): T {
+  if (typeof value === "string") return value.replace(/\0/g, "") as T;
+  if (Array.isArray(value)) return value.map(stripNulBytes) as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = stripNulBytes(v);
+    return out as T;
+  }
+  return value;
+}
+
 function getQueueEvents(pool: Pool): QueueEvents {
   let qe = queueEventsMap.get(pool);
   if (!qe) {
@@ -110,7 +127,7 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     type: data.kind,
     status: "queued",
     inputRefs: data.inputRefs,
-    settings: (data.dbSettings ?? data.settings) as Record<string, unknown>,
+    settings: stripNulBytes((data.dbSettings ?? data.settings) as Record<string, unknown>),
   });
 
   // Fire-and-forget: compute deleteAfter from team retention override

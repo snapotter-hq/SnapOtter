@@ -338,7 +338,7 @@ jobs:
             --url http://localhost:13490 \
             --checks not_a_server_error \
             --include-path-regex "^/api/v1/(tools|health|info)" \
-            --exclude-path-regex "/(remove-background|upscale|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)$" \
+            --exclude-path-regex "/(remove-background|upscale|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report
