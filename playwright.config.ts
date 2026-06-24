@@ -131,6 +131,11 @@ export default defineConfig({
       },
       testMatch: DEVICE_SPECS,
       grep: /@mobile/,
+      // @visual baselines are platform-suffixed but not browser-suffixed, so a
+      // single baseline cannot match both chromium and webkit rendering. Visual
+      // regression runs on the chromium device projects only; webkit covers the
+      // functional device flows.
+      grepInvert: /@visual/,
       dependencies: ["setup"],
     },
     {
@@ -141,6 +146,7 @@ export default defineConfig({
       },
       testMatch: DEVICE_SPECS,
       grep: /@tablet/,
+      grepInvert: /@visual/,
       dependencies: ["setup"],
     },
     {

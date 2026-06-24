@@ -54,6 +54,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
         onClick={() => setOpen((v) => !v)}
         className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold hover:opacity-90 transition-opacity"
         aria-label={username}
+        data-testid="user-menu"
       >
         {initial}
       </button>

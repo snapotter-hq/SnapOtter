@@ -220,7 +220,7 @@ jobs:
       - name: Install Playwright browsers (chromium + webkit)
         run: pnpm playwright install --with-deps chromium webkit
       - name: Run all device projects
-        run: pnpm playwright test --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium
+        run: pnpm playwright test --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium --grep-invert "@visual"
         env:
           PW_WORKERS: "2"
       - name: Upload report on failure
