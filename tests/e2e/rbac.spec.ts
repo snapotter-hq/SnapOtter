@@ -69,19 +69,6 @@ async function ensureTestUser(adminToken: string): Promise<void> {
   if (!changeRes.ok) {
     throw new Error(`Failed to clear mustChangePassword: ${changeRes.status}`);
   }
-
-  // Re-login (change-password invalidates sessions) and dismiss analytics consent
-  const reLogin = await fetch(`${API}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: TEST_USER, password: TEST_PASSWORD }),
-  });
-  const reLoginData = await reLogin.json();
-  await fetch(`${API}/api/v1/user/analytics`, {
-    method: "PUT",
-    headers: authJson(reLoginData.token),
-    body: JSON.stringify({ enabled: false }),
-  });
 }
 
 /** Delete the test user if it exists. */
@@ -217,19 +204,6 @@ base.describe("RBAC - Editor sees collaborative tabs", () => {
         currentPassword: "EditorTest1",
         newPassword: "EditorTest1",
       }),
-    });
-
-    // Re-login and dismiss analytics consent
-    const reLogin = await fetch(`${API}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "editortest", password: "EditorTest1" }),
-    });
-    const reLoginData = await reLogin.json();
-    await fetch(`${API}/api/v1/user/analytics`, {
-      method: "PUT",
-      headers: authJson(reLoginData.token),
-      body: JSON.stringify({ enabled: false }),
     });
   });
 

@@ -86,19 +86,6 @@ async function createUserWithRole(
   if (!changeRes.ok) {
     throw new Error(`Failed to clear mustChangePassword for ${username}: ${changeRes.status}`);
   }
-
-  // Re-login (change-password invalidates sessions) and dismiss analytics consent
-  const reLogin = await fetch(`${API}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  const reLoginData = await reLogin.json();
-  await fetch(`${API}/api/v1/user/analytics`, {
-    method: "PUT",
-    headers: authJson(reLoginData.token),
-    body: JSON.stringify({ enabled: false }),
-  });
 }
 
 /** Delete a user by username if it exists. */

@@ -107,19 +107,6 @@ async function createReadyUser(
     headers: authJson(loginData.token),
     body: JSON.stringify({ currentPassword: password, newPassword: password }),
   });
-
-  // Re-login and dismiss analytics consent
-  const reLogin = await fetch(`${API}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  const reLoginData = await reLogin.json();
-  await fetch(`${API}/api/v1/user/analytics`, {
-    method: "PUT",
-    headers: authJson(reLoginData.token),
-    body: JSON.stringify({ enabled: false }),
-  });
 }
 
 /** Delete a user by username if it exists. */

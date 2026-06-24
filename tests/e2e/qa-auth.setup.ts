@@ -13,18 +13,10 @@ setup("authenticate for QA", async ({ page }) => {
   await page.getByLabel("Password").fill("admin");
   await page.getByRole("button", { name: /login/i }).click();
 
-  const handle = await page.waitForFunction(() => localStorage.getItem("snapotter-token"), null, {
+  // Wait for login to complete (the token lands in localStorage)
+  await page.waitForFunction(() => localStorage.getItem("snapotter-token"), null, {
     timeout: 15_000,
   });
-  const token = await handle.jsonValue();
-
-  // Dismiss analytics consent via API (use same baseURL)
-  await page.request
-    .put("/api/v1/user/analytics", {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { enabled: false },
-    })
-    .catch(() => {});
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForURL((url) => url.pathname === "/", { timeout: 15_000 }).catch(() => {});

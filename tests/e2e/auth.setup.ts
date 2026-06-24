@@ -14,23 +14,15 @@ setup("authenticate", async ({ page }) => {
   await page.getByLabel("Password").fill("admin");
   await page.getByRole("button", { name: /login/i }).click();
 
-  // Wait for login to complete and grab the token in one step
-  const handle = await page.waitForFunction(() => localStorage.getItem("snapotter-token"), null, {
+  // Wait for login to complete (the token lands in localStorage)
+  await page.waitForFunction(() => localStorage.getItem("snapotter-token"), null, {
     timeout: 15_000,
   });
-  const token = await handle.jsonValue();
 
-  // Dismiss analytics consent via API so it won't block any test
-  const apiBase = process.env.API_URL || "http://localhost:13490";
-  await page.request.put(`${apiBase}/api/v1/user/analytics`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { enabled: false },
-  });
-
-  // Now navigate to "/" - consent guard is satisfied
+  // Navigate to "/" and let any client-side redirect settle
   // Use waitUntil: "domcontentloaded" to avoid racing with client-side redirects
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  // Wait for the URL to settle (app may redirect through consent/auth guards)
+  // Wait for the URL to settle (app may redirect through auth guards)
   await page.waitForURL((url) => url.pathname === "/", { timeout: 30_000 }).catch(() => {});
   await page.waitForLoadState("load");
 
