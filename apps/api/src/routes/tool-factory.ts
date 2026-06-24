@@ -3,7 +3,6 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import {
-  ANALYTICS_EVENTS,
   apiToolPath,
   getBundleForTool,
   type Section,
@@ -16,7 +15,6 @@ import type { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
-import { trackEvent } from "../lib/analytics.js";
 import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
 import { isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
@@ -567,14 +565,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         try {
           const result = await waitForJob(pool, jobId);
           if (result) {
-            trackEvent(ANALYTICS_EVENTS.TOOL_USED, {
-              tool_id: config.toolId,
-              status: "completed",
-              duration_ms: Date.now() - startTime,
-              category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
-              is_ai_tool: getBundleForTool(config.toolId) !== null,
-            });
-
             // Fire-and-forget: audit log must never block the response
             import("../lib/audit.js")
               .then(({ isToolAuditEnabled, auditFromRequest }) =>
@@ -609,15 +599,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
           return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
         } catch (err) {
-          trackEvent(ANALYTICS_EVENTS.TOOL_USED, {
-            tool_id: config.toolId,
-            status: "failed",
-            duration_ms: Date.now() - startTime,
-            category: TOOLS.find((t) => t.id === config.toolId)?.category ?? "unknown",
-            is_ai_tool: getBundleForTool(config.toolId) !== null,
-            error_code: err instanceof Error ? err.constructor.name : "UnknownError",
-            error_message: err instanceof Error ? err.message.slice(0, 200) : "Processing failed",
-          });
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.
           request.log.error({ err, toolId: config.toolId }, "tool processing failed");
