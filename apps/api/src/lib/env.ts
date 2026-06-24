@@ -110,14 +110,6 @@ const envSchema = z
     AUDIT_RETENTION_DAYS: z.coerce.number().default(0),
     LOG_DIR: z.string().default("./data/logs"),
     SCRATCH_PATH: z.string().default(""),
-    ANALYTICS_ENABLED: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((v) => v === "true"),
-    ANALYTICS_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1.0),
-    POSTHOG_API_KEY: z.string().default(""),
-    POSTHOG_HOST: z.string().default("https://us.i.posthog.com"),
-    SENTRY_DSN: z.string().default(""),
     DATA_ENCRYPTION_KEY: z.string().default(""),
     DATA_ENCRYPTION_KEY_PREVIOUS: z.string().default(""),
   })
