@@ -1,4 +1,4 @@
-import { APP_VERSION, en, shouldShowConsent } from "@snapotter/shared";
+import { en } from "@snapotter/shared";
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster, toast } from "sonner";
@@ -8,7 +8,7 @@ import { RouteAnnouncer } from "./components/common/route-announcer";
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
-import { identify, initAnalytics, setAnalyticsConsent } from "./lib/analytics";
+import { initAnalytics } from "./lib/analytics";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -24,9 +24,6 @@ const HomePage = lazy(() => import("./pages/home-page").then((m) => ({ default: 
 const LoginPage = lazy(() => import("./pages/login-page").then((m) => ({ default: m.LoginPage })));
 const PrivacyPolicyPage = lazy(() =>
   import("./pages/privacy-policy-page").then((m) => ({ default: m.PrivacyPolicyPage })),
-);
-const AnalyticsConsentPage = lazy(() =>
-  import("./pages/analytics-consent-page").then((m) => ({ default: m.AnalyticsConsentPage })),
 );
 const EditorPage = lazy(() =>
   import("./pages/editor-page").then((m) => ({ default: m.EditorPage })),
@@ -81,35 +78,8 @@ class ErrorBoundary extends Component<
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const {
-    loading,
-    authEnabled,
-    isAuthenticated,
-    mustChangePassword,
-    analyticsEnabled,
-    analyticsConsentShownAt,
-    analyticsConsentRemindAt,
-  } = useAuth();
-  const storeConsent = useAnalyticsStore((s) => s.consent);
-  const setStoreConsent = useAnalyticsStore((s) => s.setConsent);
-  const analyticsConfig = useAnalyticsStore((s) => s.config);
+  const { loading, authEnabled, isAuthenticated, mustChangePassword } = useAuth();
   const location = useLocation();
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only hydrate on session load, not on store changes
-  useEffect(() => {
-    if (
-      !loading &&
-      analyticsEnabled !== undefined &&
-      storeConsent.analyticsConsentShownAt === null &&
-      storeConsent.analyticsEnabled === null
-    ) {
-      setStoreConsent({
-        analyticsEnabled: analyticsEnabled ?? null,
-        analyticsConsentShownAt: analyticsConsentShownAt ?? null,
-        analyticsConsentRemindAt: analyticsConsentRemindAt ?? null,
-      });
-    }
-  }, [loading, analyticsEnabled, analyticsConsentShownAt, setStoreConsent]);
 
   // When auth is disabled, redirect away from login/change-password to prevent escalation
   if (
@@ -124,8 +94,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (
     location.pathname === "/login" ||
     location.pathname === "/change-password" ||
-    location.pathname === "/privacy" ||
-    location.pathname === "/analytics-consent"
+    location.pathname === "/privacy"
   ) {
     return <>{children}</>;
   }
@@ -150,22 +119,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/change-password" replace />;
   }
 
-  const effectiveConsent = {
-    analyticsEnabled: storeConsent.analyticsEnabled ?? analyticsEnabled ?? null,
-    analyticsConsentShownAt:
-      storeConsent.analyticsConsentShownAt ?? analyticsConsentShownAt ?? null,
-    analyticsConsentRemindAt:
-      storeConsent.analyticsConsentRemindAt ?? analyticsConsentRemindAt ?? null,
-  };
-  const serverEnabled = analyticsConfig?.enabled ?? false;
-  if (
-    authEnabled &&
-    analyticsConfig !== null &&
-    shouldShowConsent(effectiveConsent, serverEnabled)
-  ) {
-    return <Navigate to="/analytics-consent" replace />;
-  }
-
   return <>{children}</>;
 }
 
@@ -183,7 +136,6 @@ export function App() {
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const fetchAnalyticsConfig = useAnalyticsStore((s) => s.fetchConfig);
-  const analyticsConsent = useAnalyticsStore((s) => s.consent);
 
   useEffect(() => {
     fetchAnalyticsConfig();
@@ -199,22 +151,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (
-      !analyticsConfigLoaded ||
-      !analyticsConfig?.enabled ||
-      analyticsConsent.analyticsEnabled !== true
-    )
-      return;
-    void (async () => {
-      setAnalyticsConsent(true);
-      await initAnalytics(analyticsConfig);
-      identify(
-        analyticsConfig.instanceId,
-        { version: APP_VERSION },
-        { instance_id: analyticsConfig.instanceId },
-      );
-    })();
-  }, [analyticsConfigLoaded, analyticsConfig, analyticsConsent.analyticsEnabled]);
+    if (!analyticsConfigLoaded || !analyticsConfig?.enabled) return;
+    void initAnalytics(analyticsConfig);
+  }, [analyticsConfigLoaded, analyticsConfig]);
 
   return (
     <ErrorBoundary>
@@ -238,7 +177,6 @@ export function App() {
                   <Route path="/automate" element={<AutomatePage />} />
                   <Route path="/files" element={<FilesPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/analytics-consent" element={<AnalyticsConsentPage />} />
                   <Route path="/editor" element={<EditorPage />} />
                   <Route path="/:section/:toolId" element={<ToolPage />} />
                   <Route path="/" element={<HomePage />} />
