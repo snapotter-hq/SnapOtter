@@ -59,7 +59,7 @@ All configuration is done through environment variables. Every variable has a se
 
 | Variable | Default | Description |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | How long temporary files are kept before automatic deletion. |
+| `FILE_MAX_AGE_HOURS` | `72` | How long unsaved processing results (raw uploads and tool outputs) are kept before automatic deletion. Files you explicitly save to the Files library are not affected and persist until you delete them. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup job runs. |
 
 ### Appearance

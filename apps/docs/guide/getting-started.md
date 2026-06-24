@@ -134,6 +134,8 @@ Pipelines have unlimited steps by default.
 
 Every file you process can be saved to your **Files** library. SnapOtter tracks the full version history so you can trace every processing step from the original upload to the final output.
 
+Saving is explicit: results you save to the library are kept until you delete them, while results you process and leave unsaved are cleared automatically after 72 hours (configurable via `FILE_MAX_AGE_HOURS`).
+
 ### REST API & API Keys
 
 Every tool is accessible via HTTP:
