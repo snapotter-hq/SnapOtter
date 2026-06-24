@@ -10,6 +10,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        SNAPOTTER_ANALYTICS: "on"
     image: snapotter/snapotter:latest
     container_name: SnapOtter
     ports:

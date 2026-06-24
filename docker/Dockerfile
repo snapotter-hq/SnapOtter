@@ -59,6 +59,13 @@ COPY packages/shared/src ./packages/shared/src
 COPY apps/web/src ./apps/web/src
 COPY apps/web/public ./apps/web/public
 
+# Bake analytics config into the shared package before building the frontend.
+# The published image ships with analytics ON; self-builders can override:
+#   docker compose build --build-arg SNAPOTTER_ANALYTICS=off
+ARG SNAPOTTER_ANALYTICS=on
+COPY scripts/bake-analytics.mjs ./scripts/
+RUN node scripts/bake-analytics.mjs ${SNAPOTTER_ANALYTICS}
+
 # Build only the web frontend (API runs from TS source via tsx)
 RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
     pnpm --filter @snapotter/web build
