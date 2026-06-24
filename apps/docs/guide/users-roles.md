@@ -31,10 +31,10 @@ The default admin is required to change their password on first login.
 
 Users can authenticate through several methods:
 
-- **Local** -- username and password stored in the SnapOtter database
-- **OIDC** -- any OpenID Connect provider (see [OIDC / SSO](/guide/oidc))
-- **SAML** -- SAML 2.0 identity providers (see [SAML SSO](/guide/saml))
-- **SCIM** -- automated provisioning from an identity provider (see [SCIM Provisioning](/guide/scim))
+- **Local** - username and password stored in the SnapOtter database
+- **OIDC** - any OpenID Connect provider (see [OIDC / SSO](/guide/oidc))
+- **SAML** - SAML 2.0 identity providers (see [SAML SSO](/guide/saml))
+- **SCIM** - automated provisioning from an identity provider (see [SCIM Provisioning](/guide/scim))
 
 ### Disabling authentication
 

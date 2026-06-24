@@ -36,7 +36,7 @@ services:
 
     # --- Resource limits ---
     mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap -- fail fast instead of degrading the host
+    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
     cpus: 4                  # Cap CPU usage to 4 cores
     pids_limit: 512          # Prevents fork bombs
 
@@ -130,7 +130,7 @@ The only exception is **AI model downloads**: when a user installs an AI feature
 |---|---|
 | Air-gapped (no AI) | Block all outbound traffic from the container |
 | AI bundles needed | Allow HTTPS to `github.com`, `objects.githubusercontent.com`, `pypi.org`, `files.pythonhosted.org` during install, then block |
-| After AI install | Block all outbound traffic -- models are cached locally |
+| After AI install | Block all outbound traffic - models are cached locally |
 
 For reverse proxy configuration (Nginx, Traefik, Caddy, Cloudflare Tunnels), see the [Deployment guide](/guide/deployment#reverse-proxy).
 

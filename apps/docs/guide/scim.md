@@ -32,7 +32,7 @@ The response contains the token. Save it immediately; it cannot be retrieved aga
 ```json
 {
   "token": "a1b2c3d4e5f6...",
-  "message": "Save this token -- it cannot be retrieved again"
+  "message": "Save this token - it cannot be retrieved again"
 }
 ```
 

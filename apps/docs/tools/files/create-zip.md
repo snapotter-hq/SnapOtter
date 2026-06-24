@@ -14,7 +14,7 @@ Accepts multipart form data with two or more files. No settings field is require
 
 ## Parameters
 
-This tool has no configurable parameters. Upload 2--50 files of any type to bundle.
+This tool has no configurable parameters. Upload 2-50 files of any type to bundle.
 
 ## Example Request
 

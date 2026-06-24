@@ -36,10 +36,10 @@ SnapOtter ships with 21 languages out of the box. The i18n system uses a lightwe
 
 SnapOtter uses a three-tier resolution order:
 
-1. **User preference** -- stored in `localStorage("snapotter-locale")` and synced to user settings when authenticated
-2. **Browser auto-detect** -- walks the `navigator.languages` array with BCP 47 prefix matching
-3. **Instance default** -- the admin's `DEFAULT_LOCALE` env var (fetched from `GET /api/v1/config/locale`)
-4. **English fallback** -- always available
+1. **User preference** - stored in `localStorage("snapotter-locale")` and synced to user settings when authenticated
+2. **Browser auto-detect** - walks the `navigator.languages` array with BCP 47 prefix matching
+3. **Instance default** - the admin's `DEFAULT_LOCALE` env var (fetched from `GET /api/v1/config/locale`)
+4. **English fallback** - always available
 
 Users can change language from:
 - The **footer Globe selector** (desktop, always visible)
@@ -152,7 +152,7 @@ Open a PR against `main` with a title like `feat(i18n): add Swedish translation`
 When adding a new feature that needs new UI strings:
 
 1. Add the new keys to `en.ts` first (the reference file)
-2. Run `pnpm typecheck` -- every locale file will fail if missing the new key
+2. Run `pnpm typecheck` - every locale file will fail if missing the new key
 3. Add the new key to all locale files (use English as a temporary fallback)
 
 ## Configuration

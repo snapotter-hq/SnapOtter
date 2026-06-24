@@ -65,11 +65,11 @@ Live demo, per-tool landing pages, and a batch of polish fixes.
 
 ### New features
 
-- **Live demo** -- [demo.snapotter.com](https://demo.snapotter.com) lets people try SnapOtter without installing anything.
-- **Tools index page** -- Browse all 50+ tools at `/tools` with search and category filters.
-- **50+ SEO landing pages** -- Every tool now has a dedicated landing page with FAQs, use cases, and comparison tables.
-- **Background preview** -- Before-after slider shows a checkered background behind transparent images.
-- **Strong password generator** -- One-click button in the Add Members form.
+- **Live demo** - [demo.snapotter.com](https://demo.snapotter.com) lets people try SnapOtter without installing anything.
+- **Tools index page** - Browse all 50+ tools at `/tools` with search and category filters.
+- **50+ SEO landing pages** - Every tool now has a dedicated landing page with FAQs, use cases, and comparison tables.
+- **Background preview** - Before-after slider shows a checkered background behind transparent images.
+- **Strong password generator** - One-click button in the Add Members form.
 
 ### Bug fixes
 
@@ -110,28 +110,28 @@ Five new tools, a full image editor, SSO login, 20 languages. Probably should ha
 
 ### New features
 
-- **Image editor** -- Layers, brushes, shapes, adjustments, filters, curves, keyboard shortcuts. Runs in your browser, processes on your hardware.
-- **OIDC / SSO authentication** -- Login with Google, GitHub, Okta, or any OpenID Connect provider. Set a few env vars and your team uses their existing accounts.
-- **Meme generator** -- 100 built-in templates with text rendering via opentype.js. Or upload your own image.
-- **Beautify** -- Drop a screenshot in, get a polished image out. Device frames (macOS, Windows, browser), shadows, gradients, social media presets.
-- **Color blindness simulation** -- Preview how images look with protanopia, deuteranopia, tritanopia, and other color vision deficiencies.
-- **PNG transparency fixer** -- Detects fake-transparent PNGs and fixes them with BiRefNet HR-matting. Optional watermark removal via LaMa inpainting.
-- **AI canvas expand** -- Extend image boundaries with AI fill. Three quality tiers (fast, balanced, quality) depending on how much GPU time you want to trade.
-- **20 languages** -- Arabic, Chinese (Simplified/Traditional), Czech, Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, Vietnamese. RTL works for Arabic.
-- **URL import** -- Paste URLs into the dropzone or bulk-import from a list. Server-side fetch with SSRF protection.
-- **Multi-file eraser** -- Draw erase masks across multiple images, process them all with one click. Strokes persist per-image.
-- **Pipeline import/export** -- Save tool chains as JSON, share them with others.
+- **Image editor** - Layers, brushes, shapes, adjustments, filters, curves, keyboard shortcuts. Runs in your browser, processes on your hardware.
+- **OIDC / SSO authentication** - Login with Google, GitHub, Okta, or any OpenID Connect provider. Set a few env vars and your team uses their existing accounts.
+- **Meme generator** - 100 built-in templates with text rendering via opentype.js. Or upload your own image.
+- **Beautify** - Drop a screenshot in, get a polished image out. Device frames (macOS, Windows, browser), shadows, gradients, social media presets.
+- **Color blindness simulation** - Preview how images look with protanopia, deuteranopia, tritanopia, and other color vision deficiencies.
+- **PNG transparency fixer** - Detects fake-transparent PNGs and fixes them with BiRefNet HR-matting. Optional watermark removal via LaMa inpainting.
+- **AI canvas expand** - Extend image boundaries with AI fill. Three quality tiers (fast, balanced, quality) depending on how much GPU time you want to trade.
+- **20 languages** - Arabic, Chinese (Simplified/Traditional), Czech, Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, Vietnamese. RTL works for Arabic.
+- **URL import** - Paste URLs into the dropzone or bulk-import from a list. Server-side fetch with SSRF protection.
+- **Multi-file eraser** - Draw erase masks across multiple images, process them all with one click. Strokes persist per-image.
+- **Pipeline import/export** - Save tool chains as JSON, share them with others.
 - **17 new camera RAW formats** via exiftool, plus QOI, JP2, EPS, DDS, CUR, DPX, FITS, PPM/PGM/PBM, SVGZ, and APNG input. New output codecs for BMP, ICO, JP2, QOI. AVIF, TIFF, GIF, JXL, and PSD export recovered from a previously lost branch.
 
 ### Improvements
 
-- **Image enhancement** -- Replaced the old pipeline with CLAHE + normalise + gamma. New Deep Enhance toggle uses the AI model for more aggressive results.
-- **Restore photo** -- Scratch detection rewritten with 8-angle Otsu filtering. LaMa inpainting now runs at native resolution.
-- **Exotic formats everywhere** -- OCR, image-to-PDF, favicon generator, composition, stitch, and vectorize all decode HEIC, RAW, PSD now.
-- **Compress** -- Target-size tolerance tightened from 5% to 1%. Target size is the default mode. Added stepper buttons and KB/MB unit selector.
-- **Sentry cleanup** -- 644 non-actionable events filtered. Real errors now handled properly.
-- **GPU detection** -- Better diagnostics for containers where CUDA is present but nvidia-smi is not.
-- **Auth-disabled mode** -- Anonymous user is seeded in the DB with admin role. API keys, pipelines, and user files no longer break on FK constraints.
+- **Image enhancement** - Replaced the old pipeline with CLAHE + normalise + gamma. New Deep Enhance toggle uses the AI model for more aggressive results.
+- **Restore photo** - Scratch detection rewritten with 8-angle Otsu filtering. LaMa inpainting now runs at native resolution.
+- **Exotic formats everywhere** - OCR, image-to-PDF, favicon generator, composition, stitch, and vectorize all decode HEIC, RAW, PSD now.
+- **Compress** - Target-size tolerance tightened from 5% to 1%. Target size is the default mode. Added stepper buttons and KB/MB unit selector.
+- **Sentry cleanup** - 644 non-actionable events filtered. Real errors now handled properly.
+- **GPU detection** - Better diagnostics for containers where CUDA is present but nvidia-smi is not.
+- **Auth-disabled mode** - Anonymous user is seeded in the DB with admin role. API keys, pipelines, and user files no longer break on FK constraints.
 - **2,705+ new tests** across unit, integration, and E2E.
 
 ### Bug fixes

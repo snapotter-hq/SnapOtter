@@ -5,7 +5,7 @@ description: Install SnapOtter with Docker in one command. Includes Docker Compo
 # Getting Started
 
 ::: tip Try before installing
-Explore the full UI at [demo.snapotter.com](https://demo.snapotter.com) -- no signup or install required.
+Explore the full UI at [demo.snapotter.com](https://demo.snapotter.com) - no signup or install required.
 :::
 
 ## Quick Start

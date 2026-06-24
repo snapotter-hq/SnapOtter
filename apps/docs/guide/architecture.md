@@ -51,14 +51,14 @@ Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), an
 
 A Fastify v5 server exposing 157 tool routes across five modalities (image, video, audio, document, data) that handles:
 - File uploads, temporary workspace management, and persistent file storage
-- User file library with version chains (`user_files` table) -- each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
+- User file library with version chains (`user_files` table) - each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
 - Tool execution (routes each tool request to the image engine or AI bridge)
 - Pipeline orchestration (chaining multiple tools sequentially)
 - Batch processing with concurrency control via BullMQ job queues (pools: image, media, ai, docs, system)
 - User authentication, RBAC (admin/user roles with a full permission set), API key management, and rate limiting
-- Teams management -- admin-only CRUD; users are assigned to a team via the `team` field on their profile
-- Runtime settings -- a key-value store in the `settings` table that controls `disabledTools`, `enableExperimentalTools`, `loginAttemptLimit`, and other operational knobs without redeploying
-- Custom branding -- logo upload endpoint; the uploaded image is stored at `data/branding/logo.png` and served to the frontend
+- Teams management - admin-only CRUD; users are assigned to a team via the `team` field on their profile
+- Runtime settings - a key-value store in the `settings` table that controls `disabledTools`, `enableExperimentalTools`, `loginAttemptLimit`, and other operational knobs without redeploying
+- Custom branding - logo upload endpoint; the uploaded image is stored at `data/branding/logo.png` and served to the frontend
 - Swagger/OpenAPI documentation at `/api/docs`
 - Serving the built frontend as a SPA in production
 

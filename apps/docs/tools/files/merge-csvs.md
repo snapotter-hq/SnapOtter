@@ -14,7 +14,7 @@ Accepts multipart form data with two or more CSV files. No settings field is req
 
 ## Parameters
 
-This tool has no configurable parameters. Upload 2--20 CSV or TSV files with matching column headers.
+This tool has no configurable parameters. Upload 2-20 CSV or TSV files with matching column headers.
 
 ## Example Request
 

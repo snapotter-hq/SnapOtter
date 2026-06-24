@@ -8,7 +8,7 @@ Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/
 
 **Processing:** Asynchronous (returns 202, poll `/api/v1/jobs/{jobId}/progress` for status via SSE)
 
-**Model bundle:** `face-detection` (200-300 MB) -- required only for `face` mode
+**Model bundle:** `face-detection` (200-300 MB) - required only for `face` mode
 
 ## Parameters
 

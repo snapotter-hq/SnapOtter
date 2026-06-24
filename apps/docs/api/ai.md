@@ -6,7 +6,7 @@ description: AI engine reference with all local ML tools. Background removal, up
 
 The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
 
-19 Python sidecar AI tools across four modalities (image, audio, video, document), plus 2 tools with optional AI capabilities. All models run locally -- no internet required after initial model download.
+19 Python sidecar AI tools across four modalities (image, audio, video, document), plus 2 tools with optional AI capabilities. All models run locally - no internet required after initial model download.
 
 ## Architecture
 
@@ -406,7 +406,7 @@ An additional analysis endpoint is available at `POST /api/v1/tools/image/image-
 ### Content-Aware Resize (Seam Carving)
 
 **Tool route:** `content-aware-resize`  
-**Engine:** Go `caire` binary (not Python -- no GPU benefit)
+**Engine:** Go `caire` binary (not Python - no GPU benefit)
 
 Intelligently resizes images by removing low-energy seams, preserving important content.
 

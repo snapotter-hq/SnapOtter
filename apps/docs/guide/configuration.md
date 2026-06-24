@@ -142,7 +142,7 @@ volumes:
 
 The Docker Compose stack uses four volumes:
 
-- `/data` (app) -- AI models, Python venv, and user files. Mount this to keep uploaded files and installed AI bundles across restarts.
-- `/tmp/workspace` (app) -- Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
-- `SnapOtter-pgdata` (postgres) -- PostgreSQL data directory. This holds all relational data (users, settings, pipelines, jobs, audit log). Back up via `pg_dump` or volume snapshot.
-- `SnapOtter-redisdata` (redis) -- Redis append-only file for durable job queues.
+- `/data` (app) - AI models, Python venv, and user files. Mount this to keep uploaded files and installed AI bundles across restarts.
+- `/tmp/workspace` (app) - Temporary storage for files being processed. This can be ephemeral, but mounting it avoids filling up the container's writable layer.
+- `SnapOtter-pgdata` (postgres) - PostgreSQL data directory. This holds all relational data (users, settings, pipelines, jobs, audit log). Back up via `pg_dump` or volume snapshot.
+- `SnapOtter-redisdata` (redis) - Redis append-only file for durable job queues.

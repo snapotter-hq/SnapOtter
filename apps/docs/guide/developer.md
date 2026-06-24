@@ -79,7 +79,7 @@ pnpm test:coverage      # tests with coverage report
 
 ## Database
 
-PostgreSQL 17 via Drizzle ORM (pg-core). Local dev requires Postgres and Redis running -- start them with:
+PostgreSQL 17 via Drizzle ORM (pg-core). Local dev requires Postgres and Redis running - start them with:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d

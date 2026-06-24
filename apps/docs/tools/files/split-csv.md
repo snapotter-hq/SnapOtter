@@ -16,7 +16,7 @@ Accepts multipart form data with a CSV file and a JSON `settings` field.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| rowsPerFile | integer | No | `1000` | Number of data rows per output file (1--1,000,000) |
+| rowsPerFile | integer | No | `1000` | Number of data rows per output file (1-1,000,000) |
 | keepHeader | boolean | No | `true` | Repeat the header row in each output file |
 
 ## Example Request

@@ -18,8 +18,8 @@ Accepts multipart form data with a CSV or JSON file and a JSON `settings` field.
 |-----------|------|----------|---------|-------------|
 | kind | string | No | `"bar"` | Chart type: `bar`, `line`, `pie` |
 | title | string | No | - | Chart title (max 120 characters) |
-| width | integer | No | `960` | Chart width in pixels (320--2048) |
-| height | integer | No | `540` | Chart height in pixels (240--1536) |
+| width | integer | No | `960` | Chart width in pixels (320-2048) |
+| height | integer | No | `540` | Chart height in pixels (240-1536) |
 
 ## Example Request
 
