@@ -36,7 +36,6 @@ import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@
 import { format, plural } from "@/lib/format";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
-import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { OtterLogo } from "../common/otter-logo";
@@ -60,7 +59,6 @@ type Section =
   | "api-keys"
   | "ai-features"
   | "tools"
-  | "analytics"
   | "about";
 
 interface NavItem {
@@ -124,7 +122,6 @@ function useNavItems() {
         requiredPermission: "settings:write",
       },
       { id: "tools", label: t.settings.nav.tools, icon: Wrench },
-      { id: "analytics", label: t.settings.nav.productAnalytics, icon: Eye },
       { id: "about", label: t.settings.nav.about, icon: Info },
     ],
     [t],
@@ -217,7 +214,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {section === "api-keys" && <ApiKeysSection />}
           {section === "ai-features" && <AiFeaturesSection />}
           {section === "tools" && <ToolsSection />}
-          {section === "analytics" && <AnalyticsSection />}
+
           {section === "about" && <AboutSection />}
         </div>
       </div>
@@ -288,7 +285,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {section === "api-keys" && <ApiKeysSection />}
           {section === "ai-features" && <AiFeaturesSection />}
           {section === "tools" && <ToolsSection />}
-          {section === "analytics" && <AnalyticsSection />}
+
           {section === "about" && <AboutSection />}
         </div>
       </div>
@@ -3380,71 +3377,6 @@ function ToolsSection() {
           {disabledTools.length} tool{disabledTools.length !== 1 ? "s" : ""} disabled
         </span>
       </div>
-    </div>
-  );
-}
-
-/* ────────────────────── Analytics ────────────────────── */
-
-function AnalyticsSection() {
-  const { t } = useTranslation();
-  const { consent, config, configLoaded, fetchConfig, toggleAnalytics } = useAnalyticsStore();
-
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
-
-  if (!configLoaded) return null;
-
-  const disabled = !config?.enabled;
-  const enabled = consent.analyticsEnabled === true;
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">{t.analytics.settingsTitle}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{t.analytics.settingsDescription}</p>
-        <p className="text-xs text-muted-foreground">{t.analytics.settingsPrivacy}</p>
-      </div>
-
-      {disabled ? (
-        <p className="text-xs text-muted-foreground italic">
-          {t.analytics.settingsDisabledByAdmin}
-        </p>
-      ) : (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-foreground">
-            {enabled ? "Analytics enabled" : "Analytics disabled"}
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t.analytics.settingsTitle}
-            onClick={() => toggleAnalytics(!enabled)}
-            className={cn(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              enabled ? "bg-primary" : "bg-muted-foreground/30",
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-4 w-4 rounded-full bg-white transition-transform",
-                enabled ? "translate-x-6" : "translate-x-1",
-              )}
-            />
-          </button>
-        </div>
-      )}
-
-      <a
-        href="/privacy"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-xs text-primary hover:underline"
-      >
-        {t.analytics.learnMore}
-      </a>
     </div>
   );
 }
