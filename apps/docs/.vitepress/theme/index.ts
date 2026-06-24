@@ -4,6 +4,7 @@ import Layout from "./Layout.vue";
 import "./vars.css";
 import "./fonts.css";
 import "./github-stars.css";
+import "./search.css";
 
 export default {
   extends: DefaultTheme,

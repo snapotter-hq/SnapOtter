@@ -49,7 +49,14 @@ export default defineConfig({
 
   vite: {
     plugins: [
-      pagefindPlugin(),
+      pagefindPlugin({
+        btnPlaceholder: "Search",
+        placeholder: "Search tools, guides, and the API…",
+        emptyText: "No matches found. Try a different term or check the spelling.",
+        heading: "{{searchResult}} results",
+        // Show a few sub-section matches per page so deep-linked headings surface.
+        pageResultCount: 3,
+      }),
       llmstxt({
         domain: "https://docs.snapotter.com",
         customLLMsTxtTemplate: `# {title}

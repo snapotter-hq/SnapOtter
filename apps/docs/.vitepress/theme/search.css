@@ -1,0 +1,58 @@
+/**
+ * Customizations for the Pagefind-powered search dialog
+ * (vitepress-plugin-pagefind, rendered via vue-command-palette `algolia` theme).
+ *
+ * Two goals:
+ *  1. Hide the "Search by Pagefind" branding in the dialog footer.
+ *  2. Replace the misleading "No results found." text shown the instant the
+ *     dialog opens (before the user has typed anything) with a friendly hint.
+ *     We can't change the component's markup, so we detect an empty query via
+ *     the input's `:placeholder-shown` state and restyle the empty slot.
+ */
+
+/* 1. Drop the Pagefind logo/attribution in the footer.
+   The keyboard-shortcut hints (to select / navigate / close) stay. */
+.algolia .command-palette-logo {
+  display: none;
+}
+
+/* 2a. Before anything is typed (input still shows its placeholder), turn the
+   empty slot into a centered hint with an icon instead of "No results found." */
+.algolia
+  [command-dialog-wrapper]:has([command-input]:placeholder-shown)
+  [command-empty=""] {
+  flex-direction: column;
+  gap: 10px;
+  height: auto;
+  min-height: 160px;
+  /* Hide the component's default empty text without removing it from the DOM. */
+  font-size: 0;
+}
+
+.algolia
+  [command-dialog-wrapper]:has([command-input]:placeholder-shown)
+  [command-empty=""]::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  background-color: var(--vp-c-brand-1);
+  /* magnifying-glass mask so the icon picks up the brand (Otter Orange) */
+  -webkit-mask: var(--search-hint-icon) center / contain no-repeat;
+  mask: var(--search-hint-icon) center / contain no-repeat;
+  opacity: 0.9;
+}
+
+.algolia
+  [command-dialog-wrapper]:has([command-input]:placeholder-shown)
+  [command-empty=""]::after {
+  content: "Search 157 tools, guides, and the API reference";
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--vp-c-text-2);
+  max-width: 320px;
+  text-align: center;
+}
+
+:root {
+  --search-hint-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z' stroke='black' fill='none' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
