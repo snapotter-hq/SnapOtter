@@ -51,6 +51,7 @@ const envSchema = z
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
+    MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),
     MAX_PDF_PAGES: z.coerce.number().default(0),
     MAX_VIDEO_DURATION_S: z.coerce.number().default(0),
     MAX_AUDIO_DURATION_S: z.coerce.number().default(0),
