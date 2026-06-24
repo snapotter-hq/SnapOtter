@@ -237,6 +237,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
+          build-args: |
+            SNAPOTTER_ANALYTICS=on
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=snapotter/snapotter,ghcr.io/snapotter-hq/snapotter",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }}
