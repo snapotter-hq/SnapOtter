@@ -1,3 +1,4 @@
+import { KeyRound } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -236,16 +237,18 @@ export function LoginPage() {
               {oidcEnabled && (
                 <a
                   href="/api/auth/oidc/login"
-                  className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-dark transition-colors flex items-center justify-center gap-2.5"
                 >
+                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
                   {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
                 </a>
               )}
               {samlEnabled && (
                 <a
                   href="/api/auth/saml/login"
-                  className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-dark transition-colors flex items-center justify-center gap-2.5"
                 >
+                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
                   {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
                 </a>
               )}
@@ -386,16 +389,24 @@ export function LoginPage() {
               {oidcEnabled && (
                 <a
                   href="/api/auth/oidc/login"
-                  className="w-full py-3 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
+                  className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
+                  <KeyRound
+                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary transition-colors"
+                    aria-hidden="true"
+                  />
                   {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
                 </a>
               )}
               {samlEnabled && (
                 <a
                   href="/api/auth/saml/login"
-                  className="w-full py-3 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2 mt-2"
+                  className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
+                  <KeyRound
+                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary transition-colors"
+                    aria-hidden="true"
+                  />
                   {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
                 </a>
               )}
