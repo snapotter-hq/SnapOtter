@@ -254,7 +254,7 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
       { err: error, url: request.url, method: request.method },
       "Unhandled request error",
     );
-    captureException(error, request);
+    captureException(error);
   } else {
     request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
   }

@@ -566,7 +566,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         try {
           const result = await waitForJob(pool, jobId);
           if (result) {
-            trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
+            trackEvent(ANALYTICS_EVENTS.TOOL_USED, {
               tool_id: config.toolId,
               status: "completed",
               duration_ms: Date.now() - startTime,
@@ -608,7 +608,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
           return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
         } catch (err) {
-          trackEvent(request, ANALYTICS_EVENTS.TOOL_USED, {
+          trackEvent(ANALYTICS_EVENTS.TOOL_USED, {
             tool_id: config.toolId,
             status: "failed",
             duration_ms: Date.now() - startTime,

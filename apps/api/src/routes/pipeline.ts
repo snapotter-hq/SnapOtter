@@ -497,7 +497,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
 
         if (!result) {
-          trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+          trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
             step_count: pipeline.steps.length,
             tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
             is_batch: false,
@@ -511,7 +511,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
         // Check for step failure reported by the finalize handler
         if (result.resultPayload?.error) {
-          trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+          trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
             step_count: pipeline.steps.length,
             tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
             is_batch: false,
@@ -524,7 +524,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           });
         }
 
-        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
           step_count: pipeline.steps.length,
           tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
           is_batch: false,
@@ -544,7 +544,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           steps: result.resultPayload?.steps ?? [],
         });
       } catch (err) {
-        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
           step_count: pipeline.steps.length,
           tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
           is_batch: false,
@@ -1028,7 +1028,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       if (perFileChildren.length === 0) {
         // All files failed validation
-        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
           step_count: pipeline.steps.length,
           tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
           is_batch: true,
@@ -1076,7 +1076,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       const batchResult = await waitForJob("system", parentId, 30 * 60_000);
 
       if (!batchResult) {
-        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
           step_count: pipeline.steps.length,
           tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
           is_batch: true,
@@ -1150,7 +1150,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       const failedEntries = allResults.filter((r) => !r.outputRef);
 
       if (successEntries.length === 0) {
-        trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+        trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
           step_count: pipeline.steps.length,
           tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
           is_batch: true,
@@ -1164,7 +1164,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         });
       }
 
-      trackEvent(request, ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
+      trackEvent(ANALYTICS_EVENTS.PIPELINE_EXECUTED, {
         step_count: pipeline.steps.length,
         tool_ids: pipeline.steps.map((s: { toolId: string }) => s.toolId),
         is_batch: true,

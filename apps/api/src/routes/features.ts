@@ -165,7 +165,6 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       const modelsDir = getModelsDir();
 
       const installStartTime = Date.now();
-      const reqRef = request;
 
       // Hold the venv lock across the whole install so no AI tool job loads
       // native libs from the venv while pip is rewriting them (that segfaults
@@ -240,7 +239,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           shutdownDispatcher();
           setInstallProgress(null, null, null);
           updateSingleFileProgress({ jobId, phase: "complete", percent: 100, stage: "Complete" });
-          trackEvent(reqRef, ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+          trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
             bundle_id: bundleId,
             action: "installed",
             duration_ms: Date.now() - installStartTime,
@@ -366,7 +365,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       markUninstalled(bundleId);
       shutdownDispatcher();
 
-      trackEvent(request, ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+      trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
         bundle_id: bundleId,
         action: "uninstalled",
         duration_ms: 0,
@@ -410,7 +409,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         const result = await importBundleArchive(part.file);
         invalidateCache();
         shutdownDispatcher();
-        trackEvent(request, ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+        trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
           bundle_id: result.bundleId,
           action: "imported",
           duration_ms: 0,
