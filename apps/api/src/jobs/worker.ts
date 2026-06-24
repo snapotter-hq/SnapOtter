@@ -585,6 +585,7 @@ function contentTypeForFilename(name: string): string {
 
 async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
+  const startTime = Date.now();
   const totalSteps = data.totalSteps ?? 0;
 
   const steps: Array<{ step: number; toolId: string; size: number }> = [];
@@ -644,6 +645,21 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     // Batch progress (pipeline-batch only)
     if (data.parentId && data.totalFiles !== undefined) {
       await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+    }
+
+    // Analytics: emit pipeline_executed on failure
+    if (ANALYTICS_BAKED.enabled) {
+      void trackEvent(
+        ANALYTICS_EVENTS.PIPELINE_EXECUTED,
+        {
+          step_count: totalSteps,
+          tool_ids: steps.map((s) => s.toolId),
+          is_batch: data.kind === "batch-finalize",
+          duration_ms: Date.now() - startTime,
+          status: "failed",
+        },
+        data.analyticsDistinctId,
+      );
     }
 
     return {
@@ -713,6 +729,21 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   // Batch progress (pipeline-batch only)
   if (data.parentId && data.totalFiles !== undefined) {
     await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+  }
+
+  // Analytics: emit pipeline_executed on success
+  if (ANALYTICS_BAKED.enabled) {
+    void trackEvent(
+      ANALYTICS_EVENTS.PIPELINE_EXECUTED,
+      {
+        step_count: totalSteps,
+        tool_ids: steps.map((s) => s.toolId),
+        is_batch: data.kind === "batch-finalize",
+        duration_ms: Date.now() - startTime,
+        status: "completed",
+      },
+      data.analyticsDistinctId,
+    );
   }
 
   return result;
