@@ -522,3 +522,13 @@ gh workflow run release.yml
 ```
 
 Semantic-release determines the version from commit history. The `latest` Docker tag always points to the most recent release.
+
+## Analytics
+
+The official SnapOtter Docker image includes anonymous usage analytics (PostHog) and crash reporting (Sentry) to help improve the software. No IP addresses, personal identifiers, or file contents are collected.
+
+To disable analytics, build from source with the analytics flag off:
+
+```bash
+docker compose build --build-arg SNAPOTTER_ANALYTICS=off
+```
