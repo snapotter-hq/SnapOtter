@@ -273,6 +273,12 @@ jobs:
           FULL_MATRIX: "1"
           FUZZ: "1"
           FUZZ_RUNS: "50"
+          # Full-matrix tests iterate every format x tool; with 4 forks the heavy
+          # media conversions starve and hit the 30s default. Fewer forks (more
+          # CPU each) plus a generous timeout keeps them from flaking.
+          VITEST_MAX_FORKS: "2"
+          VITEST_TEST_TIMEOUT: "300000"
+          VITEST_HOOK_TIMEOUT: "120000"
 
   api-fuzz:
     name: Schemathesis API Fuzz
@@ -361,6 +367,12 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Run tests with coverage
         run: pnpm vitest run --coverage tests/unit/ tests/integration/
+        # Coverage instrumentation slows every test; fewer forks + a longer
+        # timeout keep slow media tests (e.g. qr-generate) from timing out.
+        env:
+          VITEST_MAX_FORKS: "2"
+          VITEST_TEST_TIMEOUT: "300000"
+          VITEST_HOOK_TIMEOUT: "120000"
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

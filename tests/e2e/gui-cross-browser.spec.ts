@@ -37,13 +37,18 @@ test.describe("Cross-browser smoke tests", () => {
     expect(errors).toHaveLength(0);
   });
 
-  test("home page file upload: upload image, verify preview", async ({ loggedInPage: page }) => {
+  test("tool page file upload: upload image, verify it is accepted", async ({
+    loggedInPage: page,
+  }) => {
     const errors = collectConsoleErrors(page);
+    // The home page is the tool catalog now; uploads happen on a tool page.
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     await uploadImage(page);
 
-    await expect(page.locator("[class*='text-green']").first()).toBeVisible();
+    // After a successful upload the tool's settings panel renders.
+    await expect(page.getByText("Settings").first()).toBeVisible();
 
     expect(errors).toHaveLength(0);
   });
@@ -51,7 +56,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("resize E2E: upload, set dimensions, process, download", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     await uploadImage(page);
@@ -81,7 +86,7 @@ test.describe("Cross-browser smoke tests", () => {
   }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
 
     // Upload and wait for processing to produce the before-after view
@@ -278,7 +283,7 @@ test.describe("Cross-browser smoke tests", () => {
     expect(bgColor).not.toBe("");
 
     // Navigate to a tool page and verify CSS layout
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -297,7 +302,7 @@ test.describe("Cross-browser smoke tests", () => {
   }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
     await uploadImage(page);
@@ -338,7 +343,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("drag-and-drop: drop image file onto dropzone", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -363,7 +368,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("canvas interactions: crop tool draw and adjust region", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/crop");
+    await page.goto("/image/crop");
     await page.waitForLoadState("networkidle");
 
     await uploadImage(page);
@@ -458,7 +463,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("convert E2E: upload, select format, process", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/convert");
+    await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
     await uploadImage(page);
@@ -557,7 +562,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("qr-generate: enter text and verify preview renders", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/qr-generate");
+    await page.goto("/image/qr-generate");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -593,7 +598,7 @@ test.describe("Cross-browser smoke tests", () => {
   test("collage tool renders templates across browsers", async ({ loggedInPage: page }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/collage");
+    await page.goto("/image/collage");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
@@ -645,12 +650,12 @@ test.describe("Cross-browser smoke tests", () => {
     const errors = collectConsoleErrors(page);
 
     // Navigate to resize
-    await page.goto("/resize");
+    await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(300);
 
     // Navigate to compress
-    await page.goto("/compress");
+    await page.goto("/image/compress");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(300);
 

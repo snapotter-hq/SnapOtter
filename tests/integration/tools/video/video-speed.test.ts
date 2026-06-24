@@ -11,7 +11,10 @@ import {
   type TestApp,
 } from "../../test-server.js";
 
-const MP4 = readFixture(fixtures.video.tiny("mp4"));
+// An 8s clip (44.1kHz audio): long enough that the 2x-speed duration check is
+// robust to ffmpeg's frame/packet rounding. The 1s tiny.mp4 rounded to ~0.75s
+// for a 2x speed-up, which flaked the +/-25% assertion under heavy CI load.
+const MP4 = readFixture(fixtures.video.hero.mp4);
 
 let testApp: TestApp;
 let adminToken: string;

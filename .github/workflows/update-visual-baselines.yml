@@ -12,6 +12,32 @@ jobs:
     name: Regenerate linux visual baselines
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # The e2e webServer (playwright.config.ts) creates an isolated database via
+    # tests/e2e-pg-create-db.cjs, so it needs Postgres + Redis on localhost.
+    # Without these services the webServer fails with "failed to create database".
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup

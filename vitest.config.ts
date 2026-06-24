@@ -41,8 +41,13 @@ export default defineConfig({
     poolOptions: {
       forks: {
         // Parallel forks; each fork gets an isolated DB + workspace via
-        // tests/setup/per-fork-env.ts. CI runners have 4 vCPUs.
-        maxForks: process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2)),
+        // tests/setup/per-fork-env.ts. CI runners have 4 vCPUs. Env-overridable
+        // (VITEST_MAX_FORKS) so the heavy nightly jobs (FULL_MATRIX, coverage)
+        // can drop to fewer forks and give each slow media test more CPU, which
+        // keeps format-matrix conversions from starving and timing out.
+        maxForks:
+          Number(process.env.VITEST_MAX_FORKS) ||
+          (process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2))),
       },
     },
     globalSetup: ["tests/global-setup.ts"],
