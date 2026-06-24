@@ -7,6 +7,8 @@ let initialized = false;
 
 const FILE_EXT_PATTERN =
   /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
+const FILE_EXT_TEST =
+  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/i;
 const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai|Users|home)\//g;
 
 function scrubString(str: string): string {
@@ -71,7 +73,7 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         beforeBreadcrumb(breadcrumb) {
           if (breadcrumb.category === "ui.click") return null;
           if (breadcrumb.category === "fetch" && breadcrumb.data?.url) {
-            if (FILE_EXT_PATTERN.test(breadcrumb.data.url as string)) return null;
+            if (FILE_EXT_TEST.test(breadcrumb.data.url as string)) return null;
           }
           if (breadcrumb.message) {
             breadcrumb.message = scrubString(breadcrumb.message);
