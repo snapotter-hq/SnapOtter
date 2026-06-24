@@ -81,6 +81,8 @@ test.describe("Convert tool - new output formats", () => {
 test.describe("Convert tool - format dropdown", () => {
   test("contains all 13 output formats", async ({ loggedInPage: page }) => {
     await page.goto("/image/convert");
+    // The settings panel (with the format dropdown) mounts only after a file is loaded.
+    await uploadTestImage(page);
     await page.waitForSelector("#convert-target-format", { timeout: 10_000 });
     const options = await page
       .locator("#convert-target-format option")
