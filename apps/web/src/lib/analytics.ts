@@ -4,7 +4,6 @@ type PostHogInstance = import("posthog-js").PostHog;
 
 let posthog: PostHogInstance | null = null;
 let initialized = false;
-let consentGranted = false;
 
 const FILE_EXT_PATTERN =
   /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
@@ -15,7 +14,7 @@ function scrubString(str: string): string {
 }
 
 export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
-  if (initialized || !config.enabled || !consentGranted) return;
+  if (initialized || !config.enabled) return;
 
   try {
     const posthogJs = (await import("posthog-js")).default;
@@ -25,18 +24,20 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         autocapture: false,
         capture_pageview: true,
         disable_session_recording: true,
-        session_recording: {
-          captureCanvas: { recordCanvas: false },
-          maskAllInputs: true,
-          maskTextSelector: ".file-name, .file-path, [data-file-name]",
-          blockSelector: "[data-user-content]",
-        },
         ip: false,
         persistence: "localStorage",
+        person_profiles: "always",
       }) ?? null;
     initialized = true;
   } catch (err) {
     console.warn("[analytics] PostHog init failed:", err);
+  }
+
+  if (posthog) {
+    posthog.register({
+      instance_id: config.instanceId,
+      app_version: (await import("@snapotter/shared")).APP_VERSION,
+    });
   }
 
   try {
@@ -46,8 +47,6 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         dsn: config.sentryDsn,
         sendDefaultPii: false,
         beforeSend(event) {
-          if (!consentGranted) return null;
-          startErrorReplay();
           if (event.user) {
             delete event.user.email;
             delete event.user.username;
@@ -66,7 +65,6 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
           return event;
         },
         beforeBreadcrumb(breadcrumb) {
-          if (!consentGranted) return null;
           if (breadcrumb.category === "ui.click") return null;
           if (breadcrumb.category === "fetch" && breadcrumb.data?.url) {
             if (FILE_EXT_PATTERN.test(breadcrumb.data.url as string)) return null;
@@ -83,42 +81,8 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 }
 
-export function shutdownAnalytics(): void {
-  if (posthog) {
-    try {
-      posthog.opt_out_capturing();
-      posthog.reset();
-    } catch {
-      // never throw
-    }
-  }
-  posthog = null;
-  initialized = false;
-  consentGranted = false;
-}
-
-export function setAnalyticsConsent(enabled: boolean): void {
-  consentGranted = enabled;
-  if (!enabled) {
-    shutdownAnalytics();
-  }
-}
-
-export function identify(
-  instanceId: string,
-  properties: Record<string, unknown>,
-  propertiesSetOnce?: Record<string, unknown>,
-): void {
-  if (!posthog || !consentGranted) return;
-  try {
-    posthog.identify(instanceId, properties, propertiesSetOnce);
-  } catch {
-    // never throw
-  }
-}
-
 export function track(event: string, properties?: Record<string, unknown>): void {
-  if (!posthog || !consentGranted) return;
+  if (!posthog) return;
   try {
     posthog.capture(event, properties);
   } catch {
@@ -126,11 +90,11 @@ export function track(event: string, properties?: Record<string, unknown>): void
   }
 }
 
-export function startErrorReplay(): void {
-  if (!posthog || !consentGranted) return;
+export function getDistinctId(): string | null {
+  if (!posthog) return null;
   try {
-    posthog.startSessionRecording();
+    return posthog.get_distinct_id();
   } catch {
-    // never throw
+    return null;
   }
 }
