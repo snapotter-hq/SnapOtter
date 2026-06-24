@@ -2694,35 +2694,13 @@ describe("useFeaturesStore", () => {
 // AnalyticsStore
 // ==========================================================================
 
-// Mock the analytics lib to avoid importing Sentry/PostHog
-vi.mock("@/lib/analytics", () => ({
-  setAnalyticsConsent: vi.fn(),
-  initAnalytics: vi.fn(),
-  identify: vi.fn(),
-  trackEvent: vi.fn(),
-  trackPageView: vi.fn(),
-}));
-
-import { setAnalyticsConsent } from "@/lib/analytics";
-import { apiPut } from "@/lib/api";
 import { useAnalyticsStore } from "@/stores/analytics-store";
-
-const mockApiPut = vi.mocked(apiPut);
-const mockSetAnalyticsConsent = vi.mocked(setAnalyticsConsent);
 
 describe("useAnalyticsStore", () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    mockApiPut.mockReset();
-    mockSetAnalyticsConsent.mockClear();
-    storageMap.clear();
     useAnalyticsStore.setState({
       config: null,
-      consent: {
-        analyticsEnabled: null,
-        analyticsConsentShownAt: null,
-        analyticsConsentRemindAt: null,
-      },
       configLoaded: false,
     });
   });
@@ -2730,9 +2708,6 @@ describe("useAnalyticsStore", () => {
   it("has correct initial state", () => {
     const s = useAnalyticsStore.getState();
     expect(s.config).toBeNull();
-    expect(s.consent.analyticsEnabled).toBeNull();
-    expect(s.consent.analyticsConsentShownAt).toBeNull();
-    expect(s.consent.analyticsConsentRemindAt).toBeNull();
     expect(s.configLoaded).toBe(false);
   });
 
@@ -2768,109 +2743,5 @@ describe("useAnalyticsStore", () => {
     await useAnalyticsStore.getState().fetchConfig();
     expect(useAnalyticsStore.getState().configLoaded).toBe(true);
     expect(useAnalyticsStore.getState().config).toBeNull();
-  });
-
-  it("setConsent updates consent and calls setAnalyticsConsent", () => {
-    const consent = {
-      analyticsEnabled: true,
-      analyticsConsentShownAt: 1000,
-      analyticsConsentRemindAt: null,
-    };
-    useAnalyticsStore.getState().setConsent(consent);
-
-    expect(useAnalyticsStore.getState().consent).toEqual(consent);
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(true);
-  });
-
-  it("acceptAnalytics calls API and sets consent to true", async () => {
-    mockApiPut.mockResolvedValueOnce({});
-
-    await useAnalyticsStore.getState().acceptAnalytics();
-
-    const s = useAnalyticsStore.getState();
-    expect(s.consent.analyticsEnabled).toBe(true);
-    expect(s.consent.analyticsConsentShownAt).toBeTypeOf("number");
-    expect(s.consent.analyticsConsentRemindAt).toBeNull();
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(true);
-  });
-
-  it("acceptAnalytics falls back to localStorage on API error", async () => {
-    mockApiPut.mockRejectedValueOnce(new Error("Server error"));
-
-    await useAnalyticsStore.getState().acceptAnalytics();
-
-    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "true");
-    expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(true);
-  });
-
-  it("declineAnalytics calls API and sets consent to false", async () => {
-    mockApiPut.mockResolvedValueOnce({});
-
-    await useAnalyticsStore.getState().declineAnalytics();
-
-    const s = useAnalyticsStore.getState();
-    expect(s.consent.analyticsEnabled).toBe(false);
-    expect(s.consent.analyticsConsentShownAt).toBeTypeOf("number");
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(false);
-  });
-
-  it("declineAnalytics falls back to localStorage on API error", async () => {
-    mockApiPut.mockRejectedValueOnce(new Error("Server error"));
-
-    await useAnalyticsStore.getState().declineAnalytics();
-
-    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "false");
-  });
-
-  it("remindLater calls API and sets remind-at 7 days in the future", async () => {
-    mockApiPut.mockResolvedValueOnce({});
-
-    const before = Date.now();
-    await useAnalyticsStore.getState().remindLater();
-    const after = Date.now();
-
-    const s = useAnalyticsStore.getState();
-    expect(s.consent.analyticsEnabled).toBeNull();
-    expect(s.consent.analyticsConsentRemindAt).toBeTypeOf("number");
-    // Remind-at should be approximately 7 days from now
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    expect(s.consent.analyticsConsentRemindAt!).toBeGreaterThanOrEqual(before + sevenDays);
-    expect(s.consent.analyticsConsentRemindAt!).toBeLessThanOrEqual(after + sevenDays);
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(false);
-  });
-
-  it("remindLater falls back to localStorage on API error", async () => {
-    mockApiPut.mockRejectedValueOnce(new Error("Server error"));
-
-    await useAnalyticsStore.getState().remindLater();
-
-    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "remind");
-  });
-
-  it("toggleAnalytics enables analytics", async () => {
-    mockApiPut.mockResolvedValueOnce({});
-
-    await useAnalyticsStore.getState().toggleAnalytics(true);
-
-    expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(true);
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(true);
-  });
-
-  it("toggleAnalytics disables analytics", async () => {
-    mockApiPut.mockResolvedValueOnce({});
-
-    await useAnalyticsStore.getState().toggleAnalytics(false);
-
-    expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(false);
-    expect(mockSetAnalyticsConsent).toHaveBeenCalledWith(false);
-  });
-
-  it("toggleAnalytics falls back to localStorage on API error", async () => {
-    mockApiPut.mockRejectedValueOnce(new Error("Server error"));
-
-    await useAnalyticsStore.getState().toggleAnalytics(true);
-
-    expect(localStorage.setItem).toHaveBeenCalledWith("snapotter-analytics-consent", "true");
-    expect(useAnalyticsStore.getState().consent.analyticsEnabled).toBe(true);
   });
 });

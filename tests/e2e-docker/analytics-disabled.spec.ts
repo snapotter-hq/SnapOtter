@@ -1,12 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-// ─── Analytics Disabled (ANALYTICS_ENABLED=false) ───────────────────
-// These tests verify behavior when the server has ANALYTICS_ENABLED=false.
-// They need a Docker container started with ANALYTICS_ENABLED=false.
-//
-// If the container has analytics enabled, these tests will be skipped
-// automatically by checking the config endpoint first.
+// Tests for behavior when analytics is disabled at build time.
+// Skip automatically if the container was built with analytics enabled.
 
+// biome-ignore lint/suspicious/noUndeclaredEnvVars: e2e test env var
 const BASE_URL = process.env.API_URL ?? "http://localhost:1349";
 
 async function loginFresh(page: import("@playwright/test").Page) {
@@ -16,11 +13,10 @@ async function loginFresh(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: /login/i }).click();
 }
 
-test.describe("Analytics disabled by server", () => {
+test.describe("Analytics disabled by build-time config", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ request: _request }, testInfo) => {
-    // Skip this suite if the container has analytics enabled
     const res = await fetch(`${BASE_URL}/api/v1/config/analytics`);
     const config = await res.json();
     if (config.enabled) {
@@ -43,10 +39,8 @@ test.describe("Analytics disabled by server", () => {
     });
   });
 
-  test("no consent screen when analytics disabled — goes directly to home", async ({ page }) => {
+  test("login goes directly to home (no consent screen)", async ({ page }) => {
     await loginFresh(page);
-
-    // Should go directly to home, NOT to /analytics-consent
     await page.waitForURL("/", { timeout: 30_000 });
     await expect(page).toHaveURL("/");
   });
@@ -54,17 +48,13 @@ test.describe("Analytics disabled by server", () => {
   test("no outbound network requests to PostHog or Sentry", async ({ page }) => {
     const analyticsRequests: string[] = [];
 
-    // Intercept ALL network requests and log any that hit analytics domains
     await page.route("**/*", (route) => {
       const url = route.request().url();
-      // Match on the URL host, not a substring, so an unrelated host that merely
-      // contains "posthog"/"sentry" can't false-trigger (CodeQL
-      // js/incomplete-url-substring-sanitization).
       let host = "";
       try {
         host = new URL(url).hostname.toLowerCase();
       } catch {
-        // non-URL scheme (data:/blob:) -- not an analytics host
+        // non-URL scheme
       }
       if (
         host === "posthog.com" ||
@@ -77,11 +67,9 @@ test.describe("Analytics disabled by server", () => {
       return route.continue();
     });
 
-    // Login
     await loginFresh(page);
     await page.waitForURL("/", { timeout: 30_000 });
 
-    // Navigate around
     await page.goto("/resize");
     await page.waitForTimeout(2_000);
     await page.goto("/compress");
@@ -89,7 +77,6 @@ test.describe("Analytics disabled by server", () => {
     await page.goto("/");
     await page.waitForTimeout(2_000);
 
-    // Assert ZERO analytics requests
     expect(analyticsRequests).toEqual([]);
   });
 });

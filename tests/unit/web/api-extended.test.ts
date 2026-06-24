@@ -136,31 +136,6 @@ describe("formatHeaders", () => {
     expect(headers.get("Authorization")).toBeNull();
   });
 
-  it("includes analytics consent header when no token and consent is set to true", () => {
-    storageMap.set("snapotter-analytics-consent", "true");
-    const headers = formatHeaders();
-    expect(headers.get("X-Analytics-Consent")).toBe("true");
-  });
-
-  it("includes analytics consent header when consent is false", () => {
-    storageMap.set("snapotter-analytics-consent", "false");
-    const headers = formatHeaders();
-    expect(headers.get("X-Analytics-Consent")).toBe("false");
-  });
-
-  it("does not include analytics consent header when token exists", () => {
-    storageMap.set("snapotter-token", "tok");
-    storageMap.set("snapotter-analytics-consent", "true");
-    const headers = formatHeaders();
-    expect(headers.get("X-Analytics-Consent")).toBeNull();
-  });
-
-  it("does not include analytics consent header when consent is not true/false", () => {
-    storageMap.set("snapotter-analytics-consent", "remind");
-    const headers = formatHeaders();
-    expect(headers.get("X-Analytics-Consent")).toBeNull();
-  });
-
   it("merges provided HeadersInit with auth headers", () => {
     storageMap.set("snapotter-token", "tok");
     const headers = formatHeaders({ "Content-Type": "application/json" });

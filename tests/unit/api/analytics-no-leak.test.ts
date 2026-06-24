@@ -1,86 +1,50 @@
 // Proves the server-side invariant: captureException and trackEvent
-// never send data to Sentry/PostHog when analytics is disabled or
-// the request user has not opted in.
+// never send data to Sentry/PostHog when analytics is disabled (baked).
 //
-// Tests the FIXED captureException that accepts an optional request
-// parameter and checks consent before forwarding to Sentry.
-// Also tests the FIXED PII scrubbing regex that now correctly
-// matches .heic and .heif extensions.
+// Also tests the PII scrubbing regex that correctly matches .heic and .heif.
 import { describe, expect, it } from "vitest";
 
-// The corrected regex from both apps/api and apps/web analytics modules.
-// The fix changed `he[ic]f?` to `hei[cf]?` so .heic and .heif are matched.
 const FILE_EXT_PATTERN =
   /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
 const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai)\//g;
 
 describe("Server-side Analytics No-Leak Invariant", () => {
-  describe("captureException consent gating (code review)", () => {
-    it("captureException checks isRequestOptedIn before sending to Sentry", async () => {
-      // Read the actual source to verify the consent check exists.
-      // The function signature is: captureException(error, request?)
-      // When request is provided, it checks isRequestOptedIn(request)
-      // and returns early if the user has not opted in.
+  describe("captureException gating (code review)", () => {
+    it("captureException takes only error, no request parameter", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-
       expect(source).toContain(
-        "export async function captureException(error: unknown, request?: FastifyRequest)",
+        "export async function captureException(error: unknown): Promise<void>",
       );
-      expect(source).toContain("if (request && !(await isRequestOptedIn(request))) return;");
     });
 
-    it("error handler passes request to captureException", async () => {
+    it("captureException checks sentryModule before sending", async () => {
       const fs = await import("node:fs");
-      const source = fs.readFileSync("apps/api/src/index.ts", "utf8");
-      expect(source).toContain("captureException(error, request)");
-      expect(source).not.toMatch(/captureException\(error\)[^,]/);
+      const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
+      expect(source).toContain("if (!sentryModule) return;");
     });
   });
 
-  describe("isUserOptedIn logic (code review)", () => {
-    it("returns false for anonymous user", async () => {
+  describe("initAnalytics gating (code review)", () => {
+    it("initAnalytics bails when ANALYTICS_BAKED.enabled is false", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain('if (userId === "anonymous") return false;');
+      expect(source).toContain("if (!ANALYTICS_BAKED.enabled) return;");
     });
 
-    it("checks ANALYTICS_ENABLED before user DB lookup", async () => {
+    it("shutdownAnalytics nulls both clients", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain("if (!env.ANALYTICS_ENABLED) return false;");
-    });
-  });
-
-  describe("shouldSample logic", () => {
-    it("rate 0.0 always rejects (Math.random() < 0.0 is always false)", () => {
-      for (let i = 0; i < 100; i++) {
-        expect(Math.random() < 0.0).toBe(false);
-      }
-    });
-
-    it("rate 1.0 always accepts (checked before Math.random call)", () => {
-      const rate = 1.0;
-      expect(rate >= 1.0).toBe(true);
-    });
-
-    it("rate between 0 and 1 produces a mix", () => {
-      let trueCount = 0;
-      for (let i = 0; i < 1000; i++) {
-        if (Math.random() < 0.5) trueCount++;
-      }
-      expect(trueCount).toBeGreaterThan(0);
-      expect(trueCount).toBeLessThan(1000);
+      expect(source).toContain("posthogClient = null;");
+      expect(source).toContain("sentryModule = null;");
     });
   });
 
   describe("trackEvent gating (code review)", () => {
-    it("trackEvent checks posthogClient, consent, and sampling", async () => {
+    it("trackEvent checks ANALYTICS_BAKED.enabled and posthogClient", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain(
-        "if (!posthogClient || !(await isRequestOptedIn(request)) || !shouldSample()) return;",
-      );
+      expect(source).toContain("if (!ANALYTICS_BAKED.enabled || !posthogClient) return;");
     });
 
     it("trackEvent wraps capture in try-catch (never throws)", async () => {
@@ -89,6 +53,15 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       const trackEventBlock = source.slice(source.indexOf("export async function trackEvent"));
       expect(trackEventBlock).toContain("try {");
       expect(trackEventBlock).toContain("catch {");
+    });
+
+    it("trackEvent signature: (event, properties, distinctId?)", async () => {
+      const fs = await import("node:fs");
+      const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
+      expect(source).toContain("export async function trackEvent(");
+      expect(source).toContain("event: string,");
+      expect(source).toContain("properties: Record<string, unknown>,");
+      expect(source).toContain("distinctId?: string,");
     });
   });
 
@@ -169,21 +142,6 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       const result = input.replace(FILE_PATH_PATTERN, "/[REDACTED]/");
       expect(result).not.toContain("/tmp/workspace/");
       expect(result).toContain("/[REDACTED]/");
-    });
-  });
-
-  describe("initAnalytics gating (code review)", () => {
-    it("initAnalytics bails when ANALYTICS_ENABLED is false", async () => {
-      const fs = await import("node:fs");
-      const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain("if (!env.ANALYTICS_ENABLED || !env.POSTHOG_API_KEY) return;");
-    });
-
-    it("shutdownAnalytics nulls both clients", async () => {
-      const fs = await import("node:fs");
-      const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain("posthogClient = null;");
-      expect(source).toContain("sentryModule = null;");
     });
   });
 });

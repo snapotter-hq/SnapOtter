@@ -62,7 +62,6 @@ describe("en translation completeness", () => {
       "features",
       "help",
       "errors",
-      "analytics",
       "sidebar",
       "toolCard",
       "appLayout",

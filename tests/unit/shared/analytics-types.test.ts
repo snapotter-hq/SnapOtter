@@ -1,4 +1,4 @@
-import type { AnalyticsConfig, ConsentState } from "@snapotter/shared";
+import type { AnalyticsConfig } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("AnalyticsConfig type", () => {
@@ -56,74 +56,6 @@ describe("AnalyticsConfig type", () => {
     const keys = Object.keys(config).sort();
     expect(keys).toEqual(
       ["enabled", "instanceId", "posthogApiKey", "posthogHost", "sampleRate", "sentryDsn"].sort(),
-    );
-  });
-});
-
-describe("ConsentState type", () => {
-  it("accepts all-null state (fresh user)", () => {
-    const state: ConsentState = {
-      analyticsEnabled: null,
-      analyticsConsentShownAt: null,
-      analyticsConsentRemindAt: null,
-    };
-    expect(state.analyticsEnabled).toBeNull();
-    expect(state.analyticsConsentShownAt).toBeNull();
-    expect(state.analyticsConsentRemindAt).toBeNull();
-  });
-
-  it("accepts opted-in state (analyticsEnabled = true)", () => {
-    const state: ConsentState = {
-      analyticsEnabled: true,
-      analyticsConsentShownAt: 1713800000000,
-      analyticsConsentRemindAt: null,
-    };
-    expect(state.analyticsEnabled).toBe(true);
-    expect(state.analyticsConsentShownAt).toBe(1713800000000);
-    expect(state.analyticsConsentRemindAt).toBeNull();
-  });
-
-  it("accepts declined state (analyticsEnabled = false)", () => {
-    const state: ConsentState = {
-      analyticsEnabled: false,
-      analyticsConsentShownAt: 1713800000000,
-      analyticsConsentRemindAt: null,
-    };
-    expect(state.analyticsEnabled).toBe(false);
-  });
-
-  it("accepts deferred state (maybe later with remindAt set)", () => {
-    const shownAt = Date.now() - 86400000;
-    const remindAt = Date.now() + 86400000 * 6;
-    const state: ConsentState = {
-      analyticsEnabled: null,
-      analyticsConsentShownAt: shownAt,
-      analyticsConsentRemindAt: remindAt,
-    };
-    expect(state.analyticsEnabled).toBeNull();
-    expect(state.analyticsConsentShownAt).toBe(shownAt);
-    expect(state.analyticsConsentRemindAt).toBe(remindAt);
-  });
-
-  it("accepts mixed state with analyticsEnabled true and remindAt set", () => {
-    const state: ConsentState = {
-      analyticsEnabled: true,
-      analyticsConsentShownAt: 1713800000000,
-      analyticsConsentRemindAt: 1714400000000,
-    };
-    expect(state.analyticsEnabled).toBe(true);
-    expect(state.analyticsConsentRemindAt).toBe(1714400000000);
-  });
-
-  it("has exactly the expected keys", () => {
-    const state: ConsentState = {
-      analyticsEnabled: null,
-      analyticsConsentShownAt: null,
-      analyticsConsentRemindAt: null,
-    };
-    const keys = Object.keys(state).sort();
-    expect(keys).toEqual(
-      ["analyticsConsentRemindAt", "analyticsConsentShownAt", "analyticsEnabled"].sort(),
     );
   });
 });
