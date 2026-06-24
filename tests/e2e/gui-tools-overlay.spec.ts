@@ -38,11 +38,12 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/watermark-text");
 
-      const submitBtn = page.getByTestId("watermark-text-submit");
-      await expect(submitBtn).toBeDisabled();
+      // The settings panel and submit button render only after a file is
+      // uploaded. Before upload the page shows just the dropzone.
+      await expect(page.getByTestId("watermark-text-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("watermark-text-submit")).toBeEnabled();
     });
 
     test("shows color picker for watermark text", async ({ loggedInPage: page }) => {
@@ -199,11 +200,12 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/text-overlay");
 
-      const submitBtn = page.getByTestId("text-overlay-submit");
-      await expect(submitBtn).toBeDisabled();
+      // The settings panel and submit button render only after a file is
+      // uploaded. Before upload the page shows just the dropzone.
+      await expect(page.getByTestId("text-overlay-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("text-overlay-submit")).toBeEnabled();
     });
 
     test("shows text color picker", async ({ loggedInPage: page }) => {
@@ -227,7 +229,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
-      await expect(page.getByText("Drop Shadow")).toBeVisible();
+      await expect(page.getByText("Shadow")).toBeVisible();
     });
 
     test("background box checkbox reveals box color picker", async ({ loggedInPage: page }) => {
@@ -309,6 +311,9 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
     test("shows overlay upload and position controls", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
+      // Settings render only after a base image is loaded; before that the
+      // page shows just the dropzone.
+      await uploadBaseImage(page);
 
       await expect(page.getByText("X Position")).toBeVisible();
       await expect(page.getByText("Y Position")).toBeVisible();
@@ -319,6 +324,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
     test("shows overlay image upload button", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
+      await uploadBaseImage(page);
 
       await expect(page.getByText("Overlay Image").first()).toBeVisible();
       await expect(page.getByText("Choose overlay image")).toBeVisible();
@@ -326,6 +332,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
     test("shows X and Y position number inputs", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
+      await uploadBaseImage(page);
 
       await expect(page.locator("#compose-x-position")).toBeVisible();
       await expect(page.locator("#compose-y-position")).toBeVisible();
@@ -333,12 +340,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
     test("shows opacity slider", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
+      await uploadBaseImage(page);
 
       await expect(page.locator("#compose-opacity")).toBeVisible();
     });
 
     test("blend mode dropdown has all options", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
+      await uploadBaseImage(page);
 
       const select = page.locator("#compose-blend-mode");
       await expect(select).toBeVisible();
@@ -403,9 +412,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
     test("overlay filename shown after selection", async ({ loggedInPage: page }) => {
       await page.goto("/image/compose");
-      await uploadOverlayImage(page);
+      // The overlay file input lives in the settings panel, which renders only
+      // after a base image is loaded.
+      await uploadBaseImage(page);
+      // Use a distinct overlay fixture so its filename is unambiguous (the
+      // base image is test-image.png, which would otherwise also match).
+      await uploadOverlayImage(page, "tests/fixtures/image/valid/test-50x50.webp");
 
-      await expect(page.getByText("test-image.png")).toBeVisible();
+      await expect(page.getByText("test-50x50.webp")).toBeVisible();
     });
 
     test("shows size info after processing", async ({ loggedInPage: page }) => {
@@ -582,11 +596,11 @@ test.describe("GUI Watermark & Overlay Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/border");
 
-      const submitBtn = page.getByTestId("border-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Submit is not rendered until a file is uploaded.
+      await expect(page.getByTestId("border-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("border-submit")).toBeEnabled();
     });
 
     test("processes border and shows download", async ({ loggedInPage: page }) => {
@@ -616,7 +630,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await expect(page.getByTestId("watermark-text-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("watermark-text-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("watermark-text-download")).not.toBeVisible();
@@ -634,7 +648,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await expect(page.getByTestId("text-overlay-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("text-overlay-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("text-overlay-download")).not.toBeVisible();
@@ -661,7 +675,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await expect(page.getByTestId("compose-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("compose-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.locator("#compose-x-position")).toBeVisible();
@@ -679,7 +693,7 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await expect(page.getByTestId("border-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("border-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("border-download")).not.toBeVisible();

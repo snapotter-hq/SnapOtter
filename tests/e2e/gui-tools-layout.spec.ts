@@ -123,20 +123,21 @@ test.describe("GUI Layout Tools", () => {
     test("submit disabled without file, enabled with 2+ files", async ({ loggedInPage: page }) => {
       await page.goto("/image/stitch");
 
-      const submitBtn = page.getByTestId("stitch-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Settings (and the submit button) only render after a file is uploaded.
+      await expect(page.getByTestId("stitch-submit")).toHaveCount(0);
 
       // Stitch requires 2+ images to enable submit
       const fileChooserPromise = page.waitForEvent("filechooser");
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;
-      const fixturePath = path.join(process.cwd(), "tests", "fixtures");
+      const fixturePath = path.join(process.cwd(), "tests", "fixtures", "image", "valid");
       await fileChooser.setFiles([
         path.join(fixturePath, "test-200x150.png"),
         path.join(fixturePath, "test-100x100.jpg"),
       ]);
       await page.waitForTimeout(500);
 
+      const submitBtn = page.getByTestId("stitch-submit");
       await expect(submitBtn).toBeEnabled();
     });
 
@@ -266,6 +267,7 @@ test.describe("GUI Layout Tools", () => {
 
     test("shows Quick Presets section with preset buttons", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Quick Presets")).toBeVisible();
       await expect(page.getByText("Purple Haze")).toBeVisible();
@@ -278,16 +280,21 @@ test.describe("GUI Layout Tools", () => {
 
     test("shows Background section with tabs", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Background").first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Gradient" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Solid" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Image" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "None" })).toBeVisible();
+      // exact: the uploaded file's list button ("test-image.png ...") also
+      // contains "image" as a substring.
+      await expect(page.getByRole("button", { name: "Image", exact: true })).toBeVisible();
+      // "None" also names the Device Frame and Shadow chips; scope to the first (Background tab).
+      await expect(page.getByRole("button", { name: "None" }).first()).toBeVisible();
     });
 
     test("shows Device Frame section with frame types", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Device Frame")).toBeVisible();
       await expect(page.getByRole("button", { name: "macOS" })).toBeVisible();
@@ -298,8 +305,9 @@ test.describe("GUI Layout Tools", () => {
 
     test("frame type shows Light/Dark theme toggle", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
-      // macOS is default frame -- should show theme toggle
+      // macOS is default frame, so it should show the theme toggle
       await expect(page.getByRole("button", { name: "Light" }).first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Dark" }).first()).toBeVisible();
     });
@@ -308,6 +316,7 @@ test.describe("GUI Layout Tools", () => {
       loggedInPage: page,
     }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Spacing")).toBeVisible();
       await expect(page.locator("#beautify-padding")).toBeVisible();
@@ -316,6 +325,7 @@ test.describe("GUI Layout Tools", () => {
 
     test("shows Shadow section with preset chips", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Shadow").first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Subtle" })).toBeVisible();
@@ -325,6 +335,7 @@ test.describe("GUI Layout Tools", () => {
 
     test("custom shadow shows blur/offset/color controls", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Custom" }).first().click();
       await expect(page.locator("#beautify-shadow-blur")).toBeVisible();
@@ -338,6 +349,7 @@ test.describe("GUI Layout Tools", () => {
       loggedInPage: page,
     }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Export Size")).toBeVisible();
       await page.getByText("Export Size").click();
@@ -348,6 +360,7 @@ test.describe("GUI Layout Tools", () => {
 
     test("shows collapsible Watermark section", async ({ loggedInPage: page }) => {
       await page.goto("/image/beautify");
+      await uploadTestImage(page);
 
       await expect(page.getByText("Watermark").first()).toBeVisible();
       await page.getByText("Watermark").first().click();
@@ -361,11 +374,11 @@ test.describe("GUI Layout Tools", () => {
     }) => {
       await page.goto("/image/beautify");
 
-      const submitBtn = page.getByTestId("beautify-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Settings (and the submit button) only render after a file is uploaded.
+      await expect(page.getByTestId("beautify-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("beautify-submit")).toBeEnabled();
     });
 
     test("processes beautify and shows download", async ({ loggedInPage: page }) => {

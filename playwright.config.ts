@@ -172,6 +172,15 @@ export default defineConfig({
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
         DATA_DIR: path.join(__dirname, "test-results", ".e2e-data"),
+        // Point feature-manifest detection at a path that does not exist so the
+        // API runs in native mode: it reports every AI bundle as available
+        // (apps/api/src/routes/features.ts) instead of gating each AI tool
+        // behind a multi-GB "requires an additional download" install prompt.
+        // The e2e env never downloads the model bundles, so without this every
+        // AI-tool GUI test is blocked before reaching a control. Real inference
+        // still no-ops, but the AI GUI specs assert on settings only and the
+        // processing specs skip when the sidecar is absent.
+        FEATURE_MANIFEST_PATH: path.join(__dirname, "test-results", ".no-feature-manifest.json"),
       },
       timeout: 30_000,
     },
