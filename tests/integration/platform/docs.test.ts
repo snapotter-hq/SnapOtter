@@ -23,6 +23,21 @@ describe("API docs", () => {
     expect(res.body).toContain("SnapOtter API");
   });
 
+  it("serves an ASCII-only spec (strict YAML parsers reject high-byte chars)", async () => {
+    // Schemathesis (and other strict YAML parsers) mis-decode multi-byte UTF-8
+    // sequences as C1 control characters and refuse to load the schema. Keep the
+    // spec ASCII-only: use '-' instead of em dashes, plain ASCII section dividers.
+    const res = await testApp.app.inject({ method: "GET", url: "/api/v1/openapi.yaml" });
+    const offending = [...res.body].find((ch) => ch.charCodeAt(0) > 0x7f);
+    const hint = offending
+      ? `OpenAPI spec has non-ASCII char U+${offending
+          .charCodeAt(0)
+          .toString(16)
+          .padStart(4, "0")} (${JSON.stringify(offending)}); replace it with ASCII.`
+      : "ok";
+    expect(hint).toBe("ok");
+  });
+
   it("serves the Scalar docs page without auth", async () => {
     // Scalar redirects /api/docs -> /api/docs/ (trailing slash)
     const redirect = await testApp.app.inject({
