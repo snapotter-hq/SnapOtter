@@ -18,8 +18,11 @@ setup("authenticate for QA", async ({ page }) => {
     timeout: 15_000,
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  // After login the app redirects to "/" on its own. Wait for that redirect to
+  // settle before forcing navigation, otherwise page.goto races the in-flight
+  // client-side redirect and aborts ("interrupted by another navigation").
   await page.waitForURL((url) => url.pathname === "/", { timeout: 15_000 }).catch(() => {});
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("load");
 
   await page.context().storageState({ path: authFile });

@@ -19,11 +19,11 @@ setup("authenticate", async ({ page }) => {
     timeout: 15_000,
   });
 
-  // Navigate to "/" and let any client-side redirect settle
-  // Use waitUntil: "domcontentloaded" to avoid racing with client-side redirects
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  // Wait for the URL to settle (app may redirect through auth guards)
+  // After login the app redirects to "/" on its own. Wait for that redirect to
+  // settle before forcing navigation, otherwise page.goto races the in-flight
+  // client-side redirect and aborts ("interrupted by another navigation").
   await page.waitForURL((url) => url.pathname === "/", { timeout: 30_000 }).catch(() => {});
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("load");
 
   // Fail fast on a misconfigured/stale e2e server. A correctly-configured e2e
