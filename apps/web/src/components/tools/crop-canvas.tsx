@@ -103,7 +103,14 @@ export function CropCanvas({
           crop={crop}
           onChange={(_pixelCrop, percentCrop) => onCropChange(percentCrop)}
           aspect={aspect}
-          className="max-h-full"
+          // ReactCrop's own CSS forces `.ReactCrop__child-wrapper>img` to
+          // max-height:inherit, which overrides the img's own max-h utility
+          // (higher specificity). So the viewport cap has to live on the
+          // ReactCrop element itself; the child-wrapper and img then inherit
+          // it. Without this a tall portrait renders at full natural height
+          // and overflows the viewport. max-h-full doesn't help because the
+          // ancestor chain isn't reliably height-bounded.
+          className="max-h-[calc(100dvh-12rem)]"
           ruleOfThirds={showGrid}
         >
           <img
