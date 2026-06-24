@@ -34,7 +34,12 @@ docs
 .github
 .husky
 .releaserc.json
-scripts
+# Exclude scripts/ from the build context EXCEPT bake-analytics.mjs, which
+# docker/Dockerfile COPYs to bake the analytics config. A blanket `scripts`
+# ignore breaks the production image build (COPY scripts/bake-analytics.mjs ->
+# "not found"); use dir/* + negation so the one needed file is re-included.
+scripts/*
+!scripts/bake-analytics.mjs
 
 # IDE
 .vscode
