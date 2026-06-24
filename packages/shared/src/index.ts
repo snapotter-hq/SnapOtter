@@ -1,4 +1,4 @@
-export * from "./analytics/consent.js";
+export * from "./analytics/baked.js";
 export * from "./analytics/events.js";
 export * from "./analytics/types.js";
 export * from "./audit-events.js";

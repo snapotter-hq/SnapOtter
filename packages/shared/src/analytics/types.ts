@@ -6,9 +6,3 @@ export interface AnalyticsConfig {
   sampleRate: number;
   instanceId: string;
 }
-
-export interface ConsentState {
-  analyticsEnabled: boolean | null;
-  analyticsConsentShownAt: number | null;
-  analyticsConsentRemindAt: number | null;
-}
