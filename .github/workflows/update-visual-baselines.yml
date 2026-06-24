@@ -11,7 +11,7 @@ jobs:
   update-baselines:
     name: Regenerate linux visual baselines
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     # The e2e webServer (playwright.config.ts) creates an isolated database via
     # tests/e2e-pg-create-db.cjs, so it needs Postgres + Redis on localhost.
     # Without these services the webServer fails with "failed to create database".
