@@ -106,17 +106,12 @@ describe("initAnalytics", () => {
     });
   });
 
-  it("initializes sentry when sentryDsn is provided", async () => {
+  it("does not initialize sentry (moved to preload)", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
     bakedConfig.sentryDsn = "https://test@sentry.io/123";
     await mod.initAnalytics();
-    expect(mockSentryInit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dsn: "https://test@sentry.io/123",
-        sendDefaultPii: false,
-      }),
-    );
+    expect(mockSentryInit).not.toHaveBeenCalled();
   });
 });
 
@@ -150,13 +145,13 @@ describe("shutdownAnalytics", () => {
     expect(mockShutdown).toHaveBeenCalled();
   });
 
-  it("closes sentry when initialized", async () => {
+  it("does not close sentry (moved to preload)", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
     bakedConfig.sentryDsn = "https://test@sentry.io/123";
     await mod.initAnalytics();
     await mod.shutdownAnalytics();
-    expect(mockSentryClose).toHaveBeenCalledWith(2000);
+    expect(mockSentryClose).not.toHaveBeenCalled();
   });
 });
 

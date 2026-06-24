@@ -19,8 +19,10 @@ vi.mock("posthog-js", () => ({
 }));
 
 const mockSentryInit = vi.fn();
+const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
+  browserTracingIntegration: mockBrowserTracingIntegration,
 }));
 
 const noop = () => {};

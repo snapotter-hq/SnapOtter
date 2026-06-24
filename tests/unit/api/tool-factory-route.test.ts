@@ -261,6 +261,7 @@ function createMockRequest(opts: {
         for (const p of parts) yield p;
       },
     }),
+    headers: {},
     log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
   };
 }
@@ -599,6 +600,7 @@ describe("createToolRoute", () => {
             };
           },
         }),
+        headers: {},
         log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
       };
 
@@ -644,6 +646,7 @@ describe("createToolRoute", () => {
             };
           },
         }),
+        headers: {},
         log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
       };
 
@@ -677,6 +680,7 @@ describe("createToolRoute", () => {
             };
           },
         }),
+        headers: {},
         log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
       };
 
@@ -709,6 +713,7 @@ describe("createToolRoute", () => {
             };
           },
         }),
+        headers: {},
         log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
       };
 

@@ -2,15 +2,23 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 4 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(4);
+  it("has exactly 12 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(12);
   });
 
   it("contains the expected keys", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_USED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_OPENED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("FILE_ADDED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_STARTED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_CLIENT_ERROR");
+    expect(ANALYTICS_EVENTS).toHaveProperty("RESULT_DOWNLOADED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("RESULT_SAVED");
     expect(ANALYTICS_EVENTS).toHaveProperty("SEARCH");
     expect(ANALYTICS_EVENTS).toHaveProperty("PIPELINE_EXECUTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("AI_BUNDLE_ACTION");
+    expect(ANALYTICS_EVENTS).toHaveProperty("AI_BUNDLE_PROMPTED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("BATCH_PROCESSED");
   });
 
   it("all event values are strings", () => {
@@ -47,10 +55,11 @@ describe("ANALYTICS_EVENTS", () => {
     // defined with "as const" is a plain object unless explicitly frozen.
     // We verify the values are stable by checking they haven't changed.
     const snapshot = { ...ANALYTICS_EVENTS };
-    expect(ANALYTICS_EVENTS.TOOL_USED).toBe(snapshot.TOOL_USED);
-    expect(ANALYTICS_EVENTS.SEARCH).toBe(snapshot.SEARCH);
-    expect(ANALYTICS_EVENTS.PIPELINE_EXECUTED).toBe(snapshot.PIPELINE_EXECUTED);
-    expect(ANALYTICS_EVENTS.AI_BUNDLE_ACTION).toBe(snapshot.AI_BUNDLE_ACTION);
+    for (const key of Object.keys(snapshot)) {
+      expect(ANALYTICS_EVENTS[key as keyof typeof ANALYTICS_EVENTS]).toBe(
+        snapshot[key as keyof typeof snapshot],
+      );
+    }
   });
 
   it("all values are unique (no duplicate event names)", () => {

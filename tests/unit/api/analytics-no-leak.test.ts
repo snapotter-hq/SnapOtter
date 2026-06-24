@@ -18,10 +18,10 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       );
     });
 
-    it("captureException checks sentryModule before sending", async () => {
+    it("captureException checks ANALYTICS_BAKED.enabled before sending", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
-      expect(source).toContain("if (!sentryModule) return;");
+      expect(source).toContain("if (!ANALYTICS_BAKED.enabled) return;");
     });
   });
 
@@ -32,11 +32,10 @@ describe("Server-side Analytics No-Leak Invariant", () => {
       expect(source).toContain("if (!ANALYTICS_BAKED.enabled) return;");
     });
 
-    it("shutdownAnalytics nulls both clients", async () => {
+    it("shutdownAnalytics nulls posthogClient", async () => {
       const fs = await import("node:fs");
       const source = fs.readFileSync("apps/api/src/lib/analytics.ts", "utf8");
       expect(source).toContain("posthogClient = null;");
-      expect(source).toContain("sentryModule = null;");
     });
   });
 
