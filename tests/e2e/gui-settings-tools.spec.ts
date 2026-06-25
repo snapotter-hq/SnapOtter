@@ -91,12 +91,18 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     await dialog.getByRole("button", { name: /tools/i }).click();
     await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
-    // The toggle is a role="switch" labelled with the tool name.
+    // The toggle is a role="switch" labelled with the tool name; aria-checked
+    // is true when the tool is enabled. Make sure Resize starts enabled, then
+    // disable it, asserting each flip so the post-toggle state is flushed before
+    // saving (saveToolSettings persists the current disabledTools state).
     const resizeSwitch = dialog.getByRole("switch", { name: "Resize", exact: true });
     await expect(resizeSwitch).toBeVisible();
-    if ((await resizeSwitch.getAttribute("aria-checked")) === "true") {
+    if ((await resizeSwitch.getAttribute("aria-checked")) === "false") {
       await resizeSwitch.click();
+      await expect(resizeSwitch).toHaveAttribute("aria-checked", "true");
     }
+    await resizeSwitch.click();
+    await expect(resizeSwitch).toHaveAttribute("aria-checked", "false");
 
     // Save tool settings
     await dialog.getByRole("button", { name: /save tool settings/i }).click();
@@ -108,10 +114,15 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     await page.keyboard.press("Escape");
     await page.goto("/");
 
-    // The home page is now a tool catalog of <ToolCard> links. A disabled tool
-    // is filtered out, so its link (/image/resize) is gone while siblings remain.
+    // Search is the deterministic way to probe the catalog (sections collapse,
+    // so a tool card may be absent from the DOM even when enabled). A disabled
+    // tool is filtered out of the searchable set, so searching for it yields no
+    // resize card while a sibling search still resolves.
+    const searchInput = page.locator("[data-search-input]");
+    await searchInput.fill("Resize");
+    await expect(page.locator('a[href="/image/resize"]')).toHaveCount(0, { timeout: 5_000 });
+    await searchInput.fill("Crop");
     await expect(page.locator('a[href="/image/crop"]').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('a[href="/image/resize"]')).toHaveCount(0);
 
     // The tool page itself shows the disabled message.
     await page.goto("/image/resize");

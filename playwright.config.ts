@@ -177,6 +177,10 @@ export default defineConfig({
         LOGIN_ATTEMPT_LIMIT: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
+        // The api-keys management routes cap at 30/min per IP in production. The
+        // serial api-keys specs hit the list endpoint far more than that on a
+        // shared IP, so raise the cap well above any single run.
+        API_KEYS_RATE_LIMIT_PER_MIN: "100000",
         DATABASE_URL: e2eDatabaseUrl,
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         BULLMQ_PREFIX: e2eDbName,
