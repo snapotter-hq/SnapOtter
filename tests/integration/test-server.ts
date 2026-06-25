@@ -44,6 +44,7 @@ import {
   authRoutes,
   ensureBuiltinRoles,
   ensureDefaultAdmin,
+  ensureDefaultTeam,
   requireAuth,
 } from "../../apps/api/src/plugins/auth.js";
 import { registerIpAllowlist } from "../../apps/api/src/plugins/ip-allowlist.js";
@@ -122,8 +123,9 @@ export async function buildTestApp(): Promise<TestApp> {
   // Start the BullMQ job spine (idempotent, once per fork)
   await ensureSpine();
 
-  // Seed built-in roles and default admin user (both idempotent)
+  // Seed built-in roles, the Default team, and the default admin (all idempotent)
   await ensureBuiltinRoles();
+  await ensureDefaultTeam();
   await ensureDefaultAdmin();
 
   // Clear the mustChangePassword flag so tests can use the admin freely

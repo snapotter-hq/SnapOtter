@@ -33,6 +33,7 @@ import {
   ensureAnonymousUser,
   ensureBuiltinRoles,
   ensureDefaultAdmin,
+  ensureDefaultTeam,
   getAuthUser,
 } from "./plugins/auth.js";
 import { registerMfa } from "./plugins/mfa.js";
@@ -124,6 +125,7 @@ if (env.SQLITE_MIGRATE_PATH) {
 // inserted via data statements.  The pg baseline is DDL-only, so roles are
 // seeded here at boot time.  onConflictDoNothing makes this idempotent.
 await ensureBuiltinRoles();
+await ensureDefaultTeam();
 
 if (env.AUTH_ENABLED) {
   await ensureDefaultAdmin();

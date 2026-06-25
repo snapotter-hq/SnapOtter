@@ -146,7 +146,24 @@ export function createSessionToken(): string {
   return randomUUID();
 }
 
-// ── Default admin creation ─────────────────────────────────────────
+// ── Default team + admin creation ──────────────────────────────────
+
+/**
+ * Seed the "Default" team that the rest of the platform assumes exists.
+ *
+ * The frontend People form always submits team "Default", and register,
+ * external-auth-resolver, and SCIM all fall back to a "default-team-00000000"
+ * placeholder ID for it. None of those create the row, so a fresh install has
+ * no Default team and adding a member via the UI fails with "Team not found".
+ * Seeding it here (idempotent) fixes that. The ID matches the placeholder the
+ * fallback paths use so a real row and a fallback reference line up.
+ */
+export async function ensureDefaultTeam(): Promise<void> {
+  await db
+    .insert(schema.teams)
+    .values({ id: "default-team-00000000", name: "Default" })
+    .onConflictDoNothing();
+}
 
 export async function ensureAnonymousUser(): Promise<void> {
   const [existing] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
