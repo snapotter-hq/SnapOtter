@@ -22,8 +22,13 @@ import { expect, login, openSettings, test } from "./helpers";
 // then delete it. MAX_USERS defaults to 0 (unlimited) and
 // SKIP_MUST_CHANGE_PASSWORD=true in the e2e env, so the login lands on "/".
 // ---------------------------------------------------------------------------
+// Monotonic suffix for unique throwaway usernames. A counter avoids Math.random
+// (flagged by CodeQL as insecure randomness in a security-adjacent context) and
+// is collision-free within a run.
+let throwawayUserSeq = 0;
+
 async function createThrowawayUser(adminPage: Page, password: string) {
-  const username = `pwtest-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const username = `pwtest-${Date.now()}-${++throwawayUserSeq}`;
   const token = await adminPage.evaluate(() => localStorage.getItem("snapotter-token"));
   const headers = token ? { authorization: `Bearer ${token}` } : {};
 
