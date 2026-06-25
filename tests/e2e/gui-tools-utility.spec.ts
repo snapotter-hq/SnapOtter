@@ -36,6 +36,9 @@ test.describe("GUI Utility Tools", () => {
 
     test("shows second image upload button with correct label", async ({ loggedInPage: page }) => {
       await page.goto("/image/compare");
+      // The second-image control lives in the settings panel, which renders
+      // after the first image is uploaded.
+      await uploadTestImage(page);
 
       await expect(page.getByText("Second Image").first()).toBeVisible();
       await expect(page.getByText("Choose second image")).toBeVisible();
@@ -44,16 +47,17 @@ test.describe("GUI Utility Tools", () => {
     test("submit disabled without both images", async ({ loggedInPage: page }) => {
       await page.goto("/image/compare");
 
-      const submitBtn = page.getByTestId("compare-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Pre-upload the settings panel (and its submit) is not rendered yet.
+      await expect(page.getByTestId("compare-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      // Still disabled -- no second image
-      await expect(submitBtn).toBeDisabled();
+      // Still disabled -- one image, no second image yet.
+      await expect(page.getByTestId("compare-submit")).toBeDisabled();
     });
 
     test("submit button text says Compare", async ({ loggedInPage: page }) => {
       await page.goto("/image/compare");
+      await uploadTestImage(page);
 
       await expect(page.getByTestId("compare-submit")).toHaveText(/Compare/);
     });
@@ -364,7 +368,7 @@ test.describe("GUI Utility Tools", () => {
       await uploadTestImage(page);
 
       await expect(page.locator("#bulk-rename-pattern")).toBeVisible();
-      await expect(page.locator("#bulk-rename-pattern")).toHaveValue("image-{{index}}");
+      await expect(page.locator("#bulk-rename-pattern")).toHaveValue("file-{{index}}");
     });
 
     test("shows pattern variables help text", async ({ loggedInPage: page }) => {

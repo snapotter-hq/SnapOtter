@@ -220,13 +220,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
       await expect(page.locator("#sharpen-slider-amount")).toBeVisible();
     });
 
-    test("switching to high-pass shows radius slider", async ({ loggedInPage: page }) => {
+    test("switching to high-pass shows strength slider", async ({ loggedInPage: page }) => {
       await page.goto("/image/sharpening");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "High-Pass" }).click();
-      // High-pass mode shows its own controls
-      await expect(page.getByText("Amount").first()).toBeVisible();
+      // High-pass mode shows a Strength slider.
+      await expect(page.locator("#sharpen-slider-strength")).toBeVisible();
     });
 
     test("selecting a preset enables submit", async ({ loggedInPage: page }) => {
@@ -259,13 +259,13 @@ test.describe("GUI Color & Adjustment Tools", () => {
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
-    test("shows Extract Colors button after upload", async ({ loggedInPage: page }) => {
+    test("shows Extract Palette button after upload", async ({ loggedInPage: page }) => {
       await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
       const btn = page.getByTestId("color-palette-submit");
       await expect(btn).toBeVisible();
-      await expect(btn).toHaveText(/Extract Colors/);
+      await expect(btn).toHaveText(/Extract Palette/);
     });
 
     test("submit button is enabled with file uploaded", async ({ loggedInPage: page }) => {
@@ -287,11 +287,11 @@ test.describe("GUI Color & Adjustment Tools", () => {
       await expect(page.getByText("Dominant Colors").first()).toBeVisible({ timeout: 15_000 });
     });
 
-    test("submit button text says Extract Colors", async ({ loggedInPage: page }) => {
+    test("submit button text says Extract Palette", async ({ loggedInPage: page }) => {
       await page.goto("/image/color-palette");
       await uploadTestImage(page);
 
-      await expect(page.getByTestId("color-palette-submit")).toHaveText(/Extract Colors/);
+      await expect(page.getByTestId("color-palette-submit")).toHaveText(/Extract Palette/);
     });
   });
 
@@ -499,10 +499,12 @@ test.describe("GUI Color & Adjustment Tools", () => {
     }) => {
       await page.goto("/image/color-blindness");
 
-      const submitBtn = page.getByTestId("color-blindness-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Pre-upload the page shows only the dropzone; the settings panel and its
+      // submit render after a file is loaded.
+      await expect(page.getByTestId("color-blindness-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
+      const submitBtn = page.getByTestId("color-blindness-submit");
       await expect(submitBtn).toBeEnabled();
       await expect(submitBtn).toHaveText(/Simulate/);
     });
@@ -534,7 +536,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
 
       await expect(page.getByTestId("adjust-colors-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("adjust-colors-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("adjust-colors-download")).not.toBeVisible();
@@ -553,7 +555,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
 
       await expect(page.getByTestId("sharpening-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("sharpening-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("sharpening-download")).not.toBeVisible();
@@ -570,7 +572,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
 
       await expect(page.getByTestId("replace-color-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("replace-color-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("replace-color-download")).not.toBeVisible();
@@ -588,7 +590,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
 
       await expect(page.getByTestId("color-blindness-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("color-blindness-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("color-blindness-download")).not.toBeVisible();

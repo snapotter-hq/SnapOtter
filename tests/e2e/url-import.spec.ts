@@ -4,7 +4,7 @@ test.describe("URL Image Import", () => {
   test("inline URL input is visible on tool page", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
 
-    await expect(page.getByPlaceholder("Paste image URL...")).toBeVisible();
+    await expect(page.getByPlaceholder("Paste file URL...")).toBeVisible();
   });
 
   test("bulk import modal opens and closes", async ({ loggedInPage: page }) => {
