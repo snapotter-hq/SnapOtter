@@ -170,6 +170,11 @@ export default defineConfig({
         DEFAULT_USERNAME: "admin",
         DEFAULT_PASSWORD: "admin",
         RATE_LIMIT_PER_MIN: "50000",
+        // The login route has its own per-minute attempt cap (default 10). The
+        // RBAC/settings specs sign in many times in quick succession, so raise
+        // it well above any single run to avoid 429s that cascade into
+        // create-user 401s and login timeouts.
+        LOGIN_ATTEMPT_LIMIT: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
         DATABASE_URL: e2eDatabaseUrl,

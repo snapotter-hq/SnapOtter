@@ -135,9 +135,10 @@ test.describe("Settings Dialog - Dialog state management", () => {
   test("dialog content scrolls independently of the page", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // The content pane has overflow-y-auto
-    const contentPane = page.locator(".flex-1.overflow-y-auto");
-    await expect(contentPane).toBeVisible();
+    // The dialog's content pane has overflow-y-auto. Scope to the dialog: the
+    // page's <main> also carries .flex-1.overflow-y-auto.
+    const contentPane = page.getByRole("dialog").locator(".flex-1.overflow-y-auto");
+    await expect(contentPane.first()).toBeVisible();
 
     // Navigate to a section with lots of content (Tools)
     await page.getByRole("button", { name: /tools/i }).click();
@@ -270,6 +271,9 @@ test.describe("Settings System Settings Tab - Additional coverage", () => {
       .locator("select")
       .filter({ has: page.locator("option[value='dark']") });
 
+    // The System section loads its settings asynchronously; wait for the select
+    // to render before reading its options.
+    await expect(themeSelect).toBeVisible({ timeout: 10_000 });
     const options = await themeSelect.locator("option").allTextContents();
     expect(options).toContain("Light");
     expect(options).toContain("Dark");
@@ -590,16 +594,29 @@ test.describe("Settings Teams Tab - Extended", () => {
   });
 
   test("team three-dot menu shows Rename and Delete options", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /teams/i }).click();
-    await page.waitForTimeout(500);
+    const teamName = `menuteam-${UID}`;
+    const adminToken = await getAdminToken();
+    try {
+      // A fresh instance has no teams, so create one to act on.
+      await fetch(`${API}/api/v1/teams`, {
+        method: "POST",
+        headers: authJson(adminToken),
+        body: JSON.stringify({ name: teamName }),
+      });
 
-    // Open the three-dot menu for the first team
-    const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
-    await moreButtons.first().click();
+      await openSettings(page);
+      await page.getByRole("button", { name: /teams/i }).click();
+      await expect(page.getByText(teamName)).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.locator("[role='menu']").getByText("Rename")).toBeVisible();
-    await expect(page.locator("[role='menu']").getByText("Delete")).toBeVisible();
+      // Open the three-dot menu for the team
+      const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
+      await moreButtons.last().click();
+
+      await expect(page.locator("[role='menu']").getByText("Rename")).toBeVisible();
+      await expect(page.locator("[role='menu']").getByText("Delete")).toBeVisible();
+    } finally {
+      await cleanupTeamsByPrefix(adminToken, "menuteam-");
+    }
   });
 
   test("team rename via Enter key works", async ({ loggedInPage: page }) => {
@@ -644,27 +661,40 @@ test.describe("Settings Teams Tab - Extended", () => {
   });
 
   test("team rename cancel via Escape key works", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /teams/i }).click();
-    await page.waitForTimeout(500);
+    const teamName = `escteam-${UID}`;
+    const adminToken = await getAdminToken();
+    try {
+      await fetch(`${API}/api/v1/teams`, {
+        method: "POST",
+        headers: authJson(adminToken),
+        body: JSON.stringify({ name: teamName }),
+      });
 
-    // Open menu for Default team and click Rename
-    const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
-    await moreButtons.first().click();
-    await page.locator("[role='menu']").getByText("Rename").click();
+      await openSettings(page);
+      await page.getByRole("button", { name: /teams/i }).click();
+      await page.waitForTimeout(500);
+      await expect(page.getByText(teamName)).toBeVisible({ timeout: 5_000 });
 
-    // Inline edit input should appear
-    const renameInput = page.locator("input.px-2.py-1.rounded.border.border-border.bg-background");
-    await expect(renameInput).toBeVisible({ timeout: 3_000 });
+      // Open the team menu and click Rename
+      const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
+      await moreButtons.last().click();
+      await page.locator("[role='menu']").getByText("Rename").click();
 
-    // Press Escape to cancel
-    await renameInput.press("Escape");
+      // Inline edit input should appear
+      const renameInput = page.locator(
+        "input.px-2.py-1.rounded.border.border-border.bg-background",
+      );
+      await expect(renameInput).toBeVisible({ timeout: 3_000 });
 
-    // Input should disappear
-    await expect(renameInput).not.toBeVisible();
+      // Press Escape to cancel
+      await renameInput.press("Escape");
 
-    // Default team name should still be visible
-    await expect(page.getByText("Default").first()).toBeVisible();
+      // Input should disappear and the team name should be unchanged
+      await expect(renameInput).not.toBeVisible();
+      await expect(page.getByText(teamName)).toBeVisible();
+    } finally {
+      await cleanupTeamsByPrefix(adminToken, "escteam-");
+    }
   });
 
   test("creating multiple teams shows correct member counts", async ({ loggedInPage: page }) => {

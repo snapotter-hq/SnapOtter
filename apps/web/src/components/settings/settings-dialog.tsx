@@ -2426,8 +2426,17 @@ function TeamsSection() {
                         className="px-2 py-1 rounded border border-border bg-background text-sm text-foreground w-40"
                         ref={(el) => el?.focus()}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename(tm.id);
-                          if (e.key === "Escape") setEditingTeamId(null);
+                          // Keep Enter/Escape scoped to the rename input. Without
+                          // stopping propagation, Escape also reaches the dialog's
+                          // global Escape handler and closes the whole dialog.
+                          if (e.key === "Enter") {
+                            e.stopPropagation();
+                            handleRename(tm.id);
+                          }
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setEditingTeamId(null);
+                          }
                         }}
                       />
                       <button

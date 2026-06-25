@@ -1,4 +1,4 @@
-import { changePasswordViaApi, expect, login, openSettings, putSettings, test } from "./helpers";
+import { expect, login, openSettings, putSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Settings Dialog -- General, System Settings, About tabs
@@ -722,31 +722,55 @@ test.describe("GUI Settings - Audit Log Tab", () => {
   });
 
   test("PASSWORD_CHANGED entry appears after changing password", async ({ loggedInPage: page }) => {
-    // Change password (admin -> admin) to generate audit entry
-    await openSettings(page);
-    await page.getByRole("button", { name: /security/i }).click();
+    // Generate the audit entry by changing a throwaway user's password, not the
+    // admin's: the 8-char policy means admin's "admin" password can never be
+    // restored after a temporary change, which would break the rest of the run.
+    const uid = Date.now().toString(36);
+    const username = `pwaudit-${uid}`;
+    const adminToken = await page.evaluate(() => localStorage.getItem("snapotter-token"));
 
-    // Client policy requires 8+ chars, so a temporary password is used and
-    // reverted via API right after (the current session token survives).
-    await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("Testpass123");
-    await page.getByPlaceholder("Confirm New Password").fill("Testpass123");
-    await page.getByRole("button", { name: /change password/i }).click();
-    await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+    const reg = await page.request.post("/api/auth/register", {
+      headers: { authorization: `Bearer ${adminToken}` },
+      data: { username, password: "Initpass123", role: "user" },
+    });
+    expect(reg.ok()).toBeTruthy();
 
-    const revert = await changePasswordViaApi(page, "Testpass123", "admin");
-    expect(revert.ok).toBeTruthy();
+    try {
+      const userLogin = await page.request.post("/api/auth/login", {
+        data: { username, password: "Initpass123" },
+      });
+      const { token } = await userLogin.json();
+      const change = await page.request.post("/api/auth/change-password", {
+        headers: { authorization: `Bearer ${token}` },
+        data: { currentPassword: "Initpass123", newPassword: "Newpass123" },
+      });
+      expect(change.ok()).toBeTruthy();
 
-    // Navigate to audit log and filter by PASSWORD_CHANGED
-    await page.getByRole("button", { name: /audit log/i }).click();
-    await expect(page.locator("table thead")).toBeVisible({ timeout: 10_000 });
+      // Admin views the audit log filtered to PASSWORD_CHANGED.
+      await openSettings(page);
+      await page.getByRole("button", { name: /audit log/i }).click();
+      await expect(page.locator("table thead")).toBeVisible({ timeout: 10_000 });
 
-    const filterSelect = page.locator("select").first();
-    await filterSelect.selectOption("PASSWORD_CHANGED");
+      const filterSelect = page.locator("select").first();
+      await filterSelect.selectOption("PASSWORD_CHANGED");
 
-    await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 10_000 });
-    const tableText = await page.locator("table tbody").textContent();
-    expect(tableText).toContain("PASSWORD_CHANGED");
+      await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 10_000 });
+      const tableText = await page.locator("table tbody").textContent();
+      expect(tableText).toContain("PASSWORD_CHANGED");
+    } finally {
+      const list = await page.request.get("/api/auth/users", {
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (list.ok()) {
+        const { users } = await list.json();
+        const u = users.find((x: { username: string; id: string }) => x.username === username);
+        if (u) {
+          await page.request.delete(`/api/auth/users/${u.id}`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+          });
+        }
+      }
+    }
   });
 
   test("switching audit log filter back to All actions shows unfiltered entries", async ({
