@@ -818,7 +818,7 @@ test.describe("Color Contrast", () => {
   // needs a product/brand decision (darken the accent for text, or scope these
   // checks to non-brand elements) rather than a silent test edit. Un-fixme once
   // the palette decision lands.
-  test.fixme("button text meets WCAG AA contrast ratio (4.5:1 for normal text)", async ({
+  test("button text meets WCAG AA contrast ratio (4.5:1 for normal text)", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
@@ -858,8 +858,12 @@ test.describe("Color Contrast", () => {
         const l2 = luminance(bg);
         const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 
-        // Only check buttons with non-transparent backgrounds
-        if (bg[3] !== undefined || bgColor !== "rgba(0, 0, 0, 0)") {
+        // Only check buttons that paint their own non-transparent background.
+        // A transparent background would be parsed as black and yield a bogus
+        // ratio; such buttons are covered by the comprehensive checks below,
+        // which resolve the effective (inherited) background.
+        const transparent = bgColor === "rgba(0, 0, 0, 0)" || bg[3] === 0;
+        if (!transparent) {
           results.push({ text, ratio });
         }
       }
@@ -1505,7 +1509,7 @@ test.describe("Skip-to-Content Link", () => {
 // ---------------------------------------------------------------------------
 test.describe("Comprehensive Color Contrast", () => {
   // Helper function used inside page.evaluate for contrast calculation
-  const contrastCheckScript = (selector: string, minRatio: number) => {
+  const contrastCheckScript = ({ selector, minRatio }: { selector: string; minRatio: number }) => {
     const elements = Array.from(document.querySelectorAll(selector));
     const failures: Array<{
       text: string;
@@ -1544,6 +1548,10 @@ test.describe("Comprehensive Color Contrast", () => {
 
     for (const el of elements) {
       if (!(el as HTMLElement).offsetParent && el.tagName !== "BODY") continue;
+      // Skip visually-hidden (sr-only) elements: they are clipped to ~1px and
+      // their colors are meaningless for contrast (e.g. the skip link).
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) continue;
       const text = el.textContent?.trim();
       if (!text || text.length === 0) continue;
 
@@ -1569,7 +1577,7 @@ test.describe("Comprehensive Color Contrast", () => {
     return failures;
   };
 
-  test.fixme("all headings meet WCAG AA contrast (3:1 for large text) in light theme", async ({
+  test("all headings meet WCAG AA contrast (3:1 for large text) in light theme", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
@@ -1584,7 +1592,10 @@ test.describe("Comprehensive Color Contrast", () => {
       }
     }
 
-    const failures = await page.evaluate(contrastCheckScript, "h1, h2, h3, h4, h5, h6", 3);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "h1, h2, h3, h4, h5, h6",
+      minRatio: 3,
+    });
 
     expect(
       failures,
@@ -1592,7 +1603,7 @@ test.describe("Comprehensive Color Contrast", () => {
     ).toHaveLength(0);
   });
 
-  test.fixme("all body text meets WCAG AA contrast (4.5:1 for normal text) in light theme", async ({
+  test("all body text meets WCAG AA contrast (4.5:1 for normal text) in light theme", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
@@ -1607,7 +1618,10 @@ test.describe("Comprehensive Color Contrast", () => {
       }
     }
 
-    const failures = await page.evaluate(contrastCheckScript, "p, span, label, li, td", 4.5);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "p, span, label, li, td",
+      minRatio: 4.5,
+    });
 
     expect(
       failures,
@@ -1615,12 +1629,15 @@ test.describe("Comprehensive Color Contrast", () => {
     ).toHaveLength(0);
   });
 
-  test.fixme("all buttons meet WCAG AA contrast (4.5:1) in light theme", async ({
+  test("all buttons meet WCAG AA contrast (4.5:1) in light theme", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
 
-    const failures = await page.evaluate(contrastCheckScript, "button, a[role='button']", 4.5);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "button, a[role='button']",
+      minRatio: 4.5,
+    });
 
     expect(
       failures,
@@ -1628,9 +1645,7 @@ test.describe("Comprehensive Color Contrast", () => {
     ).toHaveLength(0);
   });
 
-  test.fixme("all headings meet WCAG AA contrast (3:1) in dark theme", async ({
-    loggedInPage: page,
-  }) => {
+  test("all headings meet WCAG AA contrast (3:1) in dark theme", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
 
     // Switch to dark theme
@@ -1643,7 +1658,10 @@ test.describe("Comprehensive Color Contrast", () => {
       }
     }
 
-    const failures = await page.evaluate(contrastCheckScript, "h1, h2, h3, h4, h5, h6", 3);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "h1, h2, h3, h4, h5, h6",
+      minRatio: 3,
+    });
 
     expect(
       failures,
@@ -1659,7 +1677,7 @@ test.describe("Comprehensive Color Contrast", () => {
     }
   });
 
-  test.fixme("all body text meets WCAG AA contrast (4.5:1) in dark theme", async ({
+  test("all body text meets WCAG AA contrast (4.5:1) in dark theme", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
@@ -1674,7 +1692,10 @@ test.describe("Comprehensive Color Contrast", () => {
       }
     }
 
-    const failures = await page.evaluate(contrastCheckScript, "p, span, label, li, td", 4.5);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "p, span, label, li, td",
+      minRatio: 4.5,
+    });
 
     expect(
       failures,
@@ -1690,7 +1711,7 @@ test.describe("Comprehensive Color Contrast", () => {
     }
   });
 
-  test.fixme("all buttons meet WCAG AA contrast (4.5:1) in dark theme", async ({
+  test("all buttons meet WCAG AA contrast (4.5:1) in dark theme", async ({
     loggedInPage: page,
   }) => {
     await page.waitForLoadState("networkidle");
@@ -1705,7 +1726,10 @@ test.describe("Comprehensive Color Contrast", () => {
       }
     }
 
-    const failures = await page.evaluate(contrastCheckScript, "button, a[role='button']", 4.5);
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "button, a[role='button']",
+      minRatio: 4.5,
+    });
 
     expect(
       failures,
@@ -1721,15 +1745,14 @@ test.describe("Comprehensive Color Contrast", () => {
     }
   });
 
-  test.fixme("tool page text elements meet WCAG AA contrast", async ({ loggedInPage: page }) => {
+  test("tool page text elements meet WCAG AA contrast", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
-    const failures = await page.evaluate(
-      contrastCheckScript,
-      "h1, h2, h3, h4, p, span, label, button",
-      3,
-    );
+    const failures = await page.evaluate(contrastCheckScript, {
+      selector: "h1, h2, h3, h4, p, span, label, button",
+      minRatio: 3,
+    });
 
     expect(
       failures,
@@ -2442,7 +2465,7 @@ test.describe("Image Accessibility - QR Generate", () => {
 // Color Contrast on Tool Pages (both themes)
 // ---------------------------------------------------------------------------
 test.describe("Color Contrast - Tool Page Dark Theme", () => {
-  test.fixme("tool page meets WCAG AA contrast in dark theme", async ({ loggedInPage: page }) => {
+  test("tool page meets WCAG AA contrast in dark theme", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
@@ -2489,6 +2512,9 @@ test.describe("Color Contrast - Tool Page Dark Theme", () => {
 
       for (const el of elements) {
         if (!(el as HTMLElement).offsetParent && el.tagName !== "BODY") continue;
+        // Skip visually-hidden (sr-only) elements (e.g. the skip link).
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) continue;
         const text = el.textContent?.trim();
         if (!text || text.length === 0) continue;
 
