@@ -54,6 +54,7 @@ import { filePreviewRoutes } from "./routes/file-preview.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerMemeTemplates } from "./routes/meme-templates.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
+import { preferencesRoutes } from "./routes/preferences.js";
 import { registerProgressRoutes } from "./routes/progress.js";
 import { rolesRoutes } from "./routes/roles.js";
 import { settingsRoutes } from "./routes/settings.js";
@@ -361,6 +362,9 @@ await registerIpAllowlist(app);
 
 // Public config routes (no auth required)
 await configRoutes(app);
+
+// Per-user preferences (any authenticated user)
+await preferencesRoutes(app);
 
 // Auth middleware (must be registered before routes it protects)
 await authMiddleware(app);

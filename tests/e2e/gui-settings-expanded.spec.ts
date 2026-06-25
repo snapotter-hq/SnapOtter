@@ -343,23 +343,45 @@ test.describe("Settings Security Tab - Extended password flows", () => {
     await expect(page.getByText("Change Password").first()).toBeVisible();
   });
 
-  // Deferred: the form enforces an 8-character minimum, but the default admin
-  // password is "admin" (5 chars), so "change to the same value" can never be
-  // submitted. Needs a product/test decision (seed an 8-char admin password, or
-  // rework this to assert the min-length validation instead).
-  test.fixme("changing password to same value succeeds (admin -> admin)", async ({
-    loggedInPage: page,
-  }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /security/i }).click();
+  test("changing a password to the same value succeeds", async ({ loggedInPage: page }) => {
+    // Exercised on a throwaway user: the default admin password ("admin", 5
+    // chars) cannot satisfy the 8-char policy, so a same-value change can never
+    // be submitted for it.
+    const uid = Date.now().toString(36);
+    const username = `samepw-${uid}`;
+    const password = "Samepass123";
+    const adminToken = await page.evaluate(() => localStorage.getItem("snapotter-token"));
 
-    await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("admin");
-    await page.getByPlaceholder("Confirm New Password").fill("admin");
-    await page.getByRole("button", { name: /change password/i }).click();
+    const reg = await page.request.post("/api/auth/register", {
+      headers: { authorization: `Bearer ${adminToken}` },
+      data: { username, password, role: "user" },
+    });
+    expect(reg.ok()).toBeTruthy();
 
-    // Should show success (not "passwords do not match")
-    await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+    try {
+      const userLogin = await page.request.post("/api/auth/login", {
+        data: { username, password },
+      });
+      const { token } = await userLogin.json();
+      const change = await page.request.post("/api/auth/change-password", {
+        headers: { authorization: `Bearer ${token}` },
+        data: { currentPassword: password, newPassword: password },
+      });
+      expect(change.ok()).toBeTruthy();
+    } finally {
+      const list = await page.request.get("/api/auth/users", {
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (list.ok()) {
+        const { users } = await list.json();
+        const u = users.find((x: { username: string; id: string }) => x.username === username);
+        if (u) {
+          await page.request.delete(`/api/auth/users/${u.id}`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+          });
+        }
+      }
+    }
   });
 });
 
@@ -1469,11 +1491,7 @@ base.describe("RBAC GUI - User tab content access", () => {
     await deleteUser(adminToken, USER_GUI);
   });
 
-  // Deferred: the General tab saves defaultToolView via the admin-only
-  // PUT /v1/settings (requires settings:write), so a non-admin user gets 403.
-  // A per-user view preference (userPreferences table) would be the real fix;
-  // this needs a product decision rather than a test edit.
-  base.test.fixme("user can save General tab preferences", async ({ page }) => {
+  base.test("user can save General tab preferences", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
 

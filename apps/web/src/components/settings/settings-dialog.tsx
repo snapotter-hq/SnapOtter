@@ -362,10 +362,10 @@ function GeneralSection() {
             role: "unknown",
           });
         }),
-      apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
         .then((data) => {
-          if (data.settings.defaultToolView) {
-            setDefaultToolView(data.settings.defaultToolView);
+          if (typeof data.preferences.defaultToolView === "string") {
+            setDefaultToolView(data.preferences.defaultToolView);
           }
         })
         .catch(() => {}),
@@ -397,7 +397,10 @@ function GeneralSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", { defaultToolView });
+      // The default home view is a per-user preference, not instance config, so
+      // it saves to /v1/preferences (writable by any authenticated user) rather
+      // than the admin-only /v1/settings.
+      await apiPut("/v1/preferences", { defaultToolView });
       setSaveMsg(t.settings.general.saveSuccess);
       useSettingsStore.setState({
         defaultToolView: defaultToolView as "sidebar" | "fullscreen",

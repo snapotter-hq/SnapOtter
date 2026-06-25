@@ -63,6 +63,7 @@ import { registerFetchUrlsRoute } from "../../apps/api/src/routes/fetch-urls.js"
 import { fileRoutes } from "../../apps/api/src/routes/files.js";
 import { registerMemeTemplates } from "../../apps/api/src/routes/meme-templates.js";
 import { registerPipelineRoutes } from "../../apps/api/src/routes/pipeline.js";
+import { preferencesRoutes } from "../../apps/api/src/routes/preferences.js";
 import { registerProgressRoutes } from "../../apps/api/src/routes/progress.js";
 import { rolesRoutes } from "../../apps/api/src/routes/roles.js";
 import { settingsRoutes } from "../../apps/api/src/routes/settings.js";
@@ -208,6 +209,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // API key management routes
   await apiKeyRoutes(app);
+
+  // Per-user preferences
+  await preferencesRoutes(app);
 
   // Settings routes
   await settingsRoutes(app);
