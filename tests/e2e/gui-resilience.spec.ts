@@ -18,8 +18,10 @@ test.describe("Connection Banner & Disconnection", () => {
       window.dispatchEvent(new Event("offline"));
     });
 
-    // The banner renders role="status" aria-live="polite" when disconnected
-    const banner = page.locator("[role='status'][aria-live='polite']");
+    // The connection banner is a non-sr-only role="status" region. The
+    // RouteAnnouncer also renders role="status" aria-live="polite", so filter by
+    // the banner's visible message text to avoid a strict-mode multi-match.
+    const banner = page.getByRole("status").filter({ hasText: /offline|connect/i });
     await expect(banner).toBeVisible({ timeout: 10_000 });
     await expect(banner).toContainText(/offline|reconnecting/i);
 
@@ -27,7 +29,7 @@ test.describe("Connection Banner & Disconnection", () => {
     await page.unroute("**/api/v1/health");
   });
 
-  test("UI remains interactive while disconnected (sidebar and main visible)", async ({
+  test("UI remains interactive while disconnected (banner and main visible)", async ({
     loggedInPage: page,
   }) => {
     // Block health endpoint
@@ -35,12 +37,12 @@ test.describe("Connection Banner & Disconnection", () => {
     await page.evaluate(() => window.dispatchEvent(new Event("offline")));
 
     // Wait for banner
-    await expect(page.locator("[role='status'][aria-live='polite']")).toBeVisible({
+    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).toBeVisible({
       timeout: 10_000,
     });
 
-    // Sidebar and main content should still be visible and interactive
-    await expect(page.locator("aside")).toBeVisible();
+    // Top-nav banner and main content should still be visible and interactive
+    await expect(page.getByRole("banner")).toBeVisible();
     await expect(page.locator("main")).toBeVisible();
 
     // Should be able to click sidebar navigation (SPA navigation still works)
@@ -58,7 +60,7 @@ test.describe("Connection Banner & Disconnection", () => {
     await page.route("**/api/v1/health", (route) => route.abort());
     await page.evaluate(() => window.dispatchEvent(new Event("offline")));
 
-    await expect(page.locator("[role='status'][aria-live='polite']")).toBeVisible({
+    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -67,7 +69,7 @@ test.describe("Connection Banner & Disconnection", () => {
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
 
     // Banner should eventually disappear (after "reconnected" state clears)
-    await expect(page.locator("[role='status'][aria-live='polite']")).not.toBeVisible({
+    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).not.toBeVisible({
       timeout: 15_000,
     });
   });
@@ -90,7 +92,7 @@ test.describe("Connection Banner & Disconnection", () => {
     // An error indication should be visible (toast or inline error)
     // Sonner renders toasts in [data-sonner-toaster] or there is inline error text
     const toaster = page.locator("[data-sonner-toaster]");
-    const inlineError = page.locator("text=/error|failed|unable/i");
+    const inlineError = page.locator("text=/error|failed|unable|interrupted|reconnect/i");
     const hasToast = await toaster.isVisible({ timeout: 3000 }).catch(() => false);
     const hasInlineError = await inlineError
       .first()
@@ -122,7 +124,7 @@ test.describe("Connection Banner & Disconnection", () => {
 
     // The page should not crash -- sidebar, main, and dropzone remain
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // An error message should be displayed somewhere (error text or toast)
     const bodyText = await page.textContent("body");
@@ -140,96 +142,70 @@ test.describe("Error Boundaries", () => {
   test("navigating to nonexistent tool shows error state, not white screen", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/nonexistent-tool-xyz");
+    // A two-segment /<section>/<toolId> path with an unknown toolId hits
+    // ToolPage's "Tool not found" guard. A single-segment path would render the
+    // standalone 404 page ("Page not found") instead.
+    await page.goto("/image/nonexistent-tool-xyz");
 
     // The ToolPage component renders "Tool not found" inside AppLayout
     await expect(page.getByText("Tool not found")).toBeVisible({ timeout: 10_000 });
 
-    // Sidebar should still be accessible (not a white screen)
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+    // The top-nav banner should still be visible (not a white screen)
+    await expect(page.getByRole("banner")).toBeVisible();
   });
 
   test("error boundary fallback has Go Home button that navigates to /", async ({
     loggedInPage: page,
   }) => {
-    // Inject a render error to trigger the ErrorBoundary fallback
+    // Trigger the REAL ErrorBoundary (App.tsx) rather than fabricating its
+    // markup. Abort the Automate page's lazy chunk so its dynamic import()
+    // rejects; React.lazy turns that rejection into a thrown error during
+    // render, which propagates to the nearest error boundary.
+    await page.route("**/automate-page-*.js", (route) => route.abort());
+
     await page.goto("/");
-    await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("banner")).toBeVisible({ timeout: 10_000 });
+    await page
+      .getByRole("link", { name: /automate/i })
+      .first()
+      .click();
 
-    // Simulate the ErrorBoundary fallback using safe DOM APIs
-    await page.evaluate(() => {
-      const root = document.getElementById("root");
-      if (!root) return;
-
-      // Clear the root safely
-      while (root.firstChild) root.removeChild(root.firstChild);
-
-      // Build the fallback UI the same way the ErrorBoundary renders it
-      const wrapper = document.createElement("div");
-      wrapper.className = "flex h-screen items-center justify-center bg-background text-foreground";
-
-      const inner = document.createElement("div");
-      inner.className = "text-center space-y-4 max-w-md px-6";
-
-      const h1 = document.createElement("h1");
-      h1.className = "text-xl font-semibold";
-      h1.textContent = "Something went wrong";
-
-      const p = document.createElement("p");
-      p.className = "text-sm text-muted-foreground";
-      p.textContent = "Test error";
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium";
-      btn.textContent = "Go Home";
-      btn.addEventListener("click", () => {
-        window.location.href = "/";
-      });
-
-      inner.appendChild(h1);
-      inner.appendChild(p);
-      inner.appendChild(btn);
-      wrapper.appendChild(inner);
-      root.appendChild(wrapper);
-    });
-
-    // The "Go Home" button should be visible
+    // The real fallback renders its "Go Home" button (exactly one element).
     const goHomeBtn = page.getByRole("button", { name: "Go Home" });
-    await expect(goHomeBtn).toBeVisible({ timeout: 5_000 });
+    await expect(goHomeBtn).toBeVisible({ timeout: 10_000 });
 
-    // Click it and verify navigation to home
+    // The home chunk is not blocked, so Go Home navigates back successfully.
     await goHomeBtn.click();
     await page.waitForURL("/", { timeout: 10_000 });
+    await page.unroute("**/automate-page-*.js");
   });
 
   test("no white screen of death on any error path", async ({ loggedInPage: page }) => {
-    // Navigate to an invalid route -- should show "Tool not found", not blank
-    await page.goto("/this-tool-does-not-exist");
+    // Navigate to an invalid tool route -- should show "Tool not found", not blank
+    await page.goto("/image/this-tool-does-not-exist");
     await page.waitForLoadState("domcontentloaded");
 
     // Body must have visible content (not a white screen)
     const bodyHtml = await page.evaluate(() => document.body.innerHTML.trim());
     expect(bodyHtml.length).toBeGreaterThan(0);
 
-    // The page should show either "Tool not found" or a sidebar at minimum
-    const hasContent =
-      (await page
-        .getByText("Tool not found")
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false)) ||
-      (await page
-        .locator("aside")
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false));
-    expect(hasContent).toBeTruthy();
+    // The page should show either "Tool not found" or the top-nav banner at
+    // minimum. locator.or() waits for whichever resolves first -- isVisible()
+    // does not auto-wait, so it would race React's first render.
+    const errorState = page.getByText("Tool not found").or(page.getByRole("banner"));
+    await expect(errorState.first()).toBeVisible({ timeout: 10_000 });
   });
 
   test("multiple invalid tool routes all show error state consistently", async ({
     loggedInPage: page,
   }) => {
-    const invalidRoutes = ["/nonexistent-tool-xyz", "/fake-tool-abc", "/definitely-not-a-tool"];
+    // Two-segment tool routes with unknown toolIds hit ToolPage's
+    // "Tool not found" guard (single-segment paths render the standalone 404).
+    const invalidRoutes = [
+      "/image/nonexistent-tool-xyz",
+      "/image/fake-tool-abc",
+      "/image/definitely-not-a-tool",
+    ];
 
     for (const route of invalidRoutes) {
       await page.goto(route);
@@ -395,10 +371,12 @@ test.describe("Add Member Form Validation", () => {
     // Submit the form
     await page.getByRole("button", { name: /create/i }).click();
 
-    // Should show an error (duplicate username or user-already-exists)
-    await expect(page.getByText(/already exists|duplicate|conflict|taken|failed/i)).toBeVisible({
-      timeout: 10_000,
-    });
+    // The add-user form surfaces the failure in its role="alert" region. The API
+    // returns "Username already exists" (409) for an existing username.
+    await expect(page.getByRole("alert")).toContainText(
+      /already exists|duplicate|conflict|taken|failed/i,
+      { timeout: 10_000 },
+    );
   });
 });
 
@@ -566,8 +544,7 @@ test.describe("Toast Behavior", () => {
     // The page should still be interactive after processing
     // (toasts don't block interaction)
     await expect(page.locator("main")).toBeVisible();
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
   });
 });
 
@@ -811,7 +788,7 @@ test.describe("Server Error Handling", () => {
 
     // Page should not crash
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // Some error indication should be visible (toast or inline)
     const bodyText = await page.textContent("body");
@@ -842,7 +819,7 @@ test.describe("Server Error Handling", () => {
 
     // The page should remain functional -- no white screen
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // An error indication should be visible (inline error text or toast)
     const bodyText = await page.textContent("body");
@@ -898,7 +875,7 @@ test.describe("Server Error Handling", () => {
 
     // Page should not crash
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // Body should contain meaningful content (not blank)
     const bodyText = await page.textContent("body");
@@ -969,7 +946,7 @@ test.describe("Server Error Handling", () => {
 
     // Page should not crash
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // Body should contain meaningful content (not blank)
     const bodyText = await page.textContent("body");
@@ -996,7 +973,7 @@ test.describe("Server Error Handling", () => {
     // After a reasonable wait, the page should still be interactive
     await page.waitForTimeout(5000);
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     // Body content should exist (not a blank/crashed page)
     const bodyText = await page.textContent("body");
@@ -1123,7 +1100,7 @@ test.describe("Toast Notifications", () => {
     });
 
     // If a toast appeared, verify the sidebar is still clickable
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
     const searchInput = page.getByPlaceholder(/search/i).first();
     if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       await searchInput.focus();
@@ -1260,7 +1237,7 @@ test.describe("Server Error Handling - Service Unavailable", () => {
     await page.waitForTimeout(3000);
 
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     const bodyText = await page.textContent("body");
     expect(bodyText).toBeDefined();
@@ -1352,7 +1329,7 @@ test.describe("Browser History Navigation", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     const content = await page.textContent("body");
     expect(content).toBeDefined();
@@ -1373,13 +1350,19 @@ test.describe("Browser History Navigation", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
   });
 
   test("rapid back/forward navigation through 5 pages does not crash", async ({
     loggedInPage: page,
   }) => {
-    const routes = ["/resize", "/compress", "/rotate", "/convert", "/crop"];
+    const routes = [
+      "/image/resize",
+      "/image/compress",
+      "/image/rotate",
+      "/image/convert",
+      "/image/crop",
+    ];
     for (const route of routes) {
       await page.goto(route);
       await page.waitForLoadState("domcontentloaded");
@@ -1433,7 +1416,7 @@ test.describe("Concurrent Error Recovery", () => {
 
     // App should still be alive
     await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("banner")).toBeVisible();
 
     await page.unroute("**/api/v1/tools/**");
     await page.unroute("**/api/v1/health");
@@ -1541,33 +1524,30 @@ test.describe("Resize Aspect Ratio Lock", () => {
 // ---------------------------------------------------------------------------
 test.describe("Settings Persistence", () => {
   test("theme selection persists across page navigations", async ({ loggedInPage: page }) => {
-    const themeBtn = page.locator("button[title='Toggle Theme']");
-    const isDarkBefore = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    );
+    // The toggle lives in the top-nav, which renders only after the lazy app
+    // shell mounts. Wait for it explicitly -- locator.isVisible() does NOT
+    // auto-wait, so a bare isVisible() check races the first render.
+    const themeBtn = page.locator("button[title='Toggle theme']");
+    await expect(themeBtn).toBeVisible({ timeout: 15_000 });
 
-    if (await themeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await themeBtn.click();
-      await page.waitForTimeout(300);
-    }
+    const isDark = () => page.evaluate(() => document.documentElement.classList.contains("dark"));
+    const isDarkBefore = await isDark();
 
-    const isDarkAfterToggle = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    );
-    expect(isDarkAfterToggle).not.toBe(isDarkBefore);
+    await themeBtn.click();
+    // The `dark` class flips synchronously in the store's setTheme, but assert
+    // on the resulting state rather than a fixed wait.
+    await expect.poll(isDark, { timeout: 5_000 }).toBe(!isDarkBefore);
+    const isDarkAfterToggle = await isDark();
 
-    // Navigate away and back
+    // Navigate away and back; the choice persists via localStorage.
     await page.goto("/image/resize");
-    await page.waitForLoadState("domcontentloaded");
+    await expect(themeBtn).toBeVisible({ timeout: 15_000 });
 
-    const isDarkAfterNav = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    );
+    const isDarkAfterNav = await isDark();
     expect(isDarkAfterNav).toBe(isDarkAfterToggle);
 
-    // Toggle back to original
-    if (await themeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await themeBtn.click();
-    }
+    // Toggle back to the original theme.
+    await themeBtn.click();
+    await expect.poll(isDark, { timeout: 5_000 }).toBe(isDarkBefore);
   });
 });

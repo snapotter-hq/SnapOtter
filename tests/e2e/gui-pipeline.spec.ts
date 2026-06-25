@@ -5,7 +5,8 @@ import { expect, getTestImagePath, test, waitForProcessing } from "./helpers";
 // Helper: resolve fixture image paths
 // ---------------------------------------------------------------------------
 function getFixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  // Fixtures live under tests/fixtures/image/valid/ in 2.0.
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
