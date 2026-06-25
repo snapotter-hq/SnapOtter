@@ -34,6 +34,18 @@ async function createThrowawayUser(adminPage: Page, password: string) {
   expect(res.ok()).toBeTruthy();
   const { id } = (await res.json()) as { id: string };
 
+  // register always sets mustChangePassword, which would redirect the user's
+  // first login to /change-password. Clear it by changing the password to
+  // itself via the API so the later UI login lands on "/".
+  const userLogin = await adminPage.request.post("/api/auth/login", {
+    data: { username, password },
+  });
+  const { token: userToken } = (await userLogin.json()) as { token: string };
+  await adminPage.request.post("/api/auth/change-password", {
+    headers: { authorization: `Bearer ${userToken}` },
+    data: { currentPassword: password, newPassword: password },
+  });
+
   return {
     username,
     id,

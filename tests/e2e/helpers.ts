@@ -192,9 +192,16 @@ export const test = base.extend<{ loggedInPage: Page }>({
     // storageState is already loaded by the project config, just navigate
     await page.goto("/");
     // Self-heal global server settings a crashed predecessor may have left
-    // mutated (e.g. defaultToolView=fullscreen redirects "/" and hides the
-    // sidebar, cascading failures through every later test on the shared DB).
-    const healed = await putSettings(page, { defaultToolView: "sidebar", defaultLocale: "en" });
+    // mutated. defaultToolView=fullscreen would redirect "/"; a stale locale
+    // would translate the whole UI. loginAttemptLimit is the important one:
+    // saving System Settings persists it at the UI default ("5"), which
+    // overrides the env LOGIN_ATTEMPT_LIMIT=100000 and 429s every later admin
+    // login, cascading into "create user 401" failures across the serial run.
+    const healed = await putSettings(page, {
+      defaultToolView: "sidebar",
+      defaultLocale: "en",
+      loginAttemptLimit: "100000",
+    });
     if (!healed.ok) {
       console.warn(`loggedInPage settings heal failed with status ${healed.status}`);
     }

@@ -58,12 +58,9 @@ test.describe("State bleed between tools", () => {
     await page.getByTestId("rotate-submit").click();
     await waitForProcessing(page);
 
-    await expect(
-      page
-        .getByRole("button", { name: /^download$/i })
-        .or(page.getByRole("link", { name: /download/i }))
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-download-button]").first()).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Navigate to resize
     await page.goto("/image/resize");
@@ -81,6 +78,8 @@ test.describe("State bleed between tools", () => {
     // Process an image in compress
     await page.goto("/image/compress");
     await uploadTestImage(page);
+    // Compress defaults to Target Size mode (needs a value); switch to Quality.
+    await page.getByRole("button", { name: "Quality" }).click();
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
 
@@ -230,6 +229,8 @@ test.describe("State bleed between tools", () => {
     // Process in compress (shows size comparison after processing)
     await page.goto("/image/compress");
     await uploadTestImage(page);
+    // Compress defaults to Target Size mode (needs a value); switch to Quality.
+    await page.getByRole("button", { name: "Quality" }).click();
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
 
