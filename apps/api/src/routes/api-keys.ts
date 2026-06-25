@@ -118,6 +118,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       const selectFields = {
         id: schema.apiKeys.id,
         name: schema.apiKeys.name,
+        keyPrefix: schema.apiKeys.keyPrefix,
         permissions: schema.apiKeys.permissions,
         createdAt: schema.apiKeys.createdAt,
         lastUsedAt: schema.apiKeys.lastUsedAt,
@@ -134,6 +135,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         apiKeys: keys.map((k) => ({
           id: k.id,
           name: k.name,
+          prefix: k.keyPrefix ?? "",
           permissions: k.permissions ?? null,
           createdAt: k.createdAt.toISOString(),
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
