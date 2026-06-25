@@ -33,6 +33,7 @@ const envSchema = z
     CONCURRENT_JOBS: z.coerce.number().default(0),
     MAX_MEGAPIXELS: z.coerce.number().default(0),
     RATE_LIMIT_PER_MIN: z.coerce.number().default(300),
+    API_KEYS_RATE_LIMIT_PER_MIN: z.coerce.number().default(30),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
     SQLITE_MIGRATE_PATH: z.string().default(""),
     FILES_STORAGE_PATH: z.string().default("./data/files"),
