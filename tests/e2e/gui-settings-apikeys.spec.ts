@@ -1,8 +1,28 @@
+import type { Page } from "@playwright/test";
 import { expect, openSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Settings Dialog -- API Keys tab (full coverage)
+// Settings Dialog: API Keys tab (full coverage)
 // ---------------------------------------------------------------------------
+
+// The delete control carries both title="Delete key" and aria-label="Delete
+// key" (t.a11y.deleteKey), so getByRole resolves it by accessible name.
+const deleteKeyButton = (page: Page) => page.getByRole("button", { name: "Delete key" }).first();
+
+// Best-effort cleanup. The API keys list (GET /v1/api-keys) is shared by every
+// admin session and is rate-limited to 30/min per IP. Across parallel spec
+// files a transient 429 makes loadKeys() return empty, so the Delete control
+// can momentarily be absent. Cleanup must never fail an otherwise-passing test,
+// so this only clicks when the button is actually present.
+async function cleanupApiKey(page: Page): Promise<void> {
+  page.removeAllListeners("dialog");
+  page.on("dialog", (d) => d.accept());
+  const btn = deleteKeyButton(page);
+  if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await btn.click();
+    await page.waitForTimeout(300);
+  }
+}
 
 test.describe("GUI Settings - API Keys Tab", () => {
   test("navigates to API Keys tab and shows heading", async ({ loggedInPage: page }) => {
@@ -42,11 +62,7 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await expect(page.getByText("Store this key securely")).toBeVisible();
 
     // Clean up: delete the key we just created
-    const deleteBtn = page.locator("button[title='Delete key']").first();
-    if (await deleteBtn.isVisible()) {
-      page.on("dialog", (d) => d.accept());
-      await deleteBtn.click();
-    }
+    await cleanupApiKey(page);
   });
 
   test("generated key appears in Existing Keys list", async ({ loggedInPage: page }) => {
@@ -65,9 +81,7 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await expect(page.getByText(keyName)).toBeVisible();
 
     // Clean up
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 
   test("permission scoping toggle reveals checkboxes", async ({ loggedInPage: page }) => {
@@ -117,9 +131,12 @@ test.describe("GUI Settings - API Keys Tab", () => {
     // Confirm the key appears
     await expect(page.getByText(keyName)).toBeVisible();
 
-    // Delete it
+    // Delete it (the row's delete control must be present after the key lists)
+    page.removeAllListeners("dialog");
     page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
+    const deleteBtn = deleteKeyButton(page);
+    await expect(deleteBtn).toBeVisible({ timeout: 5_000 });
+    await deleteBtn.click();
 
     // Key name should disappear
     await expect(page.getByText(keyName)).not.toBeVisible({ timeout: 5_000 });
@@ -198,9 +215,7 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await expect(page.getByText("Scoped:")).toBeVisible();
 
     // Clean up
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 
   test("generated key starts with si_ prefix", async ({ loggedInPage: page }) => {
@@ -220,9 +235,7 @@ test.describe("GUI Settings - API Keys Tab", () => {
     expect(keyText).toMatch(/^si_/);
 
     // Clean up
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 
   test("existing keys show prefix and creation date", async ({ loggedInPage: page }) => {
@@ -234,14 +247,16 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await page.getByRole("button", { name: /generate api key/i }).click();
     await expect(page.locator("code.font-mono")).toBeVisible({ timeout: 5_000 });
 
-    // In the Existing Keys list, the key entry should show the prefix (si_...)
+    // In the Existing Keys list, the entry shows the key name plus a metadata
+    // line with the prefix and creation date. The list prefix is a SHA-256
+    // lookup hash (not the raw "si_" key), so assert on the name and the
+    // "Created" date rather than the key value.
     await expect(page.getByText("Existing Keys")).toBeVisible();
-    await expect(page.getByText(/si_/).first()).toBeVisible();
+    await expect(page.getByText(keyName)).toBeVisible();
+    await expect(page.getByText(/Created/).first()).toBeVisible();
 
     // Clean up
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 
   test("generating a key without a name still works", async ({ loggedInPage: page }) => {
@@ -258,9 +273,7 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await expect(page.getByText("Store this key securely")).toBeVisible();
 
     // Clean up
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 
   test("cancel on delete confirmation keeps the key", async ({ loggedInPage: page }) => {
@@ -273,16 +286,16 @@ test.describe("GUI Settings - API Keys Tab", () => {
     await expect(page.locator("code.font-mono")).toBeVisible({ timeout: 5_000 });
 
     // Dismiss the confirm dialog to cancel deletion
+    page.removeAllListeners("dialog");
     page.on("dialog", (d) => d.dismiss());
-    await page.locator("button[title='Delete key']").first().click();
+    const deleteBtn = deleteKeyButton(page);
+    await expect(deleteBtn).toBeVisible({ timeout: 5_000 });
+    await deleteBtn.click();
 
     // Key should still be present
     await expect(page.getByText(keyName)).toBeVisible();
 
     // Now actually delete for cleanup
-    page.removeAllListeners("dialog");
-    page.on("dialog", (d) => d.accept());
-    await page.locator("button[title='Delete key']").first().click();
-    await page.waitForTimeout(500);
+    await cleanupApiKey(page);
   });
 });

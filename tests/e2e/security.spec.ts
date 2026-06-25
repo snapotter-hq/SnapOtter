@@ -100,8 +100,10 @@ test.describe("Security: XSS in filenames", () => {
       // so it can't execute. Key assertion: no raw unescaped angle brackets.
       expect(data.downloadUrl).not.toContain("<img");
     }
-    // Status 200 (file processed with sanitized name) or 400/422 are all acceptable
-    expect([200, 400, 422]).toContain(res.status);
+    // Status 200/202 (processed sync, or queued async with sanitized name) or
+    // 400/422 (rejected) are all acceptable. 2.0 routes uploads through BullMQ,
+    // so a slow worker falls back to 202 instead of 200.
+    expect([200, 202, 400, 422]).toContain(res.status);
   });
 
   test("upload with directory traversal in filename is sanitized", async () => {
@@ -121,7 +123,8 @@ test.describe("Security: XSS in filenames", () => {
       // downloadUrl must not contain traversal sequences
       expect(data.downloadUrl).not.toContain("..");
     }
-    expect([200, 400, 422]).toContain(res.status);
+    // 202 covers the BullMQ async fallback for a slow worker.
+    expect([200, 202, 400, 422]).toContain(res.status);
   });
 
   test("upload with null bytes in filename is sanitized", async () => {
@@ -136,16 +139,16 @@ test.describe("Security: XSS in filenames", () => {
       body: formData,
     });
 
-    // Server must handle gracefully (200 with sanitized name, 400, or 422)
-    expect([200, 400, 422]).toContain(res.status);
+    // Server must handle gracefully: 200/202 (sanitized name, sync or async)
+    // or 400/422 (rejected).
+    expect([200, 202, 400, 422]).toContain(res.status);
   });
 });
 
 test.describe("Security: Rate limiting", () => {
-  // The test server is configured with RATE_LIMIT_PER_MIN=1000 so we need
-  // to send enough requests to potentially trigger it. This test verifies
-  // the rate limiter is active by checking that the appropriate headers
-  // are present on responses.
+  // The e2e server runs with RATE_LIMIT_PER_MIN=50000, so these requests
+  // never actually trip the limiter. This test just verifies the rate
+  // limiter is wired up by checking for its headers on responses.
 
   test("API returns rate limit headers", async () => {
     const res = await fetch(`${API}/api/v1/health`);

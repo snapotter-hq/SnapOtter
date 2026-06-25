@@ -50,19 +50,19 @@ test.describe("i18n - locale detection", () => {
   });
 });
 
-test.describe("i18n - footer language selector", () => {
-  test("footer shows Globe button with current language name", async ({ page }) => {
+test.describe("i18n - top nav language selector", () => {
+  test("top nav shows Globe button with current language name", async ({ page }) => {
     await page.goto("/");
-    const footer = page.locator("text=English").last();
-    await expect(footer).toBeVisible();
+    const trigger = page.locator('button[title="Language"]');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText("English");
   });
 
-  test("clicking Globe opens language dropdown with all 21 languages", async ({ page }) => {
+  test("clicking the language button opens a dropdown with all 21 languages", async ({ page }) => {
     await page.goto("/");
-    await page.locator("button", { hasText: "English" }).last().click();
-    await page.waitForTimeout(300);
+    await page.locator('button[title="Language"]').click();
 
-    const dropdown = page.locator("[class*='overflow-y-auto']").last();
+    const dropdown = page.locator(".max-h-72");
     await expect(dropdown).toBeVisible();
 
     for (const locale of LOCALES) {
@@ -73,23 +73,19 @@ test.describe("i18n - footer language selector", () => {
 
   test("selecting a language updates the UI", async ({ page }) => {
     await page.goto("/");
-    await page.locator("button", { hasText: "English" }).last().click();
-    await page.waitForTimeout(300);
-    await page.locator("button", { hasText: "Deutsch" }).click();
-    await page.waitForTimeout(500);
+    await page.locator('button[title="Language"]').click();
+    await page.locator(".max-h-72").locator("button", { hasText: "Deutsch" }).click();
 
-    const lang = await page.getAttribute("html", "lang");
-    expect(lang).toBe("de");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 });
 
 test.describe("i18n - locale persistence", () => {
   test("selected locale persists in localStorage", async ({ page }) => {
     await page.goto("/");
-    await page.locator("button", { hasText: "English" }).last().click();
-    await page.waitForTimeout(300);
-    await page.locator("button", { hasText: "Français" }).click();
-    await page.waitForTimeout(500);
+    await page.locator('button[title="Language"]').click();
+    await page.locator(".max-h-72").locator("button", { hasText: "Français" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "fr");
 
     const stored = await page.evaluate(() => localStorage.getItem("snapotter-locale"));
     expect(stored).toBe("fr");
@@ -97,10 +93,9 @@ test.describe("i18n - locale persistence", () => {
 
   test("locale persists across page refresh", async ({ page }) => {
     await page.goto("/");
-    await page.locator("button", { hasText: "English" }).last().click();
-    await page.waitForTimeout(300);
-    await page.locator("button", { hasText: "Español" }).click();
-    await page.waitForTimeout(500);
+    await page.locator('button[title="Language"]').click();
+    await page.locator(".max-h-72").locator("button", { hasText: "Español" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
 
     await page.reload();
     await page.waitForTimeout(1000);
@@ -113,16 +108,11 @@ test.describe("i18n - locale persistence", () => {
 test.describe("i18n - Arabic RTL", () => {
   test("switching to Arabic sets dir=rtl", async ({ page }) => {
     await page.goto("/");
-    await page.locator("button", { hasText: "English" }).last().click();
-    await page.waitForTimeout(300);
-    await page.locator("button", { hasText: "العربية" }).click();
-    await page.waitForTimeout(500);
+    await page.locator('button[title="Language"]').click();
+    await page.locator(".max-h-72").locator("button", { hasText: "العربية" }).click();
 
-    const dir = await page.getAttribute("html", "dir");
-    expect(dir).toBe("rtl");
-
-    const lang = await page.getAttribute("html", "lang");
-    expect(lang).toBe("ar");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(page.locator("html")).toHaveAttribute("lang", "ar");
   });
 });
 
@@ -152,7 +142,8 @@ test.describe("i18n - all locales load", () => {
     }) => {
       await page.goto("/");
       await page.evaluate((code) => localStorage.setItem("snapotter-locale", code), locale.code);
-      await page.reload();
+      // The translated dropzone text renders on a tool page, not the catalog home.
+      await page.goto("/image/resize");
       await page.waitForTimeout(1000);
 
       const lang = await page.getAttribute("html", "lang");
@@ -161,8 +152,7 @@ test.describe("i18n - all locales load", () => {
       const dir = await page.getAttribute("html", "dir");
       expect(dir).toBe(locale.dir);
 
-      const body = await page.textContent("body");
-      expect(body).toContain(locale.sample);
+      await expect(page.locator("body")).toContainText(locale.sample);
     });
   }
 });
@@ -201,13 +191,13 @@ test.describe("i18n - switching back to English", () => {
     expect(lang).toBe("de");
 
     await page.evaluate(() => localStorage.setItem("snapotter-locale", "en"));
-    await page.reload();
+    // The dropzone "Upload from computer" text renders on a tool page, not the catalog home.
+    await page.goto("/image/resize");
     await page.waitForTimeout(1000);
 
     lang = await page.getAttribute("html", "lang");
     expect(lang).toBe("en");
 
-    const body = await page.textContent("body");
-    expect(body).toContain("Upload from computer");
+    await expect(page.locator("body")).toContainText("Upload from computer");
   });
 });

@@ -167,8 +167,8 @@ test.describe("State bleed between tools", () => {
     await expect(thumbnails).toHaveCount(0);
   });
 
-  // ── Sidebar navigation (not just goto) ───────────────────────────────
-  test("sidebar navigation clears processed state", async ({ loggedInPage: page }) => {
+  // ── Top-nav navigation (not just goto) ───────────────────────────────
+  test("top-nav navigation clears processed state", async ({ loggedInPage: page }) => {
     // Process an image in resize
     await page.goto("/image/resize");
     await uploadTestImage(page);
@@ -181,13 +181,17 @@ test.describe("State bleed between tools", () => {
       timeout: 15_000,
     });
 
-    // Navigate home via sidebar
-    await page.locator("aside").getByText("Tools").click();
+    // 2.0 removed the sidebar. Navigate home via the top-nav "Tools" breadcrumb link.
+    await page.locator("header").getByRole("link", { name: "Tools", exact: true }).click();
     await expect(page).toHaveURL("/");
 
-    // Home page should show clean dropzone, not stale resize results
-    await expect(page.getByText("Upload from computer")).toBeVisible({ timeout: 5_000 });
+    // Home is now a tool catalog (search + modality tabs), not a dropzone. The
+    // catalog should render and no stale resize results should bleed through.
+    await expect(page.locator("[data-search-input]")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
+
+    const blobImages = page.locator("img[src^='blob:']");
+    await expect(blobImages).toHaveCount(0);
   });
 
   // ── Rapid navigation: process -> navigate -> navigate again ──────────

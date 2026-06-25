@@ -2,7 +2,8 @@ import { authFile } from "../../playwright.config";
 import { expect, openSettings, test } from "./helpers";
 
 test.describe("Settings Dialog", () => {
-  test("opens from sidebar", async ({ loggedInPage: page }) => {
+  test("opens from the avatar menu", async ({ loggedInPage: page }) => {
+    // 2.0 removed the desktop sidebar; openSettings drives the avatar dropdown.
     await openSettings(page);
 
     // Settings dialog should appear with sections
@@ -14,7 +15,7 @@ test.describe("Settings Dialog", () => {
 
     // Should show username and version info
     await expect(page.getByText(/admin/i).first()).toBeVisible();
-    await expect(page.getByText(/0\.1\.0|version/i).first()).toBeVisible();
+    await expect(page.getByText(/2\.0\.0|version/i).first()).toBeVisible();
   });
 
   test("General section has logout button", async ({ loggedInPage: page }) => {
@@ -27,8 +28,10 @@ test.describe("Settings Dialog", () => {
   test("Security section has change password form", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // Navigate to Security section
-    await page.getByText("Security").click();
+    // Navigate to Security section via the dialog nav button (the section
+    // heading reuses the same label, so scope to the button to avoid strict-mode
+    // ambiguity).
+    await page.getByRole("button", { name: "Security", exact: true }).click();
 
     // Should show password change fields
     await expect(page.getByText(/change password|current password/i).first()).toBeVisible();
@@ -37,8 +40,8 @@ test.describe("Settings Dialog", () => {
   test("People section shows user list", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // Navigate to People section
-    await page.getByText("People").click();
+    // Navigate to People section via the dialog nav button
+    await page.getByRole("button", { name: "People", exact: true }).click();
 
     // Should show admin user
     await expect(page.getByText("admin").first()).toBeVisible();
@@ -73,8 +76,8 @@ test.describe("Settings Dialog", () => {
   test("About section shows app info", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // Navigate to About section
-    await page.getByText("About").click();
+    // Navigate to About section via the dialog nav button
+    await page.getByRole("button", { name: "About", exact: true }).click();
 
     // Should show app description
     await expect(page.getByText(/snapotter|privacy|self-hosted/i).first()).toBeVisible();
@@ -83,8 +86,8 @@ test.describe("Settings Dialog", () => {
   test("System Settings section has configuration", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // Navigate to System Settings section
-    await page.getByText("System Settings").click();
+    // Navigate to System Settings section via the dialog nav button
+    await page.getByRole("button", { name: "System Settings", exact: true }).click();
 
     // Should show system configuration options
     await expect(page.getByText(/app name|upload limit|theme/i).first()).toBeVisible();

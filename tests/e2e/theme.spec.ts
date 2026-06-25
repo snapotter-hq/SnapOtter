@@ -1,10 +1,5 @@
 import { expect, test } from "./helpers";
 
-// Phase 4b quarantine: the footer Toggle Theme button selector
-// (button[title='Toggle Theme']) needs verification against the 2.0 UI which
-// hides the footer on mobile and may have changed the toggle mechanism.
-test.skip(true, "Phase 4b quarantine: footer theme toggle selector needs 2.0 UI verification");
-
 test.describe("Theme System", () => {
   test("page defaults to light theme", async ({ loggedInPage: page }) => {
     // Check that html element does not have 'dark' class by default
@@ -15,13 +10,31 @@ test.describe("Theme System", () => {
     expect(classList).toBeDefined();
   });
 
-  test("footer has theme toggle buttons", async ({ loggedInPage: page }) => {
-    // Footer has a "Toggle Theme" button fixed at bottom-right
-    const themeBtn = page.locator("button[title='Toggle Theme']");
+  test("top nav has a theme toggle that flips the dark class", async ({ loggedInPage: page }) => {
+    // 2.0 removed the footer. The theme toggle now lives in the top nav.
+    const themeBtn = page.locator("button[title='Toggle theme']");
     await expect(themeBtn).toBeVisible({ timeout: 10_000 });
+
+    const isDark = () => page.evaluate(() => document.documentElement.classList.contains("dark"));
+    const before = await isDark();
+
+    await themeBtn.click();
+    await expect.poll(isDark, { timeout: 5_000 }).toBe(!before);
+
+    // Theme persists in localStorage under the "snapotter-theme" key.
+    const persisted = await page.evaluate(() => localStorage.getItem("snapotter-theme"));
+    expect(persisted).toContain(before ? "light" : "dark");
+
+    // Toggling back restores the original state.
+    await themeBtn.click();
+    await expect.poll(isDark, { timeout: 5_000 }).toBe(before);
   });
 
-  test("privacy policy link is in footer", async ({ loggedInPage: page }) => {
-    await expect(page.getByText("Privacy Policy")).toBeVisible();
+  test("privacy policy is reachable at /privacy", async ({ loggedInPage: page }) => {
+    // 2.0 removed the footer privacy link; the policy still lives at /privacy.
+    await page.goto("/privacy");
+    await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

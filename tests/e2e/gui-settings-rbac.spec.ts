@@ -87,15 +87,15 @@ async function deleteUser(adminToken: string, username: string): Promise<void> {
 // The NAV_ITEMS and their required permissions from the source:
 //   general        - none
 //   system         - settings:write
-//   security       - none
+//   security       - none (authRequired)
 //   people         - users:manage
 //   teams          - teams:manage
 //   roles          - users:manage
 //   audit-log      - audit:read
+//   usage          - audit:read (Usage analytics dashboard, admin-only)
 //   api-keys       - none
 //   ai-features    - settings:write
 //   tools          - none
-//   analytics      - none (Product Analytics)
 //   about          - none
 
 base.describe("RBAC Settings Visibility - Admin", () => {
@@ -110,7 +110,7 @@ base.describe("RBAC Settings Visibility - Admin", () => {
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /product analytics/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^usage$/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
 
     // Admin-only tabs (require settings:write, users:manage, teams:manage, audit:read)
@@ -228,24 +228,20 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await deleteUser(adminToken, EDITOR_USER);
   });
 
-  base.test(
-    "editor sees general, security, api-keys, tools, analytics, about",
-    async ({ page }) => {
-      await login(page, EDITOR_USER, EDITOR_PASS);
-      await openSettings(page);
+  base.test("editor sees general, security, api-keys, tools, about", async ({ page }) => {
+    await login(page, EDITOR_USER, EDITOR_PASS);
+    await openSettings(page);
 
-      // Should see these tabs
-      await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /product analytics/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
-    },
-  );
+    // Should see these tabs
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
+  });
 
   base.test(
-    "editor does NOT see system settings, people, teams, roles, audit log, ai features",
+    "editor does NOT see system settings, people, teams, roles, audit log, usage, ai features",
     async ({ page }) => {
       await login(page, EDITOR_USER, EDITOR_PASS);
       await openSettings(page);
@@ -253,24 +249,25 @@ base.describe("RBAC Settings Visibility - Editor", () => {
       // Wait for dialog to fully render
       await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
-      // Should NOT see admin-only tabs
+      // Should NOT see admin-only tabs (usage requires audit:read)
       await expect(page.getByRole("button", { name: /system settings/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /people/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /^roles$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
     },
   );
 
-  base.test("editor sees exactly 6 nav items", async ({ page }) => {
+  base.test("editor sees exactly 5 nav items", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
     const navButtons = page.locator(".w-48 button");
     const count = await navButtons.count();
-    expect(count).toBe(6);
+    expect(count).toBe(5);
   });
 
   base.test("editor can access Security tab and see change password form", async ({ page }) => {
@@ -297,15 +294,6 @@ base.describe("RBAC Settings Visibility - Editor", () => {
 
     await expect(page.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
     await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
-  });
-
-  base.test("editor can access Product Analytics tab", async ({ page }) => {
-    await login(page, EDITOR_USER, EDITOR_PASS);
-    await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
-
-    await expect(page.getByText("Product Analytics").first()).toBeVisible();
-    await expect(page.getByText(/share anonymous usage data/i)).toBeVisible();
   });
 
   base.test("editor General tab shows correct username and role", async ({ page }) => {
@@ -361,7 +349,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     await deleteUser(adminToken, USER_USER);
   });
 
-  base.test("user sees general, security, api-keys, tools, analytics, about", async ({ page }) => {
+  base.test("user sees general, security, api-keys, tools, about", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
 
@@ -369,12 +357,11 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /product analytics/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
   });
 
   base.test(
-    "user does NOT see system settings, people, teams, roles, audit log, ai features",
+    "user does NOT see system settings, people, teams, roles, audit log, usage, ai features",
     async ({ page }) => {
       await login(page, USER_USER, USER_PASS);
       await openSettings(page);
@@ -387,18 +374,19 @@ base.describe("RBAC Settings Visibility - User", () => {
       await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /^roles$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
     },
   );
 
-  base.test("user sees exactly 6 nav items", async ({ page }) => {
+  base.test("user sees exactly 5 nav items", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
     const navButtons = page.locator(".w-48 button");
     const count = await navButtons.count();
-    expect(count).toBe(6);
+    expect(count).toBe(5);
   });
 
   base.test("user can access About tab and see version", async ({ page }) => {
@@ -435,14 +423,6 @@ base.describe("RBAC Settings Visibility - User", () => {
 
     await expect(page.getByText("Change Password").first()).toBeVisible();
     await expect(page.getByPlaceholder("Current Password")).toBeVisible();
-  });
-
-  base.test("user can access Product Analytics tab", async ({ page }) => {
-    await login(page, USER_USER, USER_PASS);
-    await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
-
-    await expect(page.getByText("Product Analytics").first()).toBeVisible();
   });
 
   base.test("user gets 403 on admin and editor API endpoints", async ({ page }) => {
@@ -700,7 +680,7 @@ base.describe("RBAC -- Editor and User see identical tabs (intentional)", () => 
   });
 
   base.test(
-    "editor and user see the same 6 tabs (correct behavior, not a bug)",
+    "editor and user see the same 5 tabs (correct behavior, not a bug)",
     async ({ page }) => {
       // Verify editor tab count
       await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);
@@ -718,15 +698,15 @@ base.describe("RBAC -- Editor and User see identical tabs (intentional)", () => 
       const userNavButtons = page.locator(".w-48 button");
       const userCount = await userNavButtons.count();
 
-      // Both should see exactly 6 tabs
-      expect(editorCount).toBe(6);
-      expect(userCount).toBe(6);
+      // Both should see exactly 5 tabs
+      expect(editorCount).toBe(5);
+      expect(userCount).toBe(5);
       expect(editorCount).toBe(userCount);
     },
   );
 
   base.test("editor and user both see the same set of tab labels", async ({ page }) => {
-    const expectedTabs = ["General", "Security", "API Keys", "Tools", "Product Analytics", "About"];
+    const expectedTabs = ["General", "Security", "API Keys", "Tools", "About"];
 
     // Check editor
     await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);
