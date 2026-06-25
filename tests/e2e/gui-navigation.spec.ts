@@ -1,4 +1,9 @@
+import { TOOLS } from "@snapotter/shared";
 import { expect, openSettings, test, uploadTestImage } from "./helpers";
+
+// Tool routes are section-prefixed at runtime (/<section>/<toolId>); resolve the
+// real route from the shared catalog rather than the bare id.
+const routeFor = (id: string): string => TOOLS.find((t) => t.id === id)?.route ?? `/${id}`;
 
 // ---------------------------------------------------------------------------
 // Login Page (unauthenticated)
@@ -16,7 +21,7 @@ test.describe("Login Page", () => {
     await expect(page.getByRole("button", { name: /login/i })).toBeVisible();
 
     // Right side: marketing text (hidden on mobile, visible on lg+)
-    await expect(page.getByText("Your images. Stay yours.")).toBeVisible();
+    await expect(page.getByText("Your files. Stay yours.")).toBeVisible();
   });
 
   test("username and password inputs start empty", async ({ page }) => {
@@ -122,40 +127,20 @@ test.describe("Login Page", () => {
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
   });
 
-  test("after too many failed attempts, rate limiting kicks in", async ({ page }) => {
-    await page.goto("/login");
-
-    // Submit several failed login attempts in rapid succession
-    for (let i = 0; i < 10; i++) {
-      await page.getByLabel("Username").fill(`wrong-user-${i}`);
-      await page.getByLabel("Password").fill(`wrong-pass-${i}`);
-      await page.getByRole("button", { name: /login/i }).click();
-
-      // Wait briefly for the response
-      await page.waitForTimeout(300);
-    }
-
-    // After many rapid failures, the UI should show a rate-limit or lockout message,
-    // or the login button should become temporarily disabled
-    const rateLimited = page.getByText(/too many|rate limit|try again|locked|slow down/i).first();
-    const disabledBtn = page.getByRole("button", { name: /login/i });
-
-    // Either an error message about rate limiting appears, or the button is disabled
-    const hasRateLimitMsg = await rateLimited.isVisible({ timeout: 5000 }).catch(() => false);
-    const isDisabled = await disabledBtn.isDisabled();
-
-    expect(hasRateLimitMsg || isDisabled).toBe(true);
-  });
+  // Login rate limiting moved to login-security.spec.ts: it must run in the
+  // serial bucket because it lowers the global login attempt cap (which the e2e
+  // env raises so parallel sign-ins do not 429) and restores it.
 });
 
 // ---------------------------------------------------------------------------
 // Home Page (authenticated)
 // ---------------------------------------------------------------------------
 test.describe("Home Page - Before Upload", () => {
-  test("shows dropzone with dashed border and upload button", async ({ loggedInPage: page }) => {
-    const dropzone = page.locator("[class*='border-dashed']").first();
-    await expect(dropzone).toBeVisible();
-    await expect(page.getByText("Upload from computer")).toBeVisible();
+  test("shows the catalog search box and tool grid", async ({ loggedInPage: page }) => {
+    // 2.0 home is a tool catalog (search + a grid of tool-card links), not a
+    // dropzone. Files are uploaded on tool pages, not on the home page.
+    await expect(page.locator("input[data-search-input]")).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
   });
 
   test("tool panel is visible with search bar and categories", async ({ loggedInPage: page }) => {
@@ -171,11 +156,13 @@ test.describe("Home Page - Before Upload", () => {
     await expect(toolPanel.getByText("Optimization").first()).toBeVisible();
   });
 
-  test("clicking a tool in the panel navigates to its page", async ({ loggedInPage: page }) => {
-    // Click on a specific tool from the panel
-    const compressLink = page.getByText("Compress").first();
-    await compressLink.click();
-    await expect(page).toHaveURL("/compress");
+  test("clicking a tool card navigates to its tool page", async ({ loggedInPage: page }) => {
+    // Catalog tools are links to /<section>/<toolId> (compress is an image tool).
+    await page
+      .getByRole("link", { name: /^Compress/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL("/image/compress");
   });
 
   test("search filters tools in tool panel", async ({ loggedInPage: page }) => {
@@ -188,184 +175,43 @@ test.describe("Home Page - Before Upload", () => {
 });
 
 test.describe("Home Page - After Upload", () => {
-  test("shows green checkmark, filename, and file size", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
+  // Removed: 2.0 has no upload-on-home flow, so the post-upload file info
+  // (green checkmark, filename, file size) no longer exists on the home page.
 
-    // Green checkmark indicator
-    await expect(page.locator("[class*='text-green']").first()).toBeVisible();
-    // Filename
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-    // File size in KB
-    await expect(page.getByText(/KB/i).first()).toBeVisible();
-  });
+  // Removed: the "Change file" button belonged to the deleted upload-on-home UX.
 
-  test("shows Change file button", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
+  // Removed: the post-upload "Quick Actions" button row was deleted in 2.0; the
+  // home page is now a tool catalog with no per-file action shortcuts.
 
-    await expect(page.getByText("Change file")).toBeVisible();
-  });
-
-  test("shows Quick Actions with 4 buttons", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
-
-    await expect(page.getByText("Quick Actions").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /resize/i }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /compress/i }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /convert/i }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /remove background/i }).first()).toBeVisible();
-  });
-
-  test("shows All Tools section with categorized list", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
-
-    await expect(page.getByText("All Tools").first()).toBeVisible();
-    // Categories should be visible within the tool list
+  test("catalog grid shows tools grouped by category", async ({ loggedInPage: page }) => {
+    // 2.0 replaced the post-upload "All Tools" list with the home catalog grid,
+    // grouped into category sections (e.g. Essentials).
     await expect(page.getByText("Essentials").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
   });
 
-  test("clicking a tool navigates to the tool page", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
-
+  test("clicking a tool card navigates to the tool page", async ({ loggedInPage: page }) => {
+    // Catalog tools are links to /<section>/<toolId> (resize is an image tool).
     await page
-      .getByRole("button", { name: /resize/i })
+      .getByRole("link", { name: /^Resize/ })
       .first()
       .click();
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
   });
 
-  test("image viewer is visible after upload", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
-
-    // The image viewer should render the uploaded image (an <img> element)
-    const img = page.locator("img").first();
-    await expect(img).toBeVisible();
-  });
-
-  test("Change file button resets to dropzone state", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
-
-    // File info should be visible
-    await expect(page.getByText(/test-image/i).first()).toBeVisible();
-
-    // Click Change file
-    await page.getByText("Change file").click();
-    await page.waitForTimeout(300);
-
-    // Dropzone should reappear
-    const dropzone = page.locator("[class*='border-dashed']").first();
-    await expect(dropzone).toBeVisible();
-    await expect(page.getByText("Upload from computer")).toBeVisible();
-  });
-
-  test("multi-upload shows file count badge", async ({ loggedInPage: page }) => {
-    // Upload first image
-    await uploadTestImage(page);
-
-    // Upload a second image via the file chooser
-    const fileChooserPromise = page.waitForEvent("filechooser");
-    // Click "Add more files" or "Change file" to trigger file picker
-    const addBtn = page.getByText(/add more|change file/i).first();
-    await addBtn.click();
-    const fileChooser = await fileChooserPromise;
-    const { getTestImagePath } = await import("./helpers");
-    await fileChooser.setFiles([getTestImagePath(), getTestImagePath()]);
-    await page.waitForTimeout(500);
-
-    // Should show a count badge or multi-file indicator
-    await expect(page.getByText(/\d+ file/i).first()).toBeVisible();
-  });
+  // Removed: 2.0 has no upload-on-home flow. The "image viewer after upload",
+  // "Change file" reset, and the multi-upload file-count badge all belonged to
+  // the deleted home dropzone. Files now upload on tool pages, so these post-
+  // upload home behaviors no longer exist.
 });
 
 // ---------------------------------------------------------------------------
 // Fullscreen Grid Page (/fullscreen)
 // ---------------------------------------------------------------------------
-test.describe("Fullscreen Grid Page", () => {
-  test("grid renders with search bar", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    await expect(page.getByPlaceholder(/search/i)).toBeVisible();
-  });
-
-  test("show/hide details toggle is visible", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    // The toggle button text
-    await expect(
-      page.getByRole("button", { name: /hide details|show details/i }).first(),
-    ).toBeVisible();
-  });
-
-  test("all category headers are visible", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    await expect(page.getByText("Essentials")).toBeVisible();
-    await expect(page.getByText("Optimization")).toBeVisible();
-    await expect(page.getByText("Adjustments")).toBeVisible();
-    await expect(page.getByText("Watermark & Overlay")).toBeVisible();
-    await expect(page.getByText("Utilities")).toBeVisible();
-    await expect(page.getByText("Layout & Composition")).toBeVisible();
-    await expect(page.getByText("Format & Conversion")).toBeVisible();
-    await expect(page.getByText("AI Tools")).toBeVisible();
-  });
-
-  test("tool cards are links to tool pages", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    const resizeLink = page.getByRole("link", { name: /^Resize/ }).first();
-    await expect(resizeLink).toBeVisible();
-
-    await resizeLink.click();
-    await expect(page).toHaveURL("/resize");
-  });
-
-  test("search filters tools in grid", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    const searchInput = page.getByPlaceholder(/search/i);
-    await searchInput.fill("compress");
-
-    await expect(page.getByRole("link", { name: /^Compress/ }).first()).toBeVisible();
-    // Another unrelated tool should be hidden
-    await expect(page.getByRole("link", { name: /^Resize/ })).toHaveCount(0);
-  });
-
-  test("clearing search restores all tools", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    const searchInput = page.getByPlaceholder(/search/i);
-
-    // Filter first
-    await searchInput.fill("compress");
-    await expect(page.getByRole("link", { name: /^Resize/ })).toHaveCount(0);
-
-    // Clear the search
-    await searchInput.fill("");
-    await page.waitForTimeout(300);
-
-    // Both tools should be visible again
-    await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Compress/ }).first()).toBeVisible();
-    // Category headers should reappear
-    await expect(page.getByText("Essentials")).toBeVisible();
-    await expect(page.getByText("Optimization")).toBeVisible();
-  });
-
-  test("show/hide details toggle changes card appearance", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-
-    const toggleBtn = page.getByRole("button", { name: /hide details|show details/i }).first();
-    await expect(toggleBtn).toBeVisible();
-
-    // Click the toggle
-    await toggleBtn.click();
-    await page.waitForTimeout(300);
-
-    // Toggle text should have changed
-    await expect(
-      page.getByRole("button", { name: /hide details|show details/i }).first(),
-    ).toBeVisible();
-  });
-});
+// Removed: 2.0 deleted the /fullscreen route and its "Fullscreen Grid Page"
+// (the show/hide details toggle, the standalone category grid, etc.). App.tsx
+// has no /fullscreen route, so it now falls through to NotFoundPage. The home
+// page ("/") is the tool catalog, so all of these assertions moved there.
 
 // ---------------------------------------------------------------------------
 // Tool Page (/:toolId) - tested with "resize"
@@ -398,9 +244,13 @@ test.describe("Tool Page - Resize", () => {
   });
 
   test("invalid tool ID shows not found message", async ({ loggedInPage: page }) => {
+    // A single-segment unknown path matches neither "/" nor "/:section/:toolId",
+    // so App.tsx falls through to the "*" route -> NotFoundPage, which renders
+    // t.common.pageNotFound ("Page not found"). (A two-segment unknown path would
+    // instead hit ToolPage's own "Tool not found" guard.)
     await page.goto("/this-tool-does-not-exist-xyz");
 
-    await expect(page.getByText("Tool not found")).toBeVisible();
+    await expect(page.getByText("Page not found")).toBeVisible();
   });
 });
 
@@ -478,7 +328,7 @@ test.describe("Tool Page - Common Structure (Dropzone Tools)", () => {
     test(`${tool.name} (/${tool.id}) shows tool name and dropzone`, async ({
       loggedInPage: page,
     }) => {
-      await page.goto(`/${tool.id}`);
+      await page.goto(routeFor(tool.id));
 
       // Tool name should be visible
       await expect(page.getByText(tool.name).first()).toBeVisible();
@@ -495,7 +345,7 @@ test.describe("Tool Page - Common Structure (No-Dropzone Tools)", () => {
     test(`${tool.name} (/${tool.id}) shows tool name without standard dropzone`, async ({
       loggedInPage: page,
     }) => {
-      await page.goto(`/${tool.id}`);
+      await page.goto(routeFor(tool.id));
 
       // Tool name should be visible
       await expect(page.getByText(tool.name).first()).toBeVisible();
@@ -511,8 +361,9 @@ test.describe("Tool Page - Settings and Process Flow", () => {
     await uploadTestImage(page);
 
     await expect(page.getByText("Settings").first()).toBeVisible();
-    // Process button should be visible after upload
-    await expect(page.getByRole("button", { name: /process/i }).first()).toBeVisible();
+    // The resize submit button mounts with the settings panel after upload.
+    // Its label is the tool name ("Resize"), so target it by test id.
+    await expect(page.getByTestId("resize-submit")).toBeVisible();
   });
 
   test("compress: settings panel appears after upload", async ({ loggedInPage: page }) => {
@@ -533,13 +384,16 @@ test.describe("Tool Page - Settings and Process Flow", () => {
     await page.goto("/image/resize");
     await uploadTestImage(page);
 
-    // Click the process button
-    const processBtn = page.getByRole("button", { name: /process/i }).first();
-    await expect(processBtn).toBeVisible();
-    await processBtn.click();
+    // Set a width so the submit button is enabled (canProcess needs a dimension).
+    await page.locator("#resize-width").fill("80");
 
-    // Wait for processing to complete and download link to appear
-    await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible({
+    const submitBtn = page.getByTestId("resize-submit");
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+
+    // The download is an <a data-testid="resize-download"> that appears once the
+    // result is ready.
+    await expect(page.getByTestId("resize-download")).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -580,9 +434,9 @@ test.describe("Automate Page", () => {
 
     await expect(page.getByText("Pipeline Builder")).toBeVisible();
     await expect(page.getByText("No steps yet")).toBeVisible();
-    await expect(
-      page.getByText("Click tools from the palette to build your pipeline"),
-    ).toBeVisible();
+    // t.automate.addToolsPrompt renders both in the canvas header subtitle and in
+    // the PipelineBuilder empty state, so scope to the first match.
+    await expect(page.getByText("Add tools from the palette to get started").first()).toBeVisible();
   });
 
   test("tool palette is visible with searchable list", async ({ loggedInPage: page }) => {
@@ -676,82 +530,82 @@ test.describe("Files Page", () => {
   test("renders file management layout on desktop", async ({ loggedInPage: page }) => {
     await page.goto("/files");
 
-    // Left nav column with "My Files" heading
-    await expect(page.getByText("My Files")).toBeVisible();
+    // "My Files" renders twice: a visually-hidden page <h1> and the visible
+    // FilesNav <h3>. Target the level-3 nav heading so we assert the visible one.
+    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
     // Navigation items
     await expect(page.getByRole("button", { name: /recent/i }).first()).toBeVisible();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Sidebar Navigation
+// Top-Nav Navigation
 // ---------------------------------------------------------------------------
-test.describe("Sidebar Navigation", () => {
-  test("sidebar has 5 top items: Tools, Grid, Automate, Editor, Files", async ({
-    loggedInPage: page,
-  }) => {
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+// 2.0 removed the desktop sidebar. Navigation now lives in the top-nav header
+// (role banner): nav links Tools (->"/"), Automate, Editor (badge "Beta"), and
+// Files, plus a Help button and an avatar dropdown (data-testid="user-menu")
+// that holds Settings + Logout. The /fullscreen "Grid" link is gone.
+test.describe("Top-Nav Navigation", () => {
+  test("top-nav shows Tools, Automate, Editor, and Files links", async ({ loggedInPage: page }) => {
+    const banner = page.getByRole("banner");
+    await expect(banner).toBeVisible();
 
-    await expect(sidebar.getByText("Tools")).toBeVisible();
-    await expect(sidebar.getByText("Grid")).toBeVisible();
-    await expect(sidebar.getByText("Automate")).toBeVisible();
-    await expect(sidebar.getByText("Editor")).toBeVisible();
-    await expect(sidebar.getByText("Files")).toBeVisible();
+    await expect(banner.getByRole("link", { name: "Tools" })).toBeVisible();
+    await expect(banner.getByRole("link", { name: "Automate" })).toBeVisible();
+    // The Editor link carries a "Beta" badge, so its accessible name is "Editor Beta".
+    await expect(banner.getByRole("link", { name: /Editor/ })).toBeVisible();
+    await expect(banner.getByRole("link", { name: "Files" })).toBeVisible();
   });
 
-  test("sidebar has 2 bottom items: Help, Settings", async ({ loggedInPage: page }) => {
-    const sidebar = page.locator("aside");
+  test("top-nav has a Help button and an avatar menu containing Settings", async ({
+    loggedInPage: page,
+  }) => {
+    const banner = page.getByRole("banner");
+    await expect(banner.getByRole("button", { name: /help/i }).first()).toBeVisible();
 
-    await expect(sidebar.getByText("Help")).toBeVisible();
-    await expect(sidebar.getByText("Settings")).toBeVisible();
+    // The avatar dropdown exposes Settings (and Logout).
+    await page.getByTestId("user-menu").click();
+    await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   });
 
   test("Tools link navigates to home /", async ({ loggedInPage: page }) => {
     await page.goto("/automate");
-    await page.locator("aside").getByText("Tools").click();
+    await page.getByRole("banner").getByRole("link", { name: "Tools" }).click();
     await expect(page).toHaveURL("/");
   });
 
-  test("Grid link navigates to /fullscreen", async ({ loggedInPage: page }) => {
-    const gridLink = page.locator("aside").getByText("Grid");
-    if (await gridLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await gridLink.click();
-    } else {
-      await page.locator('aside a[href="/fullscreen"]').click();
-    }
-    await expect(page).toHaveURL("/fullscreen");
-  });
-
   test("Automate link navigates to /automate", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Automate").click();
+    await page.getByRole("banner").getByRole("link", { name: "Automate" }).click();
     await expect(page).toHaveURL("/automate");
   });
 
   test("Editor link navigates to /editor", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Editor").click();
+    await page
+      .getByRole("banner")
+      .getByRole("link", { name: /Editor/ })
+      .click();
     await expect(page).toHaveURL("/editor");
   });
 
   test("Files link navigates to /files", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Files").click();
+    await page.getByRole("banner").getByRole("link", { name: "Files" }).click();
     await expect(page).toHaveURL("/files");
   });
 
-  test("active sidebar item is highlighted", async ({ loggedInPage: page }) => {
-    // On home page, "Tools" should have the active styling (bg-primary)
-    const toolsItem = page.locator("aside").getByText("Tools").locator("..");
-    await expect(toolsItem).toHaveClass(/bg-primary/);
+  test("active nav link is highlighted on the home page", async ({ loggedInPage: page }) => {
+    // On "/", the Tools link gets the active treatment (bg-muted in the light variant).
+    const toolsLink = page.getByRole("banner").getByRole("link", { name: "Tools" });
+    await expect(toolsLink).toHaveClass(/bg-muted/);
   });
 
   test("Help button opens HelpDialog modal", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Help").click();
+    await page.getByRole("banner").getByRole("button", { name: /help/i }).first().click();
 
     // Help dialog header
     await expect(page.getByRole("heading", { name: "Help" })).toBeVisible();
   });
 
-  test("Settings button opens SettingsDialog modal", async ({ loggedInPage: page }) => {
+  test("Settings opens SettingsDialog modal", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
     await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
@@ -760,11 +614,14 @@ test.describe("Sidebar Navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Footer (desktop only)
+// Top-Nav Controls (theme + language)
 // ---------------------------------------------------------------------------
-test.describe("Footer", () => {
+// 2.0 removed the footer. The theme toggle and language selector now live on the
+// right side of the top nav (desktop only). The theme button's title is the
+// lowercase "Toggle theme" (top-nav.tsx ThemeToggle).
+test.describe("Top-Nav Controls", () => {
   test("theme toggle button is visible with sun or moon icon", async ({ loggedInPage: page }) => {
-    const themeBtn = page.locator("button[title='Toggle Theme']");
+    const themeBtn = page.locator("button[title='Toggle theme']");
     await expect(themeBtn).toBeVisible();
 
     // Should contain an SVG icon (Sun or Moon)
@@ -772,7 +629,7 @@ test.describe("Footer", () => {
   });
 
   test("theme toggle switches between sun and moon icons", async ({ loggedInPage: page }) => {
-    const themeBtn = page.locator("button[title='Toggle Theme']");
+    const themeBtn = page.locator("button[title='Toggle theme']");
     await expect(themeBtn).toBeVisible();
 
     const hadDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
@@ -791,17 +648,12 @@ test.describe("Footer", () => {
     await expect(langBtn.locator("svg")).toBeVisible();
   });
 
-  test("privacy link navigates to /privacy", async ({ loggedInPage: page }) => {
-    const privacyLink = page.getByRole("link", { name: /privacy/i }).first();
-    if (await privacyLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await privacyLink.click();
-      await expect(page).toHaveURL("/privacy");
-      await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
-    }
-  });
+  // Removed: 2.0 deleted the footer and its privacy link. The chrome no longer
+  // links to /privacy (the page still exists and is covered in "Routing Edge
+  // Cases"); the avatar dropdown exposes Docs/API Reference instead.
 
   test("theme persists after page reload", async ({ loggedInPage: page }) => {
-    const themeBtn = page.locator("button[title='Toggle Theme']");
+    const themeBtn = page.locator("button[title='Toggle theme']");
     await expect(themeBtn).toBeVisible();
 
     // Toggle theme
@@ -830,16 +682,19 @@ test.describe("Footer", () => {
 // ---------------------------------------------------------------------------
 test.describe("Drag-and-Drop Upload", () => {
   test("dropzone accepts dropped files via DataTransfer", async ({ loggedInPage: page }) => {
+    // 2.0 has no home dropzone; uploads happen on a tool page. The Dropzone
+    // renders <section aria-label="File drop zone"> with the "Drop your files
+    // here" prompt and an "Upload from computer" button.
+    await page.goto("/image/resize");
+
     const dropzone = page.locator("section[aria-label='File drop zone']");
     await expect(dropzone).toBeVisible();
-
-    // Verify the dropzone aria-label and interactive elements
-    await expect(page.getByText("Drop files here or click the upload button")).toBeVisible();
+    await expect(page.getByText("Drop your files here")).toBeVisible();
 
     // Upload via the file chooser flow (same onFiles handler as drag-and-drop)
     await uploadTestImage(page);
 
-    // After upload, the file info should appear
+    // After upload, the selected file name should appear in the Files list
     await expect(page.getByText(/test-image/i).first()).toBeVisible();
   });
 });
@@ -848,14 +703,13 @@ test.describe("Drag-and-Drop Upload", () => {
 // Files Page Layout
 // ---------------------------------------------------------------------------
 test.describe("Files Page Layout", () => {
-  test("desktop shows three-column layout with nav, list, and details", async ({
-    loggedInPage: page,
-  }) => {
+  test("desktop shows nav column with list and details", async ({ loggedInPage: page }) => {
     await page.goto("/files");
 
-    // Left nav column with "My Files"
-    await expect(page.getByText("My Files")).toBeVisible();
-    // Nav items: Recent and Upload Files
+    // FilesNav renders the visible level-3 "My Files" heading (a separate sr-only
+    // <h1> with the same text also exists, so scope to the nav heading).
+    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
+    // Nav items: Recent and Upload Files (files-nav.tsx)
     await expect(page.getByRole("button", { name: /recent/i }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /upload files/i }).first()).toBeVisible();
   });
@@ -873,12 +727,12 @@ test.describe("Files Page Layout", () => {
 
     await page.goto("/files");
 
-    // Mobile tabs should be visible
+    // Mobile tabs (files-page.tsx): "Recent" and "Upload Files"
     await expect(page.getByRole("button", { name: "Recent" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Upload" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /upload files/i })).toBeVisible();
 
-    // Desktop nav "My Files" heading should not be visible (hidden md:block)
-    await expect(page.getByText("My Files")).not.toBeVisible();
+    // The FilesNav desktop heading (hidden md:block) is not rendered on mobile.
+    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).not.toBeVisible();
 
     await context.close();
   });
@@ -889,7 +743,11 @@ test.describe("Files Page Layout", () => {
 // ---------------------------------------------------------------------------
 test.describe("Routing Edge Cases", () => {
   test("invalid tool ID shows error state", async ({ loggedInPage: page }) => {
-    await page.goto("/nonexistent-tool-abc123");
+    // A two-segment path matches "/:section/:toolId", so ToolPage mounts and hits
+    // its own guard (t.toolPage.notFound = "Tool not found") when the id is
+    // unknown. (A single-segment path would instead fall to NotFoundPage; see the
+    // "Tool Page - Resize > invalid tool ID" test.)
+    await page.goto("/image/nonexistent-tool-abc123");
 
     await expect(page.getByText("Tool not found")).toBeVisible();
   });
@@ -934,13 +792,16 @@ test.describe("Routing Edge Cases", () => {
     await expect(page).toHaveURL("/image/adjust-colors");
   });
 
-  test("/login when already logged in redirects to /", async ({ loggedInPage: page }) => {
-    // loggedInPage already has authentication via storageState
+  test("/login renders the login page even when already authenticated", async ({
+    loggedInPage: page,
+  }) => {
+    // 2.0 does not auto-redirect authenticated users away from /login: AuthGuard
+    // lets the login route render unconditionally and LoginPage has no
+    // redirect-on-auth effect. The form stays put.
     await page.goto("/login");
 
-    // Should redirect away from login since already authenticated
-    await page.waitForURL("/", { timeout: 10_000 });
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByRole("heading", { name: /login/i })).toBeVisible();
   });
 });
 
@@ -949,9 +810,9 @@ test.describe("Routing Edge Cases", () => {
 // ---------------------------------------------------------------------------
 test.describe("Browser Back/Forward Navigation", () => {
   test("browser back button returns to previous page", async ({ loggedInPage: page }) => {
-    // Navigate: Home -> Fullscreen -> back should return to Home
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
+    // Navigate: Home -> Editor -> back should return to Home (/fullscreen is gone).
+    await page.goto("/editor");
+    await expect(page).toHaveURL("/editor");
 
     await page.goBack();
     await expect(page).toHaveURL("/");
@@ -960,14 +821,14 @@ test.describe("Browser Back/Forward Navigation", () => {
   test("browser forward button returns to next page after going back", async ({
     loggedInPage: page,
   }) => {
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
+    await page.goto("/editor");
+    await expect(page).toHaveURL("/editor");
 
     await page.goBack();
     await expect(page).toHaveURL("/");
 
     await page.goForward();
-    await expect(page).toHaveURL("/fullscreen");
+    await expect(page).toHaveURL("/editor");
   });
 
   test("multi-step back/forward through several pages", async ({ loggedInPage: page }) => {
@@ -988,14 +849,9 @@ test.describe("Browser Back/Forward Navigation", () => {
     await expect(page).toHaveURL("/automate");
   });
 
-  test("page refresh preserves route on /fullscreen", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
-
-    await page.reload();
-    await expect(page).toHaveURL("/fullscreen");
-    await expect(page.getByPlaceholder(/search/i)).toBeVisible();
-  });
+  // Removed: 2.0 deleted the /fullscreen route, so there is no fullscreen page to
+  // preserve across a refresh. Refresh-persistence is still covered for /automate,
+  // tool pages, /files, and /editor.
 
   test("page refresh preserves route on /automate", async ({ loggedInPage: page }) => {
     await page.goto("/automate");
@@ -1007,11 +863,12 @@ test.describe("Browser Back/Forward Navigation", () => {
   });
 
   test("page refresh preserves route on tool page", async ({ loggedInPage: page }) => {
+    // Tool routes are section-prefixed in 2.0 (/image/resize, not /resize).
     await page.goto("/image/resize");
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
 
     await page.reload();
-    await expect(page).toHaveURL("/resize");
+    await expect(page).toHaveURL("/image/resize");
     await expect(page.getByText("Resize").first()).toBeVisible();
   });
 
@@ -1021,7 +878,8 @@ test.describe("Browser Back/Forward Navigation", () => {
 
     await page.reload();
     await expect(page).toHaveURL("/files");
-    await expect(page.getByText("My Files")).toBeVisible();
+    // Scope to the visible FilesNav heading (an sr-only <h1> shares the text).
+    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
   });
 });
 
@@ -1029,61 +887,9 @@ test.describe("Browser Back/Forward Navigation", () => {
 // Mobile Navigation (375x667)
 // ---------------------------------------------------------------------------
 test.describe("Mobile Navigation", () => {
-  test("hamburger menu toggles sidebar overlay", async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 375, height: 667 },
-    });
-    const page = await context.newPage();
-    await page.goto("/login");
-    await page.getByLabel("Username").fill("admin");
-    await page.getByLabel("Password").fill("admin");
-    await page.getByRole("button", { name: /login/i }).click();
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    // Desktop sidebar should not be visible
-    await expect(page.locator("aside")).not.toBeVisible();
-
-    // Open hamburger menu
-    const topBar = page.locator(".fixed").filter({ hasText: "SnapOtter" }).first();
-    const hamburger = topBar.locator("button").first();
-    await hamburger.click();
-
-    // Sidebar overlay should appear with nav items
-    await expect(page.getByText("Tools").nth(1)).toBeVisible();
-    await expect(page.getByText("Grid")).toBeVisible();
-
-    await context.close();
-  });
-
-  test("tapping backdrop closes sidebar overlay", async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 375, height: 667 },
-    });
-    const page = await context.newPage();
-    await page.goto("/login");
-    await page.getByLabel("Username").fill("admin");
-    await page.getByLabel("Password").fill("admin");
-    await page.getByRole("button", { name: /login/i }).click();
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    // Open hamburger menu
-    const topBar = page.locator(".fixed").filter({ hasText: "SnapOtter" }).first();
-    const hamburger = topBar.locator("button").first();
-    await hamburger.click();
-
-    // Sidebar overlay should appear
-    const backdrop = page.locator(".fixed.inset-0").first();
-    await expect(backdrop).toBeVisible();
-
-    // Click the backdrop to close
-    await backdrop.click({ position: { x: 300, y: 300 } });
-    await page.waitForTimeout(300);
-
-    // Sidebar overlay should be closed (expanded sidebar nav no longer visible)
-    await expect(backdrop).not.toBeVisible();
-
-    await context.close();
-  });
+  // Removed: 2.0 deleted the mobile hamburger sidebar overlay (and its backdrop).
+  // Mobile navigation is a fixed bottom nav (nav.fixed) with Tools, Automate,
+  // Editor, Files, and a Settings button; the tests below cover it.
 
   test("bottom nav navigates between all main sections", async ({ browser }) => {
     const context = await browser.newContext({
@@ -1133,7 +939,10 @@ test.describe("Mobile Navigation", () => {
     await context.close();
   });
 
-  test("hamburger menu Grid link navigates to /fullscreen", async ({ browser }) => {
+  // Removed: the mobile hamburger "Grid" link (and the /fullscreen route it
+  // pointed to) no longer exist in 2.0.
+
+  test("bottom nav Settings button opens the Settings dialog", async ({ browser }) => {
     const context = await browser.newContext({
       viewport: { width: 375, height: 667 },
     });
@@ -1144,35 +953,13 @@ test.describe("Mobile Navigation", () => {
     await page.getByRole("button", { name: /login/i }).click();
     await page.waitForURL("/", { timeout: 15_000 });
 
-    // Open hamburger menu
-    const topBar = page.locator(".fixed").filter({ hasText: "SnapOtter" }).first();
-    const hamburger = topBar.locator("button").first();
-    await hamburger.click();
+    // The fixed bottom nav exposes a Settings button (mobile-bottom-nav.tsx) that
+    // opens the Settings dialog rather than navigating.
+    const bottomNav = page.locator("nav.fixed");
+    await bottomNav.getByRole("button", { name: /settings/i }).click();
 
-    // Click Grid in expanded sidebar
-    await page.getByText("Grid").click();
-    await expect(page).toHaveURL("/fullscreen");
-
-    await context.close();
-  });
-
-  test("hamburger menu Automate link navigates to /automate", async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 375, height: 667 },
-    });
-    const page = await context.newPage();
-    await page.goto("/login");
-    await page.getByLabel("Username").fill("admin");
-    await page.getByLabel("Password").fill("admin");
-    await page.getByRole("button", { name: /login/i }).click();
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    const topBar = page.locator(".fixed").filter({ hasText: "SnapOtter" }).first();
-    const hamburger = topBar.locator("button").first();
-    await hamburger.click();
-
-    await page.getByText("Automate").nth(1).click();
-    await expect(page).toHaveURL("/automate");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
 
     await context.close();
   });
@@ -1190,8 +977,13 @@ test.describe("Editor Page", () => {
     await expect(page.getByText(/editor|canvas|draw/i).first()).toBeVisible();
   });
 
-  test("editor page is accessible from sidebar", async ({ loggedInPage: page }) => {
-    await page.locator("aside").getByText("Editor").click();
+  test("editor page is reachable from the top-nav Editor link", async ({ loggedInPage: page }) => {
+    // 2.0 removed the sidebar; the Editor link (with a "Beta" badge) lives in the
+    // top-nav banner.
+    await page
+      .getByRole("banner")
+      .getByRole("link", { name: /Editor/ })
+      .click();
     await expect(page).toHaveURL("/editor");
   });
 
@@ -1223,8 +1015,9 @@ test.describe("Settings Dialog Tabs", () => {
     await page.getByRole("button", { name: "Security" }).click();
     await page.waitForTimeout(300);
 
-    // Security section content should appear
-    await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
+    // Security section content should appear (the section heading plus a couple
+    // of sub-section headings all read "Security", so scope to the first).
+    await expect(page.getByRole("heading", { name: "Security" }).first()).toBeVisible();
   });
 
   test("clicking About tab shows version info", async ({ loggedInPage: page }) => {
@@ -1298,19 +1091,23 @@ test.describe("Language Selector", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fullscreen Grid - Tool Visibility
+// Home Catalog - Tool Visibility
 // ---------------------------------------------------------------------------
-test.describe("Fullscreen Grid - AI Tool Visibility", () => {
-  test("AI tools section is visible in fullscreen grid", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+// 2.0 removed the standalone /fullscreen grid; the home catalog ("/") now shows
+// every tool grouped by section then category. The AI image tools live under the
+// "Enhance & AI" category (t.categories.enhance).
+test.describe("Home Catalog - AI Tool Visibility", () => {
+  test("AI tools are visible in the home catalog", async ({ loggedInPage: page }) => {
+    await page.goto("/");
 
-    await expect(page.getByText("AI Tools")).toBeVisible();
-    // At least one AI tool should be listed
+    // The "Enhance & AI" category header groups the AI image tools.
+    await expect(page.getByText("Enhance & AI").first()).toBeVisible();
+    // At least one AI tool card should be listed
     await expect(page.getByRole("link", { name: /Remove Background/ }).first()).toBeVisible();
   });
 
   test("tool cards display an icon and name", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+    await page.goto("/");
 
     // A tool card should have visible text for its name
     const resizeLink = page.getByRole("link", { name: /^Resize/ }).first();
@@ -1340,19 +1137,10 @@ test.describe("Automate Page - Pipeline Management", () => {
     // Step should be added
     await expect(page.getByText("No steps yet")).not.toBeVisible();
 
-    // Remove the step (click the remove/delete button on the step)
-    const removeBtn = page
-      .locator("button")
-      .filter({ has: page.locator("svg") })
-      .filter({
-        hasText: /remove|delete|x/i,
-      })
-      .first();
-    if (await removeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await removeBtn.click();
-      await page.waitForTimeout(300);
-      await expect(page.getByText("No steps yet")).toBeVisible();
-    }
+    // Each step card has a Remove button (title="Remove" -> t.automate.removeStep).
+    // Removing the only step returns the builder to its empty state.
+    await page.locator("button[title='Remove']").first().click();
+    await expect(page.getByText("No steps yet")).toBeVisible();
   });
 
   test("adding multiple steps shows ordered step list", async ({ loggedInPage: page }) => {
@@ -1405,25 +1193,28 @@ test.describe("Routing - Additional Edge Cases", () => {
     await page.goBack();
     await expect(page).toHaveURL("/");
 
-    // Home content should be intact
-    await expect(page.getByText("Upload from computer")).toBeVisible();
+    // Home content should be intact: the 2.0 home is the tool catalog (search box
+    // + tool-card links), not a dropzone.
+    await expect(page.locator("input[data-search-input]")).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Resize/ }).first()).toBeVisible();
   });
 
   test("deep-linking to a specific tool page works", async ({ loggedInPage: page }) => {
-    await page.goto("/image/watermark-text");
-    await expect(page).toHaveURL("/watermark-text");
+    // Tool routes are section-prefixed; resolve via the shared catalog.
+    await page.goto(routeFor("watermark-text"));
+    await expect(page).toHaveURL("/image/watermark-text");
     await expect(page.getByText("Text Watermark").first()).toBeVisible();
   });
 
   test("double navigation to same page does not break state", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
+    await page.goto("/automate");
+    await expect(page).toHaveURL("/automate");
 
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
+    await page.goto("/automate");
+    await expect(page).toHaveURL("/automate");
 
     // Page should still work correctly
-    await expect(page.getByPlaceholder(/search/i)).toBeVisible();
+    await expect(page.getByText("Pipeline Builder")).toBeVisible();
   });
 
   test("navigating from a legacy redirect to another page works", async ({
@@ -1432,8 +1223,8 @@ test.describe("Routing - Additional Edge Cases", () => {
     await page.goto("/brightness-contrast");
     await expect(page).toHaveURL("/image/adjust-colors");
 
-    await page.goto("/fullscreen");
-    await expect(page).toHaveURL("/fullscreen");
+    await page.goto("/files");
+    await expect(page).toHaveURL("/files");
 
     await page.goBack();
     await expect(page).toHaveURL("/image/adjust-colors");
@@ -1465,7 +1256,7 @@ test.describe("Tool Page - Mobile Structure", () => {
       await page.getByRole("button", { name: /login/i }).click();
       await page.waitForURL("/", { timeout: 15_000 });
 
-      await page.goto(`/${tool.id}`);
+      await page.goto(routeFor(tool.id));
 
       // Tool name should be visible
       await expect(page.getByText(tool.name).first()).toBeVisible();
