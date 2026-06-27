@@ -2757,6 +2757,14 @@ export const pl: TranslationKeys = {
         "Pobierz archiwum diagnostyczne z zanonimizowaną konfiguracją, logami i danymi zadań do rozwiązywania problemów.",
       supportBundleFailed: "Nie udało się pobrać pakietu diagnostycznego.",
     },
+    privacy: {
+      title: "Prywatność",
+      description:
+        "Anonimowe analizy produktu pomagają ulepszać SnapOtter. Są domyślnie włączone i ustawiane dla całej instancji przez administratora.",
+      analyticsLabel: "Anonimowe analizy produktu",
+      analyticsDescription:
+        "Udostępniaj anonimowe dane o użyciu (które narzędzia są uruchamiane, czasy trwania, kody błędów) oraz raporty o awariach. Bez adresu IP, bez tożsamości konta. Nigdy nie zbieramy nazw plików, ich zawartości, wyników OCR, metadanych obrazów ani tekstu dokumentów. Wyłącz tę opcję, aby wszystko zatrzymać.",
+    },
     security: {
       heading: "Bezpieczeństwo",
       description: "Ustawienia hasła i uwierzytelniania.",

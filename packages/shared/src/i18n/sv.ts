@@ -2748,6 +2748,14 @@ export const sv: TranslationKeys = {
         "Ladda ner en diagnostisk ZIP med maskerad konfiguration, loggar och jobbdata för felsökning.",
       supportBundleFailed: "Kunde inte ladda ner supportpaket.",
     },
+    privacy: {
+      title: "Integritet",
+      description:
+        "Anonym produktanalys hjälper till att förbättra SnapOtter. Den är på som standard och ställs in för hela instansen av en administratör.",
+      analyticsLabel: "Anonym produktanalys",
+      analyticsDescription:
+        "Dela anonyma användningsdata (vilka verktyg som körs, tidsåtgång, felkoder) och kraschrapporter. Ingen IP-adress, ingen kontoidentitet. Vi samlar aldrig in dina filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Stäng av det här för att stoppa allt.",
+    },
     security: {
       heading: "Säkerhet",
       description: "Lösenords- och autentiseringsinställningar.",

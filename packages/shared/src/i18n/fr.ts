@@ -2766,6 +2766,14 @@ export const fr: TranslationKeys = {
         "Téléchargez une archive de diagnostic avec la configuration masquée, les journaux et les données de tâches.",
       supportBundleFailed: "Échec du téléchargement du diagnostic.",
     },
+    privacy: {
+      title: "Confidentialité",
+      description:
+        "Les statistiques produit anonymes aident à améliorer SnapOtter. Elles sont activées par défaut et configurées pour toute l'instance par un administrateur.",
+      analyticsLabel: "Statistiques produit anonymes",
+      analyticsDescription:
+        "Partagez des données d'usage anonymes (quels outils sont exécutés, durées, codes d'erreur) et des rapports de plantage. Aucune adresse IP, aucune identité de compte. Nous ne collectons jamais vos noms de fichiers, le contenu des fichiers, les résultats d'OCR, les métadonnées d'images ni le texte des documents. Désactivez cette option pour tout arrêter.",
+    },
     security: {
       heading: "Sécurité",
       description: "Paramètres de mot de passe et d'authentification.",

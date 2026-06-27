@@ -2750,6 +2750,14 @@ export const vi: TranslationKeys = {
         "Tải tệp zip chẩn đoán với cấu hình đã ẩn, nhật ký và dữ liệu công việc để khắc phục sự cố.",
       supportBundleFailed: "Không thể tải gói hỗ trợ.",
     },
+    privacy: {
+      title: "Quyền riêng tư",
+      description:
+        "Phân tích sản phẩm ẩn danh giúp cải thiện SnapOtter. Tính năng này được bật theo mặc định và do quản trị viên thiết lập cho toàn bộ phiên bản.",
+      analyticsLabel: "Phân tích sản phẩm ẩn danh",
+      analyticsDescription:
+        "Chia sẻ dữ liệu sử dụng ẩn danh (công cụ nào chạy, thời lượng, mã lỗi) và báo cáo sự cố. Không có địa chỉ IP, không có danh tính tài khoản. Chúng tôi không bao giờ thu thập tên tệp, nội dung tệp, kết quả OCR, siêu dữ liệu hình ảnh hay văn bản tài liệu của bạn. Tắt tùy chọn này để dừng tất cả.",
+    },
     security: {
       heading: "Bảo mật",
       description: "Cài đặt mật khẩu và xác thực.",

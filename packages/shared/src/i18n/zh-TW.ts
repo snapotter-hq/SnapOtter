@@ -2674,6 +2674,14 @@ export const zhTW: TranslationKeys = {
       supportBundleDescription: "下載包含已遮蔽設定、記錄檔及工作資料的診斷壓縮檔，用於問題排解。",
       supportBundleFailed: "下載支援包失敗。",
     },
+    privacy: {
+      title: "隱私",
+      description:
+        "匿名產品分析有助於改進 SnapOtter。此功能預設開啟，並由管理員為整個實例統一設定。",
+      analyticsLabel: "匿名產品分析",
+      analyticsDescription:
+        "分享匿名使用資料（執行了哪些工具、時長、錯誤代碼）與當機報告。不含 IP 位址，不含帳戶身分。我們絕不收集您的檔案名稱、檔案內容、OCR 輸出、影像中繼資料或文件文字。關閉此項即可停止上述所有收集。",
+    },
     security: {
       heading: "安全性",
       description: "密碼和驗證設定。",

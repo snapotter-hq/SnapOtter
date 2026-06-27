@@ -2750,6 +2750,14 @@ export const id: TranslationKeys = {
         "Unduh ZIP diagnostik berisi konfigurasi yang disunting, log, dan data pekerjaan untuk pemecahan masalah.",
       supportBundleFailed: "Gagal mengunduh paket dukungan.",
     },
+    privacy: {
+      title: "Privasi",
+      description:
+        "Analitik Produk Anonim membantu meningkatkan SnapOtter. Fitur ini aktif secara default dan diatur untuk seluruh instance oleh administrator.",
+      analyticsLabel: "Analitik Produk Anonim",
+      analyticsDescription:
+        "Bagikan data penggunaan anonim (alat mana yang dijalankan, durasi, kode kesalahan) dan laporan kerusakan. Tanpa alamat IP, tanpa identitas akun. Kami tidak pernah mengumpulkan nama file, isi file, keluaran OCR, metadata gambar, atau teks dokumen Anda. Matikan ini untuk menghentikan semuanya.",
+    },
     security: {
       heading: "Keamanan",
       description: "Pengaturan kata sandi dan autentikasi.",

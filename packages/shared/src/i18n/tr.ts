@@ -2755,6 +2755,14 @@ export const tr: TranslationKeys = {
         "Sorun giderme için gizlenmiş yapılandırma, günlükler ve iş verilerini içeren tanı ZIP dosyasını indirin.",
       supportBundleFailed: "Destek paketi indirilemedi.",
     },
+    privacy: {
+      title: "Gizlilik",
+      description:
+        "Anonim Ürün Analitiği, SnapOtter'ı geliştirmeye yardımcı olur. Varsayılan olarak açıktır ve tüm örnek için bir yönetici tarafından ayarlanır.",
+      analyticsLabel: "Anonim Ürün Analitiği",
+      analyticsDescription:
+        "Anonim kullanım verilerini (hangi araçların çalıştığı, süreler, hata kodları) ve çökme raporlarını paylaşın. IP adresi yok, hesap kimliği yok. Dosya adlarınızı, dosya içeriklerinizi, OCR çıktısını, görüntü meta verilerini veya belge metnini asla toplamayız. Hepsini durdurmak için bunu kapatın.",
+    },
     security: {
       heading: "Güvenlik",
       description: "Parola ve kimlik doğrulama ayarları.",

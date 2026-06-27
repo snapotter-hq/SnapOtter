@@ -2692,6 +2692,14 @@ export const ko: TranslationKeys = {
         "편집된 설정, 로그 및 작업 데이터가 포함된 진단 zip을 다운로드합니다.",
       supportBundleFailed: "지원 번들 다운로드에 실패했습니다.",
     },
+    privacy: {
+      title: "개인정보",
+      description:
+        "익명 제품 분석은 SnapOtter 개선에 도움이 됩니다. 기본적으로 켜져 있으며 관리자가 전체 인스턴스에 대해 설정합니다.",
+      analyticsLabel: "익명 제품 분석",
+      analyticsDescription:
+        "익명 사용 데이터(실행된 도구, 소요 시간, 오류 코드)와 충돌 보고서를 공유합니다. IP 주소나 계정 정보는 포함되지 않습니다. 파일 이름, 파일 내용, OCR 결과, 이미지 메타데이터, 문서 텍스트는 절대 수집하지 않습니다. 모두 중단하려면 이 옵션을 끄세요.",
+    },
     security: {
       heading: "보안",
       description: "비밀번호 및 인증 설정.",

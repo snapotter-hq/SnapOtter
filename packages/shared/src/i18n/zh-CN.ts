@@ -2676,6 +2676,14 @@ export const zhCN: TranslationKeys = {
       supportBundleDescription: "下载包含脱敏配置、日志和任务数据的诊断压缩包，用于故障排查。",
       supportBundleFailed: "下载支持包失败。",
     },
+    privacy: {
+      title: "隐私",
+      description:
+        "匿名产品分析有助于改进 SnapOtter。该功能默认开启，并由管理员为整个实例统一设置。",
+      analyticsLabel: "匿名产品分析",
+      analyticsDescription:
+        "共享匿名使用数据（运行了哪些工具、时长、错误代码）和崩溃报告。不含 IP 地址，不含账户身份。我们绝不收集您的文件名、文件内容、OCR 输出、图像元数据或文档文本。关闭此项即可停止所有这些收集。",
+    },
     security: {
       heading: "安全",
       description: "密码和认证设置。",

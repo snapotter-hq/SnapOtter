@@ -2704,6 +2704,14 @@ export const en = {
         "Download a diagnostic zip with redacted config, logs, and job data for troubleshooting.",
       supportBundleFailed: "Failed to download support bundle.",
     },
+    privacy: {
+      title: "Privacy",
+      description:
+        "Anonymous Product Analytics helps improve SnapOtter. It is on by default and set for the whole instance by an administrator.",
+      analyticsLabel: "Anonymous Product Analytics",
+      analyticsDescription:
+        "Share anonymous usage data (which tools run, durations, error codes) and crash reports. No IP address, no account identity. We never collect your file names, file contents, OCR output, image metadata, or document text. Turn this off to stop all of it.",
+    },
     security: {
       heading: "Security",
       description: "Password and authentication settings.",
