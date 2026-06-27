@@ -2,11 +2,12 @@ import { ANALYTICS_BAKED } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { PostHog } from "posthog-node";
 import { db, schema } from "../db/index.js";
+import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
 
 let posthogClient: PostHog | null = null;
 
 export async function initAnalytics(): Promise<void> {
-  if (!ANALYTICS_BAKED.enabled) return;
+  if (!bakedEnabled()) return;
 
   if (ANALYTICS_BAKED.posthogApiKey) {
     try {
@@ -24,7 +25,7 @@ export async function initAnalytics(): Promise<void> {
 
 export async function captureException(error: unknown): Promise<void> {
   try {
-    if (!ANALYTICS_BAKED.enabled) return;
+    if (!analyticsEnabled()) return;
     const Sentry = await import("@sentry/node");
     Sentry.captureException(error);
   } catch {
@@ -53,7 +54,7 @@ export async function trackEvent(
   distinctId?: string,
 ): Promise<void> {
   try {
-    if (!ANALYTICS_BAKED.enabled || !posthogClient) return;
+    if (!analyticsEnabled() || !posthogClient) return;
     if (ANALYTICS_BAKED.sampleRate < 1.0) {
       if (ANALYTICS_BAKED.sampleRate <= 0.0 || Math.random() >= ANALYTICS_BAKED.sampleRate) return;
     }
