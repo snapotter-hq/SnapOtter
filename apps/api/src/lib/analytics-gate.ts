@@ -9,6 +9,7 @@ type GateReader = () => Promise<boolean | undefined>;
 
 let cachedEnabled = true; // last known toggle value (default ON)
 let knownDisabled = false; // have we positively read "disabled"? fail-closed anchor
+let primed = false; // has a successful read happened yet? gates Sentry at cold start
 let fetchedAt = 0; // Date.now() of the last read attempt
 let reader: GateReader = defaultReader;
 
@@ -50,6 +51,7 @@ export async function refreshAnalyticsGate(): Promise<void> {
     const on = v === undefined ? true : v;
     cachedEnabled = on;
     knownDisabled = !on;
+    primed = true;
     fetchedAt = Date.now();
   } catch {
     // DB read failed. If we ever positively saw "disabled", keep serving disabled
@@ -64,6 +66,15 @@ export async function primeAnalyticsGate(): Promise<void> {
   await refreshAnalyticsGate();
 }
 
+/**
+ * True once a successful read has populated the cache. Backend Sentry inits at
+ * process load (before the cache is primed), so its hooks check this to stay
+ * silent during the boot window rather than emitting on the default-ON cache.
+ */
+export function gatePrimed(): boolean {
+  return primed;
+}
+
 // Test seams (no-ops in production paths).
 export function __setReaderForTests(r: GateReader | null): void {
   reader = r ?? defaultReader;
@@ -71,6 +82,7 @@ export function __setReaderForTests(r: GateReader | null): void {
 export function __resetGateForTests(): void {
   cachedEnabled = true;
   knownDisabled = false;
+  primed = false;
   fetchedAt = 0;
   reader = defaultReader;
 }

@@ -1,5 +1,10 @@
 import { ANALYTICS_BAKED } from "@snapotter/shared";
-import { analyticsEnabled } from "./lib/analytics-gate.js";
+import { analyticsEnabled, gatePrimed } from "./lib/analytics-gate.js";
+
+// Sentry inits at process load, before the gate cache is primed. Until the
+// first successful read, stay silent rather than emit on the default-ON cache,
+// so an opted-out instance never reports even a boot-window crash.
+const sentryActive = () => gatePrimed() && analyticsEnabled();
 
 // Collapse any absolute path in a stack frame filename to its basename, so
 // even our own source paths never carry a workspace or job directory.
@@ -20,12 +25,13 @@ if (ANALYTICS_BAKED.sentryDsn) {
       tracesSampleRate: ANALYTICS_BAKED.sampleRate,
       sendDefaultPii: false,
       // Runtime opt-out: drop the whole transaction when analytics is off.
-      tracesSampler: () => (analyticsEnabled() ? ANALYTICS_BAKED.sampleRate : 0),
+      tracesSampler: () => (sentryActive() ? ANALYTICS_BAKED.sampleRate : 0),
       beforeSend(event) {
-        if (!analyticsEnabled()) return null; // kill switch (covers auto-captured errors)
+        if (!sentryActive()) return null; // kill switch (covers auto-captured errors)
         // Allow-list: emit only error type + a basename-collapsed stack.
         event.message = undefined;
         event.logentry = undefined; // structured twin of message (captureMessage path)
+        event.server_name = undefined; // hostname is not anonymous
         event.request = undefined;
         event.extra = undefined;
         event.contexts = undefined;
@@ -49,7 +55,7 @@ if (ANALYTICS_BAKED.sentryDsn) {
         return null; // breadcrumbs can carry URLs/messages with content; drop them
       },
       beforeSendTransaction(event) {
-        return analyticsEnabled() ? event : null;
+        return sentryActive() ? event : null;
       },
     });
 
