@@ -4,7 +4,7 @@ description: Security hardening guide for SnapOtter. Container security, network
 
 # Security & Hardening
 
-SnapOtter processes files entirely on your infrastructure. No telemetry, no external API calls, no phone-home behavior. Files never leave the container.
+SnapOtter processes files entirely on your infrastructure. It sends anonymous, content-free product analytics and crash reports by default to help improve the project. It never sends your files, file names, file contents, OCR output, image metadata, or document text. An administrator can turn it off in one click under Settings > System > Privacy, no rebuild required. File processing always stays inside your container.
 
 The container runs as a dedicated non-root user (`snapotter`) with all Linux capabilities dropped except the minimum required set. For the full vulnerability disclosure policy and security architecture, see [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) on GitHub.
 

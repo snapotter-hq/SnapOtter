@@ -5429,15 +5429,6 @@ paths:
                           type: string
                       teamName:
                         type: string
-                      analyticsEnabled:
-                        type: boolean
-                        nullable: true
-                      analyticsConsentShownAt:
-                        type: integer
-                        nullable: true
-                      analyticsConsentRemindAt:
-                        type: integer
-                        nullable: true
                   expiresAt:
                     type: string
                     format: date-time
@@ -5509,15 +5500,6 @@ paths:
                         type: array
                         items:
                           type: string
-                      analyticsEnabled:
-                        type: boolean
-                        nullable: true
-                      analyticsConsentShownAt:
-                        type: integer
-                        nullable: true
-                      analyticsConsentRemindAt:
-                        type: integer
-                        nullable: true
                   expiresAt:
                     type: string
                     format: date-time
@@ -6416,8 +6398,10 @@ paths:
       tags: [Analytics]
       summary: Get analytics configuration
       description: |
-        Returns analytics provider configuration. When ANALYTICS_ENABLED is
-        false on the server, all values are empty. Public endpoint.
+        Returns the effective analytics provider configuration. Analytics is
+        enabled only when both the compile-time bake and the instance
+        analyticsEnabled setting allow it. When disabled, the keys, DSN, and
+        instanceId are blank. Public endpoint.
       security: []
       responses:
         "200":
@@ -6429,6 +6413,11 @@ paths:
                 properties:
                   enabled:
                     type: boolean
+                    description: |
+                      Effective analytics state. True only when both the
+                      compile-time bake and the instance analyticsEnabled
+                      setting are on. When false, the keys, DSN, and instanceId
+                      are blank.
                   posthogApiKey:
                     type: string
                   posthogHost:

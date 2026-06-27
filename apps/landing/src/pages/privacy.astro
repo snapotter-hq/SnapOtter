@@ -86,12 +86,18 @@ const breadcrumbJsonLd = {
           <h2 class="text-lg font-semibold text-foreground">Analytics</h2>
           <ul class="mt-3 list-disc space-y-2 pl-5">
             <li>
-              Basic analytics (tool usage patterns, error reports) help improve the software.
-              Your files and personal data are never included.
+              Anonymous product analytics (tool usage patterns, error reports) help improve the
+              software. Your files, file names, and personal data are never included.
             </li>
             <li>
-              You can disable analytics at any time -- SnapOtter works normally without it.
-              Rebuild with <code class="text-xs">--build-arg SNAPOTTER_ANALYTICS=off</code>.
+              It is on by default. An administrator can turn it off any time with a one-click
+              toggle under Settings &gt; System &gt; Privacy. No rebuild is required, and it stops
+              immediately for the whole instance.
+            </li>
+            <li>
+              To build an image that can never emit analytics, set the
+              <code class="text-xs">SNAPOTTER_ANALYTICS=off</code> build arg as a compile-time
+              hard-off.
             </li>
           </ul>
         </section>
