@@ -146,6 +146,10 @@ describe("tool x format matrix (generated)", () => {
               "image/qoi",
               "image/x-portable-pixmap",
               "image/x-tga",
+              // sharp's bundled libvips has no BMP reader, so a valid BMP output
+              // still cannot be decoded here. Exclude it like the other formats
+              // sharp cannot read.
+              "image/bmp",
             ].includes(outType.split(";")[0]);
           if (sharpDecodable) {
             // The processed output must actually decode; a corrupt "success" is a bug.
