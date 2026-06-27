@@ -1,4 +1,5 @@
 import { ANALYTICS_BAKED } from "@snapotter/shared";
+import type Redis from "ioredis";
 
 const TTL_MS = 30_000;
 const SETTING_KEY = "analyticsEnabled";
@@ -72,4 +73,34 @@ export function __resetGateForTests(): void {
   knownDisabled = false;
   fetchedAt = 0;
   reader = defaultReader;
+}
+
+let gateSubscriber: Redis | null = null;
+const CHANNEL = async () => {
+  const { bullPrefix } = await import("../jobs/types.js");
+  return `${bullPrefix()}:analytics-gate`;
+};
+
+/** Subscribe so a setting change on any replica refreshes this process's cache. */
+export async function startAnalyticsGateListener(): Promise<void> {
+  const { createRedisConnection } = await import("../jobs/connection.js");
+  gateSubscriber = createRedisConnection();
+  gateSubscriber.on("error", (err) => console.error("Analytics gate subscriber error", err));
+  await gateSubscriber.subscribe(await CHANNEL());
+  gateSubscriber.on("message", () => {
+    void refreshAnalyticsGate();
+  });
+}
+
+/** Publish so every replica drops its cache after a toggle write. */
+export async function publishAnalyticsGateInvalidation(): Promise<void> {
+  const { sharedRedis } = await import("../jobs/connection.js");
+  await sharedRedis().publish(await CHANNEL(), "1");
+}
+
+export async function stopAnalyticsGateListener(): Promise<void> {
+  if (gateSubscriber) {
+    await gateSubscriber.quit();
+    gateSubscriber = null;
+  }
 }
