@@ -2,6 +2,7 @@ import { ANALYTICS_BAKED } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { PostHog } from "posthog-node";
 import { db, schema } from "../db/index.js";
+import { sanitizeEventProperties } from "./analytics-allowlist.js";
 import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
 
 let posthogClient: PostHog | null = null;
@@ -61,7 +62,7 @@ export async function trackEvent(
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),
       event,
-      properties,
+      properties: sanitizeEventProperties(event, properties),
     });
   } catch {
     // analytics must never throw
