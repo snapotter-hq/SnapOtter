@@ -1,24 +1,22 @@
 import type { Page } from "@playwright/test";
 import { expect, openSettings, test } from "./helpers";
 
-// Proves the instance-wide analytics opt-out works end to end: with the bake
-// forced ON, GET /api/v1/config/analytics reports enabled by default, an admin
-// opt-out flips it to disabled (secrets blanked), and the System settings toggle
-// reflects that state both ways.
+// Proves the instance-wide analytics opt-out works end to end THROUGH THE UI.
+// With the bake forced ON, GET /api/v1/config/analytics reports enabled by
+// default. An admin flips the System > Privacy toggle off and clicks the real
+// "Save Settings" button, and the effective config flips to disabled with every
+// secret blanked. The System bulk save now drops the read-only instance_id and
+// cookie_secret keys plus any "********" redacted sentinel before the PUT, so
+// the Save button persists the opt-out. Previously it 400'd on instance_id
+// (READONLY_SETTING) and nothing was written.
 //
 // The analytics-local Playwright config sets ANALYTICS_BAKED_OVERRIDE=on so the
 // compile-time bake is forced ON for this run; without it the effective state
 // would be OFF regardless of the toggle (dev/test bake is off by default).
-//
-// NOTE on persistence: we write the opt-out with a targeted PUT of just
-// analyticsEnabled rather than the System section's "Save Settings" button. That
-// button re-POSTs every loaded setting, which includes the read-only instance_id
-// and cookie_secret keys the API rejects (400 READONLY_SETTING). A targeted
-// write has the exact effect the toggle is meant to have without tripping that
-// pre-existing bulk-save limitation.
 
 const CONFIG_PATH = "/api/v1/config/analytics";
 const ANALYTICS_SWITCH = "Anonymous Product Analytics";
+const SAVE_BUTTON = /save settings/i;
 
 interface AnalyticsConfig {
   enabled: boolean;
@@ -51,24 +49,36 @@ async function openSystemSection(page: Page): Promise<void> {
 }
 
 test.describe("Analytics opt-out toggle", () => {
-  test("opting out flips the effective config off and the UI reflects it", async ({
+  // Always reset to ON so a reused dev server and the next spec start enabled,
+  // even if an assertion above failed mid-test.
+  test.afterEach(async ({ loggedInPage: page }) => {
+    await setAnalyticsEnabled(page, "true");
+    await expect.poll(async () => (await readConfig(page)).enabled, { timeout: 10_000 }).toBe(true);
+  });
+
+  test("admin opts out via the real Save button and the effective config flips off", async ({
     loggedInPage: page,
   }) => {
     // Forced bake ON + no opt-out yet => enabled by default.
     expect((await readConfig(page)).enabled).toBe(true);
 
-    // The System settings toggle exists and reads ON.
+    // Open System settings; the analytics toggle reads ON.
     await openSystemSection(page);
-    await expect(page.getByRole("switch", { name: ANALYTICS_SWITCH })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    await page.keyboard.press("Escape");
+    const toggle = page.getByRole("switch", { name: ANALYTICS_SWITCH });
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
 
-    // Opt out instance-wide.
-    await setAnalyticsEnabled(page, "false");
+    // Flip OFF, then persist with the real "Save Settings" button. This is the
+    // crux: the bulk save must succeed despite GET returning the read-only
+    // instance_id key and "********" secret sentinels.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await page.getByRole("button", { name: SAVE_BUTTON }).click();
 
-    // Effective config is now disabled with every secret blanked.
+    // The success message confirms the PUT returned 2xx (no 400 READONLY_SETTING).
+    await expect(page.getByText("Settings saved.")).toBeVisible();
+
+    // The settings route refreshes the gate synchronously on write, so the
+    // effective config flips to disabled near-immediately, secrets blanked.
     await expect
       .poll(async () => (await readConfig(page)).enabled, { timeout: 10_000 })
       .toBe(false);
@@ -82,15 +92,23 @@ test.describe("Analytics opt-out toggle", () => {
     });
 
     // Reopening Settings shows the toggle OFF (gate -> UI round-trip).
+    await page.keyboard.press("Escape");
     await openSystemSection(page);
     await expect(page.getByRole("switch", { name: ANALYTICS_SWITCH })).toHaveAttribute(
       "aria-checked",
       "false",
     );
     await page.keyboard.press("Escape");
+  });
 
-    // Reset so other specs (and a reused dev server) see analytics back ON.
-    await setAnalyticsEnabled(page, "true");
-    await expect.poll(async () => (await readConfig(page)).enabled, { timeout: 10_000 }).toBe(true);
+  test("targeted opt-out PUT flips the gate off without the UI", async ({ loggedInPage: page }) => {
+    // Independent of the dialog: a direct analyticsEnabled=false write also
+    // disables the gate and blanks the secrets. Guards the gate behavior on its
+    // own so a UI regression can't mask a gate regression.
+    expect((await readConfig(page)).enabled).toBe(true);
+    await setAnalyticsEnabled(page, "false");
+    await expect
+      .poll(async () => (await readConfig(page)).enabled, { timeout: 10_000 })
+      .toBe(false);
   });
 });

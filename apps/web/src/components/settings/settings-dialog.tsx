@@ -550,7 +550,17 @@ function SystemSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", settings);
+      // GET returns read-only keys (instance_id, cookie_secret) and shows redacted
+      // secrets as the literal "********". Echoing those back fails with 400
+      // READONLY_SETTING or would overwrite a real secret with the mask, so send
+      // only the keys this section can actually change.
+      const READONLY_KEYS = new Set(["instance_id", "cookie_secret"]);
+      const writable = Object.fromEntries(
+        Object.entries(settings).filter(
+          ([key, value]) => !READONLY_KEYS.has(key) && value !== "********",
+        ),
+      );
+      await apiPut("/v1/settings", writable);
       if (settings.analyticsEnabled === "false") {
         const { optOut } = await import("@/lib/analytics");
         optOut();

@@ -43,9 +43,11 @@ export function PrivacyPolicyPage() {
             <p>
               SnapOtter includes basic analytics (tool usage, error reports) to help improve the
               software. Your files, file names, and personal data are never part of this. Analytics
-              can be disabled by rebuilding with{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">SNAPOTTER_ANALYTICS=off</code>{" "}
-              -- everything works normally without it.
+              is on by default and can be disabled at runtime. An administrator can turn anonymous
+              product analytics off under Settings {">"} System {">"} Privacy, with no restart or
+              rebuild needed. For a compile-time hard-off, build with{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">SNAPOTTER_ANALYTICS=off</code>,
+              which strips it from the bundle entirely. Everything works normally without it.
             </p>
           </section>
 

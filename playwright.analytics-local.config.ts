@@ -47,11 +47,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // NOTE: invoke tsx directly instead of the `dev` script. That script
-      // hard-codes `PORT=13490`, which would override the isolated TEST_API_PORT
-      // below and collide with a developer's running dev server. Mirror the
-      // script's loader flags here.
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api exec tsx --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts`,
+      // NOTE: use the `start` script, not `dev`. The `dev` script hard-codes
+      // `PORT=13490`, which would override the isolated TEST_API_PORT below and
+      // collide with a developer's running dev server. `start` reads PORT from
+      // the env, so the PORT set in this webServer.env block is honored.
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api start`,
       port: TEST_API_PORT,
       reuseExistingServer: !process.env.CI,
       env: {
