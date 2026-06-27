@@ -1,0 +1,75 @@
+import { ANALYTICS_BAKED } from "@snapotter/shared";
+
+const TTL_MS = 30_000;
+const SETTING_KEY = "analyticsEnabled";
+
+// `undefined` from a reader means the key is absent (default ON).
+type GateReader = () => Promise<boolean | undefined>;
+
+let cachedEnabled = true; // last known toggle value (default ON)
+let knownDisabled = false; // have we positively read "disabled"? fail-closed anchor
+let fetchedAt = 0; // Date.now() of the last read attempt
+let reader: GateReader = defaultReader;
+
+async function defaultReader(): Promise<boolean | undefined> {
+  const { db, schema } = await import("../db/index.js");
+  const { eq } = await import("drizzle-orm");
+  const rows = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(eq(schema.settings.key, SETTING_KEY))
+    .limit(1);
+  if (rows.length === 0) return undefined;
+  return rows[0].value !== "false";
+}
+
+/** Compile-time bake, with a NON-PRODUCTION-only override so tests can force it on. */
+export function bakedEnabled(): boolean {
+  if (process.env.NODE_ENV !== "production") {
+    const o = process.env.ANALYTICS_BAKED_OVERRIDE;
+    if (o === "on") return true;
+    if (o === "off") return false;
+  }
+  return ANALYTICS_BAKED.enabled;
+}
+
+/** Synchronous effective gate. Safe to call from Sentry beforeSend. Never blocks. */
+export function analyticsEnabled(): boolean {
+  if (!bakedEnabled()) return false;
+  if (Date.now() - fetchedAt > TTL_MS) {
+    void refreshAnalyticsGate(); // background refresh; serve the cached value now
+  }
+  return cachedEnabled;
+}
+
+/** Read the toggle and update the cache. Fails closed on read error. */
+export async function refreshAnalyticsGate(): Promise<void> {
+  try {
+    const v = await reader();
+    const on = v === undefined ? true : v;
+    cachedEnabled = on;
+    knownDisabled = !on;
+    fetchedAt = Date.now();
+  } catch {
+    // DB read failed. If we ever positively saw "disabled", keep serving disabled
+    // rather than reverting to the ON default. Otherwise keep the last value.
+    if (knownDisabled) cachedEnabled = false;
+    fetchedAt = Date.now(); // do not hammer the DB on repeated errors
+  }
+}
+
+/** Warm the cache at boot before traffic is served. */
+export async function primeAnalyticsGate(): Promise<void> {
+  await refreshAnalyticsGate();
+}
+
+// Test seams (no-ops in production paths).
+export function __setReaderForTests(r: GateReader | null): void {
+  reader = r ?? defaultReader;
+}
+export function __resetGateForTests(): void {
+  cachedEnabled = true;
+  knownDisabled = false;
+  fetchedAt = 0;
+  reader = defaultReader;
+}
