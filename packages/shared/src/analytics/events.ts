@@ -27,7 +27,6 @@ export interface ToolUsedProperties {
 }
 
 export interface SearchProperties {
-  query: string;
   results_count: number;
   clicked_tool_id?: string;
 }

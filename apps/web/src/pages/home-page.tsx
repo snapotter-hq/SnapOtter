@@ -89,7 +89,7 @@ export function HomePage() {
     if (!search || search.length < 2) return;
     const timer = setTimeout(() => {
       import("@/lib/analytics").then(({ track }) => {
-        track(ANALYTICS_EVENTS.SEARCH, { query: search, results_count: searchResults.length });
+        track(ANALYTICS_EVENTS.SEARCH, { results_count: searchResults.length });
       });
     }, 1000);
     return () => clearTimeout(timer);
