@@ -14,7 +14,9 @@ import { expect, test } from "./helpers";
 test.describe("Tool page visual baselines", () => {
   for (const tool of TOOLS) {
     test(`${tool.id} page matches baseline`, async ({ loggedInPage: page }) => {
-      await page.goto(`/${tool.id}`);
+      // 2.0 tool routes are section-prefixed (e.g. "/image/resize"); tool.route
+      // already carries the prefix (rewritten at module load in constants.ts).
+      await page.goto(tool.route);
       // Settle: the tool name renders after the lazy settings chunk loads.
       await expect(page.getByText(tool.name, { exact: false }).first()).toBeVisible();
       await page.waitForLoadState("networkidle");
