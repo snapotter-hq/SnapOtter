@@ -47,7 +47,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api dev`,
+      // NOTE: invoke tsx directly instead of the `dev` script. That script
+      // hard-codes `PORT=13490`, which would override the isolated TEST_API_PORT
+      // below and collide with a developer's running dev server. Mirror the
+      // script's loader flags here.
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api exec tsx --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts`,
       port: TEST_API_PORT,
       reuseExistingServer: !process.env.CI,
       env: {
@@ -57,6 +61,11 @@ export default defineConfig({
         RATE_LIMIT_PER_MIN: "50000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "true",
+        // Force the compile-time bake ON (dev/test only) so the effective
+        // analytics state is enabled by default and the opt-out toggle can be
+        // exercised end to end. bakedEnabled() honors this when
+        // NODE_ENV !== "production".
+        ANALYTICS_BAKED_OVERRIDE: "on",
         DATABASE_URL: e2eDatabaseUrl,
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         BULLMQ_PREFIX: e2eDbName,
