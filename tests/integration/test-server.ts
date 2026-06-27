@@ -354,6 +354,48 @@ export async function loginAsAdmin(app: ReturnType<typeof Fastify>): Promise<str
 }
 
 /**
+ * Create (idempotently) a non-admin `user`-role account and return its session
+ * token. The user is created through the real admin-gated register route
+ * (`POST /api/auth/register`, permission `users:manage`), so the helper proves
+ * the route shape rather than poking the DB directly. The register route sets
+ * `mustChangePassword: true`, which the auth middleware would otherwise turn
+ * into a 403 on every non-auth API call (SKIP_MUST_CHANGE_PASSWORD defaults to
+ * false in tests), so we clear that flag the same way the admin seed does.
+ */
+export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<string> {
+  const adminToken = await loginAsAdmin(app);
+
+  // Create the user. A 409 means a prior call already created it -- tolerate it.
+  const create = await app.inject({
+    method: "POST",
+    url: "/api/auth/register",
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { username: "plainuser", password: "Userpass1", role: "user" },
+  });
+  if (create.statusCode !== 201 && create.statusCode !== 409) {
+    throw new Error(`User create failed (${create.statusCode}): ${create.body}`);
+  }
+
+  // Clear the first-login password-change gate so the account can reach normal
+  // permission-checked routes (idempotent if already cleared).
+  await db
+    .update(schema.users)
+    .set({ mustChangePassword: false })
+    .where(eq(schema.users.username, "plainuser"));
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "plainuser", password: "Userpass1" },
+  });
+  const body = JSON.parse(res.body);
+  if (!body.token) {
+    throw new Error(`User login failed: ${res.body}`);
+  }
+  return body.token as string;
+}
+
+/**
  * Build a multipart/form-data payload for use with `app.inject()`.
  *
  * Fastify's `inject()` doesn't natively support FormData, so we construct
