@@ -3449,4 +3449,42 @@ export const vi: TranslationKeys = {
     navigationMenu: "Điều hướng",
     homeLink: "Trang chủ SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Tối ưu cho web",
+      description: "Đổi kích thước, chuyển sang WebP và nén ảnh để tải nhanh trên web.",
+    },
+    "email-friendly": {
+      name: "Thân thiện với email",
+      description: "Thu nhỏ ảnh sao cho đủ nhỏ để đính kèm vào email.",
+    },
+    "privacy-scrub": {
+      name: "Dọn quyền riêng tư",
+      description: "Xóa EXIF, GPS và các siêu dữ liệu khác, rồi nén.",
+    },
+    "social-square": {
+      name: "Vuông mạng xã hội",
+      description: "Cắt thành hình vuông 1:1 và nén cho bài đăng mạng xã hội.",
+    },
+    "watermark-batch": {
+      name: "Đóng dấu mờ hàng loạt",
+      description: "Đóng dấu mờ văn bản lên ảnh, rồi nén.",
+    },
+    "shrink-pdf-email": {
+      name: "Thu nhỏ PDF cho email",
+      description: "Làm phẳng và nén mạnh tệp PDF để vừa với giới hạn email.",
+    },
+    "podcast-polish": {
+      name: "Hoàn thiện podcast",
+      description: "Loại bỏ khoảng lặng, chuẩn hóa độ lớn và thêm hiệu ứng mờ dần vào bản ghi.",
+    },
+    "cut-out-subject": {
+      name: "Tách chủ thể",
+      description: "Xóa nền bằng AI và nén ảnh tách nền trong suốt.",
+    },
+    "restore-old-photo": {
+      name: "Phục hồi ảnh cũ",
+      description: "Sửa chữa, tô màu và phóng to ảnh cũ hoặc hư hỏng bằng AI.",
+    },
+  },
 } as const;

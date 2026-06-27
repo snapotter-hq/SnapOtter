@@ -3425,4 +3425,42 @@ export const hi: TranslationKeys = {
     navigationMenu: "नेविगेशन",
     homeLink: "SnapOtter होम",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "वेब के लिए अनुकूलित करें",
+      description: "तेज़ वेब लोडिंग के लिए छवि का आकार बदलें, उसे WebP में बदलें और संपीड़ित करें।",
+    },
+    "email-friendly": {
+      name: "ईमेल के अनुकूल",
+      description: "छवि को इतना छोटा करें कि उसे ईमेल में अटैच किया जा सके।",
+    },
+    "privacy-scrub": {
+      name: "गोपनीयता सफ़ाई",
+      description: "EXIF, GPS और अन्य मेटाडेटा हटाएँ, फिर संपीड़ित करें।",
+    },
+    "social-square": {
+      name: "सोशल वर्ग",
+      description: "1:1 वर्ग में क्रॉप करें और सोशल पोस्ट के लिए संपीड़ित करें।",
+    },
+    "watermark-batch": {
+      name: "वॉटरमार्क बैच",
+      description: "छवियों पर टेक्स्ट वॉटरमार्क लगाएँ, फिर संपीड़ित करें।",
+    },
+    "shrink-pdf-email": {
+      name: "ईमेल के लिए PDF छोटा करें",
+      description: "PDF को समतल करें और ईमेल सीमा में फ़िट करने के लिए ज़ोरदार ढंग से संपीड़ित करें।",
+    },
+    "podcast-polish": {
+      name: "पॉडकास्ट निखार",
+      description: "रिकॉर्डिंग से ख़ामोशी हटाएँ, ध्वनि स्तर सामान्य करें और फ़ेड जोड़ें।",
+    },
+    "cut-out-subject": {
+      name: "विषय काटें",
+      description: "एआई से पृष्ठभूमि हटाएँ और पारदर्शी कटआउट को संपीड़ित करें।",
+    },
+    "restore-old-photo": {
+      name: "पुरानी फ़ोटो पुनर्स्थापित करें",
+      description: "एआई से पुरानी या क्षतिग्रस्त फ़ोटो की मरम्मत करें, रंग भरें और बड़ा करें।",
+    },
+  },
 } as const;

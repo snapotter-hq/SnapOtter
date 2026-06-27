@@ -3472,4 +3472,44 @@ export const de: TranslationKeys = {
     navigationMenu: "Navigation",
     homeLink: "SnapOtter Startseite",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Web-optimieren",
+      description:
+        "Bild verkleinern, in WebP umwandeln und komprimieren für schnelles Laden im Web.",
+    },
+    "email-friendly": {
+      name: "E-Mail-tauglich",
+      description: "Bild so verkleinern, dass es als E-Mail-Anhang klein genug ist.",
+    },
+    "privacy-scrub": {
+      name: "Metadaten entfernen",
+      description: "EXIF, GPS und andere Metadaten entfernen, dann komprimieren.",
+    },
+    "social-square": {
+      name: "Social-Quadrat",
+      description: "Auf 1:1 zuschneiden und für Social-Media-Beiträge komprimieren.",
+    },
+    "watermark-batch": {
+      name: "Wasserzeichen-Stapel",
+      description: "Text-Wasserzeichen auf Bilder setzen, dann komprimieren.",
+    },
+    "shrink-pdf-email": {
+      name: "PDF für E-Mail verkleinern",
+      description: "PDF reduzieren und stark komprimieren, damit es E-Mail-Grenzen einhält.",
+    },
+    "podcast-polish": {
+      name: "Podcast-Feinschliff",
+      description: "Stille entfernen, Lautstärke normalisieren und Ein-/Ausblendungen hinzufügen.",
+    },
+    "cut-out-subject": {
+      name: "Motiv freistellen",
+      description:
+        "Hintergrund per KI entfernen und das transparente Freisteller-Bild komprimieren.",
+    },
+    "restore-old-photo": {
+      name: "Altes Foto restaurieren",
+      description: "Altes oder beschädigtes Foto per KI reparieren, kolorieren und hochskalieren.",
+    },
+  },
 } as const;

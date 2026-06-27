@@ -3410,4 +3410,42 @@ export const th: TranslationKeys = {
     navigationMenu: "เมนูนำทาง",
     homeLink: "หน้าแรก SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "ปรับให้เหมาะกับเว็บ",
+      description: "ปรับขนาด แปลงเป็น WebP และบีบอัดภาพเพื่อให้โหลดบนเว็บได้รวดเร็ว",
+    },
+    "email-friendly": {
+      name: "เหมาะกับอีเมล",
+      description: "ย่อภาพให้เล็กพอที่จะแนบไปกับอีเมลได้",
+    },
+    "privacy-scrub": {
+      name: "ล้างข้อมูลความเป็นส่วนตัว",
+      description: "ลบ EXIF, GPS และข้อมูลเมตาอื่น ๆ แล้วบีบอัด",
+    },
+    "social-square": {
+      name: "สี่เหลี่ยมจัตุรัสโซเชียล",
+      description: "ครอปเป็นสี่เหลี่ยมจัตุรัส 1:1 และบีบอัดสำหรับโพสต์โซเชียล",
+    },
+    "watermark-batch": {
+      name: "ลายน้ำเป็นชุด",
+      description: "ประทับลายน้ำข้อความลงบนภาพ แล้วบีบอัด",
+    },
+    "shrink-pdf-email": {
+      name: "ย่อ PDF สำหรับอีเมล",
+      description: "ปรับให้แบนและบีบอัด PDF อย่างหนักเพื่อให้อยู่ในขีดจำกัดของอีเมล",
+    },
+    "podcast-polish": {
+      name: "ขัดเกลาพอดแคสต์",
+      description: "ลบช่วงเงียบ ปรับความดังให้สม่ำเสมอ และเพิ่มเสียงเฟดให้กับการบันทึก",
+    },
+    "cut-out-subject": {
+      name: "ตัดวัตถุออกมา",
+      description: "ลบพื้นหลังด้วย AI และบีบอัดภาพที่ตัดออกมาแบบโปร่งใส",
+    },
+    "restore-old-photo": {
+      name: "ฟื้นฟูภาพถ่ายเก่า",
+      description: "ซ่อมแซม ลงสี และขยายภาพถ่ายเก่าหรือที่เสียหายด้วย AI",
+    },
+  },
 } as const;

@@ -3359,6 +3359,44 @@ export const zhTW: TranslationKeys = {
     navigationMenu: "導覽選單",
     homeLink: "SnapOtter 首頁",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "網頁最佳化",
+      description: "調整尺寸、轉換為 WebP 並壓縮影像，以便在網頁上快速載入。",
+    },
+    "email-friendly": {
+      name: "適合電子郵件",
+      description: "將影像縮小到足夠小，以便附加到電子郵件中。",
+    },
+    "privacy-scrub": {
+      name: "隱私清理",
+      description: "移除 EXIF、GPS 和其他中繼資料，然後壓縮。",
+    },
+    "social-square": {
+      name: "社群方形",
+      description: "裁切為 1:1 方形並壓縮，用於社群媒體貼文。",
+    },
+    "watermark-batch": {
+      name: "批次浮水印",
+      description: "在影像上加上文字浮水印，然後壓縮。",
+    },
+    "shrink-pdf-email": {
+      name: "為電子郵件縮小 PDF",
+      description: "平面化並大幅壓縮 PDF，使其符合電子郵件大小限制。",
+    },
+    "podcast-polish": {
+      name: "播客潤飾",
+      description: "移除靜音、統一響度，並為錄音加入淡入淡出。",
+    },
+    "cut-out-subject": {
+      name: "去背主體",
+      description: "用 AI 移除背景，並壓縮透明的去背圖。",
+    },
+    "restore-old-photo": {
+      name: "修復老照片",
+      description: "用 AI 修復、上色並放大老舊或受損的照片。",
+    },
+  },
 } as const;
 
 export default zhTW;

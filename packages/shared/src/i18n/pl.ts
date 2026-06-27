@@ -3468,4 +3468,45 @@ export const pl: TranslationKeys = {
     navigationMenu: "Nawigacja",
     homeLink: "Strona główna SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Optymalizuj pod kątem sieci",
+      description:
+        "Zmień rozmiar, przekonwertuj na WebP i skompresuj obraz, aby szybko wczytywał się w sieci.",
+    },
+    "email-friendly": {
+      name: "Przyjazny dla e-maila",
+      description:
+        "Zmniejsz obraz tak, aby był wystarczająco mały do dołączenia do wiadomości e-mail.",
+    },
+    "privacy-scrub": {
+      name: "Czyszczenie prywatności",
+      description: "Usuń dane EXIF, GPS i inne metadane, a następnie skompresuj.",
+    },
+    "social-square": {
+      name: "Kwadrat społecznościowy",
+      description:
+        "Przytnij do kwadratu 1:1 i skompresuj na potrzeby wpisów w mediach społecznościowych.",
+    },
+    "watermark-batch": {
+      name: "Znak wodny wsadowo",
+      description: "Nanieś tekstowy znak wodny na obrazy, a następnie skompresuj.",
+    },
+    "shrink-pdf-email": {
+      name: "Zmniejsz PDF do e-maila",
+      description: "Spłaszcz i mocno skompresuj plik PDF, aby zmieścił się w limitach e-maila.",
+    },
+    "podcast-polish": {
+      name: "Dopracowanie podcastu",
+      description: "Usuń ciszę, znormalizuj głośność i dodaj przejścia do nagrania.",
+    },
+    "cut-out-subject": {
+      name: "Wytnij obiekt",
+      description: "Usuń tło za pomocą AI i skompresuj przezroczysty wycinek.",
+    },
+    "restore-old-photo": {
+      name: "Odnów stare zdjęcie",
+      description: "Napraw, pokoloruj i powiększ stare lub uszkodzone zdjęcie za pomocą AI.",
+    },
+  },
 } as const;

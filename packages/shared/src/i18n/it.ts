@@ -3465,4 +3465,45 @@ export const it: TranslationKeys = {
     navigationMenu: "Menu di navigazione",
     homeLink: "Home di SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Ottimizza per il web",
+      description:
+        "Ridimensiona, converti in WebP e comprimi un'immagine per un caricamento web veloce.",
+    },
+    "email-friendly": {
+      name: "Adatta alle email",
+      description: "Riduci un'immagine così da renderla abbastanza piccola da allegare a un'email.",
+    },
+    "privacy-scrub": {
+      name: "Pulizia privacy",
+      description: "Rimuovi EXIF, GPS e altri metadati, poi comprimi.",
+    },
+    "social-square": {
+      name: "Quadrato social",
+      description: "Ritaglia in un quadrato 1:1 e comprimi per i post sui social.",
+    },
+    "watermark-batch": {
+      name: "Filigrana in serie",
+      description: "Applica una filigrana di testo alle immagini, poi comprimi.",
+    },
+    "shrink-pdf-email": {
+      name: "Riduci PDF per email",
+      description:
+        "Appiattisci e comprimi con decisione un PDF per rispettare i limiti delle email.",
+    },
+    "podcast-polish": {
+      name: "Rifinitura podcast",
+      description:
+        "Rimuovi i silenzi, normalizza il volume e aggiungi dissolvenze a una registrazione.",
+    },
+    "cut-out-subject": {
+      name: "Scontorna il soggetto",
+      description: "Rimuovi lo sfondo con l'IA e comprimi il ritaglio trasparente.",
+    },
+    "restore-old-photo": {
+      name: "Restaura vecchia foto",
+      description: "Ripara, colora e ingrandisci una foto vecchia o danneggiata con l'IA.",
+    },
+  },
 } as const;

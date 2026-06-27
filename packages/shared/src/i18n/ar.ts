@@ -3430,4 +3430,42 @@ export const ar: TranslationKeys = {
     navigationMenu: "التنقل",
     homeLink: "الصفحة الرئيسية لـ SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "تحسين للويب",
+      description: "تغيير حجم الصورة وتحويلها إلى WebP وضغطها لتحميل سريع على الويب.",
+    },
+    "email-friendly": {
+      name: "مناسب للبريد الإلكتروني",
+      description: "تصغير الصورة بما يكفي لإرفاقها برسالة بريد إلكتروني.",
+    },
+    "privacy-scrub": {
+      name: "تنظيف الخصوصية",
+      description: "إزالة بيانات EXIF وGPS وبيانات التعريف الأخرى، ثم الضغط.",
+    },
+    "social-square": {
+      name: "مربع للتواصل الاجتماعي",
+      description: "اقتصاص الصورة إلى مربع 1:1 وضغطها لمنشورات التواصل الاجتماعي.",
+    },
+    "watermark-batch": {
+      name: "علامة مائية بالدُّفعة",
+      description: "إضافة علامة مائية نصية إلى الصور، ثم ضغطها.",
+    },
+    "shrink-pdf-email": {
+      name: "تصغير PDF للبريد الإلكتروني",
+      description: "تسطيح ملف PDF وضغطه بقوة ليتوافق مع حدود البريد الإلكتروني.",
+    },
+    "podcast-polish": {
+      name: "تحسين البودكاست",
+      description: "إزالة الصمت وتطبيع مستوى الصوت وإضافة تلاشٍ إلى التسجيل.",
+    },
+    "cut-out-subject": {
+      name: "قص العنصر",
+      description: "إزالة الخلفية باستخدام الذكاء الاصطناعي وضغط الصورة الشفافة المقصوصة.",
+    },
+    "restore-old-photo": {
+      name: "ترميم صورة قديمة",
+      description: "إصلاح صورة قديمة أو تالفة وتلوينها وتكبيرها باستخدام الذكاء الاصطناعي.",
+    },
+  },
 } as const;

@@ -3359,6 +3359,44 @@ export const zhCN: TranslationKeys = {
     navigationMenu: "导航",
     homeLink: "SnapOtter 首页",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "网页优化",
+      description: "调整尺寸、转换为 WebP 并压缩图片，以便在网页上快速加载。",
+    },
+    "email-friendly": {
+      name: "适合邮件",
+      description: "将图片缩小到足够小，以便附加到电子邮件中。",
+    },
+    "privacy-scrub": {
+      name: "隐私清理",
+      description: "去除 EXIF、GPS 和其他元数据，然后压缩。",
+    },
+    "social-square": {
+      name: "社交方图",
+      description: "裁剪为 1:1 方形并压缩，用于社交媒体帖子。",
+    },
+    "watermark-batch": {
+      name: "批量水印",
+      description: "在图片上加盖文字水印，然后压缩。",
+    },
+    "shrink-pdf-email": {
+      name: "为邮件缩小 PDF",
+      description: "拼合并大力压缩 PDF，使其符合邮件大小限制。",
+    },
+    "podcast-polish": {
+      name: "播客润色",
+      description: "去除静音、统一响度，并为录音添加淡入淡出。",
+    },
+    "cut-out-subject": {
+      name: "抠出主体",
+      description: "用 AI 去除背景，并压缩透明的抠图。",
+    },
+    "restore-old-photo": {
+      name: "修复老照片",
+      description: "用 AI 修复、上色并放大老旧或受损的照片。",
+    },
+  },
 } as const;
 
 export default zhCN;

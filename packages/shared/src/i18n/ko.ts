@@ -3387,6 +3387,45 @@ export const ko: TranslationKeys = {
     navigationMenu: "탐색 메뉴",
     homeLink: "SnapOtter 홈",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "웹 최적화",
+      description:
+        "이미지 크기를 조정하고 WebP로 변환한 뒤 압축하여 웹에서 빠르게 로드되도록 합니다.",
+    },
+    "email-friendly": {
+      name: "이메일 적합",
+      description: "이메일에 첨부할 수 있을 만큼 이미지를 충분히 작게 줄입니다.",
+    },
+    "privacy-scrub": {
+      name: "개인정보 정리",
+      description: "EXIF, GPS 및 기타 메타데이터를 제거한 뒤 압축합니다.",
+    },
+    "social-square": {
+      name: "소셜 정사각형",
+      description: "1:1 정사각형으로 자르고 소셜 게시물용으로 압축합니다.",
+    },
+    "watermark-batch": {
+      name: "워터마크 일괄 처리",
+      description: "이미지에 텍스트 워터마크를 찍은 뒤 압축합니다.",
+    },
+    "shrink-pdf-email": {
+      name: "이메일용 PDF 축소",
+      description: "PDF를 평면화하고 이메일 용량 제한에 맞게 강하게 압축합니다.",
+    },
+    "podcast-polish": {
+      name: "팟캐스트 다듬기",
+      description: "무음 구간을 제거하고 음량을 정규화한 뒤 녹음에 페이드를 추가합니다.",
+    },
+    "cut-out-subject": {
+      name: "피사체 오려내기",
+      description: "AI로 배경을 제거하고 투명한 누끼 이미지를 압축합니다.",
+    },
+    "restore-old-photo": {
+      name: "오래된 사진 복원",
+      description: "AI로 오래되거나 손상된 사진을 복구하고 색을 입히며 업스케일합니다.",
+    },
+  },
 } as const;
 
 export default ko;

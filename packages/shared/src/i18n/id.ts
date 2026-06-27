@@ -3453,4 +3453,43 @@ export const id: TranslationKeys = {
     navigationMenu: "Navigasi",
     homeLink: "Beranda SnapOtter",
   },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Optimalkan untuk web",
+      description: "Ubah ukuran, konversi ke WebP, dan kompres gambar agar cepat dimuat di web.",
+    },
+    "email-friendly": {
+      name: "Ramah email",
+      description: "Perkecil gambar agar cukup kecil untuk dilampirkan ke email.",
+    },
+    "privacy-scrub": {
+      name: "Pembersihan privasi",
+      description: "Hapus EXIF, GPS, dan metadata lainnya, lalu kompres.",
+    },
+    "social-square": {
+      name: "Persegi media sosial",
+      description: "Pangkas menjadi persegi 1:1 dan kompres untuk unggahan media sosial.",
+    },
+    "watermark-batch": {
+      name: "Tanda air massal",
+      description: "Bubuhkan tanda air teks pada gambar, lalu kompres.",
+    },
+    "shrink-pdf-email": {
+      name: "Perkecil PDF untuk email",
+      description: "Ratakan dan kompres PDF secara agresif agar sesuai batas email.",
+    },
+    "podcast-polish": {
+      name: "Pemolesan podcast",
+      description:
+        "Hapus jeda hening, normalkan kenyaringan, dan tambahkan transisi pudar ke rekaman.",
+    },
+    "cut-out-subject": {
+      name: "Potong subjek",
+      description: "Hapus latar belakang dengan AI dan kompres potongan transparan.",
+    },
+    "restore-old-photo": {
+      name: "Pulihkan foto lama",
+      description: "Perbaiki, beri warna, dan perbesar foto lama atau rusak dengan AI.",
+    },
+  },
 } as const;
