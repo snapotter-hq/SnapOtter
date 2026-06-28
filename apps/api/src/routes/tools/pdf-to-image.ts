@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { apiToolPath } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
@@ -179,9 +180,14 @@ function isPdfBuffer(buf: Buffer): boolean {
 }
 
 // ── Route registration ───────────────────────────────────────────
-export function registerPdfToImage(app: FastifyInstance) {
+export function registerPdfToImageRoute(
+  app: FastifyInstance,
+  opts: { toolId: string; lockedFormat?: string },
+) {
+  const basePath = apiToolPath(opts.toolId);
+
   // ── Info endpoint ────────────────────────────────────────────
-  app.post("/api/v1/tools/pdf/pdf-to-image/info", async (request, reply) => {
+  app.post(`${basePath}/info`, async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -223,7 +229,7 @@ export function registerPdfToImage(app: FastifyInstance) {
   });
 
   // ── Preview endpoint (thumbnails) ─────────────────────────────
-  app.post("/api/v1/tools/pdf/pdf-to-image/preview", async (request, reply) => {
+  app.post(`${basePath}/preview`, async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -288,7 +294,7 @@ export function registerPdfToImage(app: FastifyInstance) {
   });
 
   // ── Main processing endpoint ─────────────────────────────────
-  app.post("/api/v1/tools/pdf/pdf-to-image", async (request, reply) => {
+  app.post(basePath, async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let settingsRaw: string | null = null;
 
@@ -323,6 +329,10 @@ export function registerPdfToImage(app: FastifyInstance) {
       settings = result.data;
     } catch {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    if (opts.lockedFormat) {
+      settings.format = opts.lockedFormat as typeof settings.format;
     }
 
     let doc: mupdf.Document | null = null;
@@ -404,4 +414,20 @@ export function registerPdfToImage(app: FastifyInstance) {
       });
     }
   });
+}
+
+export function registerPdfToImage(app: FastifyInstance) {
+  registerPdfToImageRoute(app, { toolId: "pdf-to-image" });
+}
+
+/**
+ * Register a "PDF to <format>" conversion preset that reuses the pdf-to-image
+ * route logic (ZIP output, info/preview endpoints) with the format locked.
+ */
+export function registerPdfToImagePreset(
+  app: FastifyInstance,
+  toolId: string,
+  lockedFormat: string,
+) {
+  registerPdfToImageRoute(app, { toolId, lockedFormat });
 }
