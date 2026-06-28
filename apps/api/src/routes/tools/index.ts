@@ -33,6 +33,7 @@ import { registerCompress } from "./compress.js";
 import { registerCompressPdf } from "./compress-pdf.js";
 import { registerCompressVideo } from "./compress-video.js";
 import { registerContentAwareResize } from "./content-aware-resize.js";
+import { registerConversionPresets } from "./conversion-presets.js";
 import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertDocument } from "./convert-document.js";
@@ -393,4 +394,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   app.log.info(
     `Tool routes: ${registered} active, ${skipped} skipped (${toolRegistrations.length} total)`,
   );
+
+  // Conversion presets delegate to base tools' registered processV2, so they
+  // must be registered after the base loop above has populated the registry.
+  registerConversionPresets(app);
 }
