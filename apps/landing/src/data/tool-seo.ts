@@ -946,26 +946,26 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "eps-to-svg": {
     searchTitle: "EPS to SVG Converter Online Free",
     longDescription:
-      "Convert EPS files to SVG online, free and private. Your files are processed on your own SnapOtter instance, never uploaded to a third party. Batch convert multiple EPS files to SVG at once.",
+      "Convert EPS files to SVG by tracing the artwork into vector paths. This works best for logos, icons, and line art. Complex EPS files with gradients, photographic content, or fine detail can lose fidelity, because the result is a traced approximation rather than a one-to-one copy of the original vectors. Runs on your own SnapOtter instance, never uploaded to a third party.",
     useCases: [
-      "Convert a EPS file to SVG without installing software",
-      "Batch convert many EPS files to SVG at once",
-      "Prepare SVG files for apps that do not accept EPS",
+      "Trace an EPS logo or icon into a clean, scalable SVG",
+      "Convert simple EPS line art for the web without Illustrator",
+      "Batch convert many EPS files to traced SVG at once",
     ],
     features: [
-      "EPS to SVG conversion in your browser",
+      "Traces EPS artwork into SVG vector paths (not a 1:1 vector copy)",
+      "Best results on logos, icons, and line art",
       "Batch processing for multiple files",
       "Private: runs on your own instance, no third-party upload",
-      "Free and unlimited on self-hosted SnapOtter",
     ],
     faqs: [
       {
-        q: "How do I convert EPS to SVG?",
-        a: "Upload your EPS file, then download the converted SVG. SnapOtter processes it on your instance.",
+        q: "Does this preserve the original EPS vectors exactly?",
+        a: "No. It renders the EPS and traces the result into new SVG paths. Simple line art and logos convert cleanly, but complex EPS with gradients, effects, or embedded images can lose detail. For a faithful vector copy, keep the original EPS or use a dedicated vector editor.",
       },
       {
-        q: "Is EPS to SVG conversion free?",
-        a: "Yes. Self-hosted SnapOtter has no limits or watermarks.",
+        q: "How do I convert EPS to SVG?",
+        a: "Upload your EPS file, then download the traced SVG. SnapOtter processes it on your instance.",
       },
       {
         q: "Are my files private?",
