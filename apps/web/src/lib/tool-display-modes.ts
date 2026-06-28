@@ -212,7 +212,13 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
 // from the static map above. Every displayBase is one of the keys defined
 // statically, so the lookup always resolves.
 for (const preset of CONVERSION_PRESETS) {
-  TOOL_DISPLAY_MODES[preset.id] = TOOL_DISPLAY_MODES[BASE_CONFIG[preset.base].displayBase];
+  const baseMode = TOOL_DISPLAY_MODES[BASE_CONFIG[preset.base].displayBase];
+  // The pdf-to-image base renders "custom-results" with a dedicated page-picker
+  // UI backed by usePdfToImageStore. Presets use the shared
+  // ConversionPresetSettings + generic download flow instead, which has no such
+  // ResultsPanel, so they render as a plain converter (no-comparison) like the
+  // sibling image-to-pdf / convert-spreadsheet presets.
+  TOOL_DISPLAY_MODES[preset.id] = baseMode === "custom-results" ? "no-comparison" : baseMode;
 }
 
 /**
