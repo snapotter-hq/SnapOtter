@@ -3115,6 +3115,7 @@ export const en = {
     toolPalette: "Tool Palette",
     clickToAdd: "Click to add to pipeline",
     savedLabel: "Saved",
+    templatesLabel: "Templates",
     importButton: "Import",
     noSavedPipelines: "No saved pipelines",
     stepCount: "({count} step)",

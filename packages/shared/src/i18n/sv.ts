@@ -3163,6 +3163,7 @@ export const sv: TranslationKeys = {
     toolPalette: "Verktygspalett",
     clickToAdd: "Klicka för att lägga till i pipeline",
     savedLabel: "Sparad",
+    templatesLabel: "Mallar",
     importButton: "Importera",
     noSavedPipelines: "Inga sparade pipelines",
     stepCount: "({count} steg)",

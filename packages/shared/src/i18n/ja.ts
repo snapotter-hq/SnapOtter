@@ -3118,6 +3118,7 @@ export const ja: TranslationKeys = {
     toolPalette: "ツールパレット",
     clickToAdd: "クリックでPipelineに追加",
     savedLabel: "保存済み",
+    templatesLabel: "テンプレート",
     importButton: "インポート",
     noSavedPipelines: "保存されたPipelineはありません",
     stepCount: "（{count}ステップ）",

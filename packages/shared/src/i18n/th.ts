@@ -3127,6 +3127,7 @@ export const th: TranslationKeys = {
     toolPalette: "จานเครื่องมือ",
     clickToAdd: "คลิกเพื่อเพิ่มใน Pipeline",
     savedLabel: "บันทึกแล้ว",
+    templatesLabel: "เทมเพลต",
     importButton: "นำเข้า",
     noSavedPipelines: "ไม่มี Pipeline ที่บันทึก",
     stepCount: "({count} ขั้นตอน)",

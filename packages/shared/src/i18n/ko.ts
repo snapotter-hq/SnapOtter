@@ -3101,6 +3101,7 @@ export const ko: TranslationKeys = {
     toolPalette: "도구 팔레트",
     clickToAdd: "클릭하여 Pipeline에 추가",
     savedLabel: "저장됨",
+    templatesLabel: "템플릿",
     importButton: "가져오기",
     noSavedPipelines: "저장된 Pipeline이 없습니다",
     stepCount: "({count}단계)",

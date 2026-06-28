@@ -3175,6 +3175,7 @@ export const nl: TranslationKeys = {
     toolPalette: "Gereedschapspalet",
     clickToAdd: "Klik om toe te voegen aan pipeline",
     savedLabel: "Opgeslagen",
+    templatesLabel: "Sjablonen",
     importButton: "Importeren",
     noSavedPipelines: "Geen opgeslagen pipelines",
     stepCount: "({count} stap)",

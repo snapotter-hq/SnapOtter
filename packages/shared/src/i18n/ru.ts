@@ -3170,6 +3170,7 @@ export const ru: TranslationKeys = {
     toolPalette: "Палитра инструментов",
     clickToAdd: "Нажмите для добавления в Pipeline",
     savedLabel: "Сохранённые",
+    templatesLabel: "Шаблоны",
     importButton: "Импорт",
     noSavedPipelines: "Нет сохранённых Pipeline",
     stepCount: "({count} шаг)",

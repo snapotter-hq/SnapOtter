@@ -3167,6 +3167,7 @@ export const id: TranslationKeys = {
     toolPalette: "Palet Alat",
     clickToAdd: "Klik untuk menambahkan ke Pipeline",
     savedLabel: "Tersimpan",
+    templatesLabel: "Templat",
     importButton: "Impor",
     noSavedPipelines: "Tidak ada Pipeline tersimpan",
     stepCount: "({count} langkah)",

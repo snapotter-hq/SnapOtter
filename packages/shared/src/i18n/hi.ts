@@ -3141,6 +3141,7 @@ export const hi: TranslationKeys = {
     toolPalette: "टूल पैलेट",
     clickToAdd: "Pipeline में जोड़ने के लिए क्लिक करें",
     savedLabel: "सहेजा गया",
+    templatesLabel: "टेम्पलेट",
     importButton: "इम्पोर्ट",
     noSavedPipelines: "कोई सहेजा गया Pipeline नहीं",
     stepCount: "({count} स्टेप)",

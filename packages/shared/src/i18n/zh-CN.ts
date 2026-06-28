@@ -3077,6 +3077,7 @@ export const zhCN: TranslationKeys = {
     toolPalette: "工具面板",
     clickToAdd: "点击添加到 Pipeline",
     savedLabel: "已保存",
+    templatesLabel: "模板",
     importButton: "导入",
     noSavedPipelines: "暂无已保存的 Pipeline",
     stepCount: "（{count} 个步骤）",

@@ -3164,6 +3164,7 @@ export const vi: TranslationKeys = {
     toolPalette: "Bảng công cụ",
     clickToAdd: "Nhấp để thêm vào Pipeline",
     savedLabel: "Đã lưu",
+    templatesLabel: "Mẫu",
     importButton: "Nhập",
     noSavedPipelines: "Không có Pipeline đã lưu",
     stepCount: "({count} bước)",

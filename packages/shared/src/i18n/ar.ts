@@ -3146,6 +3146,7 @@ export const ar: TranslationKeys = {
     toolPalette: "لوحة الأدوات",
     clickToAdd: "اضغط للإضافة إلى Pipeline",
     savedLabel: "محفوظ",
+    templatesLabel: "القوالب",
     importButton: "استيراد",
     noSavedPipelines: "لا توجد Pipeline محفوظة",
     stepCount: "({count} خطوة)",

@@ -3174,6 +3174,7 @@ export const ptBR: TranslationKeys = {
     toolPalette: "Paleta de ferramentas",
     clickToAdd: "Clique para adicionar ao Pipeline",
     savedLabel: "Salvo",
+    templatesLabel: "Modelos",
     importButton: "Importar",
     noSavedPipelines: "Nenhum Pipeline salvo",
     stepCount: "({count} passo)",

@@ -3185,6 +3185,7 @@ export const de: TranslationKeys = {
     toolPalette: "Werkzeugpalette",
     clickToAdd: "Zum Hinzufügen zur Pipeline klicken",
     savedLabel: "Gespeichert",
+    templatesLabel: "Vorlagen",
     importButton: "Importieren",
     noSavedPipelines: "Keine gespeicherten Pipelines",
     stepCount: "({count} Schritt)",

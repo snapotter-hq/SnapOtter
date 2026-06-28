@@ -3172,6 +3172,7 @@ export const uk: TranslationKeys = {
     toolPalette: "Палітра інструментів",
     clickToAdd: "Натисніть для додавання до Pipeline",
     savedLabel: "Збережені",
+    templatesLabel: "Шаблони",
     importButton: "Імпорт",
     noSavedPipelines: "Немає збережених Pipeline",
     stepCount: "({count} крок)",

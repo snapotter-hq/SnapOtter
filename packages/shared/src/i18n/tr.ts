@@ -3175,6 +3175,7 @@ export const tr: TranslationKeys = {
     toolPalette: "Araç Paleti",
     clickToAdd: "Pipeline'a eklemek için tıklayın",
     savedLabel: "Kaydedildi",
+    templatesLabel: "Şablonlar",
     importButton: "İçe Aktar",
     noSavedPipelines: "Kayıtlı Pipeline yok",
     stepCount: "({count} adım)",

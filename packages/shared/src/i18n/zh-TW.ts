@@ -3076,6 +3076,7 @@ export const zhTW: TranslationKeys = {
     toolPalette: "工具面板",
     clickToAdd: "點擊加入到Pipeline",
     savedLabel: "已儲存",
+    templatesLabel: "範本",
     importButton: "匯入",
     noSavedPipelines: "沒有已儲存的Pipeline",
     stepCount: "（{count}個步驟）",
