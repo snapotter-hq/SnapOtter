@@ -1394,6 +1394,33 @@ describe("Settings", () => {
       expect(body.value).toBe("testValue");
     });
 
+    it("treats a redacted secret mask as a no-op instead of overwriting the secret", async () => {
+      // Store a real secret; GET then redacts it to the literal mask.
+      await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { oidc_client_secret: "real-oidc-secret-xyz" },
+      });
+      const getRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/settings/oidc_client_secret",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(JSON.parse(getRes.body).value).toBe("********");
+
+      // A client echoing the mask back must not overwrite the stored secret, so only
+      // the other key is written (updatedCount counts actual writes).
+      const putRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { oidc_client_secret: "********", theme: "dark" },
+      });
+      expect(putRes.statusCode).toBe(200);
+      expect(JSON.parse(putRes.body).updatedCount).toBe(1);
+    });
+
     it("non-admin cannot save settings", async () => {
       // Create a regular user
       await app.inject({
