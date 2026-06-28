@@ -3,6 +3,7 @@ import { FileImage, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useFuseSearch } from "@/hooks/use-fuse-search";
 import { apiGet } from "@/lib/api";
 import { ICON_MAP } from "@/lib/icon-map";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
@@ -37,19 +38,17 @@ export function ToolPalette({ onAddStep, className }: ToolPaletteProps) {
       .catch(() => {});
   }, []);
 
-  const availableTools = useMemo(() => {
-    const q = search.toLowerCase();
+  const preFiltered = useMemo(() => {
     return TOOLS.filter((t) => {
       if (EXCLUDED_TOOLS.has(t.id)) return false;
       if (disabledTools.includes(t.id)) return false;
       if (t.experimental && !experimentalEnabled) return false;
       if (pipelineToolIds && !pipelineToolIds.includes(t.id)) return false;
-      if (q && !t.name.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) {
-        return false;
-      }
       return true;
     });
-  }, [disabledTools, experimentalEnabled, pipelineToolIds, search]);
+  }, [disabledTools, experimentalEnabled, pipelineToolIds]);
+
+  const availableTools = useFuseSearch(preFiltered, search);
 
   const groupedTools = useMemo(() => {
     const groups: Record<string, typeof availableTools> = {};

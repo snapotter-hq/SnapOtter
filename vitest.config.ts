@@ -167,6 +167,7 @@ export default defineConfig({
       "react-dom": path.join(webNodeModules, "react-dom"),
       "react-router-dom": path.join(webNodeModules, "react-router-dom"),
       zustand: path.join(webNodeModules, "zustand"),
+      "fuse.js": path.join(webNodeModules, "fuse.js"),
       "posthog-js": path.join(webNodeModules, "posthog-js"),
       "@sentry/react": path.join(webNodeModules, "@sentry/react"),
       "@opentelemetry/api": path.join(apiNodeModules, "@opentelemetry/api"),
