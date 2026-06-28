@@ -124,8 +124,8 @@ const OCR_NAMES = {
 function block(locale) {
   const tpl = L[locale] ?? L.en;
   const lines = CONVERSION_PRESETS.map((p) => {
-    const name = tpl.name(p.from, p.to).replace(/"/g, '\\"');
-    const desc = tpl.desc(p.from, p.to).replace(/"/g, '\\"');
+    const name = tpl.name(p.from, p.to).replace(/[\\"]/g, "\\$&");
+    const desc = tpl.desc(p.from, p.to).replace(/[\\"]/g, "\\$&");
     return `    "${p.id}": { name: "${name}", description: "${desc}" },`;
   });
   return [BEGIN, ...lines, END].join("\n");
@@ -137,7 +137,7 @@ function escapeRe(s) {
 
 /** Rename the display tools.ocr.name (the first `ocr:` block, the one whose first key is `name`). */
 function renameOcr(src, locale) {
-  const name = (OCR_NAMES[locale] ?? OCR_NAMES.en).replace(/"/g, '\\"');
+  const name = (OCR_NAMES[locale] ?? OCR_NAMES.en).replace(/[\\"]/g, "\\$&");
   return src.replace(/(ocr:\s*\{\s*name:\s*")(?:[^"\\]|\\.)*(")/, `$1${name}$2`);
 }
 
