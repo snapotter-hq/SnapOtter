@@ -2757,6 +2757,14 @@ export const it: TranslationKeys = {
         "Scarica uno ZIP diagnostico con configurazioni oscurate, log e dati dei job per la risoluzione dei problemi.",
       supportBundleFailed: "Impossibile scaricare il pacchetto di supporto.",
     },
+    privacy: {
+      title: "Privacy",
+      description:
+        "Le analisi di prodotto anonime aiutano a migliorare SnapOtter. Sono attive per impostazione predefinita e vengono configurate per l'intera istanza da un amministratore.",
+      analyticsLabel: "Analisi di prodotto anonime",
+      analyticsDescription:
+        "Condividi dati d'uso anonimi (quali strumenti vengono eseguiti, durate, codici di errore) e segnalazioni di arresto anomalo. Nessun indirizzo IP, nessuna identità dell'account. Non raccogliamo mai i nomi dei tuoi file, il contenuto dei file, l'output OCR, i metadati delle immagini o il testo dei documenti. Disattiva questa opzione per fermare tutto.",
+    },
     security: {
       heading: "Sicurezza",
       description: "Impostazioni di password e autenticazione.",

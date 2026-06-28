@@ -7,11 +7,12 @@ interface AnalyticsState {
   fetchConfig: () => Promise<void>;
 }
 
-export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
+export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   config: null,
   configLoaded: false,
+  // No one-shot guard: callers may refetch (e.g. on tab focus) so an
+  // instance-wide opt-out converges in already-open tabs.
   fetchConfig: async () => {
-    if (get().configLoaded) return;
     try {
       const res = await fetch("/api/v1/config/analytics");
       const config: AnalyticsConfig = await res.json();

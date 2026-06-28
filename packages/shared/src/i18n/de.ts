@@ -2760,6 +2760,14 @@ export const de: TranslationKeys = {
         "Diagnosearchiv mit bereinigter Konfiguration, Protokollen und Auftragsdaten zur Fehlerbehebung herunterladen.",
       supportBundleFailed: "Support-Paket konnte nicht heruntergeladen werden.",
     },
+    privacy: {
+      title: "Datenschutz",
+      description:
+        "Anonyme Produktanalysen helfen, SnapOtter zu verbessern. Sie sind standardmäßig aktiviert und werden von einem Administrator für die gesamte Instanz festgelegt.",
+      analyticsLabel: "Anonyme Produktanalysen",
+      analyticsDescription:
+        "Teilen Sie anonyme Nutzungsdaten (welche Tools ausgeführt werden, Dauer, Fehlercodes) und Absturzberichte. Keine IP-Adresse, keine Kontoidentität. Wir erfassen niemals Ihre Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Schalten Sie dies aus, um alles davon zu beenden.",
+    },
     security: {
       heading: "Sicherheit",
       description: "Passwort- und Authentifizierungseinstellungen.",

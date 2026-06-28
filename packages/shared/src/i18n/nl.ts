@@ -2757,6 +2757,14 @@ export const nl: TranslationKeys = {
         "Download een diagnostisch zipbestand met afgeschermde configuratie, logs en taakgegevens voor probleemoplossing.",
       supportBundleFailed: "Ondersteuningsbundel downloaden mislukt.",
     },
+    privacy: {
+      title: "Privacy",
+      description:
+        "Anonieme productanalyse helpt SnapOtter te verbeteren. Deze staat standaard aan en wordt voor de hele instantie ingesteld door een beheerder.",
+      analyticsLabel: "Anonieme productanalyse",
+      analyticsDescription:
+        "Deel anonieme gebruiksgegevens (welke tools worden uitgevoerd, duur, foutcodes) en crashrapporten. Geen IP-adres, geen accountidentiteit. We verzamelen nooit uw bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Schakel dit uit om alles te stoppen.",
+    },
     security: {
       heading: "Beveiliging",
       description: "Wachtwoord- en authenticatie-instellingen.",

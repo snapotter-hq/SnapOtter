@@ -2754,6 +2754,14 @@ export const ptBR: TranslationKeys = {
         "Baixe um ZIP de diagnóstico com configurações ocultadas, logs e dados de tarefas para solução de problemas.",
       supportBundleFailed: "Falha ao baixar o pacote de suporte.",
     },
+    privacy: {
+      title: "Privacidade",
+      description:
+        "As análises de produto anônimas ajudam a melhorar o SnapOtter. Elas ficam ativadas por padrão e são configuradas para toda a instância por um administrador.",
+      analyticsLabel: "Análises de produto anônimas",
+      analyticsDescription:
+        "Compartilhe dados de uso anônimos (quais ferramentas são executadas, durações, códigos de erro) e relatórios de falha. Sem endereço IP, sem identidade de conta. Nunca coletamos os nomes dos seus arquivos, o conteúdo dos arquivos, a saída de OCR, os metadados de imagem ou o texto de documentos. Desative isso para interromper tudo.",
+    },
     security: {
       heading: "Segurança",
       description: "Configurações de senha e autenticação.",

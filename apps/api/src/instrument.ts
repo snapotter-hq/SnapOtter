@@ -1,10 +1,19 @@
 import { ANALYTICS_BAKED } from "@snapotter/shared";
+import { analyticsEnabled, gatePrimed } from "./lib/analytics-gate.js";
 
-const FILE_EXT_PATTERN =
-  /\.(jpe?g|png|pdf|webp|gif|tiff?|bmp|svg|hei[cf]?|avif|raw|cr2|nef|arw|dng|psd|tga|exr|hdr)\b/gi;
-const FILE_PATH_PATTERN = /\/(tmp\/workspace|data\/files|data\/ai)\//g;
+// Sentry inits at process load, before the gate cache is primed. Until the
+// first successful read, stay silent rather than emit on the default-ON cache,
+// so an opted-out instance never reports even a boot-window crash.
+const sentryActive = () => gatePrimed() && analyticsEnabled();
 
-if (ANALYTICS_BAKED.enabled && ANALYTICS_BAKED.sentryDsn) {
+// Collapse any absolute path in a stack frame filename to its basename, so
+// even our own source paths never carry a workspace or job directory.
+function basename(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+if (ANALYTICS_BAKED.sentryDsn) {
   try {
     const Sentry = await import("@sentry/node");
     const { APP_VERSION } = await import("@snapotter/shared");
@@ -15,52 +24,42 @@ if (ANALYTICS_BAKED.enabled && ANALYTICS_BAKED.sentryDsn) {
       environment: process.env.NODE_ENV || "production",
       tracesSampleRate: ANALYTICS_BAKED.sampleRate,
       sendDefaultPii: false,
+      // Runtime opt-out: drop the whole transaction when analytics is off.
+      tracesSampler: () => (sentryActive() ? ANALYTICS_BAKED.sampleRate : 0),
       beforeSend(event) {
-        if (event.user) {
-          delete event.user.email;
-          delete event.user.username;
-        }
+        if (!sentryActive()) return null; // kill switch (covers auto-captured errors)
+        // Allow-list: emit only error type + a basename-collapsed stack.
+        event.message = undefined;
+        event.logentry = undefined; // structured twin of message (captureMessage path)
+        event.server_name = undefined; // hostname is not anonymous
+        event.request = undefined;
+        event.extra = undefined;
+        event.contexts = undefined;
+        event.breadcrumbs = undefined;
+        event.user = undefined;
         if (event.exception?.values) {
           for (const ex of event.exception.values) {
-            if (
-              ex.value &&
-              (ex.value.includes("Rate limit exceeded") ||
-                ex.value.includes("Body cannot be empty") ||
-                ex.value.includes("Unsupported Media Type") ||
-                ex.value.includes("Request body size did not match") ||
-                ex.value.includes("Premature close"))
-            ) {
-              return null;
-            }
-            if (ex.value) {
-              ex.value = ex.value
-                .replace(FILE_EXT_PATTERN, ".[REDACTED]")
-                .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
-            }
+            ex.value = ex.type; // never the raw message body
             if (ex.stacktrace?.frames) {
               for (const frame of ex.stacktrace.frames) {
-                if (frame.filename) {
-                  frame.filename = frame.filename
-                    .replace(FILE_EXT_PATTERN, ".[REDACTED]")
-                    .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
-                }
+                if (frame.filename) frame.filename = basename(frame.filename);
+                frame.abs_path = undefined;
+                frame.vars = undefined;
               }
             }
           }
         }
         return event;
       },
-      beforeBreadcrumb(breadcrumb) {
-        if (breadcrumb.message) {
-          breadcrumb.message = breadcrumb.message
-            .replace(FILE_EXT_PATTERN, ".[REDACTED]")
-            .replace(FILE_PATH_PATTERN, "/[REDACTED]/");
-        }
-        return breadcrumb;
+      beforeBreadcrumb() {
+        return null; // breadcrumbs can carry URLs/messages with content; drop them
+      },
+      beforeSendTransaction(event) {
+        return sentryActive() ? event : null;
       },
     });
 
-    console.log("[sentry] initialized with performance tracing, release:", APP_VERSION);
+    console.log("[sentry] initialized, release:", APP_VERSION);
   } catch {
     // @sentry/node not available
   }

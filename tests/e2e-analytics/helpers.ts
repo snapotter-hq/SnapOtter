@@ -14,4 +14,13 @@ export const test = base.extend<{ loggedInPage: Page }>({
   },
 });
 
+// openSettings() opens the Settings dialog via the top-nav avatar dropdown.
+// The default layout has no left sidebar, so Settings is reached by opening the
+// avatar menu (a button labelled with the username) and clicking Settings.
+export async function openSettings(page: Page, username = "admin"): Promise<void> {
+  await page.getByRole("button", { name: username, exact: true }).first().click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
+}
+
 export { expect };

@@ -155,8 +155,13 @@ function matchRoute(url: string, method: string): Response | null {
         enableExperimentalTools: "false",
         defaultToolView: "sidebar",
         defaultTheme: "system",
+        analyticsEnabled: "false",
       },
     });
+  }
+
+  if (path === "/api/v1/settings" && method === "PUT") {
+    return json({ ok: true, updatedCount: 0 });
   }
 
   if (path === "/api/v1/features" && method === "GET") {
@@ -165,12 +170,12 @@ function matchRoute(url: string, method: string): Response | null {
 
   if (path === "/api/v1/config/analytics" && method === "GET") {
     return json({
-      enabled: true,
+      enabled: false,
       posthogApiKey: "",
       posthogHost: "",
       sentryDsn: "",
       sampleRate: 0,
-      instanceId: "demo-instance",
+      instanceId: "",
     });
   }
 

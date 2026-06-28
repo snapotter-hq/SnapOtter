@@ -144,6 +144,20 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (entries.some((e) => e.key === "analyticsEnabled")) {
+      // The setting is already persisted. A Redis hiccup here must not turn a
+      // successful save into a 500; the TTL refresh converges replicas anyway.
+      try {
+        const { refreshAnalyticsGate, publishAnalyticsGateInvalidation } = await import(
+          "../lib/analytics-gate.js"
+        );
+        await refreshAnalyticsGate(); // this replica, immediately
+        await publishAnalyticsGateInvalidation(); // all other replicas
+      } catch (err) {
+        request.log.warn({ err }, "analytics gate invalidation failed (save still applied)");
+      }
+    }
+
     return reply.send({ ok: true, updatedCount: entries.length });
   });
 

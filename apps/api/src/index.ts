@@ -173,6 +173,8 @@ if (!env.COOKIE_SECRET) {
 }
 
 await initAnalytics();
+const { primeAnalyticsGate } = await import("./lib/analytics-gate.js");
+await primeAnalyticsGate();
 
 // Enterprise features (license-gated)
 let enterpriseLicense: { org: string; plan: string } | null = null;
@@ -211,6 +213,8 @@ if (env.STORAGE_MODE === "s3") {
 
 // Start the cooperative cancellation listener (Redis pub/sub)
 await startCancelListener();
+const { startAnalyticsGateListener } = await import("./lib/analytics-gate.js");
+await startAnalyticsGateListener();
 
 // Set up AI feature directories and recover from interrupted installs. Both are
 // best-effort and must never block boot: ensureAiDirs swallows its own errors,
@@ -761,6 +765,8 @@ async function shutdown(signal: string) {
     await closeQueueEvents();
     await closeQueues();
     await stopCancelListener();
+    const { stopAnalyticsGateListener } = await import("./lib/analytics-gate.js");
+    await stopAnalyticsGateListener();
     await closeRedis();
     console.log("Redis connections closed");
   } catch (err) {

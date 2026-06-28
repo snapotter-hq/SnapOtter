@@ -25,12 +25,13 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { ANALYTICS_BAKED, ANALYTICS_EVENTS, getBundleForTool, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, getBundleForTool, TOOLS } from "@snapotter/shared";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { captureException, trackEvent } from "../lib/analytics.js";
+import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
@@ -315,7 +316,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       jobDuration.observe({ pool: data.pool }, durationMs / 1000);
 
       // Analytics: emit tool_used on success
-      if (ANALYTICS_BAKED.enabled) {
+      if (analyticsEnabled()) {
         const tool = TOOLS.find((t) => t.id === data.toolId);
         void trackEvent(
           ANALYTICS_EVENTS.TOOL_USED,
@@ -420,7 +421,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       // Analytics: emit tool_used on failure
-      if (ANALYTICS_BAKED.enabled) {
+      if (analyticsEnabled()) {
         const tool = TOOLS.find((t) => t.id === data.toolId);
         void trackEvent(
           ANALYTICS_EVENTS.TOOL_USED,
@@ -648,7 +649,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     }
 
     // Analytics: emit pipeline_executed on failure
-    if (ANALYTICS_BAKED.enabled) {
+    if (analyticsEnabled()) {
       void trackEvent(
         ANALYTICS_EVENTS.PIPELINE_EXECUTED,
         {
@@ -732,7 +733,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   }
 
   // Analytics: emit pipeline_executed on success
-  if (ANALYTICS_BAKED.enabled) {
+  if (analyticsEnabled()) {
     void trackEvent(
       ANALYTICS_EVENTS.PIPELINE_EXECUTED,
       {
@@ -875,7 +876,7 @@ export function startWorkers(): void {
       });
 
       worker.on("failed", (job, err) => {
-        if (ANALYTICS_BAKED.enabled && job) {
+        if (analyticsEnabled() && job) {
           void captureException(err instanceof Error ? err : new Error(String(err)));
         }
       });
@@ -903,7 +904,7 @@ export function startWorkers(): void {
     });
 
     worker.on("failed", (job, err) => {
-      if (ANALYTICS_BAKED.enabled && job) {
+      if (analyticsEnabled() && job) {
         void captureException(err instanceof Error ? err : new Error(String(err)));
       }
     });

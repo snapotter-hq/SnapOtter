@@ -8,7 +8,7 @@ import { RouteAnnouncer } from "./components/common/route-announcer";
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
-import { initAnalytics, track } from "./lib/analytics";
+import { initAnalytics, isAnalyticsActive, optOut, track } from "./lib/analytics";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -48,13 +48,12 @@ class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Uncaught render error:", error, info.componentStack);
-    // Mirror the crash to PostHog (error class only, no PII). track() is best-effort.
+    if (!isAnalyticsActive()) return; // respect the runtime opt-out
+    // Mirror the crash class only (no PII). track() and Sentry are best-effort.
     track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, { error_name: error.name });
     import("@sentry/react")
       .then((Sentry) => {
-        Sentry.captureException(error, {
-          contexts: { react: { componentStack: info.componentStack ?? undefined } },
-        });
+        Sentry.captureException(error);
       })
       .catch(() => {});
   }
@@ -160,9 +159,26 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!analyticsConfigLoaded || !analyticsConfig?.enabled) return;
-    void initAnalytics(analyticsConfig);
+    if (!analyticsConfigLoaded) return;
+    if (analyticsConfig?.enabled) {
+      void initAnalytics(analyticsConfig);
+    } else if (isAnalyticsActive()) {
+      // Instance-wide opt-out observed after this tab already initialized.
+      optOut();
+    }
   }, [analyticsConfigLoaded, analyticsConfig]);
+
+  useEffect(() => {
+    const refetch = () => {
+      if (document.visibilityState === "visible") void fetchAnalyticsConfig();
+    };
+    document.addEventListener("visibilitychange", refetch);
+    window.addEventListener("focus", refetch);
+    return () => {
+      document.removeEventListener("visibilitychange", refetch);
+      window.removeEventListener("focus", refetch);
+    };
+  }, [fetchAnalyticsConfig]);
 
   return (
     <ErrorBoundary>

@@ -47,7 +47,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api dev`,
+      // NOTE: use the `start` script, not `dev`. The `dev` script hard-codes
+      // `PORT=13490`, which would override the isolated TEST_API_PORT below and
+      // collide with a developer's running dev server. `start` reads PORT from
+      // the env, so the PORT set in this webServer.env block is honored.
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api start`,
       port: TEST_API_PORT,
       reuseExistingServer: !process.env.CI,
       env: {
@@ -57,6 +61,11 @@ export default defineConfig({
         RATE_LIMIT_PER_MIN: "50000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "true",
+        // Force the compile-time bake ON (dev/test only) so the effective
+        // analytics state is enabled by default and the opt-out toggle can be
+        // exercised end to end. bakedEnabled() honors this when
+        // NODE_ENV !== "production".
+        ANALYTICS_BAKED_OVERRIDE: "on",
         DATABASE_URL: e2eDatabaseUrl,
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         BULLMQ_PREFIX: e2eDbName,

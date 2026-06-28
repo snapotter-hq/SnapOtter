@@ -533,8 +533,8 @@ Query parameters:
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| `GET` | `/api/v1/config/analytics` | Public | Get analytics configuration (PostHog key, Sentry DSN, sample rate). Returns empty values if `ANALYTICS_ENABLED=false`. |
-| `PUT` | `/api/v1/user/analytics` | Auth | Set the current user's analytics consent (`enabled: true/false`) or defer with `remindLater: true`. |
+| `GET` | `/api/v1/config/analytics` | Public | Get the effective analytics configuration (PostHog key, Sentry DSN, sample rate). Keys, DSN, and instance ID are blank when analytics is off, either from the compile-time bake or the instance `analyticsEnabled` setting. |
+| `PUT` | `/api/v1/settings` | Admin (`settings:write`) | Set the instance-wide opt-out. Send a JSON body `{ "analyticsEnabled": "false" }` to turn analytics off for everyone, or `"true"` to turn it back on. |
 
 ## Features / AI Bundles
 
