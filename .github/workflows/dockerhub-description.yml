@@ -1,7 +1,8 @@
 name: Sync Docker Hub description
 
-# Publishes DOCKERHUB.md as the snapotter/snapotter repository overview on Docker Hub
-# when it changes on main (or on manual dispatch). Secret DOCKER_HUB_README holds the
+# Publishes DOCKERHUB.md as the snapotter/snapotter repository overview (and sets the
+# short description) on Docker Hub when it changes on main (or on manual dispatch).
+# Secret DOCKER_HUB_README holds the
 # Docker Hub account password; DOCKERHUB_USERNAME already exists (used by release.yml).
 
 on:
@@ -28,3 +29,4 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_README }}
           repository: snapotter/snapotter
           readme-filepath: ./DOCKERHUB.md
+          short-description: "Self-hosted file toolkit. 200+ tools for Image, Video, Audio, PDF, and Files. Open source."
