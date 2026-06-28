@@ -79,6 +79,14 @@ const BASE_TOOLS: Tool[] = [
     route: "/convert",
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
+    keywords: [
+      "image converter",
+      "jpg to png",
+      "png to jpg",
+      "heic to jpg",
+      "webp to png",
+      "convert image format",
+    ],
     executionHint: "fast",
   },
   {
@@ -242,7 +250,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "ocr",
-    name: "OCR / Text Extraction",
+    name: "Extract Text from Image (OCR)",
     description: "Extract text from images",
     category: "doc-convert",
     icon: "ScanText",
@@ -810,6 +818,7 @@ const BASE_TOOLS: Tool[] = [
     route: "/convert-video",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    keywords: ["video converter", "mov to mp4", "mkv to mp4", "avi to mp4", "webm to mp4"],
     executionHint: "long",
   },
   {
@@ -1112,6 +1121,7 @@ const BASE_TOOLS: Tool[] = [
     route: "/convert-audio",
     modality: "audio",
     acceptedInputs: AUDIO_INPUTS,
+    keywords: ["audio converter", "m4a to mp3", "aac to mp3", "wav to mp3", "ogg to mp3"],
     executionHint: "fast",
   },
   {
@@ -1369,6 +1379,7 @@ const BASE_TOOLS: Tool[] = [
     route: "/convert-spreadsheet",
     modality: "document",
     acceptedInputs: [".xlsx", ".xls", ".ods", ".csv"],
+    keywords: ["excel to csv", "xlsx to csv", "spreadsheet converter"],
     executionHint: "long",
   },
   {
