@@ -1581,6 +1581,18 @@ const BASE_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "sign-pdf",
+    name: "Sign PDF",
+    description: "Draw, type, or upload a signature and place it anywhere on a PDF",
+    category: "pdf-edit",
+    icon: "Signature",
+    route: "/sign-pdf",
+    modality: "document",
+    acceptedInputs: [".pdf"],
+    executionHint: "fast",
+    keywords: ["sign", "signature", "e-sign", "esign", "fill and sign", "autograph"],
+  },
+  {
     id: "pdf-to-text",
     name: "PDF to Text",
     description: "Extract plain text from a PDF",

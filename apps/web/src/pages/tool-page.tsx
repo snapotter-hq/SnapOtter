@@ -36,6 +36,7 @@ import { CropCanvas } from "@/components/tools/crop-canvas";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import { EraserCanvas } from "@/components/tools/eraser-canvas";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
+import { SignCanvas, type SignCanvasRef } from "@/components/tools/sign-canvas";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useMobile } from "@/hooks/use-mobile";
@@ -359,6 +360,11 @@ export function ToolPage() {
   // Center of the painted mask as a 0-100 percentage — used to init the slider at the right spot
   const [eraserSliderInitPos, setEraserSliderInitPos] = useState<number | null>(null);
 
+  // Sign state
+  const signCanvasRef = useRef<SignCanvasRef | null>(null);
+  const [signHasSelection, setSignHasSelection] = useState(false);
+  const [signPlacementCount, setSignPlacementCount] = useState(0);
+
   // Page-level drag overlay state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragCounter = useRef(0);
@@ -651,6 +657,14 @@ export function ToolPage() {
             maskedFileCount: eraserMaskedCount,
           }
         : undefined,
+    signProps:
+      displayMode === "interactive-sign"
+        ? {
+            canvasRef: signCanvasRef,
+            hasSelection: signHasSelection,
+            placementCount: signPlacementCount,
+          }
+        : undefined,
   };
 
   const ToolSettings = registryEntry.Settings;
@@ -839,6 +853,17 @@ export function ToolPage() {
           beforeSize={showSizeComparison ? (originalSize ?? undefined) : undefined}
           afterSize={showSizeComparison ? (processedSize ?? undefined) : undefined}
           initialPosition={eraserSliderInitPos ?? 50}
+        />
+      );
+    }
+
+    if (displayMode === "interactive-sign" && hasFile && originalBlobUrl) {
+      return (
+        <SignCanvas
+          ref={signCanvasRef}
+          fileUrl={originalBlobUrl}
+          onSelectionChange={setSignHasSelection}
+          onCountChange={setSignPlacementCount}
         />
       );
     }

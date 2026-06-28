@@ -15,6 +15,7 @@ export type DisplayMode =
   | "no-comparison"
   | "interactive-crop"
   | "interactive-eraser"
+  | "interactive-sign"
   | "interactive-split"
   | "no-dropzone"
   | "custom-results"
@@ -183,6 +184,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "pdfa-convert": "no-comparison",
   "flatten-pdf": "document",
   "redact-pdf": "document",
+  "sign-pdf": "interactive-sign",
   "pdf-to-text": "no-comparison",
   "pdf-to-word": "no-comparison",
   "pdf-metadata": "no-comparison",

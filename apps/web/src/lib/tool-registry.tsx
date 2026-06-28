@@ -18,6 +18,7 @@ import type { Crop } from "react-image-crop";
 import type { BgPreviewState } from "@/components/common/image-viewer";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
+import type { SignProps } from "@/components/tools/sign-pdf-settings";
 import { TOOL_DISPLAY_MODES } from "./tool-display-modes";
 
 // ── Display modes ──────────────────────────────────────────────────
@@ -70,6 +71,7 @@ export interface ToolRegistryEntry {
     onImageOverlay?: (children: React.ReactNode) => void;
     cropProps?: CropProps;
     eraserProps?: EraserProps;
+    signProps?: SignProps;
   }>;
   /** Optional panel for tools that render custom content in the main area. */
   ResultsPanel?: React.ComponentType;
@@ -721,6 +723,9 @@ const RedactPdfSettings = lazy(() =>
     default: m.RedactPdfSettings,
   })),
 );
+const SignPdfSettings = lazy(() =>
+  import("@/components/tools/sign-pdf-settings").then((m) => ({ default: m.SignPdfSettings })),
+);
 const PdfToTextSettings = lazy(() =>
   import("@/components/tools/pdf-to-text-settings").then((m) => ({
     default: m.PdfToTextSettings,
@@ -1113,6 +1118,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["pdfa-convert", { accept: ".pdf", Settings: PdfaConvertSettings }],
   ["flatten-pdf", { accept: ".pdf", Settings: FlattenPdfSettings }],
   ["redact-pdf", { accept: ".pdf", Settings: RedactPdfSettings }],
+  ["sign-pdf", { accept: ".pdf", Settings: SignPdfSettings }],
   ["pdf-to-text", { accept: ".pdf", Settings: PdfToTextSettings }],
   ["pdf-to-word", { accept: ".pdf", Settings: PdfToWordSettings }],
   ["pdf-metadata", { accept: ".pdf", Settings: PdfMetadataSettings }],
