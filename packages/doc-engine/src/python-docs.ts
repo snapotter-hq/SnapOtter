@@ -119,3 +119,39 @@ export async function htmlToPdfPy(
     throw new Error(`doc_html_pdf failed: ${parsed.error}`);
   }
 }
+
+export interface SignPlacement {
+  sig: number;
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Stamp signature images onto a PDF (PyMuPDF insert_image), flattened. */
+export async function pdfSignPy(
+  inPath: string,
+  outPath: string,
+  signatures: string[],
+  placements: SignPlacement[],
+): Promise<{ placed: number }> {
+  const stdout = await runDocsScript("doc_sign", {
+    input: inPath,
+    output: outPath,
+    signatures,
+    placements,
+  });
+  const parsed = JSON.parse(stdout.trim()) as {
+    ok?: boolean;
+    placed?: number;
+    error?: string;
+  };
+  if (parsed.error) {
+    throw new Error(`doc_sign failed: ${parsed.error}`);
+  }
+  if (typeof parsed.placed !== "number") {
+    throw new Error(`doc_sign failed: ${stdout.slice(0, 200)}`);
+  }
+  return { placed: parsed.placed };
+}
