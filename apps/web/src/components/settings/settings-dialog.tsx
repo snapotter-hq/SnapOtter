@@ -521,6 +521,19 @@ function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
+// PUT /v1/settings rejects server-managed read-only keys (instance_id, cookie_secret)
+// with 400 READONLY_SETTING, and GET returns redacted secrets as the literal "********"
+// (cookie_secret, oidc_client_secret, siem_webhook_auth). Echoing either back breaks the
+// save or overwrites a real secret with the mask, so strip both before any bulk save.
+const READONLY_SETTING_KEYS = new Set(["instance_id", "cookie_secret"]);
+function writableSettings(settings: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(settings).filter(
+      ([key, value]) => !READONLY_SETTING_KEYS.has(key) && value !== "********",
+    ),
+  );
+}
+
 function SystemSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -553,17 +566,7 @@ function SystemSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      // GET returns read-only keys (instance_id, cookie_secret) and shows redacted
-      // secrets as the literal "********". Echoing those back fails with 400
-      // READONLY_SETTING or would overwrite a real secret with the mask, so send
-      // only the keys this section can actually change.
-      const READONLY_KEYS = new Set(["instance_id", "cookie_secret"]);
-      const writable = Object.fromEntries(
-        Object.entries(settings).filter(
-          ([key, value]) => !READONLY_KEYS.has(key) && value !== "********",
-        ),
-      );
-      await apiPut("/v1/settings", writable);
+      await apiPut("/v1/settings", writableSettings(settings));
       if (settings.analyticsEnabled === "false") {
         const { optOut } = await import("@/lib/analytics");
         optOut();
@@ -1032,7 +1035,7 @@ function AdminSecuritySettings() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", settings);
+      await apiPut("/v1/settings", writableSettings(settings));
       setSaveMsg(t.settings.security.securitySettingsSaved);
     } catch {
       setSaveMsg(t.settings.security.securitySettingsFailed);
