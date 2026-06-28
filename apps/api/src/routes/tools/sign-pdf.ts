@@ -22,10 +22,13 @@ const SIG_FIELD = /^sig(\d+)$/;
 const placementSchema = z.object({
   sig: z.number().int().min(0),
   page: z.number().int().min(0),
-  x: z.number().min(0).max(1),
-  y: z.number().min(0).max(1),
-  w: z.number().min(0).max(1),
-  h: z.number().min(0).max(1),
+  // Page fractions, top-left origin. Off-page bleed is tolerated in every
+  // direction (a signature nudged past an edge or sized larger than the page);
+  // PyMuPDF clips the rect to the page. Bounded to keep the rect sane.
+  x: z.number().min(-2).max(2),
+  y: z.number().min(-2).max(2),
+  w: z.number().min(0).max(4),
+  h: z.number().min(0).max(4),
 });
 const settingsSchema = z.object({
   placements: z.array(placementSchema).min(1).max(MAX_PLACEMENTS),
