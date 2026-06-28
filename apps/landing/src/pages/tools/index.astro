@@ -190,6 +190,7 @@ const collectionJsonLd = {
                   data-name={tool.name.toLowerCase()}
                   data-desc={tool.description.toLowerCase()}
                   data-modality={tool.modality}
+                  data-keywords={(tool.keywords ?? []).join(" ")}
                 >
                   <div
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -265,64 +266,63 @@ const collectionJsonLd = {
     </section>
   </main>
 
-  <script is:inline>
-    (function () {
-      var search = document.getElementById("tools-search");
-      var countEl = document.getElementById("tools-count");
-      var emptyEl = document.getElementById("tools-empty");
-      var items = Array.prototype.slice.call(document.querySelectorAll(".tool-item"));
-      var sections = Array.prototype.slice.call(document.querySelectorAll("[data-cat-section]"));
-      var modBtns = Array.prototype.slice.call(document.querySelectorAll(".tools-mod-btn"));
-      var total = items.length;
-      var activeMod = "all";
+  <script>
+    import { matchTool } from "../../lib/tool-search";
 
-      function setBtns() {
-        modBtns.forEach(function (b) {
-          var on = b.getAttribute("data-modality") === activeMod;
+    const search = document.getElementById("tools-search") as HTMLInputElement | null;
+    const countEl = document.getElementById("tools-count");
+    const emptyEl = document.getElementById("tools-empty");
+    const items = Array.from(document.querySelectorAll<HTMLElement>(".tool-item"));
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-cat-section]"));
+    const modBtns = Array.from(document.querySelectorAll<HTMLElement>(".tools-mod-btn"));
+    const total = items.length;
+    let activeMod = "all";
+
+    if (search && countEl && emptyEl) {
+      const setBtns = () => {
+        for (const b of modBtns) {
+          const on = b.getAttribute("data-modality") === activeMod;
           b.className =
             "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
             (on ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt");
-        });
-      }
+        }
+      };
 
-      function filter() {
-        var q = search.value.toLowerCase().trim();
-        var visible = 0;
-        items.forEach(function (el) {
-          var matchMod = activeMod === "all" || el.getAttribute("data-modality") === activeMod;
-          var matchQ =
-            !q ||
-            el.getAttribute("data-name").indexOf(q) !== -1 ||
-            el.getAttribute("data-desc").indexOf(q) !== -1;
-          var show = matchMod && matchQ;
+      const filter = () => {
+        const q = search.value.trim();
+        let visible = 0;
+        for (const el of items) {
+          const matchMod = activeMod === "all" || el.getAttribute("data-modality") === activeMod;
+          const hay =
+            `${el.getAttribute("data-name") || ""} ${el.getAttribute("data-desc") || ""} ` +
+            `${el.getAttribute("data-keywords") || ""}`;
+          const matchQ = !q || matchTool(q, hay);
+          const show = matchMod && matchQ;
           el.style.display = show ? "" : "none";
           if (show) visible++;
-        });
-        sections.forEach(function (sec) {
-          var anyVisible = Array.prototype.some.call(
-            sec.querySelectorAll(".tool-item"),
-            function (el) {
-              return el.style.display !== "none";
-            },
+        }
+        for (const sec of sections) {
+          const anyVisible = Array.from(sec.querySelectorAll<HTMLElement>(".tool-item")).some(
+            (el) => el.style.display !== "none",
           );
           sec.style.display = anyVisible ? "" : "none";
-        });
+        }
         emptyEl.style.display = visible === 0 ? "block" : "none";
         countEl.textContent =
           q || activeMod !== "all"
-            ? "Showing " + visible + " of " + total + " tools"
-            : "Showing all " + total + " tools";
-      }
+            ? `Showing ${visible} of ${total} tools`
+            : `Showing all ${total} tools`;
+      };
 
       search.addEventListener("input", filter);
-      modBtns.forEach(function (b) {
-        b.addEventListener("click", function () {
-          activeMod = b.getAttribute("data-modality");
+      for (const b of modBtns) {
+        b.addEventListener("click", () => {
+          activeMod = b.getAttribute("data-modality") ?? "all";
           setBtns();
           filter();
         });
-      });
-    })();
+      }
+    }
   </script>
 
   <Footer />
