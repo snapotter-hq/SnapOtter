@@ -14,6 +14,15 @@ export interface CompressControlsProps {
   onChange?: (settings: Record<string, unknown>) => void;
 }
 
+/** Stable serialization (sorted keys) for comparing two settings payloads. */
+function canonicalSettings(settings: Record<string, unknown>): string {
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(settings).sort()) {
+    sorted[key] = settings[key];
+  }
+  return JSON.stringify(sorted);
+}
+
 export function CompressControls({ settings: initialSettings, onChange }: CompressControlsProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<CompressMode>("targetSize");
@@ -21,19 +30,15 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
   const [targetSizeValue, setTargetSizeValue] = useState("");
   const [sizeUnit, setSizeUnit] = useState<SizeUnit>("KB");
 
-  const prevSettingsKeyRef = useRef<string | null>(null);
-  // When local state is synced FROM props (initialSettings), the resulting emit
-  // effect must not echo those values back through onChange. Doing so feeds a
-  // new initialSettings object in (e.g. via the pipeline store), and a preset
-  // that differs from the default state ping-pongs the two effects into an
-  // infinite render loop (React error #185).
-  const syncingRef = useRef(false);
+  // Seed local state from preloaded settings exactly once (a pipeline step can
+  // mount this control with non-default settings). One-time, not a re-sync: a
+  // re-sync would keep pulling the store's value back into local state and fight
+  // the emit effect below, ping-ponging into an infinite render loop (React
+  // error #185). Mirrors resize-settings / convert-settings.
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (!initialSettings) return;
-    const key = JSON.stringify(initialSettings);
-    if (prevSettingsKeyRef.current === key) return;
-    prevSettingsKeyRef.current = key;
-    syncingRef.current = true;
+    if (!initialSettings || initializedRef.current) return;
+    initializedRef.current = true;
     if (initialSettings.mode != null) setMode(initialSettings.mode as CompressMode);
     if (initialSettings.quality != null) setQuality(Number(initialSettings.quality));
     if (initialSettings.targetSizeKb != null)
@@ -45,19 +50,28 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
     onChangeRef.current = onChange;
   });
 
+  // Emit settings on change. Once local state has converged on initialSettings
+  // (a preloaded pipeline step), the computed payload equals initialSettings, so
+  // we skip the echo. A genuine user edit produces a payload that differs, so it
+  // still emits. This idempotent guard replaces an earlier one-shot flag that
+  // could dangle and silently swallow a real edit when the sync effect's
+  // setState calls were no-ops; it has no such failure mode.
   useEffect(() => {
-    if (syncingRef.current) {
-      syncingRef.current = false;
+    const next: Record<string, unknown> =
+      mode === "quality"
+        ? { mode, quality }
+        : {
+            mode,
+            targetSizeKb:
+              sizeUnit === "MB" ? Number(targetSizeValue) * 1024 : Number(targetSizeValue),
+          };
+
+    if (initialSettings && canonicalSettings(next) === canonicalSettings(initialSettings)) {
       return;
     }
-    if (mode === "quality") {
-      onChangeRef.current?.({ mode, quality });
-    } else {
-      const valueNum = Number(targetSizeValue);
-      const targetSizeKb = sizeUnit === "MB" ? valueNum * 1024 : valueNum;
-      onChangeRef.current?.({ mode, targetSizeKb });
-    }
-  }, [mode, quality, targetSizeValue, sizeUnit]);
+
+    onChangeRef.current?.(next);
+  }, [mode, quality, targetSizeValue, sizeUnit, initialSettings]);
 
   return (
     <div className="space-y-4">

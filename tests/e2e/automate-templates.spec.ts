@@ -58,6 +58,40 @@ test.describe("Automate templates", () => {
     await expect(page.getByText("2 steps configured")).toBeVisible();
   });
 
+  test("preloaded remove-background settings persist after loading cut-out-subject", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoAutomate(page);
+
+    // cut-out-subject = remove-background -> compress, with non-default
+    // remove-background settings (transparent / WebP / edgeRefine 1 / decontaminate).
+    await page.getByTestId("template-use-cut-out-subject").click();
+
+    await waitForSteps(page, 2);
+    await expect(page.getByText("2 steps configured")).toBeVisible();
+
+    // Expand the remove-background step to reveal its settings panel.
+    const stepRow = page
+      .locator("[role='button']")
+      .filter({ hasText: "Remove Background" })
+      .first();
+    await stepRow.click();
+
+    // Output format reflects the preset (WebP), not the PNG default.
+    await expect(page.getByTestId("remove-background-format-webp")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByTestId("remove-background-format-png")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    // The effects section auto-opens because edgeRefine/decontaminate are active.
+    await expect(page.getByTestId("remove-background-edge-refine")).toHaveValue("1");
+    await expect(page.getByTestId("remove-background-decontaminate")).toBeChecked();
+  });
+
   test("an out-of-the-box template runs to completion", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
 

@@ -86,7 +86,7 @@ export interface RemoveBgControlsProps {
   onChange: (settings: Record<string, unknown>) => void;
 }
 
-export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgControlsProps) {
+export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) {
   const { t } = useTranslation();
   const [subject, setSubject] = useState<SubjectType>("people");
   const [quality, setQuality] = useState<Quality>("balanced");
@@ -115,6 +115,39 @@ export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgCont
 
   // Expandable sections
   const [effectsOpen, setEffectsOpen] = useState(false);
+
+  // Seed local state from preloaded settings exactly once. Pipeline steps (e.g.
+  // a template) mount this control with non-default settings; without seeding,
+  // the emit effect below would overwrite them with the hardcoded defaults.
+  // Mirrors the initializedRef pattern in resize-settings / convert-settings.
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!settings || initializedRef.current) return;
+    initializedRef.current = true;
+    if (settings.backgroundType != null) setBgType(settings.backgroundType as BackgroundType);
+    if (settings.backgroundColor != null) setBgColor(String(settings.backgroundColor));
+    if (settings.gradientColor1 != null) setGradColor1(String(settings.gradientColor1));
+    if (settings.gradientColor2 != null) setGradColor2(String(settings.gradientColor2));
+    if (settings.gradientAngle != null) setGradAngle(Number(settings.gradientAngle));
+    if (settings.blurEnabled != null) setBlurEnabled(Boolean(settings.blurEnabled));
+    if (settings.blurIntensity != null) setBlurIntensity(Number(settings.blurIntensity));
+    if (settings.shadowEnabled != null) setShadowEnabled(Boolean(settings.shadowEnabled));
+    if (settings.shadowOpacity != null) setShadowOpacity(Number(settings.shadowOpacity));
+    if (settings.edgeRefine != null) setEdgeRefine(Number(settings.edgeRefine));
+    if (settings.decontaminate != null) setDecontaminate(Boolean(settings.decontaminate));
+    if (settings.outputFormat != null)
+      setOutputFormat(settings.outputFormat as "png" | "webp" | "avif");
+    // Reveal the effects section when any seeded effect is active so the
+    // preloaded values are immediately visible (and adjustable).
+    if (
+      settings.blurEnabled ||
+      settings.shadowEnabled ||
+      settings.edgeRefine ||
+      settings.decontaminate
+    ) {
+      setEffectsOpen(true);
+    }
+  }, [settings]);
 
   // Filter quality options based on subject (Ultra only for People)
   const qualityOptions = ALL_QUALITY_OPTIONS.filter(
@@ -409,6 +442,8 @@ export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgCont
           <button
             key={fmt}
             type="button"
+            data-testid={`remove-background-format-${fmt}`}
+            aria-pressed={outputFormat === fmt}
             onClick={() => setOutputFormat(fmt)}
             className={`py-2 px-2 rounded-lg border text-xs font-medium uppercase transition-colors ${
               outputFormat === fmt
@@ -520,6 +555,7 @@ export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgCont
             </div>
             <input
               type="range"
+              data-testid="remove-background-edge-refine"
               min={0}
               max={3}
               step={1}
@@ -534,6 +570,7 @@ export function RemoveBgControls({ settings: _settings, onChange }: RemoveBgCont
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
+                data-testid="remove-background-decontaminate"
                 checked={decontaminate}
                 onChange={(e) => setDecontaminate(e.target.checked)}
                 className="rounded border-border accent-primary"
