@@ -1,3 +1,4 @@
+import { expandConversionPresets } from "./conversion-presets.js";
 import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import { toolSection } from "./section.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
@@ -34,7 +35,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "archives", name: "Archives", icon: "FolderArchive", color: "#6366F1" },
 ];
 
-export const TOOLS: Tool[] = [
+const BASE_TOOLS: Tool[] = [
   // Essentials
   {
     id: "resize",
@@ -1797,6 +1798,8 @@ export const TOOLS: Tool[] = [
     executionHint: "fast",
   },
 ];
+
+export const TOOLS: Tool[] = [...BASE_TOOLS, ...expandConversionPresets(BASE_TOOLS)];
 
 for (const tool of TOOLS) {
   const slug = `/${toolSection(tool)}`;
