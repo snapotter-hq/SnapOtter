@@ -48,8 +48,7 @@ docs/*
 !docs/COMMUNITY_GUIDE.md
 PRD.md
 
-# Docker Hub overview source + publish script (maintainer-local ops)
-DOCKERHUB.md
+# Docker Hub publish script (maintainer-local ops)
 scripts/update-dockerhub-overview.sh
 
 # Ad-hoc test screenshots and reports

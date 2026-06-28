@@ -1,0 +1,30 @@
+name: Sync Docker Hub description
+
+# Publishes DOCKERHUB.md as the snapotter/snapotter repository overview on Docker Hub
+# when it changes on main (or on manual dispatch). Secret DOCKER_HUB_README holds the
+# Docker Hub account password; DOCKERHUB_USERNAME already exists (used by release.yml).
+
+on:
+  push:
+    branches: [main]
+    paths: ["DOCKERHUB.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-description
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_README }}
+          repository: snapotter/snapotter
+          readme-filepath: ./DOCKERHUB.md
