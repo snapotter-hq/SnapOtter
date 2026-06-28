@@ -104,6 +104,15 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // A redacted secret comes back from GET as the literal mask, so a client that
+      // reads settings, edits one field, and saves the whole object echoes the mask
+      // back. Treat the mask as "leave this secret unchanged" instead of encrypting
+      // and persisting "********", which would destroy the real secret (e.g. the OIDC
+      // client secret or SIEM webhook auth, neither of which is read-only).
+      if (REDACTED_KEYS.has(key) && strValue === "********") {
+        continue;
+      }
+
       if (READONLY_KEYS.has(key)) {
         return reply.status(400).send({
           error: `Setting "${key}" cannot be modified via the API`,
