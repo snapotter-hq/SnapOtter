@@ -14,8 +14,18 @@ const RENDER_SCALE = 1.5; // on-screen scale; placements are normalized so this 
 const EXPORT_QUALITY = 2; // raster the baked PNG at ~2x page points for crispness
 const KONVA_CONTAINER_ID = "sign-konva-container";
 
+/** Rendered size (px) and page size (points) for one page, captured at render time. */
+interface PageMeta {
+  sizeW: number;
+  sizeH: number;
+  ptsW: number;
+  ptsH: number;
+}
+
+/** A placed signature node, tagged with the page it belongs to. */
 interface PlacedSig {
   id: string;
+  page: number;
   node: Konva.Image;
 }
 
@@ -41,13 +51,18 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   const layerRef = useRef<Konva.Layer | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
   const docRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
-  const placementsRef = useRef<Map<number, PlacedSig[]>>(new Map()); // page -> nodes
+  // Flat list of every placed node across all pages. Nodes live here for the
+  // component's lifetime; page navigation only attaches/detaches them from the
+  // layer (never destroys), so revisiting a page keeps its signatures.
+  const placementsRef = useRef<PlacedSig[]>([]);
+  // Per-page render size (px) + page size (points), captured when each page renders.
+  const pageMetaRef = useRef<Map<number, PageMeta>>(new Map());
 
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
-  const [pagePts, setPagePts] = useState({ w: 0, h: 0 });
   const [size, setSize] = useState({ w: 0, h: 0 });
 
+  // Load the document once per file.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -63,6 +78,9 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     };
   }, [fileUrl]);
 
+  // Render the current page and show that page's nodes. The Konva stage is
+  // created once (lazily) and reused; switching pages resizes it and swaps which
+  // signature nodes are attached.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -72,53 +90,82 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       const pdfPage = await doc.getPage(page + 1);
       if (cancelled) return;
       const ptsViewport = pdfPage.getViewport({ scale: 1 });
-      setPagePts({ w: ptsViewport.width, h: ptsViewport.height });
       const viewport = pdfPage.getViewport({ scale: RENDER_SCALE });
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       setSize({ w: viewport.width, h: viewport.height });
       await pdfPage.render({ canvas, viewport }).promise;
+      if (cancelled) return;
 
-      stageRef.current?.destroy();
-      const stage = new Konva.Stage({
-        container: KONVA_CONTAINER_ID,
-        width: viewport.width,
-        height: viewport.height,
+      pageMetaRef.current.set(page, {
+        sizeW: viewport.width,
+        sizeH: viewport.height,
+        ptsW: ptsViewport.width,
+        ptsH: ptsViewport.height,
       });
-      const layer = new Konva.Layer();
-      const tr = new Konva.Transformer({
-        rotateEnabled: true,
-        keepRatio: true,
-        enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right"],
-      });
-      layer.add(tr);
-      stage.add(layer);
-      stageRef.current = stage;
-      layerRef.current = layer;
-      trRef.current = tr;
 
-      for (const placed of placementsRef.current.get(page) ?? []) layer.add(placed.node);
-      layer.draw();
+      let stage = stageRef.current;
+      if (!stage) {
+        stage = new Konva.Stage({
+          container: KONVA_CONTAINER_ID,
+          width: viewport.width,
+          height: viewport.height,
+        });
+        const layer = new Konva.Layer();
+        const tr = new Konva.Transformer({
+          rotateEnabled: true,
+          keepRatio: true,
+          enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right"],
+        });
+        layer.add(tr);
+        stage.add(layer);
+        stageRef.current = stage;
+        layerRef.current = layer;
+        trRef.current = tr;
+        stage.on("click tap", (e) => {
+          if (e.target === stage) {
+            tr.nodes([]);
+            onSelectionChange?.(false);
+          }
+        });
+      } else {
+        stage.width(viewport.width);
+        stage.height(viewport.height);
+      }
 
-      stage.on("click tap", (e) => {
-        if (e.target === stage) {
-          tr.nodes([]);
-          onSelectionChange?.(false);
-        }
-      });
+      const layer = layerRef.current;
+      const tr = trRef.current;
+      if (!layer || !tr) return;
+      // Detach the previously shown signatures (keep the transformer), then
+      // attach this page's. Nodes are never destroyed here.
+      tr.nodes([]);
+      for (const child of [...layer.getChildren()]) {
+        if (child instanceof Konva.Image) child.remove();
+      }
+      for (const placed of placementsRef.current) {
+        if (placed.page === page) layer.add(placed.node);
+      }
+      layer.batchDraw();
+      onSelectionChange?.(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [page, onSelectionChange]);
 
-  const emitCount = () => {
-    let n = 0;
-    for (const list of placementsRef.current.values()) n += list.length;
-    onCountChange?.(n);
-  };
+  // Destroy the stage and all nodes on unmount.
+  useEffect(() => {
+    return () => {
+      for (const placed of placementsRef.current) placed.node.destroy();
+      placementsRef.current = [];
+      stageRef.current?.destroy();
+      stageRef.current = null;
+    };
+  }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: handle reads page/size/pagePts snapshots; the parent callbacks are stable and deliberately excluded to avoid rebuilding the handle every render
+  const emitCount = () => onCountChange?.(placementsRef.current.length);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the handle reads page/size snapshots; parent callbacks are stable and deliberately excluded to avoid rebuilding the handle every render
   useImperativeHandle(
     ref,
     () => ({
@@ -144,10 +191,8 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           });
           layer.add(node);
           tr.nodes([node]);
-          layer.draw();
-          const list = placementsRef.current.get(page) ?? [];
-          list.push({ id: crypto.randomUUID(), node });
-          placementsRef.current.set(page, list);
+          layer.batchDraw();
+          placementsRef.current.push({ id: crypto.randomUUID(), page, node });
           onSelectionChange?.(true);
           emitCount();
         };
@@ -158,59 +203,68 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
         const layer = layerRef.current;
         if (!tr || !layer) return;
         for (const n of tr.nodes()) {
+          placementsRef.current = placementsRef.current.filter((p) => p.node !== n);
           n.destroy();
-          for (const [pg, list] of placementsRef.current) {
-            placementsRef.current.set(
-              pg,
-              list.filter((p) => p.node !== n),
-            );
-          }
         }
         tr.nodes([]);
-        layer.draw();
+        layer.batchDraw();
         onSelectionChange?.(false);
         emitCount();
       },
       hasPlacements() {
-        for (const list of placementsRef.current.values()) if (list.length) return true;
-        return false;
+        return placementsRef.current.length > 0;
       },
       async exportPlacements() {
         const pngs: Blob[] = [];
         const placements: SignPlacement[] = [];
-        const stage = stageRef.current;
-        const selected = trRef.current?.nodes() ?? [];
-        trRef.current?.nodes([]); // hide handles while rasterizing
-        trRef.current?.getLayer()?.draw();
-        let sigIndex = 0;
-        for (const [pg, list] of placementsRef.current) {
-          for (const placed of list) {
-            const node = placed.node;
-            const box = node.getClientRect({ relativeTo: stage ?? undefined });
-            const norm = toNormalizedRect(
-              { x: box.x, y: box.y, w: box.width, h: box.height },
-              size.w,
-              size.h,
-            );
-            placements.push({
-              sig: sigIndex,
-              page: pg,
-              x: norm.x,
-              y: norm.y,
-              w: norm.w,
-              h: norm.h,
-            });
-            const ratio = (EXPORT_QUALITY * pagePts.w) / size.w;
-            const dataUrl = node.toDataURL({ pixelRatio: ratio });
-            pngs.push(await (await fetch(dataUrl)).blob());
-            sigIndex++;
+        const layer = layerRef.current;
+        const tr = trRef.current;
+        const selected = tr?.nodes() ?? [];
+        tr?.nodes([]);
+        // Detach all visible signatures; we re-attach each node one at a time so
+        // getClientRect/toDataURL run on an attached node regardless of page.
+        if (layer) {
+          for (const child of [...layer.getChildren()]) {
+            if (child instanceof Konva.Image) child.remove();
           }
         }
-        if (selected.length) trRef.current?.nodes(selected);
+        let sigIndex = 0;
+        for (const placed of placementsRef.current) {
+          const meta = pageMetaRef.current.get(placed.page);
+          if (!meta || !layer) continue;
+          layer.add(placed.node);
+          const box = placed.node.getClientRect({ relativeTo: layer });
+          const norm = toNormalizedRect(
+            { x: box.x, y: box.y, w: box.width, h: box.height },
+            meta.sizeW,
+            meta.sizeH,
+          );
+          placements.push({
+            sig: sigIndex,
+            page: placed.page,
+            x: norm.x,
+            y: norm.y,
+            w: norm.w,
+            h: norm.h,
+          });
+          const ratio = (EXPORT_QUALITY * meta.ptsW) / meta.sizeW;
+          const dataUrl = placed.node.toDataURL({ pixelRatio: ratio });
+          pngs.push(await (await fetch(dataUrl)).blob());
+          placed.node.remove();
+          sigIndex++;
+        }
+        // Restore the current page's view.
+        if (layer) {
+          for (const placed of placementsRef.current) {
+            if (placed.page === page) layer.add(placed.node);
+          }
+          if (selected.length) tr?.nodes(selected);
+          layer.batchDraw();
+        }
         return { pngs, placements };
       },
     }),
-    [page, size, pagePts],
+    [page, size],
   );
 
   return (
