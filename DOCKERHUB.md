@@ -90,8 +90,8 @@ The same image runs on CPU or GPU. See [Docker Tags](https://docs.snapotter.com/
   - **Image (105):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats.
   - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn or extract subtitles, and more.
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge or split, waveform, and more.
-  - **Documents / PDF (40):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, OCR, and more.
-  - **Files (11):** CSV, JSON, XML, and YAML conversion, CSV merge or split, chart maker, ZIP create or extract.
+  - **Documents / PDF (28):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, OCR, and more.
+  - **Files (23):** CSV, JSON, XML, and YAML conversion, CSV merge or split, chart maker, ZIP create or extract.
 - **Image editor:** layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware.
 - **Local AI:** remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required.
 - **OIDC / SSO:** log in with Google, GitHub, Okta, or any OpenID Connect provider.

@@ -33,8 +33,8 @@ Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all fi
   - **Image (105):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, plus dedicated format converters (JPG to PNG, HEIC to JPG, WebP to PNG, image to PDF, and more). Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
   - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
-  - **Documents / PDF (40):** merge, split, compress, convert (Word/Excel/PowerPoint/EPUB), protect/unlock, redact, watermark, page numbers, OCR, plus PDF to JPG/PNG/TIFF
-  - **Files (11):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, ZIP create/extract
+  - **Documents / PDF (28):** merge, split, compress, convert (Word/Excel/PowerPoint/EPUB), protect/unlock, redact, watermark, page numbers, OCR, plus PDF to JPG/PNG/TIFF
+  - **Files (23):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, ZIP create/extract
 - **Image editor:** Layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware
 - **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
