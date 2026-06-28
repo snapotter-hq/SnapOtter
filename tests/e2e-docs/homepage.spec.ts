@@ -29,7 +29,7 @@ test.describe("docs homepage (Two Doors)", () => {
   });
 
   test("renders the modality strip with counts", async ({ page }) => {
-    await expect(page.getByText("240 tools across 5 modalities")).toBeVisible();
+    await expect(page.getByText("200+ tools across 5 modalities")).toBeVisible();
     await expect(page.getByRole("link", { name: /Image/ })).toBeVisible();
   });
 

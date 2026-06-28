@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 1.17.1
   description: |
-    REST API for SnapOtter, a self-hosted file processing suite with 240 tools across image, video, audio, document, and data.
+    REST API for SnapOtter, a self-hosted file processing suite with 200+ tools across image, video, audio, document, and data.
 
     ## Authentication
 

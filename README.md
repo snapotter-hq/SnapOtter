@@ -3,7 +3,7 @@
 </p>
 
 > [!NOTE]
-> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 240 tools across image, video, audio, documents, and files. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
+> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 200+ tools across image, video, audio, documents, and files. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
 
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <strong>Self-hosted file toolkit. 240 tools across image, video, audio, PDF, and files.</strong><br />
+  <strong>Self-hosted file toolkit. 200+ tools across image, video, audio, PDF, and files.</strong><br />
   The open-source alternative to Smallpdf, iLovePDF, TinyPNG, CloudConvert, and Otter.ai, in one stack you host yourself.
 </p>
 
@@ -29,7 +29,7 @@ Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all fi
 
 ## Key Features
 
-- **240 tools across 5 modalities:**
+- **200+ tools across 5 modalities:**
   - **Image (105):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, plus dedicated format converters (JPG to PNG, HEIC to JPG, WebP to PNG, image to PDF, and more). Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
   - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)

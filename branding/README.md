@@ -2,7 +2,7 @@
 
 Press kit for use in blog posts, articles, reviews, and other publications about SnapOtter. Free to use when referencing SnapOtter.
 
-SnapOtter is an open-source, self-hosted file processing suite with 240 tools across image, video, audio, PDF, and file workflows.
+SnapOtter is an open-source, self-hosted file processing suite with 200+ tools across image, video, audio, PDF, and file workflows.
 
 ## Files
 
@@ -20,7 +20,7 @@ SnapOtter is an open-source, self-hosted file processing suite with 240 tools ac
 | `wordmark.svg` | Scalable | "SnapOtter" text mark (dark text) |
 | `wordmark-white.svg` | Scalable | "SnapOtter" text mark (white text, for dark backgrounds) |
 | `banner.svg` | Scalable | Wordmark + tagline banner on dark background |
-| `dashboard.gif` | Animated | Scrolling tour of all 240 tools across the five modalities (README hero) |
+| `dashboard.gif` | Animated | Scrolling tour of all 200+ tools across the five modalities (README hero) |
 
 ## Brand Colors
 

@@ -45,7 +45,7 @@ function copyCommand() {
       <p class="eyebrow">Self-hosted · Open source · AGPLv3</p>
       <h1 class="hero-title">SnapOtter Documentation</h1>
       <p class="hero-sub">
-        <strong>Self-hosted file processing.</strong> 240 tools across image, video, audio, PDF &amp;
+        <strong>Self-hosted file processing.</strong> 200+ tools across image, video, audio, PDF &amp;
         files, all on your own hardware. Choose your path below, or get running in one command:
       </p>
       <div class="cmd" title="Click to copy" @click="copyCommand">
@@ -90,7 +90,7 @@ function copyCommand() {
     </section>
 
     <section class="mod">
-      <p class="mod-head"><strong>240 tools across 5 modalities</strong> <span>browse the full reference by type</span></p>
+      <p class="mod-head"><strong>200+ tools across 5 modalities</strong> <span>browse the full reference by type</span></p>
       <div class="chips">
         <a v-for="m in modalities" :key="m.href" class="chip" :href="m.href">
           <span class="chip-label">{{ m.label }}</span>

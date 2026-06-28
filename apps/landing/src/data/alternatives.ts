@@ -109,7 +109,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         q: "Does it do more than PDFs?",
-        a: "Yes. Beyond its 28 PDF tools, SnapOtter handles image, video, audio, and file tasks too, 240 tools in one stack.",
+        a: "Yes. Beyond its PDF tools, SnapOtter handles image, video, audio, and file tasks too, 200+ tools in one stack.",
       },
     ],
   },
@@ -120,7 +120,7 @@ export const ALTERNATIVES: Alternative[] = [
     pageTitle: "The Open-Source, Self-Hosted Alternative to iLovePDF",
     h1: "The open-source, self-hosted alternative to iLovePDF",
     metaDescription:
-      "iLovePDF processes your files in the cloud. SnapOtter runs PDF merge, split, compress, convert, and OCR on your own server. 240 tools across five file types. Open source, AGPLv3.",
+      "iLovePDF processes your files in the cloud. SnapOtter runs PDF merge, split, compress, convert, and OCR on your own server. 200+ tools across five file types. Open source, AGPLv3.",
     intro:
       "iLovePDF is a hosted PDF service, which means your documents are uploaded to process them. SnapOtter gives you the same toolset to run yourself, with the file staying on your server.",
     breadth:

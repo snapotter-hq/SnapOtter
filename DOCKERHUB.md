@@ -2,7 +2,7 @@
 
 ![SnapOtter, a self-hosted file manipulation suite](https://raw.githubusercontent.com/snapotter-hq/SnapOtter/main/branding/social-preview.png)
 
-Open-source, self-hostable file manipulation suite. 240 tools across image, video, audio, documents, and files, plus a layer-based image editor and local AI. Everything runs on your own hardware, so your files never leave your network.
+Open-source, self-hostable file manipulation suite. 200+ tools across image, video, audio, documents, and files, plus a layer-based image editor and local AI. Everything runs on your own hardware, so your files never leave your network.
 
 [![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue)](https://github.com/snapotter-hq/SnapOtter/blob/main/LICENSE)
 [![Website](https://img.shields.io/badge/Website-snapotter.com-blue?logo=googlechrome&logoColor=white)](https://snapotter.com)
@@ -11,7 +11,7 @@ Open-source, self-hostable file manipulation suite. 240 tools across image, vide
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/hr3s7HPUsr)
 [![GitHub](https://img.shields.io/badge/GitHub-snapotter--hq%2FSnapOtter-181717?logo=github)](https://github.com/snapotter-hq/SnapOtter)
 
-> **SnapOtter v2.0.0 is coming soon.** The current `latest` image is v1.x and includes image tools only. v2.0 adds 240 tools across image, video, audio, documents, and files. We are fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned.
+> **SnapOtter v2.0.0 is coming soon.** The current `latest` image is v1.x and includes image tools only. v2.0 adds 200+ tools across image, video, audio, documents, and files. We are fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned.
 
 ## What is SnapOtter?
 
@@ -86,7 +86,7 @@ The same image runs on CPU or GPU. See [Docker Tags](https://docs.snapotter.com/
 
 ## Features
 
-- **240 tools across 5 modalities**
+- **200+ tools across 5 modalities**
   - **Image (105):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats.
   - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn or extract subtitles, and more.
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge or split, waveform, and more.

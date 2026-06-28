@@ -6,7 +6,7 @@ import pkg from "../../../package.json";
 export default defineConfig({
   title: "SnapOtter",
   description:
-    "Documentation for SnapOtter - A Self-Hosted File Manipulation Suite. 240 tools for image, video, audio, PDF, and data processing. Local AI, pipelines, REST API.",
+    "Documentation for SnapOtter - A Self-Hosted File Manipulation Suite. 200+ tools for image, video, audio, PDF, and data processing. Local AI, pipelines, REST API.",
   base: "/",
   appearance: { initialValue: "light" },
   srcDir: ".",
@@ -86,7 +86,7 @@ export default defineConfig({
 `,
         customTemplateVariables: {
           description:
-            "SnapOtter is a self-hosted, open-source file processing platform with 240 tools across image, video, audio, PDF, and data. Includes AI/ML tools. Runs via Docker Compose with GPU auto-detection.",
+            "SnapOtter is a self-hosted, open-source file processing platform with 200+ tools across image, video, audio, PDF, and data. Includes AI/ML tools. Runs via Docker Compose with GPU auto-detection.",
           details:
             "Process images (resize, compress, convert, remove backgrounds, upscale, OCR), videos (trim, merge, subtitles), audio (normalize, transcribe, convert), PDFs (merge, split, watermark, redact), and data files (CSV, JSON, XML conversion) - without sending files to external services.",
         },
