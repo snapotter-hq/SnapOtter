@@ -3382,7 +3382,7 @@ export const sv: TranslationKeys = {
       heading: "Om",
       appName: "SnapOtter",
       appDescription:
-        "En självhostad, integritetsfokuserad filbehandlingssvit med 240 verktyg. Konvertera, komprimera, redigera, transkribera, OCR, och automatisera bild-, video-, ljud-, dokument- och dataarbetsflöden utan att skicka data till molnet.",
+        "En självhostad, integritetsfokuserad filbehandlingssvit med 200+ verktyg. Konvertera, komprimera, redigera, transkribera, OCR, och automatisera bild-, video-, ljud-, dokument- och dataarbetsflöden utan att skicka data till molnet.",
       versionLabel: "Version:",
       linksHeading: "Länkar",
       githubLink: "GitHub-arkiv",
@@ -3441,7 +3441,7 @@ export const sv: TranslationKeys = {
       "Inga gränser. Inga dolda tak.",
       "Fungerar helt offline.",
       "Obegränsad batchbearbetning.",
-      "240 verktyg.",
+      "200+ verktyg.",
       "16 AI-modeller. Din hårdvara.",
       "Blixtsnabb. Byggd på Sharp.",
       "Fungerar i slutna nätverk.",
