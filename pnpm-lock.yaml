@@ -457,6 +457,9 @@ importers:
       '@sentry/react':
         specifier: ^10.59.0
         version: 10.59.0(react@19.2.7)
+      '@snapotter/doc-engine':
+        specifier: workspace:*
+        version: link:../../packages/doc-engine
       '@snapotter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
