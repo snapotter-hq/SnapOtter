@@ -17,8 +17,8 @@ export default defineConfig({
     tailwindcss(),
     // Must come after the other plugins so it sees the final bundle.
     sentryVitePlugin({
-      org: "deepsafe",
-      project: "snapotter",
+      org: "snapotter",
+      project: "node",
       authToken: sentryAuthToken,
       telemetry: false,
       disable: !sentryAuthToken,
