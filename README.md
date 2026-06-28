@@ -3,7 +3,7 @@
 </p>
 
 > [!NOTE]
-> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 157 tools across image, video, audio, documents, and files. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
+> **SnapOtter v2.0.0 is coming soon.** The current Docker image (`latest`) is v1.x and includes image tools only. v2.0 adds 240 tools across image, video, audio, documents, and files. We're fixing a last-minute issue with local AI installs before publishing the new image. Stay tuned!
 
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
@@ -22,7 +22,7 @@
 
 ## Key Features
 
-- **157 tools across 5 modalities:**
+- **240 tools across 5 modalities:**
   - **Image (64):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 14 output formats
   - **Video (29):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, and more
   - **Audio (17):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, and more

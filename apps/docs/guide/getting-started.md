@@ -109,7 +109,7 @@ pnpm dev
 
 ## What You Can Do
 
-### File Processing (157 Tools)
+### File Processing (240 Tools)
 
 | Modality | Count | Example Tools |
 |----------|-------|---------------|

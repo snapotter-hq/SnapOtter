@@ -3384,7 +3384,7 @@ export const tr: TranslationKeys = {
       heading: "Hakkında",
       appName: "SnapOtter",
       appDescription:
-        "157 araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir dosya işleme paketi. Buluta veri göndermeden dönüştürme, sıkıştırma, düzenleme, transkripsiyon, OCR ve görüntü, video, ses, belge ve veri iş akışlarınızı otomatikleştirme.",
+        "240 araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir dosya işleme paketi. Buluta veri göndermeden dönüştürme, sıkıştırma, düzenleme, transkripsiyon, OCR ve görüntü, video, ses, belge ve veri iş akışlarınızı otomatikleştirme.",
       versionLabel: "Sürüm:",
       linksHeading: "Bağlantılar",
       githubLink: "GitHub Deposu",
@@ -3444,7 +3444,7 @@ export const tr: TranslationKeys = {
       "Limit yok. Gizli kota yok.",
       "Tamamen çevrimdışı çalışır.",
       "Sınırsız toplu işleme.",
-      "157 araç.",
+      "240 araç.",
       "16 AI modeli. Sizin donanımınız.",
       "Yıldırım hızında. Sharp ile geliştirildi.",
       "Hava boşluklu ağlar için hazır.",

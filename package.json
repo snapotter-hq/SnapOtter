@@ -2,7 +2,7 @@
   "name": "snapotter",
   "version": "2.0.0",
   "private": true,
-  "description": "Self-hosted file processing suite with 157 tools across image, video, audio, document, and data, plus local AI. Runs as a Docker Compose stack with Postgres and Redis.",
+  "description": "Self-hosted file processing suite with 240 tools across image, video, audio, document, and data, plus local AI. Runs as a Docker Compose stack with Postgres and Redis.",
   "homepage": "https://snapotter.com",
   "repository": {
     "type": "git",

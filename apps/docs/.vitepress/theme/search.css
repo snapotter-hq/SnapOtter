@@ -45,7 +45,7 @@
 .algolia
   [command-dialog-wrapper]:has([command-input]:placeholder-shown)
   [command-empty=""]::after {
-  content: "Search 157 tools, guides, and the API reference";
+  content: "Search 240 tools, guides, and the API reference";
   font-size: 14px;
   line-height: 1.4;
   color: var(--vp-c-text-2);

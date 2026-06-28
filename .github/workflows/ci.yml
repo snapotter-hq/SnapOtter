@@ -162,7 +162,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm playwright install --with-deps chromium
       - name: Run smoke specs
-        # tools-all.spec.ts is the full 157-tool per-tool render matrix (~170 tests)
+        # tools-all.spec.ts is the full 240-tool per-tool render matrix (~250 tests)
         # -- a comprehensive check, not a PR-gate smoke test. It runs in the nightly
         # e2e-full bucket, which executes the whole suite sharded. Keep this gate to
         # genuinely fast sanity specs so it finishes well inside the timeout.

@@ -3394,7 +3394,7 @@ export const de: TranslationKeys = {
       heading: "Info",
       appName: "SnapOtter",
       appDescription:
-        "Eine selbst gehostete, datenschutzorientierte Dateiverarbeitungssuite mit 157 Werkzeugen. Konvertieren, komprimieren, bearbeiten, transkribieren, OCR und Bild-, Video-, Audio-, Dokument- und Datenabläufe automatisieren, ohne Daten in die Cloud zu senden.",
+        "Eine selbst gehostete, datenschutzorientierte Dateiverarbeitungssuite mit 240 Werkzeugen. Konvertieren, komprimieren, bearbeiten, transkribieren, OCR und Bild-, Video-, Audio-, Dokument- und Datenabläufe automatisieren, ohne Daten in die Cloud zu senden.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub-Repository",
@@ -3454,7 +3454,7 @@ export const de: TranslationKeys = {
       "Keine Limits. Keine versteckten Grenzen.",
       "Funktioniert komplett offline.",
       "Unbegrenzte Stapelverarbeitung.",
-      "157 Werkzeuge.",
+      "240 Werkzeuge.",
       "16 AI-Modelle. Ihre Hardware.",
       "Blitzschnell. Basiert auf Sharp.",
       "Geeignet für abgeschottete Netzwerke.",
