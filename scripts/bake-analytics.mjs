@@ -13,7 +13,7 @@ const posthogHost = enabled ? "https://us.i.posthog.com" : "";
 // A Sentry DSN is a public, write-only identifier. It already ships inside the
 // browser bundle and the published image, so committing it here leaks nothing.
 const sentryDsn = enabled
-  ? "https://8bb088d82ba026d28c8936ec9292b009@o4511137467727872.ingest.us.sentry.io/4511137492238336"
+  ? "https://2fd53fc3b3fdc59d02cac044a4f90b71@o4511263372738560.ingest.us.sentry.io/4511264620085248"
   : "";
 // tracesSampleRate only governs performance transactions; errors are always
 // captured. Keep this low so fleet-wide tracing does not drain Sentry quota.
