@@ -91,11 +91,11 @@ export const ALTERNATIVES: Alternative[] = [
     pageTitle: "The Open-Source, Self-Hosted Alternative to Smallpdf",
     h1: "The open-source, self-hosted alternative to Smallpdf",
     metaDescription:
-      "Smallpdf uploads your documents to its servers. SnapOtter runs the same PDF tools on yours. 40 PDF tools plus 200 more for image, video, audio, and files. Open source, AGPLv3.",
+      "Smallpdf uploads your documents to its servers. SnapOtter runs the same PDF tools on yours. 28 PDF tools plus 212 more for image, video, audio, and files. Open source, AGPLv3.",
     intro:
       "Smallpdf is a cloud PDF suite, so every file you touch goes up to its servers. SnapOtter runs the same kinds of tools on hardware you own, and the file never leaves it.",
     breadth:
-      "Smallpdf does PDFs. SnapOtter ships 40 PDF tools (merge, split, compress, convert, redact, OCR, and more) and another 200 across image, video, audio, and files, so one stack covers what you'd otherwise spread across several accounts.",
+      "Smallpdf does PDFs. SnapOtter ships 28 PDF tools (merge, split, compress, convert, redact, OCR, and more) and another 212 across image, video, audio, and files, so one stack covers what you'd otherwise spread across several accounts.",
     competitorOpenSource: false,
     rows: cloudRows("PDFs", "Subscription, free tier with daily limits", "PDF only"),
     faqs: [
@@ -109,7 +109,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         q: "Does it do more than PDFs?",
-        a: "Yes. Beyond its 40 PDF tools, SnapOtter handles image, video, audio, and file tasks too, 240 tools in one stack.",
+        a: "Yes. Beyond its 28 PDF tools, SnapOtter handles image, video, audio, and file tasks too, 240 tools in one stack.",
       },
     ],
   },
@@ -124,7 +124,7 @@ export const ALTERNATIVES: Alternative[] = [
     intro:
       "iLovePDF is a hosted PDF service, which means your documents are uploaded to process them. SnapOtter gives you the same toolset to run yourself, with the file staying on your server.",
     breadth:
-      "iLovePDF stays inside PDFs. SnapOtter pairs 40 PDF tools with image, video, audio, and file tools, so the same deployment handles a contract, a screen recording, and a podcast edit.",
+      "iLovePDF stays inside PDFs. SnapOtter pairs 28 PDF tools with image, video, audio, and file tools, so the same deployment handles a contract, a screen recording, and a podcast edit.",
     competitorOpenSource: false,
     rows: cloudRows("PDFs", "Subscription, free tier with limits", "PDF only"),
     faqs: [
