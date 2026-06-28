@@ -2,6 +2,7 @@ import type { SignPlacement } from "@snapotter/doc-engine";
 import Konva from "konva";
 import * as pdfjs from "pdfjs-dist";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { toNormalizedRect } from "@/lib/sign-geometry";
 import type { SavedSignature } from "@/lib/signature-store";
 
@@ -46,6 +47,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   { fileUrl, onSelectionChange, onCountChange },
   ref,
 ) {
+  const { t } = useTranslation();
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
@@ -284,10 +286,10 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           onClick={() => setPage((p) => p - 1)}
           className="rounded border border-border px-2 py-1 disabled:opacity-40"
         >
-          ‹ Prev
+          ‹ {t.tools.documentView.previousPage}
         </button>
         <span className="font-medium text-foreground">
-          Page {page + 1} / {pageCount}
+          {page + 1} / {pageCount}
         </span>
         <button
           type="button"
@@ -295,7 +297,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           onClick={() => setPage((p) => p + 1)}
           className="rounded border border-border px-2 py-1 disabled:opacity-40"
         >
-          Next ›
+          {t.tools.documentView.nextPage} ›
         </button>
       </div>
     </div>

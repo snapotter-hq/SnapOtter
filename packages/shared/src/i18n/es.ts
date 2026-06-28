@@ -2623,6 +2623,33 @@ export const es: TranslationKeys = {
       submitBatch: "Aplanar ({count} archivos)",
       progressLabel: "Aplanando",
     },
+    "sign-pdf": {
+      yourSignatures: "Tus firmas",
+      newSignature: "Nueva",
+      clickToPlace: "Haz clic en una firma para colocarla en la página actual.",
+      selectedSignature: "Firma seleccionada",
+      dragToAdjust: "Arrastra los controladores para cambiar el tamaño o rotar.",
+      disclaimer:
+        "Añade una imagen de firma visible. No es una firma digital basada en certificado.",
+      signing: "Firmando…",
+      signingPercent: "Firmando… {percent}%",
+      downloadSigned: "Descargar PDF firmado",
+      addFirst: "Añade al menos una firma antes de descargar.",
+      pad: {
+        title: "Crear firma",
+        draw: "Dibujar",
+        type: "Escribir",
+        upload: "Subir",
+        color: "Color",
+        pen: "Lápiz",
+        namePlaceholder: "Escribe tu nombre",
+        yourName: "Tu nombre",
+        remember: "Recordar en este dispositivo",
+        save: "Guardar y colocar",
+        uploadHint:
+          "Suelta un PNG / JPG o haz clic para elegir. Un PNG transparente funciona mejor.",
+      },
+    },
     "redact-pdf": {
       terms: "Términos a censurar",
       termsHint: "Un término por línea (máx. 50)",

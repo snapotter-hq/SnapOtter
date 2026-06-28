@@ -2640,6 +2640,34 @@ export const de: TranslationKeys = {
       submitBatch: "Reduzieren ({count} Dateien)",
       progressLabel: "Wird reduziert",
     },
+    "sign-pdf": {
+      yourSignatures: "Ihre Unterschriften",
+      newSignature: "Neu",
+      clickToPlace:
+        "Klicken Sie auf eine Unterschrift, um sie auf der aktuellen Seite zu platzieren.",
+      selectedSignature: "Ausgewählte Unterschrift",
+      dragToAdjust: "Ziehen Sie an den Griffen, um die Größe zu ändern oder zu drehen.",
+      disclaimer:
+        "Fügt ein sichtbares Unterschriftsbild hinzu. Dies ist keine zertifikatbasierte digitale Signatur.",
+      signing: "Wird unterschrieben…",
+      signingPercent: "Wird unterschrieben… {percent}%",
+      downloadSigned: "Unterschriebenes PDF herunterladen",
+      addFirst: "Fügen Sie vor dem Herunterladen mindestens eine Unterschrift hinzu.",
+      pad: {
+        title: "Unterschrift erstellen",
+        draw: "Zeichnen",
+        type: "Tippen",
+        upload: "Hochladen",
+        color: "Farbe",
+        pen: "Stift",
+        namePlaceholder: "Geben Sie Ihren Namen ein",
+        yourName: "Ihr Name",
+        remember: "Auf diesem Gerät merken",
+        save: "Speichern und platzieren",
+        uploadHint:
+          "Legen Sie ein PNG / JPG ab oder klicken Sie zum Auswählen. Ein transparentes PNG funktioniert am besten.",
+      },
+    },
     "redact-pdf": {
       terms: "Zu schwärzende Begriffe",
       termsHint: "Ein Begriff pro Zeile (max. 50)",

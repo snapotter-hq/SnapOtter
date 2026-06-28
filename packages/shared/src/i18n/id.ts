@@ -2633,6 +2633,33 @@ export const id: TranslationKeys = {
       submitBatch: "Ratakan ({count} file)",
       progressLabel: "Meratakan",
     },
+    "sign-pdf": {
+      yourSignatures: "Tanda tangan Anda",
+      newSignature: "Baru",
+      clickToPlace: "Klik tanda tangan untuk meletakkannya di halaman saat ini.",
+      selectedSignature: "Tanda tangan terpilih",
+      dragToAdjust: "Seret pegangan untuk mengubah ukuran atau memutar.",
+      disclaimer:
+        "Menambahkan gambar tanda tangan visual. Ini bukan tanda tangan digital berbasis sertifikat.",
+      signing: "Menandatangani…",
+      signingPercent: "Menandatangani… {percent}%",
+      downloadSigned: "Unduh PDF yang ditandatangani",
+      addFirst: "Tambahkan setidaknya satu tanda tangan sebelum mengunduh.",
+      pad: {
+        title: "Buat tanda tangan",
+        draw: "Gambar",
+        type: "Ketik",
+        upload: "Unggah",
+        color: "Warna",
+        pen: "Pena",
+        namePlaceholder: "Ketik nama Anda",
+        yourName: "Nama Anda",
+        remember: "Ingat di perangkat ini",
+        save: "Simpan dan tempatkan",
+        uploadHint:
+          "Letakkan PNG / JPG, atau klik untuk memilih. PNG transparan bekerja paling baik.",
+      },
+    },
     "redact-pdf": {
       terms: "Istilah untuk disensor",
       termsHint: "Satu istilah per baris (maks 50)",

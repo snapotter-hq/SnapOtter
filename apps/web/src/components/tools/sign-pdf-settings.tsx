@@ -1,6 +1,8 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import {
   addSignature,
   deleteSignature,
@@ -105,6 +107,8 @@ export interface SignProps {
 }
 
 export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
+  const { t } = useTranslation();
+  const sp = t.toolSettings["sign-pdf"];
   const { currentEntry } = useFileStore();
   const [sigs, setSigs] = useState<SavedSignature[]>(() => listSignatures());
   const [padOpen, setPadOpen] = useState(false);
@@ -133,7 +137,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const file = currentEntry?.file;
     if (!canvas || !file) return;
     if (!canvas.hasPlacements()) {
-      setError("Add at least one signature before downloading.");
+      setError(sp.addFirst);
       return;
     }
     setError(null);
@@ -228,7 +232,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     <div className="space-y-4">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Your signatures
+          {sp.yourSignatures}
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {sigs.map((s) => (
@@ -262,19 +266,17 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
             onClick={() => setPadOpen(true)}
             className="h-9 min-w-[60px] rounded border border-dashed border-border text-xs text-muted-foreground"
           >
-            + New
+            + {sp.newSignature}
           </button>
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Click a signature to drop it on the current page.
-        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{sp.clickToPlace}</p>
       </div>
 
       <div className="border-t border-border" />
 
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Selected signature
+          {sp.selectedSignature}
         </p>
         <button
           type="button"
@@ -282,16 +284,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           onClick={() => signProps?.canvasRef.current?.deleteSelected()}
           className="mt-2 rounded border border-border px-2 py-1 text-xs text-destructive disabled:opacity-40"
         >
-          ✕ Delete
+          ✕ {t.common.delete}
         </button>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Drag the handles to resize or rotate.
-        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{sp.dragToAdjust}</p>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
-        Adds a visual signature image. This is not a certificate-based digital signature.
-      </p>
+      <p className="text-[11px] text-muted-foreground">{sp.disclaimer}</p>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -301,7 +299,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           download
           className="block w-full rounded-lg bg-primary py-2.5 text-center font-semibold text-primary-foreground"
         >
-          Download signed PDF
+          {sp.downloadSigned}
         </a>
       ) : (
         <button
@@ -312,9 +310,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         >
           {processing
             ? progress > 0
-              ? `Signing… ${Math.round(progress)}%`
-              : "Signing…"
-            : "Apply & Download"}
+              ? format(sp.signingPercent, { percent: Math.round(progress) })
+              : sp.signing
+            : t.toolPage.applyAndDownload}
         </button>
       )}
 

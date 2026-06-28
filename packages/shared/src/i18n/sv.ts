@@ -2631,6 +2631,33 @@ export const sv: TranslationKeys = {
       submitBatch: "Platta till ({count} filer)",
       progressLabel: "Plattar till",
     },
+    "sign-pdf": {
+      yourSignatures: "Dina signaturer",
+      newSignature: "Ny",
+      clickToPlace: "Klicka på en signatur för att placera den på den aktuella sidan.",
+      selectedSignature: "Vald signatur",
+      dragToAdjust: "Dra i handtagen för att ändra storlek eller rotera.",
+      disclaimer:
+        "Lägger till en synlig signaturbild. Detta är inte en certifikatbaserad digital signatur.",
+      signing: "Signerar…",
+      signingPercent: "Signerar… {percent}%",
+      downloadSigned: "Ladda ner signerad PDF",
+      addFirst: "Lägg till minst en signatur innan du laddar ner.",
+      pad: {
+        title: "Skapa signatur",
+        draw: "Rita",
+        type: "Skriv",
+        upload: "Ladda upp",
+        color: "Färg",
+        pen: "Penna",
+        namePlaceholder: "Skriv ditt namn",
+        yourName: "Ditt namn",
+        remember: "Kom ihåg på den här enheten",
+        save: "Spara och placera",
+        uploadHint:
+          "Släpp en PNG / JPG eller klicka för att välja. En transparent PNG fungerar bäst.",
+      },
+    },
     "redact-pdf": {
       terms: "Termer att maskera",
       termsHint: "En term per rad (max 50)",

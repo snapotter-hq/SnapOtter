@@ -2638,6 +2638,33 @@ export const nl: TranslationKeys = {
       submitBatch: "Afvlakken ({count} bestanden)",
       progressLabel: "Afvlakken",
     },
+    "sign-pdf": {
+      yourSignatures: "Je handtekeningen",
+      newSignature: "Nieuw",
+      clickToPlace: "Klik op een handtekening om deze op de huidige pagina te plaatsen.",
+      selectedSignature: "Geselecteerde handtekening",
+      dragToAdjust: "Sleep de handvatten om het formaat te wijzigen of te draaien.",
+      disclaimer:
+        "Voegt een zichtbare handtekeningafbeelding toe. Dit is geen op certificaten gebaseerde digitale handtekening.",
+      signing: "Bezig met ondertekenen…",
+      signingPercent: "Bezig met ondertekenen… {percent}%",
+      downloadSigned: "Ondertekende PDF downloaden",
+      addFirst: "Voeg ten minste één handtekening toe voordat je downloadt.",
+      pad: {
+        title: "Handtekening maken",
+        draw: "Tekenen",
+        type: "Typen",
+        upload: "Uploaden",
+        color: "Kleur",
+        pen: "Pen",
+        namePlaceholder: "Typ je naam",
+        yourName: "Je naam",
+        remember: "Onthouden op dit apparaat",
+        save: "Opslaan en plaatsen",
+        uploadHint:
+          "Zet een PNG / JPG neer of klik om te kiezen. Een transparante PNG werkt het best.",
+      },
+    },
     "redact-pdf": {
       terms: "Te censureren termen",
       termsHint: "Een term per regel (max. 50)",

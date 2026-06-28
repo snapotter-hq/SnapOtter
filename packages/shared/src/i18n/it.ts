@@ -2636,6 +2636,33 @@ export const it: TranslationKeys = {
       submitBatch: "Appiattisci ({count} file)",
       progressLabel: "Appiattimento",
     },
+    "sign-pdf": {
+      yourSignatures: "Le tue firme",
+      newSignature: "Nuova",
+      clickToPlace: "Fai clic su una firma per posizionarla nella pagina corrente.",
+      selectedSignature: "Firma selezionata",
+      dragToAdjust: "Trascina le maniglie per ridimensionare o ruotare.",
+      disclaimer:
+        "Aggiunge un'immagine di firma visibile. Non è una firma digitale basata su certificato.",
+      signing: "Firma in corso…",
+      signingPercent: "Firma in corso… {percent}%",
+      downloadSigned: "Scarica il PDF firmato",
+      addFirst: "Aggiungi almeno una firma prima di scaricare.",
+      pad: {
+        title: "Crea firma",
+        draw: "Disegna",
+        type: "Scrivi",
+        upload: "Carica",
+        color: "Colore",
+        pen: "Penna",
+        namePlaceholder: "Scrivi il tuo nome",
+        yourName: "Il tuo nome",
+        remember: "Ricorda su questo dispositivo",
+        save: "Salva e posiziona",
+        uploadHint:
+          "Trascina un PNG / JPG o fai clic per scegliere. Un PNG trasparente è l'ideale.",
+      },
+    },
     "redact-pdf": {
       terms: "Termini da oscurare",
       termsHint: "Un termine per riga (max 50)",

@@ -2646,6 +2646,33 @@ export const fr: TranslationKeys = {
       submitBatch: "Aplatir ({count} fichiers)",
       progressLabel: "Aplatissement",
     },
+    "sign-pdf": {
+      yourSignatures: "Vos signatures",
+      newSignature: "Nouvelle",
+      clickToPlace: "Cliquez sur une signature pour la placer sur la page actuelle.",
+      selectedSignature: "Signature sélectionnée",
+      dragToAdjust: "Faites glisser les poignées pour redimensionner ou pivoter.",
+      disclaimer:
+        "Ajoute une image de signature visible. Ce n'est pas une signature numérique basée sur un certificat.",
+      signing: "Signature en cours…",
+      signingPercent: "Signature en cours… {percent}%",
+      downloadSigned: "Télécharger le PDF signé",
+      addFirst: "Ajoutez au moins une signature avant de télécharger.",
+      pad: {
+        title: "Créer une signature",
+        draw: "Dessiner",
+        type: "Saisir",
+        upload: "Importer",
+        color: "Couleur",
+        pen: "Stylo",
+        namePlaceholder: "Saisissez votre nom",
+        yourName: "Votre nom",
+        remember: "Mémoriser sur cet appareil",
+        save: "Enregistrer et placer",
+        uploadHint:
+          "Déposez un PNG / JPG ou cliquez pour choisir. Un PNG transparent fonctionne le mieux.",
+      },
+    },
     "redact-pdf": {
       terms: "Termes à masquer",
       termsHint: "Un terme par ligne (max 50)",

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 
 const INK_COLORS = ["#13315c", "#1a1814", "#1f6feb"];
 const PEN_WIDTHS = { S: 2, M: 3.5, L: 6 } as const;
@@ -49,6 +50,9 @@ function cropToInk(source: HTMLCanvasElement): string | null {
 }
 
 export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
+  const { t } = useTranslation();
+  const pad = t.toolSettings["sign-pdf"].pad;
+  const tabLabels: Record<Tab, string> = { draw: pad.draw, type: pad.type, upload: pad.upload };
   const [tab, setTab] = useState<Tab>("draw");
   const [remember, setRemember] = useState(true);
   const [color, setColor] = useState(INK_COLORS[0]);
@@ -148,15 +152,15 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       role="dialog"
       aria-modal="true"
-      aria-label="Create signature"
+      aria-label={pad.title}
     >
       <div className="w-[460px] max-w-[92vw] rounded-xl border border-border bg-background shadow-2xl">
         <div className="flex items-center justify-between border-b border-border p-3">
-          <h2 className="text-sm font-semibold">Create signature</h2>
+          <h2 className="text-sm font-semibold">{pad.title}</h2>
           <button
             type="button"
             onClick={onCancel}
-            aria-label="Close"
+            aria-label={t.common.close}
             className="text-muted-foreground"
           >
             ✕
@@ -170,7 +174,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
               onClick={() => setTab(tb)}
               className={`rounded-t-lg border border-b-0 px-3 py-1.5 text-sm capitalize ${tab === tb ? "border-primary bg-background font-medium" : "border-border bg-muted text-muted-foreground"}`}
             >
-              {tb}
+              {tabLabels[tb]}
             </button>
           ))}
         </div>
@@ -185,7 +189,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                 style={{ touchAction: "none" }}
               />
               <div className="mt-3 flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">Color</span>
+                <span className="text-xs text-muted-foreground">{pad.color}</span>
                 {INK_COLORS.map((c) => (
                   <button
                     key={c}
@@ -196,7 +200,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                     style={{ background: c }}
                   />
                 ))}
-                <span className="ms-2 text-xs text-muted-foreground">Pen</span>
+                <span className="ms-2 text-xs text-muted-foreground">{pad.pen}</span>
                 {(Object.keys(PEN_WIDTHS) as Array<keyof typeof PEN_WIDTHS>).map((w) => (
                   <button
                     key={w}
@@ -212,7 +216,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                   onClick={clearDraw}
                   className="ms-auto rounded border border-border px-2 py-1 text-xs"
                 >
-                  Clear
+                  {t.common.clear}
                 </button>
               </div>
             </>
@@ -222,7 +226,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
               <input
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
-                placeholder="Type your name"
+                placeholder={pad.namePlaceholder}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm"
               />
               <div className="mt-3 flex flex-col gap-2">
@@ -234,7 +238,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                     className={`rounded-lg border px-3 py-2 text-start ${font.label === f.label ? "border-primary bg-primary/10" : "border-border"}`}
                     style={{ fontFamily: f.css, color }}
                   >
-                    {typed || "Your name"}
+                    {typed || pad.yourName}
                   </button>
                 ))}
               </div>
@@ -243,7 +247,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
           {tab === "upload" && (
             <>
               <label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                Drop a PNG / JPG, or click to choose. Transparent PNG works best.
+                {pad.uploadHint}
                 <input
                   type="file"
                   accept="image/png,image/jpeg"
@@ -268,14 +272,14 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
             />{" "}
-            Remember on this device
+            {pad.remember}
           </label>
           <button
             type="button"
             onClick={onCancel}
             className="ms-auto rounded-lg border border-border px-3 py-1.5 text-sm"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
@@ -283,7 +287,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
             onClick={handleSave}
             className="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
-            Save &amp; place
+            {pad.save}
           </button>
         </div>
       </div>

@@ -2638,6 +2638,33 @@ export const pl: TranslationKeys = {
       submitBatch: "Spłaszcz ({count} plików)",
       progressLabel: "Spłaszczanie",
     },
+    "sign-pdf": {
+      yourSignatures: "Twoje podpisy",
+      newSignature: "Nowy",
+      clickToPlace: "Kliknij podpis, aby umieścić go na bieżącej stronie.",
+      selectedSignature: "Wybrany podpis",
+      dragToAdjust: "Przeciągnij uchwyty, aby zmienić rozmiar lub obrócić.",
+      disclaimer:
+        "Dodaje widoczny obraz podpisu. To nie jest podpis cyfrowy oparty na certyfikacie.",
+      signing: "Podpisywanie…",
+      signingPercent: "Podpisywanie… {percent}%",
+      downloadSigned: "Pobierz podpisany PDF",
+      addFirst: "Dodaj co najmniej jeden podpis przed pobraniem.",
+      pad: {
+        title: "Utwórz podpis",
+        draw: "Rysuj",
+        type: "Wpisz",
+        upload: "Prześlij",
+        color: "Kolor",
+        pen: "Pióro",
+        namePlaceholder: "Wpisz swoje imię",
+        yourName: "Twoje imię",
+        remember: "Zapamiętaj na tym urządzeniu",
+        save: "Zapisz i umieść",
+        uploadHint:
+          "Upuść plik PNG / JPG lub kliknij, aby wybrać. Przezroczysty PNG działa najlepiej.",
+      },
+    },
     "redact-pdf": {
       terms: "Frazy do zredagowania",
       termsHint: "Jedna fraza na wiersz (maks. 50)",
