@@ -124,6 +124,7 @@ import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerRotateVideo } from "./rotate-video.js";
 import { registerSharpening } from "./sharpening.js";
+import { registerSignPdf } from "./sign-pdf.js";
 import { registerSilenceRemoval } from "./silence-removal.js";
 import { registerSmartCrop } from "./smart-crop.js";
 import { registerSplit } from "./split.js";
@@ -364,6 +365,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "ocr-pdf", register: registerOcrPdf },
     { id: "blur-faces", register: registerBlurFaces },
     { id: "erase-object", register: registerEraseObject },
+    { id: "sign-pdf", register: registerSignPdf },
     { id: "smart-crop", register: registerSmartCrop },
     { id: "image-enhancement", register: registerImageEnhancement },
     { id: "content-aware-resize", register: registerContentAwareResize },
