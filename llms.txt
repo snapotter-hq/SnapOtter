@@ -1,204 +1,66 @@
 # SnapOtter
 
-Open-source, self-hostable file manipulation suite with 157 tools across image, video, audio, document, and data. Single Docker container, no external services required. Dual-licensed AGPLv3 and commercial.
+Open-source, self-hostable file processing suite with 200+ tools across image, video, audio, PDF, and files, plus a layer-based image editor and local AI. Runs as a small Docker Compose stack, no external services. Dual-licensed AGPLv3 and commercial.
 
 All processing happens locally. Files never leave your infrastructure.
 
-## Quick Start (Docker)
+## Quick Start (Docker Compose)
 
-docker run -d --name snapotter -p 1349:1349 -v snapotter-data:/data snapotter/snapotter:latest
+SnapOtter runs alongside PostgreSQL 17 and Redis 8. Minimal compose.yaml:
 
-Default credentials: admin / admin (must change on first login).
-Add --gpus all for NVIDIA GPU acceleration on AI tools.
-Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
+  services:
+    snapotter:
+      image: snapotter/snapotter:latest
+      ports: ["1349:1349"]
+      environment:
+        DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
+        REDIS_URL: redis://redis:6379
+      volumes: ["snapotter-data:/data"]
+      depends_on: [postgres, redis]
+    postgres:
+      image: postgres:17-alpine
+      environment:
+        POSTGRES_USER: snapotter
+        POSTGRES_PASSWORD: snapotter
+        POSTGRES_DB: snapotter
+      volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    redis:
+      image: redis:8-alpine
+      volumes: ["snapotter-redisdata:/data"]
+  volumes:
+    snapotter-data:
+    snapotter-pgdata:
+    snapotter-redisdata:
+
+Then run docker compose up -d, open http://localhost:1349, and log in with admin / admin (you must change it on first login). Add an NVIDIA GPU device reservation to the snapotter service for AI acceleration. Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
 
 ## Tools
 
-157 tools across 5 modalities: image (64), video (29), audio (17), document/PDF (37), and data (10). 19 are local AI tools (no cloud APIs).
+200+ tools across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
-### Image (64 tools)
+### Image
 
-#### Essentials
-- resize: Resize by pixels, percentage, or social media presets
-- crop: Freeform crop, aspect ratio presets, shape crop
-- circle-crop: Crop to a centered circle
-- rotate: Rotate, flip, and straighten images
-- convert: Convert between image formats
-- compress: Reduce file size by quality or target size
-- image-pad: Pad to a target aspect ratio
+Resize, Crop, Rotate & Flip, Convert, Compress, Optimize for Web, Remove Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator, Adjust Colors, Sharpening, Replace & Invert Color, Color Blindness Simulation, Remove Background, Image Upscaling, Object Eraser, Extract Text from Image (OCR), Face / PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo, Content-Aware Resize, AI Canvas Expand, PNG Transparency Fixer, Background Replace, Blur Background, Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator, Image Info, Image Compare, Find Duplicates, Color Palette, QR Code Generator, HTML to Image, Barcode Reader, Image to Base64, Barcode Generator, Collage / Grid, Stitch / Combine, Image Splitting, Border & Frame, Beautify Screenshot, Circle Crop, Duotone, Image Pad, Pixelate, Vignette, GIF/WebP Converter, Histogram, LQIP Placeholder, Sprite Sheet, SVG to Raster, Image to SVG, GIF Tools. Plus format converters: JPG to PNG, PNG to JPG, JPG to WebP, PNG to WebP, WebP to JPG, WebP to PNG, JPG to AVIF, PNG to AVIF, WebP to AVIF, HEIC to JPG, HEIC to PNG, HEIC to AVIF, JPG to GIF, PNG to GIF, GIF to JPG, GIF to PNG, WebP to GIF, JPG to TIFF, PNG to TIFF, TIFF to JPG, TIFF to PNG, PSD to JPG, PSD to PNG, PNG to EPS, JPG to EPS, EPS to PNG, EPS to JPG, PNG to SVG, JPG to SVG, TIFF to SVG, PSD to SVG, EPS to SVG, SVG to PNG, SVG to JPG, JPG to PDF, PNG to PDF, HEIC to PDF, TIFF to PDF, WebP to PDF, GIF to PDF, EPS to PDF.
 
-#### Optimization
-- optimize-for-web: Smart format selection and quality tuning for web delivery
-- strip-metadata: Remove EXIF, GPS, and camera info for privacy
-- edit-metadata: View and edit EXIF, IPTC, and XMP fields
-- bulk-rename: Pattern-based batch renaming with variables
-- image-to-pdf: Combine images into multi-page PDFs
-- favicon: Generate all favicon and app icon sizes from one image
-- lqip-placeholder: Generate tiny low-quality image placeholders
+### Video
 
-#### Adjustments and Effects
-- adjust-colors: Brightness, contrast, saturation, temperature, and effects
-- sharpening: Adaptive, unsharp mask, and high-pass sharpening
-- replace-color: Swap colors with tolerance control or invert
-- color-blindness: Simulate 8 types of color vision deficiency
-- duotone: Two-color duotone effect
-- pixelate: Pixelation effect, full image or region
-- vignette: Adjustable vignette effect
-- histogram: Generate an RGB histogram chart
+Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to GIF, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Audio, Aspect Pad, Blur Pad, Watermark Video, Stabilize Video, GIF to Video, Video to WebP, Video to Frames, Merge Videos, Replace Audio, Burn Subtitles, Embed Subtitles, Extract Subtitles, Images to Video, Clean Video Metadata, Extract Audio. Plus format converters: MOV to MP4, WEBM to MP4, MKV to MP4, AVI to MP4, MP4 to MOV, MP4 to WEBM, WEBM to MOV, MKV to MOV, AVI to MOV, MP4 to AVI, MOV to AVI, MKV to AVI, AVI to MKV, MP4 to GIF, MOV to GIF, MKV to GIF, AVI to GIF, GIF to MP4, GIF to WEBM, GIF to MOV, MP4 to MP3, MOV to MP3, MKV to MP3, WEBM to MP3, AVI to MP3, MP4 to WAV, MOV to WAV, MP4 to OGG.
 
-#### AI Tools (local ML, no cloud APIs)
-- remove-background: AI background removal (rembg)
-- upscale: 2x/4x AI super-resolution (RealESRGAN)
-- erase-object: AI inpainting to remove unwanted objects (LaMa)
-- ocr: Extract text from images (PaddleOCR, 80+ languages)
-- blur-faces: AI face detection with blur for GDPR compliance
-- smart-crop: Subject-aware and face-centered cropping
-- image-enhancement: One-click auto-fix for exposure, contrast, color
-- enhance-faces: AI face restoration for blurry or low-res portraits
-- colorize: Convert B&W photos to full color with AI
-- noise-removal: AI denoising for ISO noise, JPEG artifacts, grain
-- red-eye-removal: Automatic red-eye detection and correction
-- restore-photo: AI repair of scratches, tears, and damage
-- passport-photo: Compliant passport/ID photos for 30+ countries
-- content-aware-resize: Seam carving that preserves subjects
-- ai-canvas-expand: Outpainting to extend image borders with AI
-- transparency-fixer: Fix PNGs with fake transparent backgrounds
-- background-replace: Replace the background with a solid color
-- blur-background: Blur the background while keeping the subject sharp
+### Audio
 
-#### Watermark and Overlay
-- watermark-text: Add text watermarks with tiling and opacity
-- watermark-image: Overlay logos with position and opacity control
-- text-overlay: Add styled text, captions, and titles
-- compose: Layer and composite multiple images with blending
-- meme-generator: Create memes with custom text and templates
+Transcribe Audio, Convert Audio, Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels, Silence Removal, Noise Reduction, Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata. Plus format converters: M4A to MP3, M4A to WAV, AAC to MP3, AAC to WAV, AAC to FLAC, OGG to MP3, OGG to WAV, WAV to MP3, MP3 to WAV, FLAC to MP3.
 
-#### Utilities
-- info: View dimensions, EXIF, GPS, color space, file details
-- compare: Side-by-side image comparison with slider overlay
-- find-duplicates: Perceptual hashing for near-duplicate detection
-- color-palette: Extract dominant colors as hex/RGB values
-- qr-generate: Custom QR codes with colors, logos, and patterns
-- html-to-image: Capture webpages as high-quality images
-- barcode-read: Decode QR, Code 128, EAN-13 and more from images
-- barcode-generate: Generate Code 128, EAN-13, UPC-A and more
-- image-to-base64: Generate data URIs for HTML/CSS embedding
+### PDF
 
-#### Layout and Composition
-- collage: 25+ grid templates for photo collages
-- stitch: Join images side by side, stacked, or in grids
-- split: Cut images into grid tiles for Instagram and print
-- border: Add borders, rounded corners, and drop shadows
-- beautify: Screenshot mockups with device frames and backgrounds
-- sprite-sheet: Combine images into a sprite sheet
+PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Convert, Crop PDF, N-up PDF, Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, PDF to Text, PDF to Word, PDF Metadata, PDF to JPG, PDF to PNG, PDF to TIFF.
 
-#### Format and Conversion
-- svg-to-raster: Convert SVG to PNG/JPEG/WebP at custom scale/DPI
-- vectorize: Trace raster images to SVG vector paths
-- gif-tools: Resize, optimize, reverse, extract GIF frames
-- gif-webp: Convert between animated GIF and WebP
-- pdf-to-image: Convert PDF pages to images at custom DPI
+### Files
 
-### Video (29 tools)
-- convert-video: Convert between MP4, MOV, WebM and more
-- compress-video: Shrink file size with quality control
-- trim-video: Cut a clip from a video
-- mute-video: Remove the audio track
-- video-to-gif: Turn a clip into an animated GIF
-- resize-video: Scale to a new resolution or preset
-- crop-video: Crop a region from video
-- rotate-video: Rotate or flip
-- change-fps: Change the frame rate
-- video-color: Brightness, contrast, saturation, gamma
-- video-speed: Speed up or slow down
-- reverse-video: Play backwards
-- video-loudnorm: Normalize audio to broadcast loudness
-- aspect-pad: Add solid-color bars for a target aspect ratio
-- blur-pad: Add blurred-copy bars for padding
-- watermark-video: Burn a text watermark onto frames
-- stabilize-video: Two-pass camera shake reduction
-- gif-to-video: Convert an animated GIF to MP4/WebM
-- video-to-webp: Convert a clip to animated WebP
-- video-to-frames: Extract frames as a ZIP of images
-- merge-videos: Join multiple clips into one
-- replace-audio: Swap the video audio track
-- burn-subtitles: Render subtitles onto frames
-- embed-subtitles: Mux a subtitle track into the container
-- extract-subtitles: Pull a subtitle track out as SRT
-- images-to-video: Build a slideshow video from images
-- video-metadata: Strip metadata from video
-- extract-audio: Pull the audio track from a video
-- auto-subtitles: Generate subtitles from speech with AI
+Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Excel to PDF, Word to PDF, PowerPoint to PDF, HTML to PDF, Markdown to Word, Markdown to HTML, Markdown to PDF, Convert EPUB, Convert to EPUB, Chart Maker, CSV to Excel, CSV to JSON, JSON to XML, YAML / JSON, XML to CSV, Split CSV, Merge CSVs, Excel to CSV, Create ZIP, Extract ZIP.
 
-### Audio (17 tools)
-- convert-audio: Convert between MP3, WAV, OGG, FLAC and more
-- trim-audio: Cut a section from audio
-- volume-adjust: Increase or decrease volume by gain
-- normalize-audio: Even out loudness to broadcast levels
-- fade-audio: Add fade-in and fade-out
-- reverse-audio: Play backwards
-- audio-speed: Speed up or slow down playback
-- pitch-shift: Shift pitch without changing speed
-- audio-channels: Mono/stereo conversion and channel swap
-- silence-removal: Strip silent sections
-- noise-reduction: FFT-based background noise reduction
-- merge-audio: Combine multiple files into one
-- split-audio: Split by time, parts, or silence
-- ringtone-maker: Create a ringtone clip from audio
-- waveform-image: Generate a waveform PNG visualization
-- audio-metadata: View, edit, or strip ID3 tags
-- transcribe-audio: Speech-to-text with AI (faster-whisper)
+## Local AI (all on your hardware, no cloud APIs)
 
-### Document / PDF (37 tools)
-- pdf-to-image: Convert PDF pages to images
-- merge-pdf: Combine multiple PDFs into one
-- split-pdf: Extract pages or split into parts
-- compress-pdf: Shrink PDF file size
-- rotate-pdf: Rotate pages
-- convert-document: Convert between Word, ODT, RTF, TXT
-- convert-presentation: Convert between PowerPoint and ODP
-- convert-spreadsheet: Convert between Excel, ODS, CSV
-- excel-to-pdf: Convert spreadsheets to PDF
-- word-to-pdf: Convert Word documents to PDF
-- extract-pages: Pull selected pages into a new PDF
-- remove-pages: Delete specific pages
-- organize-pdf: Reorder pages
-- protect-pdf: AES-256 password protection
-- unlock-pdf: Remove password protection
-- repair-pdf: Fix damaged or corrupted PDFs
-- linearize-pdf: Linearize for fast web viewing
-- grayscale-pdf: Convert colors to grayscale
-- pdfa-convert: Convert to archival PDF/A-2
-- crop-pdf: Crop pages with a uniform margin
-- nup-pdf: Place multiple pages per sheet
-- booklet-pdf: Arrange pages for folding into a booklet
-- watermark-pdf: Add a text watermark to every page
-- pdf-page-numbers: Add page numbers
-- flatten-pdf: Bake forms and annotations into page content
-- redact-pdf: Permanently remove text (true redaction)
-- pdf-to-text: Extract plain text
-- pdf-to-word: Convert a PDF to a Word document
-- pdf-metadata: Read and write document metadata
-- powerpoint-to-pdf: Convert presentations to PDF
-- html-to-pdf: Convert an HTML file to PDF
-- markdown-to-docx: Convert Markdown to a Word document
-- markdown-to-html: Convert Markdown to standalone HTML
-- markdown-to-pdf: Convert Markdown to a styled PDF
-- epub-convert: Convert EPUB to PDF/DOCX/HTML/Markdown
-- to-epub: Convert Word/Markdown/HTML/TXT to EPUB
-- ocr-pdf: Extract text from scanned PDFs with AI
-
-### Data (10 tools)
-- chart-maker: Bar, line, and pie charts from CSV/JSON
-- csv-excel: Convert between CSV and Excel
-- csv-json: Convert between CSV and JSON
-- json-xml: Convert between JSON and XML
-- split-csv: Split a CSV by row count
-- merge-csvs: Combine CSVs with matching columns
-- yaml-json: Convert between YAML and JSON
-- xml-to-csv: Extract XML elements into a CSV table
-- create-zip: Bundle files into a ZIP archive
-- extract-zip: Safely extract a ZIP (with bomb protection)
+Background removal (rembg), image upscaling 2x/4x (RealESRGAN), object eraser (LaMa inpainting), OCR for images and PDFs (PaddleOCR, 80+ languages), speech transcription and auto subtitles (faster-whisper), face and PII blur plus face enhancement (MediaPipe), AI colorization, noise removal, red-eye removal, photo restoration, smart crop, content-aware resize, and AI canvas expand (outpainting). Model bundles install on demand.
 
 ## REST API
 
@@ -236,7 +98,7 @@ Batch processing: POST /api/v1/tools/:section/:toolId/batch (multiple files in, 
 ## Tech Stack
 
 Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand
-Backend: Fastify 5; Sharp (images), FFmpeg (video/audio), qpdf and LibreOffice (documents); Drizzle ORM
+Backend: Fastify 5; Sharp (images), FFmpeg (video/audio), qpdf and LibreOffice (documents); Drizzle ORM on PostgreSQL 17; BullMQ on Redis 8 for durable async jobs
 AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, faster-whisper, MediaPipe, LaMa)
 Auth: Session-based with OIDC/SSO support (Google, GitHub, Okta, any OIDC provider)
 Languages: 21 locales with RTL support
@@ -244,10 +106,10 @@ Languages: 21 locales with RTL support
 ## Key Features
 
 - Pipelines: chain tools into reusable workflows, import/export as JSON
-- Batch processing: process hundreds of files at once
+- Batch processing: process hundreds of files at once, ZIP output
 - Image editor: layer-based editor with brushes, shapes, filters, curves
 - OIDC/SSO: Google, GitHub, Okta, or any OpenID Connect provider
-- Role-based access: admin, editor, user roles with 14 granular permissions
+- Role-based access: admin, editor, user roles with 17 granular permissions
 - Custom roles and API key scoping
 
 ## Links

@@ -12,7 +12,7 @@ SnapOtter runs entirely on your own infrastructure. Files are processed locally 
 - [API Reference](https://docs.snapotter.com/api/rest): Full REST API with OpenAPI documentation
 - [Demo](https://demo.snapotter.com): Try SnapOtter without installing
 
-## Image Tools (64 tools)
+## Image Tools
 
 Core: Resize, Crop, Rotate & Flip, Convert (JPEG/PNG/WebP/AVIF/TIFF/GIF/HEIC/RAW), Compress, Optimize for Web, Strip Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator.
 
@@ -30,21 +30,21 @@ Format: SVG to Raster, Image to SVG (vectorize), GIF Tools, GIF/WebP Converter, 
 
 Generators: QR Code Generator, Barcode Generator, Barcode Reader, HTML to Image.
 
-## Video Tools (29 tools)
+## Video Tools
 
 Convert Video (MP4/MOV/WebM), Compress Video, Trim Video, Mute Video, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color Adjust, Video Speed, Reverse Video, Normalize Audio, Stabilize Video, Aspect Pad, Blur Pad, Watermark Video, Merge Videos, Replace Audio, Extract Audio, Video to GIF, GIF to Video, Video to WebP, Video to Frames, Images to Video, Auto Subtitles (AI transcription), Burn Subtitles, Embed Subtitles, Extract Subtitles, Clean Video Metadata.
 
-## Audio Tools (17 tools)
+## Audio Tools
 
 Transcribe Audio (AI speech-to-text), Convert Audio (MP3/WAV/OGG/FLAC/AAC), Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels (mono/stereo), Silence Removal, Noise Reduction (FFT), Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata.
 
-## Document Tools (37 tools)
+## Document Tools
 
 PDF: Merge, Split, Compress, Rotate, Extract Pages, Remove Pages, Organize, Protect (AES-256), Unlock, Repair, Web-Optimize (linearize), Grayscale, PDF/A Convert, Crop, N-up, Booklet, Watermark, Page Numbers, Flatten, Redact, PDF to Text, PDF to Word, PDF to Image, PDF Metadata, PDF OCR (AI).
 
 Conversion: Word to PDF, Excel to PDF, PowerPoint to PDF, HTML to PDF, Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Markdown to Word, Markdown to HTML, Markdown to PDF, Convert EPUB, Convert to EPUB.
 
-## Data & File Tools (10 tools)
+## File Tools
 
 Chart Maker (bar/line/pie from CSV/JSON), CSV to Excel, CSV to JSON, JSON to XML, YAML to JSON, XML to CSV, Split CSV, Merge CSVs, Create ZIP, Extract ZIP.
 
