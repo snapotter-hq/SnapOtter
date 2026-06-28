@@ -5,7 +5,7 @@ import { runMediaTool } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  format: z.enum(["mp4", "mov", "webm"]).default("mp4"),
+  format: z.enum(["mp4", "mov", "webm", "avi", "mkv"]).default("mp4"),
   quality: z.enum(["high", "balanced", "small"]).default("balanced"),
 });
 
@@ -19,6 +19,8 @@ const CONTENT_TYPES: Record<string, string> = {
   mp4: "video/mp4",
   mov: "video/quicktime",
   webm: "video/webm",
+  avi: "video/x-msvideo",
+  mkv: "video/x-matroska",
 };
 
 export function registerConvertVideo(app: FastifyInstance) {
@@ -48,6 +50,45 @@ export function registerConvertVideo(app: FastifyInstance) {
             out,
           ];
         }
+        if (settings.format === "avi") {
+          return [
+            "-i",
+            inPath,
+            "-c:v",
+            resolveEncoder("h264"),
+            "-crf",
+            CRF[settings.quality].h264,
+            "-preset",
+            "medium",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "192k",
+            out,
+          ];
+        }
+        if (settings.format === "mkv") {
+          return [
+            "-i",
+            inPath,
+            "-c:v",
+            resolveEncoder("h264"),
+            "-crf",
+            CRF[settings.quality].h264,
+            "-preset",
+            "medium",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            resolveEncoder("aac"),
+            "-b:a",
+            "128k",
+            out,
+          ];
+        }
+        // mp4 and mov
         return [
           "-i",
           inPath,

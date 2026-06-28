@@ -4,13 +4,14 @@ import { runMediaTool } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  format: z.enum(["mp3", "wav", "m4a"]).default("mp3"),
+  format: z.enum(["mp3", "wav", "m4a", "ogg"]).default("mp3"),
 });
 
 const CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   m4a: "audio/mp4",
+  ogg: "audio/ogg",
 };
 
 export function registerExtractAudio(app: FastifyInstance) {
@@ -33,6 +34,8 @@ export function registerExtractAudio(app: FastifyInstance) {
             return ["-i", inPath, "-vn", "-c:a", "pcm_s16le", out];
           case "m4a":
             return ["-i", inPath, "-vn", "-c:a", "aac", "-b:a", "192k", out];
+          case "ogg":
+            return ["-i", inPath, "-vn", "-c:a", "libvorbis", "-q:a", "5", out];
           default:
             return ["-i", inPath, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", out];
         }
