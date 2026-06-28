@@ -131,6 +131,7 @@ export default defineConfig({
       "@snapotter/media-engine": path.resolve(__dirname, "packages/media-engine/src/index.ts"),
       "@snapotter/doc-engine": path.resolve(__dirname, "packages/doc-engine/src/index.ts"),
       "@snapotter/shared/i18n": path.resolve(__dirname, "packages/shared/src/i18n"),
+      "@snapotter/shared/search": path.resolve(__dirname, "packages/shared/src/search"),
       "@snapotter/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
       fastify: path.join(apiNodeModules, "fastify"),
       "@fastify/cookie": path.join(apiNodeModules, "@fastify/cookie"),

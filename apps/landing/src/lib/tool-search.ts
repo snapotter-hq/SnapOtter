@@ -1,4 +1,4 @@
-import { normalizeSearchQuery } from "@snapotter/shared";
+import { normalizeSearchQuery } from "@snapotter/shared/search/format-aliases.js";
 
 /** Bounded Levenshtein: returns edit distance, short-circuiting above `max`. */
 function editDistance(a: string, b: string, max: number): number {
