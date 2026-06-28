@@ -5,7 +5,13 @@
  * Adding a new tool means adding one entry here instead of editing a 750-line file.
  */
 
-import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "@snapotter/shared";
+import {
+  AUDIO_INPUTS,
+  CONVERSION_PRESETS,
+  IMAGE_INPUTS,
+  SUBTITLE_INPUTS,
+  VIDEO_INPUTS,
+} from "@snapotter/shared";
 import type React from "react";
 import { lazy } from "react";
 import type { Crop } from "react-image-crop";
@@ -868,6 +874,13 @@ const VignetteSettings = lazy(() =>
   })),
 );
 
+// One settings component shared by every conversion preset (jpg-to-png, etc.).
+const ConversionPresetSettings = lazy(() =>
+  import("@/components/tools/conversion-preset-settings").then((m) => ({
+    default: m.ConversionPresetSettings,
+  })),
+);
+
 // ── Color tool wrapper ─────────────────────────────────────────────
 // Color tools share a single component but differ by toolId.
 
@@ -1119,8 +1132,20 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];
 
+// Conversion presets all share ConversionPresetSettings; each narrows the
+// file picker to its own source inputs. Generated from shared metadata so the
+// list stays in lockstep with the catalog.
+const PRESET_ENTRIES: ReadonlyArray<[string, RegistryEntryConfig]> = CONVERSION_PRESETS.map(
+  (p) => [p.id, { accept: p.sourceInputs.join(","), Settings: ConversionPresetSettings }] as const,
+);
+
+const ALL_ENTRIES: ReadonlyArray<[string, RegistryEntryConfig]> = [
+  ...ENTRY_CONFIG,
+  ...PRESET_ENTRIES,
+];
+
 export const toolRegistry = new Map<string, ToolRegistryEntry>(
-  ENTRY_CONFIG.map(([toolId, entry]) => {
+  ALL_ENTRIES.map(([toolId, entry]) => {
     const displayMode = TOOL_DISPLAY_MODES[toolId];
     if (!displayMode) {
       throw new Error(`Tool "${toolId}" has no display mode in tool-display-modes.ts`);

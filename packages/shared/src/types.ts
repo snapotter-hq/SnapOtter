@@ -9,6 +9,8 @@ export interface Tool {
   route: string;
   modality: Modality;
   acceptedInputs: string[];
+  /** Optional search aliases/variants (e.g. "jpeg to png", "jpg2png"). Indexed by app + landing search. */
+  keywords?: string[];
   /** Modality of this tool's output, when it differs from `modality`. Defaults to `modality`. */
   outputModality?: Modality;
   executionHint: "fast" | "long";

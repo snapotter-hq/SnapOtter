@@ -5,8 +5,14 @@ import { runMediaTool } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  format: z.enum(["mp4", "webm"]).default("mp4"),
+  format: z.enum(["mp4", "webm", "mov"]).default("mp4"),
 });
+
+const CONTENT_TYPES: Record<string, string> = {
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+};
 
 export function registerGifToVideo(app: FastifyInstance) {
   createToolRoute(app, {
@@ -19,7 +25,7 @@ export function registerGifToVideo(app: FastifyInstance) {
       const settings = settingsSchema.parse(ctx.settings);
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}.${settings.format}`;
-      const contentType = settings.format === "mp4" ? "video/mp4" : "video/webm";
+      const contentType = CONTENT_TYPES[settings.format];
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
         if (settings.format === "webm") {

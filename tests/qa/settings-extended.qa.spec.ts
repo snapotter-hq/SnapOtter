@@ -127,7 +127,7 @@ test.afterAll(async () => {
     `- **Semantic verification**: ${semTools.length} tools`,
     `- **Valid-output-only**: ${voTools.length} tools`,
     `- **Original file (settings.qa.spec.ts)**: 33 tools`,
-    `- **Running total**: ${33 + Object.keys(coverage).length} of 157 tools`,
+    `- **Running total**: ${33 + Object.keys(coverage).length} of 240 tools`,
     "",
   ];
 

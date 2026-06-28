@@ -1,3 +1,4 @@
+import { expandConversionPresets } from "./conversion-presets.js";
 import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./modality.js";
 import { toolSection } from "./section.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
@@ -34,7 +35,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "archives", name: "Archives", icon: "FolderArchive", color: "#6366F1" },
 ];
 
-export const TOOLS: Tool[] = [
+const BASE_TOOLS: Tool[] = [
   // Essentials
   {
     id: "resize",
@@ -78,6 +79,14 @@ export const TOOLS: Tool[] = [
     route: "/convert",
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
+    keywords: [
+      "image converter",
+      "jpg to png",
+      "png to jpg",
+      "heic to jpg",
+      "webp to png",
+      "convert image format",
+    ],
     executionHint: "fast",
   },
   {
@@ -241,7 +250,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: "ocr",
-    name: "OCR / Text Extraction",
+    name: "Extract Text from Image (OCR)",
     description: "Extract text from images",
     category: "doc-convert",
     icon: "ScanText",
@@ -809,6 +818,7 @@ export const TOOLS: Tool[] = [
     route: "/convert-video",
     modality: "video",
     acceptedInputs: VIDEO_INPUTS,
+    keywords: ["video converter", "mov to mp4", "mkv to mp4", "avi to mp4", "webm to mp4"],
     executionHint: "long",
   },
   {
@@ -1111,6 +1121,7 @@ export const TOOLS: Tool[] = [
     route: "/convert-audio",
     modality: "audio",
     acceptedInputs: AUDIO_INPUTS,
+    keywords: ["audio converter", "m4a to mp3", "aac to mp3", "wav to mp3", "ogg to mp3"],
     executionHint: "fast",
   },
   {
@@ -1368,6 +1379,7 @@ export const TOOLS: Tool[] = [
     route: "/convert-spreadsheet",
     modality: "document",
     acceptedInputs: [".xlsx", ".xls", ".ods", ".csv"],
+    keywords: ["excel to csv", "xlsx to csv", "spreadsheet converter"],
     executionHint: "long",
   },
   {
@@ -1797,6 +1809,8 @@ export const TOOLS: Tool[] = [
     executionHint: "fast",
   },
 ];
+
+export const TOOLS: Tool[] = [...BASE_TOOLS, ...expandConversionPresets(BASE_TOOLS)];
 
 for (const tool of TOOLS) {
   const slug = `/${toolSection(tool)}`;

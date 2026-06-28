@@ -90,7 +90,7 @@ export default defineConfig({
       // functions 86.5 over unit+integration. Raise when coverage rises;
       // never lower without a written reason.
       // 2026-06-24: re-baselined branches 81 -> 80 and functions 84 -> 83.
-      // The 2.0 surface growth (157 tools) plus the analytics-system removal
+      // The 2.0 surface growth (240 tools) plus the analytics-system removal
       // (#336 deleted tested code) settled the all-tests-passing measurement at
       // branches 80.97 / functions 83.36, just under the old ratchet. Per-tool
       // integration tests still cover the critical paths.
@@ -131,6 +131,7 @@ export default defineConfig({
       "@snapotter/media-engine": path.resolve(__dirname, "packages/media-engine/src/index.ts"),
       "@snapotter/doc-engine": path.resolve(__dirname, "packages/doc-engine/src/index.ts"),
       "@snapotter/shared/i18n": path.resolve(__dirname, "packages/shared/src/i18n"),
+      "@snapotter/shared/search": path.resolve(__dirname, "packages/shared/src/search"),
       "@snapotter/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
       fastify: path.join(apiNodeModules, "fastify"),
       "@fastify/cookie": path.join(apiNodeModules, "@fastify/cookie"),
@@ -167,6 +168,7 @@ export default defineConfig({
       "react-dom": path.join(webNodeModules, "react-dom"),
       "react-router-dom": path.join(webNodeModules, "react-router-dom"),
       zustand: path.join(webNodeModules, "zustand"),
+      "fuse.js": path.join(webNodeModules, "fuse.js"),
       "posthog-js": path.join(webNodeModules, "posthog-js"),
       "@sentry/react": path.join(webNodeModules, "@sentry/react"),
       "@opentelemetry/api": path.join(apiNodeModules, "@opentelemetry/api"),

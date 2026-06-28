@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { apiToolPath } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -16,6 +17,12 @@ import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize
 import { updateJobProgress } from "../progress.js";
 
 const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
+
+/** Case-insensitive check that a filename ends with one of the accepted extensions. */
+function matchesAccept(filename: string, accept: string[]): boolean {
+  const lower = filename.toLowerCase();
+  return accept.some((ext) => lower.endsWith(ext.toLowerCase()));
+}
 
 const settingsSchema = z.object({
   width: z.number().min(1).max(65536).optional(),
@@ -103,9 +110,14 @@ async function convertSvg(
  * SVG to raster conversion.
  * Custom route since input is SVG (not validated as image by magic bytes).
  */
-export function registerSvgToRaster(app: FastifyInstance) {
+export function registerSvgToRasterRoute(
+  app: FastifyInstance,
+  opts: { toolId: string; accept?: string[]; lockedFormat?: string },
+) {
+  const basePath = apiToolPath(opts.toolId);
+
   // --- Batch endpoint (registered first for route priority) ---
-  app.post("/api/v1/tools/image/svg-to-raster/batch", async (request, reply) => {
+  app.post(`${basePath}/batch`, async (request, reply) => {
     const files: ParsedSvgFile[] = [];
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
@@ -151,6 +163,16 @@ export function registerSvgToRaster(app: FastifyInstance) {
       });
     }
 
+    if (opts.accept) {
+      const accept = opts.accept;
+      const invalid = files.find((file) => !matchesAccept(file.filename, accept));
+      if (invalid) {
+        return reply.status(400).send({
+          error: "File is not a valid SVG. This tool only accepts SVG files.",
+        });
+      }
+    }
+
     let settings: z.infer<typeof settingsSchema>;
     try {
       const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
@@ -164,6 +186,10 @@ export function registerSvgToRaster(app: FastifyInstance) {
       settings = result.data;
     } catch {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    if (opts.lockedFormat) {
+      settings.outputFormat = opts.lockedFormat as typeof settings.outputFormat;
     }
 
     const jobId = clientJobId || randomUUID();
@@ -347,9 +373,10 @@ export function registerSvgToRaster(app: FastifyInstance) {
   });
 
   // --- Single-file endpoint ---
-  app.post("/api/v1/tools/image/svg-to-raster", async (request, reply) => {
+  app.post(basePath, async (request, reply) => {
     let fileBuffer: Buffer | null = null;
     let filename = "output";
+    let uploadFilename = "output";
     let settingsRaw: string | null = null;
 
     try {
@@ -361,7 +388,8 @@ export function registerSvgToRaster(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "output").replace(/\.svgz?$/i, "");
+          uploadFilename = sanitizeFilename(part.filename ?? "output");
+          filename = uploadFilename.replace(/\.svgz?$/i, "");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }
@@ -375,6 +403,12 @@ export function registerSvgToRaster(app: FastifyInstance) {
 
     if (!fileBuffer || fileBuffer.length === 0) {
       return reply.status(400).send({ error: "No SVG file provided" });
+    }
+
+    if (opts.accept && !matchesAccept(uploadFilename, opts.accept)) {
+      return reply.status(400).send({
+        error: "File is not a valid SVG. This tool only accepts SVG files.",
+      });
     }
 
     try {
@@ -411,6 +445,10 @@ export function registerSvgToRaster(app: FastifyInstance) {
       settings = result.data;
     } catch {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    if (opts.lockedFormat) {
+      settings.outputFormat = opts.lockedFormat as typeof settings.outputFormat;
     }
 
     try {
@@ -452,4 +490,24 @@ export function registerSvgToRaster(app: FastifyInstance) {
       });
     }
   });
+}
+
+/**
+ * SVG to raster conversion.
+ * Custom route since input is SVG (not validated as image by magic bytes).
+ */
+export function registerSvgToRaster(app: FastifyInstance) {
+  registerSvgToRasterRoute(app, { toolId: "svg-to-raster" });
+}
+
+/**
+ * Register an "SVG to <format>" conversion preset that reuses the svg-to-raster
+ * route logic with the output format locked and inputs narrowed to SVG.
+ */
+export function registerSvgToRasterPreset(
+  app: FastifyInstance,
+  toolId: string,
+  lockedFormat: string,
+) {
+  registerSvgToRasterRoute(app, { toolId, lockedFormat, accept: [".svg", ".svgz"] });
 }

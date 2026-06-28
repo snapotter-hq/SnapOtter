@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./i18n/*": "./src/i18n/*"
+    "./i18n/*": "./src/i18n/*",
+    "./search/*": "./src/search/*"
   },
   "scripts": {
     "lint": "biome check src/",

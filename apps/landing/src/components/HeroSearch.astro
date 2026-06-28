@@ -53,6 +53,7 @@ function renderIcon(iconName: string): string {
             data-name={tool.name.toLowerCase()}
             data-desc={tool.description.toLowerCase()}
             data-mod={(mod?.label || "").toLowerCase()}
+            data-keywords={(tool.keywords ?? []).join(" ")}
             hidden
           >
             <a
@@ -88,63 +89,59 @@ function renderIcon(iconName: string): string {
   </div>
 </div>
 
-<script is:inline>
-  (function () {
-    var input = document.getElementById("hero-tool-search");
-    var box = document.getElementById("hero-search-results");
-    var empty = document.getElementById("hero-search-empty");
-    var items = Array.prototype.slice.call(
-      document.querySelectorAll("#hero-search-list .hero-result"),
-    );
-    var MAX = 7;
-    var firstHref = null;
+<script>
+  import { matchTool } from "../lib/tool-search";
 
-    function close() {
+  const input = document.getElementById("hero-tool-search") as HTMLInputElement | null;
+  const box = document.getElementById("hero-search-results");
+  const empty = document.getElementById("hero-search-empty");
+  const items = Array.from(
+    document.querySelectorAll<HTMLLIElement>("#hero-search-list .hero-result"),
+  );
+  const MAX = 7;
+  let firstHref: string | null = null;
+
+  if (input && box && empty) {
+    const close = () => {
       box.classList.add("hidden");
       input.setAttribute("aria-expanded", "false");
-    }
+    };
 
-    function open() {
+    const open = () => {
       box.classList.remove("hidden");
       input.setAttribute("aria-expanded", "true");
-    }
+    };
 
-    function run() {
-      var q = input.value.toLowerCase().trim();
+    const run = () => {
+      const q = input.value.trim();
       if (!q) {
         close();
         return;
       }
-      var tokens = q.split(/\s+/);
-      var shown = 0;
+      let shown = 0;
       firstHref = null;
-      items.forEach(function (li) {
-        var hay =
-          (li.getAttribute("data-name") || "") +
-          " " +
-          (li.getAttribute("data-desc") || "") +
-          " " +
-          (li.getAttribute("data-mod") || "");
-        var hit = tokens.every(function (t) {
-          return hay.indexOf(t) !== -1;
-        });
+      for (const li of items) {
+        const hay =
+          `${li.getAttribute("data-name") || ""} ${li.getAttribute("data-desc") || ""} ` +
+          `${li.getAttribute("data-mod") || ""} ${li.getAttribute("data-keywords") || ""}`;
+        const hit = matchTool(q, hay);
         if (hit && shown < MAX) {
           li.hidden = false;
           shown++;
-          if (!firstHref) firstHref = li.querySelector("a").getAttribute("href");
+          if (!firstHref) firstHref = li.querySelector("a")?.getAttribute("href") ?? null;
         } else {
           li.hidden = true;
         }
-      });
+      }
       empty.classList.toggle("hidden", shown !== 0);
       open();
-    }
+    };
 
     input.addEventListener("input", run);
-    input.addEventListener("focus", function () {
+    input.addEventListener("focus", () => {
       if (input.value.trim()) run();
     });
-    input.addEventListener("keydown", function (e) {
+    input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && firstHref) {
         window.location.href = firstHref;
       } else if (e.key === "Escape") {
@@ -152,8 +149,8 @@ function renderIcon(iconName: string): string {
         input.blur();
       }
     });
-    document.addEventListener("click", function (e) {
-      if (!box.contains(e.target) && e.target !== input) close();
+    document.addEventListener("click", (e) => {
+      if (!box.contains(e.target as Node) && e.target !== input) close();
     });
-  })();
+  }
 </script>
