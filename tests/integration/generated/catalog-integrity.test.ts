@@ -54,6 +54,21 @@ const REGISTRY_EXEMPT = new Set([
   "svg-to-raster",
   "transcribe-audio",
   "watermark-image",
+  // Conversion presets riding the three custom ZIP routes above (image-to-pdf,
+  // pdf-to-image, svg-to-raster). They share those routes' contracts, so like
+  // their bases they are not in the process-fn registry.
+  "jpg-to-pdf",
+  "png-to-pdf",
+  "heic-to-pdf",
+  "tiff-to-pdf",
+  "webp-to-pdf",
+  "gif-to-pdf",
+  "eps-to-pdf",
+  "pdf-to-jpg",
+  "pdf-to-png",
+  "pdf-to-tiff",
+  "svg-to-png",
+  "svg-to-jpg",
 ]);
 
 describe("catalog integrity launch gate", () => {

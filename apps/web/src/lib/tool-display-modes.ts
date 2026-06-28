@@ -6,6 +6,8 @@
  * truth for display modes; tool-registry.tsx merges it into registry entries.
  */
 
+import { BASE_CONFIG, CONVERSION_PRESETS } from "@snapotter/shared";
+
 export type DisplayMode =
   | "side-by-side"
   | "before-after"
@@ -204,6 +206,14 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "create-zip": "no-comparison",
   "extract-zip": "no-comparison",
 };
+
+// Each conversion preset mirrors the display mode of its base tool (e.g.
+// jpg-to-png follows "convert"). Generated here so the 83 presets never drift
+// from the static map above. Every displayBase is one of the keys defined
+// statically, so the lookup always resolves.
+for (const preset of CONVERSION_PRESETS) {
+  TOOL_DISPLAY_MODES[preset.id] = TOOL_DISPLAY_MODES[BASE_CONFIG[preset.base].displayBase];
+}
 
 /**
  * Tools whose selected files all post in ONE request as repeated "file" parts.
