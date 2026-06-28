@@ -220,9 +220,10 @@ describe("analytics lib (baked model)", () => {
       expect(result.breadcrumbs).toBeUndefined();
       // The exception message is replaced by its type so no free text leaves.
       expect(result.exception.values[0].value).toBe("TypeError");
-      // Stack frames keep only the basename; absolute paths are dropped.
+      // Filesystem paths collapse to the basename (directory and any username
+      // stripped); abs_path is scrubbed the same way rather than dropped.
       expect(result.exception.values[0].stacktrace.frames[0].filename).toBe("file.png");
-      expect(result.exception.values[0].stacktrace.frames[0].abs_path).toBeUndefined();
+      expect(result.exception.values[0].stacktrace.frames[0].abs_path).toBe("photo.jpeg");
     });
 
     it("handles event without user or exception fields", async () => {

@@ -11,6 +11,16 @@ function basename(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+// App bundle frames are http(s) URLs. Keep the host-less pathname so Sentry can
+// match the frame to its uploaded source map, but drop the instance hostname
+// (not anonymous). Filesystem-style paths collapse to the basename so a local
+// path or username can never leave the browser.
+function scrubFramePath(p: string): string {
+  const url = p.match(/^https?:\/\/[^/]+(\/[^?#]*)?/i);
+  if (url) return url[1] ?? "/";
+  return basename(p);
+}
+
 // Only these keys may leave the browser per event, and only as primitives.
 const ALLOWED: Record<string, ReadonlySet<string>> = {
   tool_opened: new Set(["tool_id", "category", "modality"]),
@@ -66,7 +76,8 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
       const Sentry = await import("@sentry/react");
       Sentry.init({
         dsn: config.sentryDsn,
-        release: (await import("@snapotter/shared")).APP_VERSION,
+        release:
+          import.meta.env.VITE_SENTRY_RELEASE || (await import("@snapotter/shared")).APP_VERSION,
         environment: "production",
         tracesSampleRate: config.sampleRate,
         sendDefaultPii: false,
@@ -85,10 +96,19 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
               ex.value = ex.type;
               if (ex.stacktrace?.frames) {
                 for (const frame of ex.stacktrace.frames) {
-                  if (frame.filename) frame.filename = basename(frame.filename);
-                  frame.abs_path = undefined;
+                  if (frame.filename) frame.filename = scrubFramePath(frame.filename);
+                  if (frame.abs_path) frame.abs_path = scrubFramePath(frame.abs_path);
                   frame.vars = undefined;
                 }
+              }
+            }
+          }
+          // Keep debug_meta image paths consistent with the scrubbed frames so
+          // debug-id source-map matching still resolves, minus the hostname.
+          if (event.debug_meta?.images) {
+            for (const img of event.debug_meta.images) {
+              if ("code_file" in img && img.code_file) {
+                img.code_file = scrubFramePath(img.code_file);
               }
             }
           }

@@ -239,6 +239,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             SNAPOTTER_ANALYTICS=on
+            SENTRY_RELEASE=${{ needs.release.outputs.new_version }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=snapotter/snapotter,ghcr.io/snapotter-hq/snapotter",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }}

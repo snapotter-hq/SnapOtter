@@ -17,10 +17,13 @@ if (ANALYTICS_BAKED.sentryDsn) {
   try {
     const Sentry = await import("@sentry/node");
     const { APP_VERSION } = await import("@snapotter/shared");
+    // The Docker build sets SENTRY_RELEASE to the release version so errors
+    // attribute to a build; falls back to APP_VERSION for non-image runs.
+    const release = process.env.SENTRY_RELEASE || APP_VERSION;
 
     Sentry.init({
       dsn: ANALYTICS_BAKED.sentryDsn,
-      release: APP_VERSION,
+      release,
       environment: process.env.NODE_ENV || "production",
       tracesSampleRate: ANALYTICS_BAKED.sampleRate,
       sendDefaultPii: false,
@@ -59,7 +62,7 @@ if (ANALYTICS_BAKED.sentryDsn) {
       },
     });
 
-    console.log("[sentry] initialized, release:", APP_VERSION);
+    console.log("[sentry] initialized, release:", release);
   } catch {
     // @sentry/node not available
   }

@@ -66,8 +66,16 @@ ARG SNAPOTTER_ANALYTICS=on
 COPY scripts/bake-analytics.mjs ./scripts/
 RUN node scripts/bake-analytics.mjs ${SNAPOTTER_ANALYTICS}
 
-# Build only the web frontend (API runs from TS source via tsx)
+# Build only the web frontend (API runs from TS source via tsx). When a
+# SENTRY_AUTH_TOKEN build secret is supplied (the published image build does),
+# the Sentry Vite plugin uploads source maps for SENTRY_RELEASE; without it the
+# plugin is a no-op and no maps are emitted.
+ARG SENTRY_RELEASE=
 RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
+    --mount=type=secret,id=sentry_auth_token,required=false \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+    SENTRY_RELEASE="${SENTRY_RELEASE}" \
+    VITE_SENTRY_RELEASE="${SENTRY_RELEASE}" \
     pnpm --filter @snapotter/web build
 
 # ============================================
@@ -412,6 +420,11 @@ ENV PORT=1349 \
     TRUST_PROXY=true \
     OIDC_ENABLED=false \
     EXTERNAL_URL=
+
+# Sentry release for the API runtime, matching the source maps the web build
+# uploaded. Empty for non-image builds, where the API falls back to APP_VERSION.
+ARG SENTRY_RELEASE=
+ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
 # COOKIE_SECRET is intentionally not baked in: the app auto-generates and persists one
 # on first boot if unset (see apps/api/src/index.ts). Override via runtime env to pin it.

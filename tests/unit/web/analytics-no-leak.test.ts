@@ -154,8 +154,57 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       // Free-text message is replaced by the bare error type; the path cannot leak.
       expect(result.exception.values[0].value).toBe("Error");
       expect(result.exception.values[0].value).not.toContain("photo.jpg");
-      // Stack frame keeps only the basename.
+      // Filesystem-style paths still collapse to the basename (no dir/username leak).
       expect(result.exception.values[0].stacktrace.frames[0].filename).toBe("handler.png");
+    });
+
+    it("Sentry keeps a host-stripped path for app bundle frames so maps symbolicate", async () => {
+      await mod.initAnalytics(enabledConfig);
+      const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
+      const beforeSend = sentryCall?.[0].beforeSend;
+      if (!beforeSend) return;
+
+      const event = {
+        exception: {
+          values: [
+            {
+              type: "TypeError",
+              value: "boom",
+              stacktrace: {
+                frames: [
+                  {
+                    filename: "https://files.acme.example/assets/index-abc123.js",
+                    abs_path: "https://files.acme.example/assets/index-abc123.js",
+                    lineno: 5,
+                    colno: 12,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        debug_meta: {
+          images: [
+            {
+              type: "sourcemap",
+              code_file: "https://files.acme.example/assets/index-abc123.js",
+              debug_id: "11111111-2222-3333-4444-555555555555",
+            },
+          ],
+        },
+      };
+      const result = beforeSend(event);
+      const frame = result.exception.values[0].stacktrace.frames[0];
+      // Host-less path is kept (Sentry needs it to match the uploaded map); the
+      // instance hostname is dropped. Line/column survive for symbolication.
+      expect(frame.filename).toBe("/assets/index-abc123.js");
+      expect(frame.abs_path).toBe("/assets/index-abc123.js");
+      expect(frame.lineno).toBe(5);
+      // debug_meta stays consistent with the frame and keeps the debug id.
+      expect(result.debug_meta.images[0].code_file).toBe("/assets/index-abc123.js");
+      expect(result.debug_meta.images[0].debug_id).toBe("11111111-2222-3333-4444-555555555555");
+      // The instance hostname must not appear anywhere in the serialized event.
+      expect(JSON.stringify(result)).not.toContain("acme.example");
     });
 
     it("Sentry blocks ui.click breadcrumbs", async () => {
