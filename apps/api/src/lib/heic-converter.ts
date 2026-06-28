@@ -52,7 +52,9 @@ async function findDecodeCmd(): Promise<string> {
  */
 export async function decodeHeic(buffer: Buffer): Promise<Buffer> {
   const cmd = await findDecodeCmd();
-  const id = randomUUID();
+  // Include the PID so concurrent processes (and test workers) write to
+  // distinct, attributable temp paths in the shared tmpdir.
+  const id = `${process.pid}-${randomUUID()}`;
   const inputPath = join(tmpdir(), `heic-in-${id}.heic`);
   const outputPath = join(tmpdir(), `heic-out-${id}.png`);
   const suffixedPath = outputPath.replace(/\.png$/, "-1.png");
@@ -101,7 +103,7 @@ export async function ensureSharpCompat(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function encodeHeic(buffer: Buffer, quality = 80): Promise<Buffer> {
-  const id = randomUUID();
+  const id = `${process.pid}-${randomUUID()}`;
   const inputPath = join(tmpdir(), `heic-in-${id}.png`);
   const outputPath = join(tmpdir(), `heic-out-${id}.heic`);
 

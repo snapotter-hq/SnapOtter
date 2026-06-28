@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { HelpDialog } from "../help/help-dialog";
 import { SettingsDialog } from "../settings/settings-dialog";
 import { AiInstallIndicator } from "./ai-install-indicator";
@@ -20,6 +21,16 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
   const isMobile = useMobile();
   const connectionStatus = useConnectionStore((s) => s.status);
   const bannerVisible = connectionStatus !== "connected";
+
+  // Load global settings (disabled tools, experimental flag, default theme) on
+  // every authenticated page, not just the home grid. Without this, navigating
+  // directly to a tool URL leaves disabledTools empty, so an admin-disabled tool
+  // renders normally instead of showing the disabled message. fetch() is a
+  // no-op once loaded, so this is cheap on subsequent navigations.
+  const fetchSettings = useSettingsStore((s) => s.fetch);
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   return (
     <div

@@ -15,7 +15,6 @@ test.describe("GUI Essential Tools", () => {
       await page.goto("/image/resize");
       await expect(page.getByText("Resize").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
-      await expect(page.getByText("Settings").first()).toBeVisible();
     });
 
     test("shows custom size tab with width/height inputs after upload", async ({
@@ -66,13 +65,12 @@ test.describe("GUI Essential Tools", () => {
       await page.getByText("Fit inside").click();
     });
 
-    test("content-aware toggle reveals advanced options", async ({ loggedInPage: page }) => {
+    test("content-aware tab reveals advanced options", async ({ loggedInPage: page }) => {
       await page.goto("/image/resize");
       await uploadTestImage(page);
 
-      // Toggle content-aware switch (label is a sibling span, not aria-label)
-      const toggle = page.locator("button[role='switch'][aria-checked]").first();
-      await toggle.click();
+      // Content-aware is a settings tab (presets / custom / scale / content-aware)
+      await page.getByRole("button", { name: "Content-Aware" }).click();
 
       // Advanced options should appear
       await expect(page.getByText("Resize to square")).toBeVisible();
@@ -292,6 +290,8 @@ test.describe("GUI Essential Tools", () => {
         process.cwd(),
         "tests",
         "fixtures",
+        "image",
+        "edge",
         "test-portrait-extreme.png",
       );
       const fileChooserPromise = page.waitForEvent("filechooser");
@@ -433,12 +433,7 @@ test.describe("GUI Essential Tools", () => {
       await page.getByTestId("rotate-submit").click();
       await waitForProcessing(page);
 
-      await expect(
-        page
-          .getByRole("button", { name: /^download$/i })
-          .or(page.getByRole("link", { name: /download/i }))
-          .first(),
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator("[data-download-button]").first()).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -468,8 +463,9 @@ test.describe("GUI Essential Tools", () => {
 
       const select = page.locator("#convert-target-format");
       const options = select.locator("option");
-      // jpg, png, webp, avif, tiff, gif, heic, heif, jxl, bmp, ico, jp2, qoi
-      await expect(options).toHaveCount(13);
+      // jpg, png, webp, avif, tiff, gif, heic, heif, jxl, bmp, ico, jp2, qoi,
+      // ppm, eps, tga (OUTPUT_FORMATS in convert-settings.tsx)
+      await expect(options).toHaveCount(16);
     });
 
     test("quality slider appears for lossy formats", async ({ loggedInPage: page }) => {
@@ -630,13 +626,13 @@ test.describe("GUI Essential Tools", () => {
     }) => {
       await page.goto("/image/compress");
 
-      const submitBtn = page.getByTestId("compress-submit");
-      await expect(submitBtn).toBeDisabled();
+      // Before upload the settings panel (and its submit) is not rendered yet.
+      await expect(page.getByTestId("compress-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
       // Default mode is Target Size (requires a value), switch to Quality mode
       await page.getByRole("button", { name: "Quality" }).click();
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("compress-submit")).toBeEnabled();
     });
 
     test("processes compression and shows download with size info", async ({
@@ -673,7 +669,7 @@ test.describe("GUI Essential Tools", () => {
       await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
 
       // Click the Undo button in the review panel
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       // Should return to settings panel with upload still present (no dropzone)
       await expect(page.getByTestId("resize-submit")).toBeVisible({ timeout: 5_000 });
@@ -697,7 +693,7 @@ test.describe("GUI Essential Tools", () => {
 
       await expect(page.getByTestId("crop-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("crop-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("crop-download")).not.toBeVisible();
@@ -713,14 +709,9 @@ test.describe("GUI Essential Tools", () => {
       await page.getByTestId("rotate-submit").click();
       await waitForProcessing(page);
 
-      await expect(
-        page
-          .getByRole("button", { name: /^download$/i })
-          .or(page.getByRole("link", { name: /download/i }))
-          .first(),
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator("[data-download-button]").first()).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("rotate-submit")).toBeVisible({ timeout: 5_000 });
     });
@@ -737,7 +728,7 @@ test.describe("GUI Essential Tools", () => {
 
       await expect(page.getByTestId("convert-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("convert-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("convert-download")).not.toBeVisible();
@@ -756,7 +747,7 @@ test.describe("GUI Essential Tools", () => {
 
       await expect(page.getByTestId("compress-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("compress-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("compress-download")).not.toBeVisible();

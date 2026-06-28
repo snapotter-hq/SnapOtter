@@ -22,7 +22,7 @@ const modalities = [
   { label: "Video", count: 29, href: "/tools/convert-video" },
   { label: "Audio", count: 17, href: "/tools/convert-audio" },
   { label: "PDF", count: 37, href: "/tools/merge-pdf" },
-  { label: "Data", count: 10, href: "/tools/chart-maker" },
+  { label: "Files", count: 10, href: "/tools/chart-maker" },
 ];
 const shared = [
   { label: "REST API", sub: "Keys, endpoints & OpenAPI", href: "/api/rest" },
@@ -45,8 +45,8 @@ function copyCommand() {
       <p class="eyebrow">Self-hosted · Open source · AGPLv3</p>
       <h1 class="hero-title">SnapOtter Documentation</h1>
       <p class="hero-sub">
-        <strong>240 tools</strong> for image, video, audio, PDF &amp; data, running entirely on your
-        hardware. Choose your path below, or get running in one command:
+        <strong>Self-hosted file processing.</strong> 240 tools across image, video, audio, PDF &amp;
+        files, all on your own hardware. Choose your path below, or get running in one command:
       </p>
       <div class="cmd" title="Click to copy" @click="copyCommand">
         <code>$ {{ command }}</code>

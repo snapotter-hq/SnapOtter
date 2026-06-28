@@ -238,14 +238,15 @@ test.describe("GUI Metadata Tools", () => {
       await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
     });
 
-    test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
+    test("submit absent without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/info");
 
-      const submitBtn = page.getByTestId("info-submit");
-      await expect(submitBtn).toBeDisabled();
+      // The settings panel (and its submit button) only mounts after a file is
+      // added. Before upload the page shows just the dropzone.
+      await expect(page.getByTestId("info-submit")).toHaveCount(0);
 
       await uploadTestImage(page);
-      await expect(submitBtn).toBeEnabled();
+      await expect(page.getByTestId("info-submit")).toBeEnabled();
     });
   });
 
@@ -264,7 +265,7 @@ test.describe("GUI Metadata Tools", () => {
 
       await expect(page.getByTestId("strip-metadata-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("strip-metadata-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("strip-metadata-download")).not.toBeVisible();
@@ -283,7 +284,7 @@ test.describe("GUI Metadata Tools", () => {
 
       await expect(page.getByTestId("edit-metadata-download")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole("button", { name: /undo/i }).click();
+      await page.getByRole("button", { name: /adjust settings/i }).click();
 
       await expect(page.getByTestId("edit-metadata-submit")).toBeVisible({ timeout: 5_000 });
       await expect(page.getByTestId("edit-metadata-download")).not.toBeVisible();

@@ -18,7 +18,14 @@
   <a href="https://github.com/sponsors/snapotter-hq"><img src="https://img.shields.io/badge/Sponsor-pink?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
+<p align="center">
+  <strong>Self-hosted file toolkit. 157 tools across image, video, audio, PDF, and files.</strong><br />
+  The open-source alternative to Smallpdf, iLovePDF, TinyPNG, CloudConvert, and Otter.ai, in one stack you host yourself.
+</p>
+
 ![SnapOtter - Dashboard](branding/dashboard.gif)
+
+Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all five, and your files never leave your server. Edit images, convert video, transcribe audio, repair PDFs, batch your files: one Docker stack, on hardware you own.
 
 ## Key Features
 

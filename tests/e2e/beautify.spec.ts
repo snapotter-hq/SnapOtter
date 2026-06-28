@@ -21,6 +21,9 @@ test.describe("Beautify Screenshot", () => {
 
   test("shows preset cards", async ({ loggedInPage: page }) => {
     await page.goto("/image/beautify");
+    // BeautifyControls (live-preview) mounts only after a file is uploaded.
+    await uploadTestImage(page);
+    await page.waitForTimeout(1000);
 
     // Quick Presets section is open by default
     await expect(page.getByText("Quick Presets").first()).toBeVisible();
@@ -31,6 +34,9 @@ test.describe("Beautify Screenshot", () => {
 
   test("shows background, frame, spacing, and shadow sections", async ({ loggedInPage: page }) => {
     await page.goto("/image/beautify");
+    // BeautifyControls (live-preview) mounts only after a file is uploaded.
+    await uploadTestImage(page);
+    await page.waitForTimeout(1000);
 
     await expect(page.getByText("Background").first()).toBeVisible();
     await expect(page.getByText("Device Frame").first()).toBeVisible();

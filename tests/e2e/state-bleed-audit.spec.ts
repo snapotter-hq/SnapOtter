@@ -58,12 +58,9 @@ test.describe("State bleed between tools", () => {
     await page.getByTestId("rotate-submit").click();
     await waitForProcessing(page);
 
-    await expect(
-      page
-        .getByRole("button", { name: /^download$/i })
-        .or(page.getByRole("link", { name: /download/i }))
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-download-button]").first()).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Navigate to resize
     await page.goto("/image/resize");
@@ -81,6 +78,8 @@ test.describe("State bleed between tools", () => {
     // Process an image in compress
     await page.goto("/image/compress");
     await uploadTestImage(page);
+    // Compress defaults to Target Size mode (needs a value); switch to Quality.
+    await page.getByRole("button", { name: "Quality" }).click();
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
 
@@ -167,8 +166,8 @@ test.describe("State bleed between tools", () => {
     await expect(thumbnails).toHaveCount(0);
   });
 
-  // ── Sidebar navigation (not just goto) ───────────────────────────────
-  test("sidebar navigation clears processed state", async ({ loggedInPage: page }) => {
+  // ── Top-nav navigation (not just goto) ───────────────────────────────
+  test("top-nav navigation clears processed state", async ({ loggedInPage: page }) => {
     // Process an image in resize
     await page.goto("/image/resize");
     await uploadTestImage(page);
@@ -181,13 +180,17 @@ test.describe("State bleed between tools", () => {
       timeout: 15_000,
     });
 
-    // Navigate home via sidebar
-    await page.locator("aside").getByText("Tools").click();
+    // 2.0 removed the sidebar. Navigate home via the top-nav "Tools" breadcrumb link.
+    await page.locator("header").getByRole("link", { name: "Tools", exact: true }).click();
     await expect(page).toHaveURL("/");
 
-    // Home page should show clean dropzone, not stale resize results
-    await expect(page.getByText("Upload from computer")).toBeVisible({ timeout: 5_000 });
+    // Home is now a tool catalog (search + modality tabs), not a dropzone. The
+    // catalog should render and no stale resize results should bleed through.
+    await expect(page.locator("[data-search-input]")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
+
+    const blobImages = page.locator("img[src^='blob:']");
+    await expect(blobImages).toHaveCount(0);
   });
 
   // ── Rapid navigation: process -> navigate -> navigate again ──────────
@@ -226,6 +229,8 @@ test.describe("State bleed between tools", () => {
     // Process in compress (shows size comparison after processing)
     await page.goto("/image/compress");
     await uploadTestImage(page);
+    // Compress defaults to Target Size mode (needs a value); switch to Quality.
+    await page.getByRole("button", { name: "Quality" }).click();
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
 

@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { getTestImagePath, openSettings, test, waitForProcessing } from "./helpers";
+import { getTestImagePath, test, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Cross-browser smoke tests -- critical flows validated across browsers.
@@ -24,6 +24,11 @@ function collectConsoleErrors(page: Page): string[] {
     if (msg.type() === "error") {
       const text = msg.text();
       if (text.includes("favicon") || text.includes("analytics")) return;
+      // WebKit reports failed network responses (e.g. the expected 401 from
+      // /api/auth/me on unauthenticated pages, or a deliberately wrong login)
+      // as console errors, unlike Chromium/Firefox. That is browser noise, not
+      // an app error, so ignore resource-load failures.
+      if (text.includes("Failed to load resource")) return;
       errors.push(text);
     }
   });
@@ -61,22 +66,19 @@ test.describe("Cross-browser smoke tests", () => {
 
     await uploadImage(page);
 
-    // Verify settings panel appeared after upload
-    await expect(page.getByText("Settings").first()).toBeVisible();
-
-    // Check that width/height inputs are present and interactable
-    const widthInput = page.locator("input[type='number']").first();
+    // The resize settings panel mounts after upload; assert the real width input.
+    const widthInput = page.locator("#resize-width");
     await expect(widthInput).toBeVisible();
     await widthInput.fill("200");
 
+    // Resize requires an explicit submit; it does not auto-process on input.
+    await page.locator("[data-testid='resize-submit']").click();
+
     await waitForProcessing(page);
 
-    // Verify a download button or link is available after processing
-    const downloadBtn = page.getByRole("button", { name: /download/i }).first();
-    const downloadLink = page.getByRole("link", { name: /download/i }).first();
-    const hasDownloadBtn = await downloadBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    const hasDownloadLink = await downloadLink.isVisible({ timeout: 2000 }).catch(() => false);
-    expect(hasDownloadBtn || hasDownloadLink).toBe(true);
+    // After processing a download affordance appears (tool link or ReviewPanel button).
+    const download = page.locator("[data-download-button], a[data-testid$='-download']").first();
+    await expect(download).toBeVisible({ timeout: 10_000 });
 
     expect(errors).toHaveLength(0);
   });
@@ -169,7 +171,10 @@ test.describe("Cross-browser smoke tests", () => {
     const errors = collectConsoleErrors(page);
     await page.waitForLoadState("networkidle");
 
-    await openSettings(page);
+    // Settings moved into the top-nav avatar dropdown (the sidebar was removed in 2.0).
+    await page.getByRole("button", { name: "admin", exact: true }).click();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
 
     await page.getByRole("button", { name: "About" }).click();
     await page.waitForTimeout(300);
@@ -194,7 +199,7 @@ test.describe("Cross-browser smoke tests", () => {
       document.documentElement.classList.contains("dark"),
     );
 
-    const themeBtn = page.locator("button[title='Toggle Theme']");
+    const themeBtn = page.locator("button[title='Toggle theme']");
     await expect(themeBtn).toBeVisible({ timeout: 10_000 });
     await themeBtn.click();
     await page.waitForTimeout(300);
@@ -238,8 +243,8 @@ test.describe("Cross-browser smoke tests", () => {
     await compressBtn.click();
     await page.waitForTimeout(300);
 
-    // Verify both steps are visible in the pipeline
-    const steps = page.locator("[class*='step'], [class*='pipeline-step']");
+    // Each pipeline step renders a "Remove" button; count those.
+    const steps = page.locator("button[title='Remove']");
     const stepCount = await steps.count();
     expect(stepCount).toBeGreaterThanOrEqual(2);
 
@@ -533,30 +538,9 @@ test.describe("Cross-browser smoke tests", () => {
     expect(errors).toHaveLength(0);
   });
 
-  // ---- Fullscreen grid page rendering ----
-  test("fullscreen grid: toggle details across browsers", async ({ loggedInPage: page }) => {
-    const errors = collectConsoleErrors(page);
-
-    await page.goto("/fullscreen");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(500);
-
-    // Verify details toggle works
-    await expect(page.getByText("Hide Details")).toBeVisible();
-
-    await page.getByText("Hide Details").click();
-    await page.waitForTimeout(300);
-
-    await expect(page.getByText("Show Details")).toBeVisible();
-
-    // Toggle back
-    await page.getByText("Show Details").click();
-    await page.waitForTimeout(300);
-
-    await expect(page.getByText("Hide Details")).toBeVisible();
-
-    expect(errors).toHaveLength(0);
-  });
+  // The standalone /fullscreen grid page and its Hide/Show Details toggle were
+  // removed in the 2.0 redesign (the home page is now a tabbed catalog), so the
+  // cross-browser test for it was dropped.
 
   // ---- QR generate tool (no-dropzone mode) ----
   test("qr-generate: enter text and verify preview renders", async ({ loggedInPage: page }) => {
@@ -566,8 +550,9 @@ test.describe("Cross-browser smoke tests", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    // Enter text to generate a QR code
-    const textInput = page.locator("input[type='text'], textarea").first();
+    // Enter text to generate a QR code. The default content tab is URL, so target
+    // its input directly (the generic text/textarea inputs live in collapsed sections).
+    const textInput = page.getByTestId("qr-input-url");
     await textInput.fill("https://snapotter.com");
     await page.waitForTimeout(1000);
 
@@ -629,12 +614,12 @@ test.describe("Cross-browser smoke tests", () => {
     await convertBtn.click();
     await page.waitForTimeout(300);
 
-    // Verify 3 steps were added
-    const steps = page.locator("[class*='step'], [class*='pipeline-step']");
+    // Verify 3 steps were added (each step renders a "Remove" button).
+    const steps = page.locator("button[title='Remove']");
     expect(await steps.count()).toBeGreaterThanOrEqual(3);
 
-    // Remove one step if a remove/delete button exists
-    const removeBtn = page.getByRole("button", { name: /remove|delete|close/i }).first();
+    // Remove one step
+    const removeBtn = steps.first();
     const hasRemove = await removeBtn.isVisible({ timeout: 2000 }).catch(() => false);
     if (hasRemove) {
       await removeBtn.click();

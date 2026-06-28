@@ -165,7 +165,10 @@ test.describe("GUI Settings - People Tab", () => {
 
       // User should appear in the table with editor role
       await expect(page.getByText(username)).toBeVisible({ timeout: 5_000 });
-      await expect(page.getByText("EDITOR")).toBeVisible();
+      // Scope to the created user's row: the username itself contains "editor" and
+      // the role badge renders the lowercase role text (CSS uppercases it visually).
+      const userRow = page.locator("div.px-4.py-3").filter({ hasText: username });
+      await expect(userRow.locator("span.uppercase")).toHaveText("editor");
     } finally {
       adminToken = await getAdminToken();
       await cleanupUsersByPrefix(adminToken, "guieditor-");
@@ -603,8 +606,8 @@ test.describe("GUI Settings - Teams Tab", () => {
     // The Members column header should be visible
     await expect(page.getByText("Members").first()).toBeVisible();
 
-    // The Default team should show a numeric member count
-    const defaultRow = page.locator("div").filter({ hasText: "Default" }).last();
+    // The Default team should show a numeric member count in its row
+    const defaultRow = page.locator("div.px-4.py-3").filter({ hasText: "Default" }).first();
     const memberCountText = await defaultRow
       .locator("span.text-sm.text-muted-foreground")
       .textContent();
@@ -685,11 +688,13 @@ test.describe("GUI Settings - Roles Tab", () => {
     await expect(page.getByText("New Role")).toBeVisible();
     await expect(page.getByPlaceholder("Role name")).toBeVisible();
     await expect(page.getByPlaceholder("Description (optional)")).toBeVisible();
-    await expect(page.getByText("Permissions")).toBeVisible();
+    // "Permissions" is also a substring of the section description, so match exactly.
+    await expect(page.getByText("Permissions", { exact: true })).toBeVisible();
 
     // Permission checkboxes should be present
     await expect(page.locator("input[type='checkbox']").first()).toBeVisible();
-    await expect(page.getByText("tools:use")).toBeVisible();
+    // "tools:use" also renders on the built-in role cards below, so scope to the form.
+    await expect(page.locator("form").getByText("tools:use")).toBeVisible();
 
     // Create and Cancel buttons
     await expect(page.getByRole("button", { name: /^create$/i })).toBeVisible();
@@ -827,9 +832,13 @@ test.describe("GUI Settings - Roles Tab", () => {
       page.on("dialog", (d) => d.accept());
       await page.locator("button[title='Delete role']").first().click();
 
-      // Role should be removed
-      await expect(page.getByText(roleName)).not.toBeVisible({ timeout: 5_000 });
+      // Assert the success toast first (it auto-clears after 3s), then confirm the
+      // role card is gone. The toast text contains the role name, so scope the
+      // "removed" check to the role-name card span, not a bare text match.
       await expect(page.getByText(/deleted/i)).toBeVisible({ timeout: 3_000 });
+      await expect(
+        page.locator("span.font-semibold.capitalize").filter({ hasText: roleName }),
+      ).not.toBeVisible({ timeout: 5_000 });
     } finally {
       // Cleanup fallback
       await fetch(`${API}/api/v1/roles`, { headers: authOnly(adminToken) })
@@ -863,9 +872,13 @@ test.describe("GUI Settings - Roles Tab", () => {
     await page.getByRole("button", { name: /^roles$/i }).click();
 
     await page.getByRole("button", { name: /create custom role/i }).click();
-    await expect(page.getByText("Permissions")).toBeVisible();
+    // "Permissions" is also a substring of the section description, so match exactly.
+    await expect(page.getByText("Permissions", { exact: true })).toBeVisible();
 
-    // Permission group headings should be visible
+    // Permission group headings should be visible. Scope to the form: several of
+    // these labels ("Tools", "Settings", "Users", "Teams", "API Keys") also appear
+    // in the settings nav sidebar and dialog title.
+    const createForm = page.locator("form");
     for (const group of [
       "Tools",
       "Files",
@@ -876,7 +889,7 @@ test.describe("GUI Settings - Roles Tab", () => {
       "Teams",
       "System",
     ]) {
-      await expect(page.getByText(group, { exact: true }).first()).toBeVisible();
+      await expect(createForm.getByText(group, { exact: true }).first()).toBeVisible();
     }
 
     // Cancel

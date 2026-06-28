@@ -87,6 +87,9 @@ test.describe("Essential Tools", () => {
     await page.goto("/image/compress");
     await uploadTestImage(page);
 
+    // Compress defaults to Target Size mode (needs a value); switch to Quality
+    // mode so submit is enabled with its default.
+    await page.getByRole("button", { name: "Quality" }).click();
     // Use submit button to avoid matching "Processed:" text
     await page.locator("button[type='submit']").click();
 

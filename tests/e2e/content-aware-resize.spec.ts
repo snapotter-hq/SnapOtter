@@ -2,7 +2,7 @@ import path from "node:path";
 import { expect, test } from "./helpers";
 
 function fixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 async function uploadFile(page: import("@playwright/test").Page, filePath: string) {
@@ -14,22 +14,12 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
   await page.waitForTimeout(500);
 }
 
+// In 2.0 content-aware is a tab inside the Resize tool, not a toggle switch.
+// The settings panel (tabs included) only mounts after a file is uploaded, so
+// callers must upload before invoking this helper.
 async function enableContentAware(page: import("@playwright/test").Page) {
-  const _toggle = page
-    .getByRole("switch", { name: "Content-aware" })
-    .or(
-      page
-        .locator("button[role='switch'][aria-checked]")
-        .filter({ hasText: "" })
-        .locator("..")
-        .filter({ hasText: "Content-aware" })
-        .locator("button[role='switch']"),
-    );
-  const sw = page.locator("button[role='switch']").first();
-  if ((await sw.getAttribute("aria-checked")) !== "true") {
-    await sw.click();
-  }
-  await expect(sw).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Content-Aware" }).click();
+  await expect(page.getByText("Resize to square")).toBeVisible();
 }
 
 test.describe("Content-Aware Resize", () => {
@@ -41,97 +31,100 @@ test.describe("Content-Aware Resize", () => {
     // Must NOT show "Tool not found"
     await expect(page.getByText("Tool not found")).not.toBeVisible();
 
-    // Must show the tool name and content-aware controls
-    await expect(page.getByText("Content-Aware Resize")).toBeVisible();
+    // Tool name is shown by the dropzone branding even before upload (it also
+    // appears in the breadcrumb, so scope to the first match).
+    await expect(page.getByText("Content-Aware Resize").first()).toBeVisible();
+
+    // Settings (and the content-aware controls) mount only after a file loads
+    await uploadFile(page, fixturePath("test-200x150.png"));
+
     await expect(page.getByText("Resize to square")).toBeVisible();
     await expect(page.getByText("Protect faces")).toBeVisible();
     await expect(page.getByText("Smoothing")).toBeVisible();
     await expect(page.getByText("Edge sensitivity")).toBeVisible();
   });
 
-  test("direct route submit disabled without file", async ({ loggedInPage: page }) => {
+  test("direct route submit absent without file", async ({ loggedInPage: page }) => {
     await page.goto("/image/content-aware-resize");
-    await expect(page.getByTestId("content-aware-resize-submit")).toBeDisabled();
+    // Pre-upload the page shows only the dropzone; the submit never mounts.
+    await expect(page.getByTestId("content-aware-resize-submit")).toHaveCount(0);
   });
 
   test("direct route submit enables with width and file", async ({ loggedInPage: page }) => {
     await page.goto("/image/content-aware-resize");
     await uploadFile(page, fixturePath("test-200x150.png"));
 
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    await widthInput.fill("150");
+    await page.locator("#car-width").fill("150");
 
     await expect(page.getByTestId("content-aware-resize-submit")).toBeEnabled();
   });
 
-  test("content-aware toggle reveals seam carving controls", async ({ loggedInPage: page }) => {
+  test("content-aware tab reveals seam carving controls", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
 
-    await expect(page.getByText("Content-aware")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Content-Aware" })).toBeVisible();
 
-    // Controls hidden before toggle
+    // Controls hidden before switching to the content-aware tab
     await expect(page.getByText("Resize to square")).not.toBeVisible();
     await expect(page.getByText("Protect faces")).not.toBeVisible();
 
     await enableContentAware(page);
 
-    // Controls visible after toggle
+    // Controls visible once the content-aware tab is active
     await expect(page.getByText("Resize to square")).toBeVisible();
     await expect(page.getByText("Protect faces")).toBeVisible();
     await expect(page.getByText("Smoothing")).toBeVisible();
     await expect(page.getByText("Edge sensitivity")).toBeVisible();
   });
 
-  test("standard resize tabs hidden when content-aware is active", async ({
+  test("standard resize controls hidden when content-aware is active", async ({
     loggedInPage: page,
   }) => {
     await page.goto("/image/resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
 
-    // Standard tabs visible before toggle
-    await expect(page.getByRole("button", { name: "Custom" })).toBeVisible();
+    // The default Custom Size tab exposes the fit-mode controls
+    await expect(page.getByRole("button", { name: "Crop to fit" })).toBeVisible();
 
     await enableContentAware(page);
 
-    // Standard tabs hidden
-    await expect(page.getByRole("button", { name: "Custom" })).not.toBeVisible();
+    // Switching to content-aware replaces the standard custom-size controls
+    await expect(page.getByRole("button", { name: "Crop to fit" })).not.toBeVisible();
   });
 
-  test("submit disabled without file", async ({ loggedInPage: page }) => {
+  test("submit absent without file", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
-
-    await expect(page.getByTestId("resize-submit")).toBeDisabled();
+    // No file means no settings panel and no submit button at all.
+    await expect(page.getByTestId("resize-submit")).toHaveCount(0);
   });
 
   test("submit disabled without dimensions or square mode", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
+    await enableContentAware(page);
 
     // Width and height are empty, square is unchecked - submit should be disabled
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    await widthInput.fill("");
-    const heightInput = page.locator("input[placeholder='Auto']").nth(1);
-    await heightInput.fill("");
+    await page.locator("#resize-width").fill("");
+    await page.locator("#resize-height").fill("");
 
     await expect(page.getByTestId("resize-submit")).toBeDisabled();
   });
 
   test("submit enables with width specified", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
+    await enableContentAware(page);
 
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    await widthInput.fill("150");
+    await page.locator("#resize-width").fill("150");
 
     await expect(page.getByTestId("resize-submit")).toBeEnabled();
   });
 
   test("submit enables with square mode checked", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
+    await enableContentAware(page);
 
     await page.getByText("Resize to square").click();
 
@@ -140,19 +133,18 @@ test.describe("Content-Aware Resize", () => {
 
   test("square mode disables width and height inputs", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
     await enableContentAware(page);
 
     await page.getByText("Resize to square").click();
 
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    const heightInput = page.locator("input[placeholder='Auto']").nth(1);
-
-    await expect(widthInput).toBeDisabled();
-    await expect(heightInput).toBeDisabled();
+    await expect(page.locator("#resize-width")).toBeDisabled();
+    await expect(page.locator("#resize-height")).toBeDisabled();
   });
 
   test("smoothing slider has correct range", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
     await enableContentAware(page);
 
     const slider = page.locator("#blur-radius");
@@ -162,6 +154,7 @@ test.describe("Content-Aware Resize", () => {
 
   test("edge sensitivity slider has correct range", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
+    await uploadFile(page, fixturePath("test-200x150.png"));
     await enableContentAware(page);
 
     const slider = page.locator("#sobel-threshold");
@@ -171,11 +164,10 @@ test.describe("Content-Aware Resize", () => {
 
   test("PNG - content-aware resize processes and shows result", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.png"));
+    await enableContentAware(page);
 
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    await widthInput.fill("150");
+    await page.locator("#resize-width").fill("150");
 
     await page.getByTestId("resize-submit").click();
 
@@ -188,11 +180,10 @@ test.describe("Content-Aware Resize", () => {
 
   test("HEIC input with content-aware resize", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
-    await enableContentAware(page);
     await uploadFile(page, fixturePath("test-200x150.heic"));
+    await enableContentAware(page);
 
-    const widthInput = page.locator("input[placeholder='Auto']").first();
-    await widthInput.fill("150");
+    await page.locator("#resize-width").fill("150");
 
     await page.getByTestId("resize-submit").click();
 

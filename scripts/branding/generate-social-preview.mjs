@@ -1,6 +1,6 @@
 // Generates branding/social-preview.png (1280x640) -- the SnapOtter social/OG card.
-// Echoes the landing hero: trust badges, the "Every file tool you need / Nothing
-// leaves your network" headline, the supporting subhead, and the five modality
+// Echoes the landing hero: trust badges, the "Every file tool you need / Your files
+// never leave your network" headline, the supporting subhead, and the five modality
 // cards. Rendered from HTML with the real brand fonts via headless Chromium.
 // Run: node scripts/branding/generate-social-preview.mjs
 //
@@ -127,7 +127,7 @@ html,body{width:1280px;height:640px}
 </style></head><body><div class="canvas">
 <div class="brand"><img src="logo-512.png" alt=""/><span class="wm">Snap<span class="o">Otter</span></span><span class="pill">${total} tools</span></div>
 <div class="badges">${badgesHtml}</div>
-<div class="headline">Every <span class="f">file</span> tool you need.<span class="hl2">Nothing leaves your network.</span></div>
+<div class="headline">Every <span class="f">file</span> tool you need.<span class="hl2">Your files never leave your network.</span></div>
 <div class="subhead">The file-processing suite for teams that keep sensitive data in-house.</div>
 <div class="cards">${cardsHtml}</div>
 </div></body></html>`;

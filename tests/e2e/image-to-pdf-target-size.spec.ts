@@ -17,6 +17,8 @@ test.describe("Image to PDF - Target File Size", () => {
   });
 
   test("target size controls are visible", async ({ page }) => {
+    // The settings panel (with the target-size controls) renders after upload.
+    await uploadViaButton(page);
     const valueInput = page.getByTestId("image-to-pdf-target-size-value");
     const unitSelect = page.getByTestId("image-to-pdf-target-size-unit");
 
@@ -107,6 +109,7 @@ test.describe("Image to PDF - Target File Size", () => {
   });
 
   test("can switch between KB and MB units", async ({ page }) => {
+    await uploadViaButton(page);
     const unitSelect = page.getByTestId("image-to-pdf-target-size-unit");
 
     await expect(unitSelect).toHaveValue("MB");
@@ -117,6 +120,7 @@ test.describe("Image to PDF - Target File Size", () => {
   });
 
   test("target size input accepts decimal values", async ({ page }) => {
+    await uploadViaButton(page);
     const valueInput = page.getByTestId("image-to-pdf-target-size-value");
     await valueInput.fill("1.5");
     await expect(valueInput).toHaveValue("1.5");

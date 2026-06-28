@@ -38,15 +38,18 @@ test.describe("All tool pages render", () => {
 
       if (NO_DROPZONE_MODES.has(displayMode)) {
         // Custom-input tools (meme-generator, qr-generate, collage, html-to-image,
-        // pdf-to-image) render their own input UI; just require the settings panel.
+        // pdf-to-image) render their own input UI immediately, so the settings
+        // panel is present before any upload.
         await expect(page.locator(".settings-container").first()).toBeVisible();
         return;
       }
 
-      // Standard dropzone tools
+      // Standard dropzone tools: before a file is loaded the page renders the
+      // full-width dropzone (tool-page.tsx renders the dropzone-only layout when
+      // !hasFile). The settings panel appears only after upload, which the
+      // per-tool gui-tools-*.spec.ts suites cover. Here, assert the dropzone.
       await expect(page.getByText("Upload from computer")).toBeVisible();
       await expect(page.getByText("Files").first()).toBeVisible();
-      await expect(page.locator(".settings-container").first()).toBeVisible();
     });
   }
 });

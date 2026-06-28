@@ -363,10 +363,10 @@ function GeneralSection() {
             role: "unknown",
           });
         }),
-      apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
         .then((data) => {
-          if (data.settings.defaultToolView) {
-            setDefaultToolView(data.settings.defaultToolView);
+          if (typeof data.preferences.defaultToolView === "string") {
+            setDefaultToolView(data.preferences.defaultToolView);
           }
         })
         .catch(() => {}),
@@ -398,7 +398,10 @@ function GeneralSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", { defaultToolView });
+      // The default home view is a per-user preference, not instance config, so
+      // it saves to /v1/preferences (writable by any authenticated user) rather
+      // than the admin-only /v1/settings.
+      await apiPut("/v1/preferences", { defaultToolView });
       setSaveMsg(t.settings.general.saveSuccess);
       useSettingsStore.setState({
         defaultToolView: defaultToolView as "sidebar" | "fullscreen",
@@ -1682,6 +1685,10 @@ function PeopleSection() {
                 setShowAddForm(false);
                 setShowGeneratedPw(false);
                 setPwCopied(false);
+                // Reset the field values too, so re-opening the form is clean.
+                setNewUsername("");
+                setNewPassword("");
+                setAddError(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
@@ -2466,8 +2473,17 @@ function TeamsSection() {
                         className="px-2 py-1 rounded border border-border bg-background text-sm text-foreground w-40"
                         ref={(el) => el?.focus()}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename(tm.id);
-                          if (e.key === "Escape") setEditingTeamId(null);
+                          // Keep Enter/Escape scoped to the rename input. Without
+                          // stopping propagation, Escape also reaches the dialog's
+                          // global Escape handler and closes the whole dialog.
+                          if (e.key === "Enter") {
+                            e.stopPropagation();
+                            handleRename(tm.id);
+                          }
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setEditingTeamId(null);
+                          }
                         }}
                       />
                       <button

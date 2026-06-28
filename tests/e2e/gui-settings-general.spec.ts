@@ -1,4 +1,4 @@
-import { changePasswordViaApi, expect, login, openSettings, putSettings, test } from "./helpers";
+import { expect, login, openSettings, putSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Settings Dialog -- General, System Settings, About tabs
@@ -67,7 +67,7 @@ test.describe("GUI Settings - Dialog Navigation", () => {
     await expect(generalBtn).not.toHaveClass(/bg-primary/);
   });
 
-  test("re-opening dialog defaults to General tab", async ({ loggedInPage: page }) => {
+  test("re-opening dialog preserves the last-viewed tab", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
     // Navigate to About
@@ -78,9 +78,11 @@ test.describe("GUI Settings - Dialog Navigation", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("h2").filter({ hasText: "Settings" })).not.toBeVisible();
 
-    // Re-open -- should be back on General (component state resets)
+    // Re-open. The dialog stays mounted (open is a prop; the body returns null
+    // when closed), so component state and the selected section persist. The
+    // last-viewed tab (About) is shown again.
     await openSettings(page);
-    await expect(page.locator("h3").filter({ hasText: "General" })).toBeVisible();
+    await expect(page.locator("h3").filter({ hasText: "About" })).toBeVisible();
   });
 
   test("closes dialog via the X button", async ({ loggedInPage: page }) => {
@@ -111,10 +113,11 @@ test.describe("GUI Settings - Dialog Navigation", () => {
     await expect(page.locator("h2").filter({ hasText: "Settings" })).not.toBeVisible();
   });
 
-  test("settings icon is visible in the sidebar", async ({ loggedInPage: page }) => {
-    // The sidebar should have a Settings entry
-    const sidebar = page.locator("aside");
-    await expect(sidebar.getByText("Settings")).toBeVisible();
+  test("settings opens from the top-nav avatar menu", async ({ loggedInPage: page }) => {
+    // 2.0 removed the desktop sidebar. Settings now lives in the top-nav avatar
+    // (user) dropdown, which carries data-testid="user-menu".
+    await page.getByTestId("user-menu").click();
+    await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   });
 });
 
@@ -183,7 +186,7 @@ test.describe("GUI Settings - General Tab", () => {
     await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
   });
 
-  test("setting Fullscreen Grid and saving redirects home to /fullscreen", async ({
+  test("setting Fullscreen Grid and saving no longer redirects (route removed)", async ({
     loggedInPage: page,
   }) => {
     await openSettings(page);
@@ -191,7 +194,8 @@ test.describe("GUI Settings - General Tab", () => {
     const select = page.locator("select").first();
     const originalValue = await select.inputValue();
 
-    // Set to fullscreen
+    // Set to fullscreen. The General save sends only { defaultToolView }, which
+    // is not a readonly key, so it persists successfully.
     await select.selectOption("fullscreen");
     await page.getByRole("button", { name: /save settings/i }).click();
     await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
@@ -200,12 +204,12 @@ test.describe("GUI Settings - General Tab", () => {
     await page.keyboard.press("Escape");
     await page.goto("/");
 
-    // Should redirect to /fullscreen
-    await page.waitForURL(/\/fullscreen/, { timeout: 10_000 });
-    expect(page.url()).toContain("/fullscreen");
+    // 2.0 removed the /fullscreen route and the Fullscreen Grid home view. The
+    // setting still exists, but home no longer redirects: "/" stays "/".
+    await expect(page).toHaveURL(/\/$/);
+    expect(page.url()).not.toContain("/fullscreen");
 
-    // Restore via API: the fullscreen layout has no reachable settings entry,
-    // and an unrestored value poisons every later test on the shared server.
+    // Restore via API so an unexpected value cannot poison later tests.
     const restore = await putSettings(page, { defaultToolView: originalValue });
     expect(restore.ok).toBeTruthy();
   });
@@ -320,9 +324,9 @@ test.describe("GUI Settings - System Settings Tab", () => {
     // Wait for settings to load
     await expect(page.getByText("Startup Cleanup")).toBeVisible();
 
-    // The toggle is a button.rounded-full near "Startup Cleanup"
-    const toggleRow = page.locator("div").filter({ hasText: "Startup Cleanup" }).last();
-    const toggle = toggleRow.locator("button.rounded-full");
+    // The toggle renders as a role="switch" button with an aria-label, so target
+    // it by role rather than by walking the SettingRow DOM.
+    const toggle = page.getByRole("switch", { name: "Startup Cleanup" });
     await expect(toggle).toBeVisible();
 
     // Click to toggle
@@ -583,32 +587,12 @@ test.describe("GUI Settings - Tools Tab (deep)", () => {
   });
 });
 
-test.describe("GUI Settings - Product Analytics Tab (deep)", () => {
-  test("displays description about anonymous data and image privacy", async ({
-    loggedInPage: page,
-  }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
-
-    await expect(page.getByText(/share anonymous usage data/i)).toBeVisible();
-    await expect(page.getByText(/images never leave your network/i)).toBeVisible();
-  });
-
-  test("shows either consent toggle or admin-disabled message", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
-
-    // Either the toggle button is present, or the admin-disabled message is shown
-    const toggle = page.locator("button.rounded-full");
-    const disabledMsg = page.getByText(/has been disabled by the server administrator/i);
-
-    const toggleVisible = await toggle.isVisible().catch(() => false);
-    const disabledVisible = await disabledMsg.isVisible().catch(() => false);
-
-    // One of the two states must be true
-    expect(toggleVisible || disabledVisible).toBe(true);
-  });
-});
+// NOTE: The "Product Analytics" settings tab was removed. Analytics is now
+// on-by-default with opt-out configured server-side (env / GET
+// /api/v1/config/analytics), so there is no in-dialog consent tab or toggle to
+// assert. The former describe block ("displays description about anonymous data
+// and image privacy" + "shows either consent toggle or admin-disabled message")
+// tested that removed UI and has been dropped.
 
 // ---------------------------------------------------------------------------
 // Audit Log Tab (12.8) -- admin-only
@@ -738,31 +722,55 @@ test.describe("GUI Settings - Audit Log Tab", () => {
   });
 
   test("PASSWORD_CHANGED entry appears after changing password", async ({ loggedInPage: page }) => {
-    // Change password (admin -> admin) to generate audit entry
-    await openSettings(page);
-    await page.getByRole("button", { name: /security/i }).click();
+    // Generate the audit entry by changing a throwaway user's password, not the
+    // admin's: the 8-char policy means admin's "admin" password can never be
+    // restored after a temporary change, which would break the rest of the run.
+    const uid = Date.now().toString(36);
+    const username = `pwaudit-${uid}`;
+    const adminToken = await page.evaluate(() => localStorage.getItem("snapotter-token"));
 
-    // Client policy requires 8+ chars, so a temporary password is used and
-    // reverted via API right after (the current session token survives).
-    await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("Testpass123");
-    await page.getByPlaceholder("Confirm New Password").fill("Testpass123");
-    await page.getByRole("button", { name: /change password/i }).click();
-    await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+    const reg = await page.request.post("/api/auth/register", {
+      headers: { authorization: `Bearer ${adminToken}` },
+      data: { username, password: "Initpass123", role: "user" },
+    });
+    expect(reg.ok()).toBeTruthy();
 
-    const revert = await changePasswordViaApi(page, "Testpass123", "admin");
-    expect(revert.ok).toBeTruthy();
+    try {
+      const userLogin = await page.request.post("/api/auth/login", {
+        data: { username, password: "Initpass123" },
+      });
+      const { token } = await userLogin.json();
+      const change = await page.request.post("/api/auth/change-password", {
+        headers: { authorization: `Bearer ${token}` },
+        data: { currentPassword: "Initpass123", newPassword: "Newpass123" },
+      });
+      expect(change.ok()).toBeTruthy();
 
-    // Navigate to audit log and filter by PASSWORD_CHANGED
-    await page.getByRole("button", { name: /audit log/i }).click();
-    await expect(page.locator("table thead")).toBeVisible({ timeout: 10_000 });
+      // Admin views the audit log filtered to PASSWORD_CHANGED.
+      await openSettings(page);
+      await page.getByRole("button", { name: /audit log/i }).click();
+      await expect(page.locator("table thead")).toBeVisible({ timeout: 10_000 });
 
-    const filterSelect = page.locator("select").first();
-    await filterSelect.selectOption("PASSWORD_CHANGED");
+      const filterSelect = page.locator("select").first();
+      await filterSelect.selectOption("PASSWORD_CHANGED");
 
-    await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 10_000 });
-    const tableText = await page.locator("table tbody").textContent();
-    expect(tableText).toContain("PASSWORD_CHANGED");
+      await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 10_000 });
+      const tableText = await page.locator("table tbody").textContent();
+      expect(tableText).toContain("PASSWORD_CHANGED");
+    } finally {
+      const list = await page.request.get("/api/auth/users", {
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (list.ok()) {
+        const { users } = await list.json();
+        const u = users.find((x: { username: string; id: string }) => x.username === username);
+        if (u) {
+          await page.request.delete(`/api/auth/users/${u.id}`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+          });
+        }
+      }
+    }
   });
 
   test("switching audit log filter back to All actions shows unfiltered entries", async ({

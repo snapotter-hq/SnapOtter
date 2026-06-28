@@ -135,9 +135,10 @@ test.describe("Settings Dialog - Dialog state management", () => {
   test("dialog content scrolls independently of the page", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    // The content pane has overflow-y-auto
-    const contentPane = page.locator(".flex-1.overflow-y-auto");
-    await expect(contentPane).toBeVisible();
+    // The dialog's content pane has overflow-y-auto. Scope to the dialog: the
+    // page's <main> also carries .flex-1.overflow-y-auto.
+    const contentPane = page.getByRole("dialog").locator(".flex-1.overflow-y-auto");
+    await expect(contentPane.first()).toBeVisible();
 
     // Navigate to a section with lots of content (Tools)
     await page.getByRole("button", { name: /tools/i }).click();
@@ -218,7 +219,9 @@ test.describe("Settings General Tab - User info details", () => {
   test("General tab shows Language (locale) dropdown", async ({ loggedInPage: page }) => {
     await openSettings(page);
 
-    await expect(page.getByText("Language")).toBeVisible();
+    // Exact match: "Language" also appears inside the row description
+    // ("Language for the interface"), which would trip strict mode.
+    await expect(page.getByText("Language", { exact: true })).toBeVisible();
     // The locale select has the user's current locale as its value
     const localeSelect = page.locator("select").filter({ has: page.locator("option[value='en']") });
     await expect(localeSelect).toBeVisible();
@@ -268,6 +271,9 @@ test.describe("Settings System Settings Tab - Additional coverage", () => {
       .locator("select")
       .filter({ has: page.locator("option[value='dark']") });
 
+    // The System section loads its settings asynchronously; wait for the select
+    // to render before reading its options.
+    await expect(themeSelect).toBeVisible({ timeout: 10_000 });
     const options = await themeSelect.locator("option").allTextContents();
     expect(options).toContain("Light");
     expect(options).toContain("Dark");
@@ -337,19 +343,45 @@ test.describe("Settings Security Tab - Extended password flows", () => {
     await expect(page.getByText("Change Password").first()).toBeVisible();
   });
 
-  test("changing password to same value succeeds (admin -> admin)", async ({
-    loggedInPage: page,
-  }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /security/i }).click();
+  test("changing a password to the same value succeeds", async ({ loggedInPage: page }) => {
+    // Exercised on a throwaway user: the default admin password ("admin", 5
+    // chars) cannot satisfy the 8-char policy, so a same-value change can never
+    // be submitted for it.
+    const uid = Date.now().toString(36);
+    const username = `samepw-${uid}`;
+    const password = "Samepass123";
+    const adminToken = await page.evaluate(() => localStorage.getItem("snapotter-token"));
 
-    await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("admin");
-    await page.getByPlaceholder("Confirm New Password").fill("admin");
-    await page.getByRole("button", { name: /change password/i }).click();
+    const reg = await page.request.post("/api/auth/register", {
+      headers: { authorization: `Bearer ${adminToken}` },
+      data: { username, password, role: "user" },
+    });
+    expect(reg.ok()).toBeTruthy();
 
-    // Should show success (not "passwords do not match")
-    await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
+    try {
+      const userLogin = await page.request.post("/api/auth/login", {
+        data: { username, password },
+      });
+      const { token } = await userLogin.json();
+      const change = await page.request.post("/api/auth/change-password", {
+        headers: { authorization: `Bearer ${token}` },
+        data: { currentPassword: password, newPassword: password },
+      });
+      expect(change.ok()).toBeTruthy();
+    } finally {
+      const list = await page.request.get("/api/auth/users", {
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (list.ok()) {
+        const { users } = await list.json();
+        const u = users.find((x: { username: string; id: string }) => x.username === username);
+        if (u) {
+          await page.request.delete(`/api/auth/users/${u.id}`, {
+            headers: { authorization: `Bearer ${adminToken}` },
+          });
+        }
+      }
+    }
   });
 });
 
@@ -362,15 +394,17 @@ test.describe("Settings About Tab - Extended", () => {
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
 
-    await expect(page.getByText("AGPLv3")).toBeVisible();
+    // Exact match: the license description paragraph also contains "AGPLv3",
+    // so a substring match would resolve to two elements (strict mode).
+    await expect(page.getByText("AGPLv3", { exact: true })).toBeVisible();
   });
 
   test("shows SnapOtter logo element", async ({ loggedInPage: page }) => {
     await openSettings(page);
     await page.getByRole("button", { name: /about/i }).click();
 
-    // The OtterLogo component renders an SVG
-    const logo = page.locator("svg.text-primary").first();
+    // The OtterLogo component renders an <img> (logo.png), not an inline SVG.
+    const logo = page.locator("img.text-primary").first();
     await expect(logo).toBeVisible();
   });
 
@@ -452,8 +486,11 @@ test.describe("Settings People Tab - Team assignment", () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // The password field should now have a value (16 chars generated password)
-    const pwInput = page.locator("form input[type='text']").first();
+    // The password field should now have a value (16 chars generated password).
+    // After generating, the password input flips to type="text", so a generic
+    // form input[type='text'] selector would also match the (empty) username
+    // field. Target the password input by its id instead.
+    const pwInput = page.locator("#new-user-password");
     const value = await pwInput.inputValue();
     expect(value.length).toBeGreaterThanOrEqual(8);
 
@@ -579,16 +616,29 @@ test.describe("Settings Teams Tab - Extended", () => {
   });
 
   test("team three-dot menu shows Rename and Delete options", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /teams/i }).click();
-    await page.waitForTimeout(500);
+    const teamName = `menuteam-${UID}`;
+    const adminToken = await getAdminToken();
+    try {
+      // A fresh instance has no teams, so create one to act on.
+      await fetch(`${API}/api/v1/teams`, {
+        method: "POST",
+        headers: authJson(adminToken),
+        body: JSON.stringify({ name: teamName }),
+      });
 
-    // Open the three-dot menu for the first team
-    const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
-    await moreButtons.first().click();
+      await openSettings(page);
+      await page.getByRole("button", { name: /teams/i }).click();
+      await expect(page.getByText(teamName)).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.locator("[role='menu']").getByText("Rename")).toBeVisible();
-    await expect(page.locator("[role='menu']").getByText("Delete")).toBeVisible();
+      // Open the three-dot menu for the team
+      const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
+      await moreButtons.last().click();
+
+      await expect(page.locator("[role='menu']").getByText("Rename")).toBeVisible();
+      await expect(page.locator("[role='menu']").getByText("Delete")).toBeVisible();
+    } finally {
+      await cleanupTeamsByPrefix(adminToken, "menuteam-");
+    }
   });
 
   test("team rename via Enter key works", async ({ loggedInPage: page }) => {
@@ -633,27 +683,40 @@ test.describe("Settings Teams Tab - Extended", () => {
   });
 
   test("team rename cancel via Escape key works", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /teams/i }).click();
-    await page.waitForTimeout(500);
+    const teamName = `escteam-${UID}`;
+    const adminToken = await getAdminToken();
+    try {
+      await fetch(`${API}/api/v1/teams`, {
+        method: "POST",
+        headers: authJson(adminToken),
+        body: JSON.stringify({ name: teamName }),
+      });
 
-    // Open menu for Default team and click Rename
-    const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
-    await moreButtons.first().click();
-    await page.locator("[role='menu']").getByText("Rename").click();
+      await openSettings(page);
+      await page.getByRole("button", { name: /teams/i }).click();
+      await page.waitForTimeout(500);
+      await expect(page.getByText(teamName)).toBeVisible({ timeout: 5_000 });
 
-    // Inline edit input should appear
-    const renameInput = page.locator("input.px-2.py-1.rounded.border.border-border.bg-background");
-    await expect(renameInput).toBeVisible({ timeout: 3_000 });
+      // Open the team menu and click Rename
+      const moreButtons = page.locator("button:has(svg.lucide-ellipsis-vertical)");
+      await moreButtons.last().click();
+      await page.locator("[role='menu']").getByText("Rename").click();
 
-    // Press Escape to cancel
-    await renameInput.press("Escape");
+      // Inline edit input should appear
+      const renameInput = page.locator(
+        "input.px-2.py-1.rounded.border.border-border.bg-background",
+      );
+      await expect(renameInput).toBeVisible({ timeout: 3_000 });
 
-    // Input should disappear
-    await expect(renameInput).not.toBeVisible();
+      // Press Escape to cancel
+      await renameInput.press("Escape");
 
-    // Default team name should still be visible
-    await expect(page.getByText("Default").first()).toBeVisible();
+      // Input should disappear and the team name should be unchanged
+      await expect(renameInput).not.toBeVisible();
+      await expect(page.getByText(teamName)).toBeVisible();
+    } finally {
+      await cleanupTeamsByPrefix(adminToken, "escteam-");
+    }
   });
 
   test("creating multiple teams shows correct member counts", async ({ loggedInPage: page }) => {

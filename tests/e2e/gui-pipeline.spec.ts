@@ -5,7 +5,8 @@ import { expect, getTestImagePath, test, waitForProcessing } from "./helpers";
 // Helper: resolve fixture image paths
 // ---------------------------------------------------------------------------
 function getFixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  // Fixtures live under tests/fixtures/image/valid/ in 2.0.
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
@@ -75,9 +76,9 @@ test.describe("Pipeline Builder - Empty state", () => {
     await gotoAutomate(page);
 
     await expect(page.getByText("No steps yet")).toBeVisible();
-    await expect(
-      page.getByText("Click tools from the palette to build your pipeline"),
-    ).toBeVisible();
+    // The prompt renders in two places (canvas header + builder empty state),
+    // so scope to the first match to avoid a strict-mode violation.
+    await expect(page.getByText("Add tools from the palette to get started").first()).toBeVisible();
   });
 
   test("tool palette with search is visible", async ({ loggedInPage: page }) => {
@@ -169,12 +170,15 @@ test.describe("Pipeline Builder - Adding steps", () => {
 
     await addToolStep(page, "Resize", 1);
 
-    // Click on the step row to expand it
-    const stepRow = page.locator("[role='button']").filter({ hasText: "Resize" }).first();
+    // A newly added step auto-expands, so collapse it first to test expanding.
+    // The step header is a div[role=button] (palette items are real <button>s).
+    const stepRow = page.locator("div[role='button']").filter({ hasText: "Resize" }).first();
     await stepRow.click();
+    await expect(page.locator("#resize-width")).toBeHidden({ timeout: 5_000 });
 
-    // Settings form should appear (border-primary indicates expanded state)
-    await expect(page.locator(".border-primary").first()).toBeVisible({ timeout: 3_000 });
+    // Re-expand: the Resize settings form (width input) should reappear.
+    await stepRow.click();
+    await expect(page.locator("#resize-width")).toBeVisible({ timeout: 5_000 });
   });
 
   test("collapse expanded step hides settings form", async ({ loggedInPage: page }) => {
@@ -182,20 +186,16 @@ test.describe("Pipeline Builder - Adding steps", () => {
 
     await addToolStep(page, "Resize", 1);
 
-    // Click on the step row to expand it
-    const stepRow = page.locator("[role='button']").filter({ hasText: "Resize" }).first();
+    // A newly added step auto-expands, so its settings form (width input) shows.
+    await expect(page.locator("#resize-width")).toBeVisible({ timeout: 5_000 });
+
+    // Click the step header to collapse it. The step header is a
+    // div[role=button] (palette items are real <button>s).
+    const stepRow = page.locator("div[role='button']").filter({ hasText: "Resize" }).first();
     await stepRow.click();
 
-    // Settings form should appear
-    const expandedStep = page.locator(".border-primary").first();
-    await expect(expandedStep).toBeVisible({ timeout: 3_000 });
-
-    // Click the step header again to collapse
-    await stepRow.click();
-    await page.waitForTimeout(300);
-
-    // Expanded state (border-primary on the step card) should be gone
-    await expect(expandedStep).not.toBeVisible({ timeout: 3_000 });
+    // Once collapsed, the settings form should be hidden.
+    await expect(page.locator("#resize-width")).toBeHidden({ timeout: 5_000 });
   });
 
   test("add 3 steps: resize, compress, convert - all visible in order", async ({
@@ -345,60 +345,72 @@ test.describe("Pipeline Builder - File upload and processing", () => {
   test("process pipeline shows progress then result with before/after", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     // Click Process
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
-    // Wait for the before/after slider to appear
+    // Wait for the before/after slider to appear (BullMQ flow can exceed 30s)
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
-    // Should show Original and Processed labels
-    await expect(page.getByText("Original").first()).toBeVisible();
-    await expect(page.getByText("Processed").first()).toBeVisible();
+    // Should show Original and Processed labels (exact to avoid the size badges)
+    await expect(page.getByText("Original", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Processed", { exact: true }).first()).toBeVisible();
   });
 
   test("download button visible after processing", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Compress", 1);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
-    // Wait for the before/after slider
+    // Wait for the before/after slider (BullMQ flow can exceed 30s)
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
     // File info should be visible in the preview area
     await expect(page.getByText("test-image.png").first()).toBeVisible();
   });
 
   test("processing completes and shows before/after result", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     // Click Process
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
-    // Wait for processing to complete (may be instant for small images)
-    await waitForProcessing(page, 30_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // After completion, the before/after slider should appear
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 15_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
-    // Original and Processed labels should be shown
-    await expect(page.getByText("Original").first()).toBeVisible();
-    await expect(page.getByText("Processed").first()).toBeVisible();
+    // Original and Processed labels should be shown (exact to skip size badges)
+    await expect(page.getByText("Original", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Processed", { exact: true }).first()).toBeVisible();
   });
 
   test("process button disabled without file even when steps present", async ({
@@ -427,10 +439,14 @@ test.describe("Pipeline Builder - File upload and processing", () => {
   });
 
   test("progress indicator appears during pipeline execution", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     // Click Process
@@ -445,27 +461,31 @@ test.describe("Pipeline Builder - File upload and processing", () => {
       .isVisible({ timeout: 3_000 })
       .catch(() => false);
 
-    // Wait for processing to complete
-    await waitForProcessing(page, 30_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // After completion, the before/after slider should appear
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 15_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
   });
 
   test("download button shows after single-file pipeline execution", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Compress", 1);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadTestFile(page);
 
     await page.getByRole("button", { name: "Process", exact: true }).click();
 
-    // Wait for the before/after slider
+    // Wait for the before/after slider (BullMQ flow can exceed 30s)
     const slider = page.locator("[aria-label='Before/after comparison slider']");
-    await expect(slider).toBeVisible({ timeout: 30_000 });
+    await expect(slider).toBeVisible({ timeout: 60_000 });
 
     // A download link or button should be visible in the results area
     const downloadBtn = page
@@ -491,11 +511,15 @@ test.describe("Pipeline Builder - Batch processing", () => {
   test("batch pipeline: 3 images through 2 steps, all processed", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     // Add 2 pipeline steps
     await addToolStep(page, "Remove Metadata", 1);
     await addToolStep(page, "Compress", 2);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
 
     // Upload 3 images
     await uploadMultipleFiles(page);
@@ -508,8 +532,8 @@ test.describe("Pipeline Builder - Batch processing", () => {
     await expect(processBtn).toBeEnabled();
     await processBtn.click();
 
-    // Wait for processing to complete (may be instant for small images)
-    await waitForProcessing(page, 45_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // Counter badge should appear (N / M format)
     await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
@@ -518,17 +542,21 @@ test.describe("Pipeline Builder - Batch processing", () => {
   test("batch pipeline: Download ZIP button appears after batch processing", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Compress", 1);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadMultipleFiles(page);
 
     // Process batch
     const processBtn = page.getByRole("button", { name: /process all.*3/i });
     await processBtn.click();
 
-    // Wait for processing to complete
-    await waitForProcessing(page, 45_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // Counter badge should appear to confirm results are ready
     await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
@@ -540,46 +568,54 @@ test.describe("Pipeline Builder - Batch processing", () => {
   test("batch pipeline: navigate through results with Prev/Next", async ({
     loggedInPage: page,
   }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Compress", 1);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadMultipleFiles(page);
 
     // Process batch
     const processBtn = page.getByRole("button", { name: /process all.*3/i });
     await processBtn.click();
 
-    // Wait for processing to complete
-    await waitForProcessing(page, 45_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // Counter badge should show "1 / 3" for first result
     await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });
 
-    // Navigate to second result
-    await page.getByRole("button", { name: "Next image" }).click();
+    // Navigate to second result (a11y labels are "Next file"/"Previous file")
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText(/2 \/ 3/).first()).toBeVisible();
 
     // Navigate to third result
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText(/3 \/ 3/).first()).toBeVisible();
 
     // Navigate back to verify bidirectional navigation
-    await page.getByRole("button", { name: "Previous image" }).click();
+    await page.getByRole("button", { name: "Previous file" }).click();
     await expect(page.getByText(/2 \/ 3/).first()).toBeVisible();
   });
 
   test("batch pipeline: Download ZIP triggers actual download", async ({ loggedInPage: page }) => {
+    test.setTimeout(90_000);
     await gotoAutomate(page);
 
     await addToolStep(page, "Compress", 1);
+    // Compress defaults to Target Size mode with an invalid empty value; switch
+    // the active (just-added) step to Quality mode so the pipeline can execute.
+    await page.getByRole("button", { name: "Quality", exact: true }).click();
     await uploadMultipleFiles(page);
 
     // Process batch
     const processBtn = page.getByRole("button", { name: /process all.*3/i });
     await processBtn.click();
 
-    // Wait for processing to complete
-    await waitForProcessing(page, 45_000);
+    // Wait for processing to complete (BullMQ flow can exceed 30s)
+    await waitForProcessing(page, 60_000);
 
     // Counter badge should appear
     await expect(page.getByText(/1 \/ 3/).first()).toBeVisible({ timeout: 15_000 });

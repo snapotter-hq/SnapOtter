@@ -131,6 +131,11 @@ export default defineConfig({
       },
       testMatch: DEVICE_SPECS,
       grep: /@mobile/,
+      // @visual baselines are platform-suffixed but not browser-suffixed, so a
+      // single baseline cannot match both chromium and webkit rendering. Visual
+      // regression runs on the chromium device projects only; webkit covers the
+      // functional device flows.
+      grepInvert: /@visual/,
       dependencies: ["setup"],
     },
     {
@@ -141,6 +146,7 @@ export default defineConfig({
       },
       testMatch: DEVICE_SPECS,
       grep: /@tablet/,
+      grepInvert: /@visual/,
       dependencies: ["setup"],
     },
     {
@@ -164,14 +170,32 @@ export default defineConfig({
         DEFAULT_USERNAME: "admin",
         DEFAULT_PASSWORD: "admin",
         RATE_LIMIT_PER_MIN: "50000",
+        // The login route has its own per-minute attempt cap (default 10). The
+        // RBAC/settings specs sign in many times in quick succession, so raise
+        // it well above any single run to avoid 429s that cascade into
+        // create-user 401s and login timeouts.
+        LOGIN_ATTEMPT_LIMIT: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
+        // The api-keys management routes cap at 30/min per IP in production. The
+        // serial api-keys specs hit the list endpoint far more than that on a
+        // shared IP, so raise the cap well above any single run.
+        API_KEYS_RATE_LIMIT_PER_MIN: "100000",
         DATABASE_URL: e2eDatabaseUrl,
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         BULLMQ_PREFIX: e2eDbName,
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
         DATA_DIR: path.join(__dirname, "test-results", ".e2e-data"),
+        // Point feature-manifest detection at a path that does not exist so the
+        // API runs in native mode: it reports every AI bundle as available
+        // (apps/api/src/routes/features.ts) instead of gating each AI tool
+        // behind a multi-GB "requires an additional download" install prompt.
+        // The e2e env never downloads the model bundles, so without this every
+        // AI-tool GUI test is blocked before reaching a control. Real inference
+        // still no-ops, but the AI GUI specs assert on settings only and the
+        // processing specs skip when the sidecar is absent.
+        FEATURE_MANIFEST_PATH: path.join(__dirname, "test-results", ".no-feature-manifest.json"),
       },
       timeout: 30_000,
     },

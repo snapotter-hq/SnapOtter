@@ -5,7 +5,7 @@ import { expect, test, waitForProcessing } from "./helpers";
 // Helper: resolve fixture image paths
 // ---------------------------------------------------------------------------
 function getFixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 const FIXTURE_JPG = getFixturePath("test-100x100.jpg");
@@ -137,28 +137,28 @@ test.describe("Multi-file upload", () => {
     await expect(page.getByText("1 / 3")).toBeVisible();
 
     // Previous arrow should NOT be visible on first image
-    await expect(page.getByRole("button", { name: "Previous image" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous file" })).not.toBeVisible();
 
     // Next arrow should be visible
-    await expect(page.getByRole("button", { name: "Next image" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next file" })).toBeVisible();
 
     // Click next to go to image 2
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 3")).toBeVisible();
 
     // Both arrows should be visible on middle image
-    await expect(page.getByRole("button", { name: "Previous image" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Next image" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous file" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next file" })).toBeVisible();
 
     // Click next to go to image 3
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("3 / 3")).toBeVisible();
 
     // Next arrow should NOT be visible on last image
-    await expect(page.getByRole("button", { name: "Next image" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Next file" })).not.toBeVisible();
 
     // Click previous to go back
-    await page.getByRole("button", { name: "Previous image" }).click();
+    await page.getByRole("button", { name: "Previous file" }).click();
     await expect(page.getByText("2 / 3")).toBeVisible();
   });
 
@@ -278,7 +278,7 @@ test.describe("Multi-file upload", () => {
     await page.waitForTimeout(1000);
 
     // The main viewer img should be visible
-    const mainImg = page.locator("section[aria-label='Image area'] img").first();
+    const mainImg = page.locator("section[aria-label='Preview area'] img").first();
     await expect(mainImg).toBeVisible();
 
     // Verify an image is displayed in the viewer (first file is selected by default)
@@ -333,7 +333,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // After processing, the image area should show a result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -357,7 +357,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for at least one result image
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -384,7 +384,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -392,11 +392,11 @@ test.describe("Batch processing", () => {
     await expect(page.getByText("1 / 2")).toBeVisible();
 
     // Navigate to next result
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
 
     // Navigate back
-    await page.getByRole("button", { name: "Previous image" }).click();
+    await page.getByRole("button", { name: "Previous file" }).click();
     await expect(page.getByText("1 / 2")).toBeVisible();
   });
 
@@ -419,7 +419,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -432,7 +432,7 @@ test.describe("Batch processing", () => {
     ).toBeVisible();
 
     // Navigate to second result
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await page.waitForTimeout(500);
 
     // Second result should also have a download link
@@ -474,7 +474,7 @@ test.describe("Batch processing", () => {
     await expect(spinner).not.toBeVisible({ timeout: 5_000 });
 
     // And results should be available
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -498,7 +498,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -530,7 +530,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -538,7 +538,7 @@ test.describe("Batch processing", () => {
     await expect(page.getByText("Files (2)")).toBeVisible();
 
     // Click undo (resets all processed state for all entries in the store)
-    const undoBtn = page.getByRole("button", { name: /^undo$|^reset$/i });
+    const undoBtn = page.getByRole("button", { name: /adjust settings/i });
     if (await undoBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await undoBtn.click();
       await page.waitForTimeout(500);
@@ -569,7 +569,7 @@ test.describe("Batch processing", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result on image 1
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText("1 / 2")).toBeVisible();
@@ -581,15 +581,15 @@ test.describe("Batch processing", () => {
     await expect(downloadLink.first()).toBeVisible({ timeout: 5_000 });
 
     // Navigate to image 2 and verify it also has a download link
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
     await expect(downloadLink.first()).toBeVisible({ timeout: 5_000 });
 
     // Go back to image 1 and click undo/reset
-    await page.getByRole("button", { name: "Previous image" }).click();
+    await page.getByRole("button", { name: "Previous file" }).click();
     await expect(page.getByText("1 / 2")).toBeVisible();
 
-    const undoBtn = page.getByRole("button", { name: /^undo$|^reset$/i });
+    const undoBtn = page.getByRole("button", { name: /adjust settings/i });
     if (await undoBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await undoBtn.click();
       await page.waitForTimeout(500);
@@ -658,7 +658,7 @@ test.describe("Mixed formats", () => {
     await waitForProcessing(page, 30_000);
 
     // After processing, results should be available
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -666,10 +666,10 @@ test.describe("Mixed formats", () => {
     await expect(page.getByText("1 / 3")).toBeVisible();
 
     // Navigate through all results to verify each processed successfully
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 3")).toBeVisible();
 
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("3 / 3")).toBeVisible();
 
     // Download All should be available for mixed-format batch
@@ -729,7 +729,7 @@ test.describe("Batch processing - Compress tool", () => {
     await waitForProcessing(page, 30_000);
 
     // After processing, results should be available
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -737,7 +737,7 @@ test.describe("Batch processing - Compress tool", () => {
     await expect(page.getByText("1 / 2")).toBeVisible();
 
     // Navigate to second result
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
   });
 
@@ -762,7 +762,7 @@ test.describe("Batch processing - Compress tool", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -795,7 +795,7 @@ test.describe("Batch processing - Convert tool", () => {
     await waitForProcessing(page, 30_000);
 
     // After processing, results should be available
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -824,15 +824,15 @@ test.describe("Batch processing - Convert tool", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
     // Navigate through all 3 results
     await expect(page.getByText("1 / 3")).toBeVisible();
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 3")).toBeVisible();
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("3 / 3")).toBeVisible();
 
     // Download All should be available
@@ -864,7 +864,7 @@ test.describe("Batch processing - Rotate tool", () => {
     await waitForProcessing(page, 30_000);
 
     // After processing, results should be available
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -872,7 +872,7 @@ test.describe("Batch processing - Rotate tool", () => {
     await expect(page.getByText("1 / 2")).toBeVisible();
 
     // Navigate to second result
-    await page.getByRole("button", { name: "Next image" }).click();
+    await page.getByRole("button", { name: "Next file" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
   });
 
@@ -899,7 +899,7 @@ test.describe("Batch processing - Rotate tool", () => {
     await waitForProcessing(page, 30_000);
 
     // Wait for result
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 

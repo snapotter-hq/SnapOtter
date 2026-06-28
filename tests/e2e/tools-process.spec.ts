@@ -24,7 +24,9 @@ test.describe("Tool processing (core tools)", () => {
   test("compress processes image", async ({ loggedInPage: page }) => {
     await page.goto("/image/compress");
     await uploadTestImage(page);
-    // Compress has defaults, just click
+    // Compress defaults to Target Size mode (which needs a value); switch to
+    // Quality mode, which has a default and immediately enables submit.
+    await page.getByRole("button", { name: "Quality" }).click();
     await page.getByRole("button", { name: "Compress" }).click();
     await waitForProcessing(page);
     await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible({
@@ -52,12 +54,11 @@ test.describe("Tool processing (core tools)", () => {
     await expect(page.locator("input[inputmode='numeric']")).toHaveValue("90", { timeout: 2000 });
     await page.getByTestId("rotate-submit").click();
     await waitForProcessing(page);
-    await expect(
-      page
-        .getByRole("button", { name: /^download$/i })
-        .or(page.getByRole("link", { name: /download/i }))
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
+    // The rotate review panel surfaces the result via the shared download
+    // control marked with data-download-button.
+    await expect(page.locator("[data-download-button]").first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("crop processes image", async ({ loggedInPage: page }) => {

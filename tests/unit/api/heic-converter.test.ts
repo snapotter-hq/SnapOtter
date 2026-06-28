@@ -57,16 +57,16 @@ describe("decodeHeic", () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
     const { tmpdir } = await import("node:os");
     const { readdirSync } = await import("node:fs");
-    const beforeSet = new Set(
-      readdirSync(tmpdir()).filter((f) => f.startsWith("heic-in-") || f.startsWith("heic-out-")),
-    );
+    // decodeHeic stamps its temp files with this process's PID. Scope the check
+    // to those so temp files created by other concurrent test-worker processes
+    // (different PID) in the shared tmpdir cannot make this flaky.
+    const mine = (f: string) =>
+      f.startsWith(`heic-in-${process.pid}-`) || f.startsWith(`heic-out-${process.pid}-`);
+    const beforeSet = new Set(readdirSync(tmpdir()).filter(mine));
     await decodeHeic(heicBuf);
-    const after = readdirSync(tmpdir()).filter(
-      (f) => f.startsWith("heic-in-") || f.startsWith("heic-out-"),
-    );
-    // Only check that files created during THIS call were cleaned up.
-    // Other concurrent test workers may create temp files in the same dir.
-    const leftover = after.filter((f) => !beforeSet.has(f));
+    const leftover = readdirSync(tmpdir())
+      .filter(mine)
+      .filter((f) => !beforeSet.has(f));
     expect(leftover).toHaveLength(0);
   });
 });

@@ -9,10 +9,16 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { getPermissions, hasEffectivePermission } from "../permissions.js";
 import { computeKeyPrefix, hashPassword, requireAuth } from "../plugins/auth.js";
+
+// Per-route cap on the API-key management endpoints. Defaults to 30/min as an
+// anti-abuse guard; raised via env in the e2e suite, where many api-keys specs
+// hit the list endpoint in quick succession on a shared IP.
+const API_KEYS_RATE_LIMIT = { max: env.API_KEYS_RATE_LIMIT_PER_MIN, timeWindow: "1 minute" };
 
 const createApiKeySchema = z.object({
   name: z.string().max(100, "Key name must be 100 characters or fewer").optional(),
@@ -24,7 +30,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/api-keys — Generate a new API key
   app.post(
     "/api/v1/api-keys",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -110,7 +116,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/api-keys — List user's API keys (never returns the key itself)
   app.get(
     "/api/v1/api-keys",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -118,6 +124,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
       const selectFields = {
         id: schema.apiKeys.id,
         name: schema.apiKeys.name,
+        keyPrefix: schema.apiKeys.keyPrefix,
         permissions: schema.apiKeys.permissions,
         createdAt: schema.apiKeys.createdAt,
         lastUsedAt: schema.apiKeys.lastUsedAt,
@@ -134,6 +141,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         apiKeys: keys.map((k) => ({
           id: k.id,
           name: k.name,
+          prefix: k.keyPrefix ?? "",
           permissions: k.permissions ?? null,
           createdAt: k.createdAt.toISOString(),
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
@@ -146,7 +154,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /api/v1/api-keys/:id — Delete an API key
   app.delete(
     "/api/v1/api-keys/:id",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;

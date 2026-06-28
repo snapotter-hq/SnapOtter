@@ -9,11 +9,15 @@ async function setTheme(page: import("@playwright/test").Page, theme: "light" | 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
   const wantDark = theme === "dark";
   if (isDark !== wantDark) {
-    const themeBtn = page.locator("button[title='Toggle Theme']");
-    // Fall back to keyboard shortcut if theme button is not visible (e.g. login page)
-    if (await themeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await themeBtn.click();
-    } else {
+    // The toggle lives in the top nav. On pages without it (login) or when a
+    // dialog overlay covers it (settings, help), the click is not actionable,
+    // so fall back to the global mod+shift+d shortcut.
+    const clicked = await page
+      .locator("button[title='Toggle theme']")
+      .click({ timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!clicked) {
       await page.keyboard.press(`${MOD}+Shift+d`);
     }
     await page.waitForTimeout(300);
@@ -23,18 +27,25 @@ async function setTheme(page: import("@playwright/test").Page, theme: "light" | 
 // ---------------------------------------------------------------------------
 // Helper: take a themed screenshot pair (light + dark) for a given page state
 // ---------------------------------------------------------------------------
-async function takeThemedScreenshots(page: import("@playwright/test").Page, baseName: string) {
+async function takeThemedScreenshots(
+  page: import("@playwright/test").Page,
+  baseName: string,
+  target?: import("@playwright/test").Locator,
+) {
+  // When a target locator is given (e.g. the settings dialog), screenshot just
+  // that element so the live page behind a modal -- whose catalog/collapse state
+  // varies between runs -- does not make the comparison flaky. fullPage only
+  // applies to a full-page screenshot.
+  const subject = target ?? page;
+  const opts = target ? {} : { fullPage: false };
+
   // Light theme
   await setTheme(page, "light");
-  await expect(page).toHaveScreenshot(`desktop-${baseName}-light.png`, {
-    fullPage: false,
-  });
+  await expect(subject).toHaveScreenshot(`desktop-${baseName}-light.png`, opts);
 
   // Dark theme
   await setTheme(page, "dark");
-  await expect(page).toHaveScreenshot(`desktop-${baseName}-dark.png`, {
-    fullPage: false,
-  });
+  await expect(subject).toHaveScreenshot(`desktop-${baseName}-dark.png`, opts);
 
   // Reset to light for next test
   await setTheme(page, "light");
@@ -106,39 +117,39 @@ test.describe("Visual Desktop (1280x720)", () => {
     await takeThemedScreenshots(page, "home-empty");
   });
 
-  // ---- Home page (file uploaded, Quick Actions visible) ----
+  // ---- Home page (catalog loaded) ----
   test("home page with file uploaded - light and dark", async ({ loggedInPage: page }) => {
-    await uploadTestImage(page);
+    // 2.0 home is a tool catalog with no dropzone or "Quick Actions" panel.
+    // Capture the loaded catalog state.
+    await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
-
-    // Verify Quick Actions appeared before capturing
-    await expect(page.getByText("Quick Actions").first()).toBeVisible();
 
     await takeThemedScreenshots(page, "home-uploaded");
   });
 
-  // ---- Fullscreen grid page (details shown - default) ----
+  // ---- Catalog grid (formerly the /fullscreen grid) ----
   test("fullscreen grid details shown - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+    // 2.0 removed /fullscreen; the home catalog ("/") is the equivalent grid.
+    await page.goto("/");
     await page.waitForLoadState("networkidle");
+    await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
-
-    // Details are shown by default (showDetails = true)
-    await expect(page.getByText("Hide Details")).toBeVisible();
 
     await takeThemedScreenshots(page, "fullscreen-details-shown");
   });
 
-  // ---- Fullscreen grid page (details hidden) ----
+  // ---- Catalog grid, Image tab selected ----
   test("fullscreen grid details hidden - light and dark", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+    // The 1.x "hide details" toggle no longer exists. Capture the catalog
+    // narrowed to a single modality tab so this stays a distinct view.
+    await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(500);
-
-    // Click "Hide Details" to toggle details off
-    await page.getByText("Hide Details").click();
+    await expect(page.locator("[data-search-input]")).toBeVisible();
+    await page
+      .getByRole("button", { name: /^Image\s/ })
+      .first()
+      .click();
     await page.waitForTimeout(300);
-    await expect(page.getByText("Show Details")).toBeVisible();
 
     await takeThemedScreenshots(page, "fullscreen-details-hidden");
   });
@@ -193,7 +204,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await openSettings(page);
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-general");
+    await takeThemedScreenshots(page, "settings-general", page.getByRole("dialog"));
   });
 
   // ---- Settings dialog - People tab ----
@@ -204,7 +215,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "People" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-people");
+    await takeThemedScreenshots(page, "settings-people", page.getByRole("dialog"));
   });
 
   // ---- Settings dialog - About tab ----
@@ -215,7 +226,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "About" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-about");
+    await takeThemedScreenshots(page, "settings-about", page.getByRole("dialog"));
   });
 
   // ---- Help dialog ----
@@ -223,9 +234,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    // Open help dialog from the sidebar
-    const sidebar = page.locator("aside");
-    await sidebar.getByText("Help").click();
+    // 2.0 moved Help to the top nav bar (the sidebar was removed).
+    await page.getByRole("button", { name: "Help", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(500);
 
@@ -294,7 +304,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForTimeout(500);
 
     // QR generate is a no-dropzone tool; enter text to generate a QR code
-    const textInput = page.locator("input[type='text'], textarea").first();
+    const textInput = page.getByTestId("qr-input-url");
     await textInput.fill("https://snapotter.com");
     await page.waitForTimeout(1000);
 
@@ -413,24 +423,24 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "Security" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-security");
+    await takeThemedScreenshots(page, "settings-security", page.getByRole("dialog"));
   });
 
-  // ---- Sidebar expanded state ----
+  // ---- Top nav bar (formerly the desktop sidebar) ----
   test("sidebar expanded state - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    // Verify sidebar is visible at desktop width
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+    // 2.0 removed the desktop sidebar; the top nav <header> banner is the
+    // equivalent navigation chrome.
+    const nav = page.getByRole("banner");
+    await expect(nav).toBeVisible();
 
-    // Take screenshot focused on sidebar region
     await setTheme(page, "light");
-    await expect(sidebar).toHaveScreenshot("desktop-sidebar-expanded-light.png");
+    await expect(nav).toHaveScreenshot("desktop-sidebar-expanded-light.png");
 
     await setTheme(page, "dark");
-    await expect(sidebar).toHaveScreenshot("desktop-sidebar-expanded-dark.png");
+    await expect(nav).toHaveScreenshot("desktop-sidebar-expanded-dark.png");
 
     await setTheme(page, "light");
   });

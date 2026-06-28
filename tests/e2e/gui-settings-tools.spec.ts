@@ -1,39 +1,49 @@
 import { expect, openSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Settings Dialog -- Tools tab (enable/disable) and Product Analytics
+// Settings Dialog -- Tools tab (enable/disable) and Usage tab
+//
+// 2.0 notes:
+// - The settings dialog content and the AppLayout <main> both carry the
+//   `.flex-1.overflow-y-auto` classes, so scope every query to the dialog via
+//   page.getByRole("dialog") rather than that class pair.
+// - Tool toggles are role="switch" with aria-label set to the tool name.
+// - The old "Product Analytics" tab is now the "Usage" tab (t.settings.nav.usage)
+//   and shows local usage statistics; the consent toggle / privacy link are gone.
 // ---------------------------------------------------------------------------
 
 test.describe("GUI Settings - Tools Tab", () => {
   test("displays tools list with category headings", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
 
-    await expect(page.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
-    await expect(page.getByText("Enable or disable individual tools")).toBeVisible();
+    await expect(dialog.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
+    await expect(dialog.getByText("Enable or disable individual tools")).toBeVisible();
 
     // At least one category heading should be visible (uppercase text)
-    const categoryHeadings = page.locator("h4");
-    await expect(categoryHeadings.first()).toBeVisible();
+    await expect(dialog.locator("h4").first()).toBeVisible();
   });
 
   test("Save Tool Settings button and disabled tools counter", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
 
-    await expect(page.getByRole("button", { name: /save tool settings/i })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /save tool settings/i })).toBeVisible();
 
     // The disabled tools counter text
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible();
   });
 
   test("saving tool settings shows restart banner", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
 
-    await page.getByRole("button", { name: /save tool settings/i }).click();
+    await dialog.getByRole("button", { name: /save tool settings/i }).click();
 
-    await expect(page.getByText("Restart required for changes to take effect.")).toBeVisible({
+    await expect(dialog.getByText("Restart required for changes to take effect.")).toBeVisible({
       timeout: 5_000,
     });
   });
@@ -42,90 +52,95 @@ test.describe("GUI Settings - Tools Tab", () => {
 test.describe("GUI Settings - Tools Tab (additional)", () => {
   test("each category has a heading", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
 
-    await expect(page.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
+    await expect(dialog.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
     // Wait for tools to finish loading
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
     // Category headings are h4 elements inside the dialog content
-    const dialogContent = page.locator(".flex-1.overflow-y-auto");
-    const headings = dialogContent.locator("h4");
+    const headings = dialog.locator("h4");
     const count = await headings.count();
     expect(count).toBeGreaterThanOrEqual(3);
   });
 
   test("tools show both name and description", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
 
     // Wait for tools to load
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
-    // Verify the Resize tool is listed with its description
-    const dialogContent = page.locator(".flex-1.overflow-y-auto");
-    await expect(dialogContent.getByText("Resize").first()).toBeVisible();
+    // The Resize tool is listed with its name (toggle aria-label) and description
+    await expect(dialog.getByRole("switch", { name: "Resize", exact: true })).toBeVisible();
+    await expect(
+      dialog.getByText("Resize by pixels, percentage, or social media presets"),
+    ).toBeVisible();
   });
 });
 
 test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
-  test("disabling a tool and saving hides it from the tool panel", async ({
+  test("disabling a tool and saving hides it from the catalog and tool page", async ({
     loggedInPage: page,
   }) => {
-    // First check the Resize tool is visible in the sidebar tool list
-    await expect(page.locator("aside").getByText("Resize").first()).toBeVisible({ timeout: 5_000 });
-
     // Open settings and disable the Resize tool
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
-    // Find the Resize tool row and its toggle
-    const dialogContent = page.locator(".flex-1.overflow-y-auto");
-    const resizeRow = dialogContent
-      .locator("div")
-      .filter({ hasText: /^Resize$/ })
-      .first();
-
-    // Get the toggle in the same parent container
-    const resizeToggle = resizeRow.locator("..").locator("button.w-11.h-6");
-
-    // Check if the toggle exists; if so, click it to disable
-    if (await resizeToggle.isVisible().catch(() => false)) {
-      // Only click if the tool is currently enabled (toggle has bg-primary class)
-      const isEnabled = await resizeToggle.evaluate((el) => el.classList.contains("bg-primary"));
-      if (isEnabled) {
-        await resizeToggle.click();
-      }
+    // The toggle is a role="switch" labelled with the tool name; aria-checked
+    // is true when the tool is enabled. Make sure Resize starts enabled, then
+    // disable it, asserting each flip so the post-toggle state is flushed before
+    // saving (saveToolSettings persists the current disabledTools state).
+    const resizeSwitch = dialog.getByRole("switch", { name: "Resize", exact: true });
+    await expect(resizeSwitch).toBeVisible();
+    if ((await resizeSwitch.getAttribute("aria-checked")) === "false") {
+      await resizeSwitch.click();
+      await expect(resizeSwitch).toHaveAttribute("aria-checked", "true");
     }
+    await resizeSwitch.click();
+    await expect(resizeSwitch).toHaveAttribute("aria-checked", "false");
 
     // Save tool settings
-    await page.getByRole("button", { name: /save tool settings/i }).click();
-    await expect(page.getByText("Restart required for changes to take effect.")).toBeVisible({
+    await dialog.getByRole("button", { name: /save tool settings/i }).click();
+    await expect(dialog.getByText("Restart required for changes to take effect.")).toBeVisible({
       timeout: 5_000,
     });
 
-    // Close settings
+    // Close settings and reload so the catalog re-reads the disabled-tool list.
     await page.keyboard.press("Escape");
+    await page.goto("/");
 
-    // Re-enable the tool to clean up (reopen settings)
+    // Search is the deterministic way to probe the catalog (sections collapse,
+    // so a tool card may be absent from the DOM even when enabled). A disabled
+    // tool is filtered out of the searchable set, so searching for it yields no
+    // resize card while a sibling search still resolves.
+    const searchInput = page.locator("[data-search-input]");
+    await searchInput.fill("Resize");
+    await expect(page.locator('a[href="/image/resize"]')).toHaveCount(0, { timeout: 5_000 });
+    await searchInput.fill("Crop");
+    await expect(page.locator('a[href="/image/crop"]').first()).toBeVisible({ timeout: 5_000 });
+
+    // The tool page itself shows the disabled message.
+    await page.goto("/image/resize");
+    await expect(page.getByText("This tool has been disabled by your administrator")).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Re-enable the tool to clean up.
+    await page.goto("/");
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
-
-    // Find and re-enable the Resize toggle
-    const resizeRow2 = dialogContent
-      .locator("div")
-      .filter({ hasText: /^Resize$/ })
-      .first();
-    const resizeToggle2 = resizeRow2.locator("..").locator("button.w-11.h-6");
-    if (await resizeToggle2.isVisible().catch(() => false)) {
-      const isDisabled = await resizeToggle2.evaluate((el) => !el.classList.contains("bg-primary"));
-      if (isDisabled) {
-        await resizeToggle2.click();
-      }
+    const dialog2 = page.getByRole("dialog");
+    await dialog2.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog2.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    const resizeSwitch2 = dialog2.getByRole("switch", { name: "Resize", exact: true });
+    if ((await resizeSwitch2.getAttribute("aria-checked")) === "false") {
+      await resizeSwitch2.click();
     }
-    await page.getByRole("button", { name: /save tool settings/i }).click();
+    await dialog2.getByRole("button", { name: /save tool settings/i }).click();
     await page.waitForTimeout(500);
   });
 
@@ -133,27 +148,28 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     loggedInPage: page,
   }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
     // Read the initial disabled count
-    const counterText = page.getByText(/\d+ tools? disabled/);
+    const counterText = dialog.getByText(/\d+ tools? disabled/);
     const initialText = await counterText.textContent();
     const initialCount = parseInt(initialText?.match(/(\d+)/)?.[1] || "0", 10);
 
     // Toggle the first tool off (if it is currently enabled)
-    const firstToggle = page.locator("button.w-11.h-6").first();
-    const wasEnabled = await firstToggle.evaluate((el) => el.classList.contains("bg-primary"));
+    const firstSwitch = dialog.getByRole("switch").first();
+    const wasEnabled = (await firstSwitch.getAttribute("aria-checked")) === "true";
 
     if (wasEnabled) {
-      await firstToggle.click();
+      await firstSwitch.click();
       // Counter should increase by 1
       const afterText = await counterText.textContent();
       const afterCount = parseInt(afterText?.match(/(\d+)/)?.[1] || "0", 10);
       expect(afterCount).toBe(initialCount + 1);
 
       // Toggle it back on
-      await firstToggle.click();
+      await firstSwitch.click();
       const restoredText = await counterText.textContent();
       const restoredCount = parseInt(restoredText?.match(/(\d+)/)?.[1] || "0", 10);
       expect(restoredCount).toBe(initialCount);
@@ -164,103 +180,99 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     loggedInPage: page,
   }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    let dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
     // Read the initial disabled count
-    const counterText = page.getByText(/\d+ tools? disabled/);
-    const initialText = await counterText.textContent();
+    const initialText = await dialog.getByText(/\d+ tools? disabled/).textContent();
     const initialCount = parseInt(initialText?.match(/(\d+)/)?.[1] || "0", 10);
 
     // Toggle the first tool to change state
-    const firstToggle = page.locator("button.w-11.h-6").first();
-    await firstToggle.click();
+    await dialog.getByRole("switch").first().click();
 
     // Save
-    await page.getByRole("button", { name: /save tool settings/i }).click();
-    await expect(page.getByText("Restart required for changes to take effect.")).toBeVisible({
+    await dialog.getByRole("button", { name: /save tool settings/i }).click();
+    await expect(dialog.getByText("Restart required for changes to take effect.")).toBeVisible({
       timeout: 5_000,
     });
 
     // Close and re-open
     await page.keyboard.press("Escape");
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
     // The count should reflect the saved change
-    const afterReopen = await page.getByText(/\d+ tools? disabled/).textContent();
+    const afterReopen = await dialog.getByText(/\d+ tools? disabled/).textContent();
     const afterCount = parseInt(afterReopen?.match(/(\d+)/)?.[1] || "0", 10);
     expect(Math.abs(afterCount - initialCount)).toBe(1);
 
-    // Revert: toggle the first tool back
-    await page.locator("button.w-11.h-6").first().click();
-    await page.getByRole("button", { name: /save tool settings/i }).click();
+    // Revert: toggle the first tool back and save
+    await dialog.getByRole("switch").first().click();
+    await dialog.getByRole("button", { name: /save tool settings/i }).click();
     await page.waitForTimeout(500);
   });
 
-  test("Enable All and Disable All buttons work", async ({ loggedInPage: page }) => {
+  test("toggling all tools in a category", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /tools/i }).click();
+    await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
-    // Look for Enable All / Disable All buttons if they exist
-    const enableAllBtn = page.getByRole("button", { name: /enable all/i });
-    const disableAllBtn = page.getByRole("button", { name: /disable all/i });
+    // 2.0 has no bulk "Enable All" / "Disable All" controls. Each tool is an
+    // individual role="switch". Verify a tool can be toggled and the counter
+    // reacts, then revert.
+    const counter = dialog.getByText(/\d+ tools? disabled/);
+    const initialCount = parseInt((await counter.textContent())?.match(/(\d+)/)?.[1] || "0", 10);
 
-    const hasEnableAll = await enableAllBtn.isVisible().catch(() => false);
-    const hasDisableAll = await disableAllBtn.isVisible().catch(() => false);
+    const firstSwitch = dialog.getByRole("switch").first();
+    const wasEnabled = (await firstSwitch.getAttribute("aria-checked")) === "true";
+    await firstSwitch.click();
 
-    // At least one should be present (depending on current state)
-    // If neither exists, these buttons may not be implemented -- skip gracefully
-    if (hasEnableAll || hasDisableAll) {
-      // Record initial state
-      const counterText = page.getByText(/\d+ tools? disabled/);
-      const initialText = await counterText.textContent();
+    const toggledCount = parseInt((await counter.textContent())?.match(/(\d+)/)?.[1] || "0", 10);
+    expect(toggledCount).toBe(wasEnabled ? initialCount + 1 : initialCount - 1);
 
-      if (hasDisableAll) {
-        await disableAllBtn.click();
-        // Counter should increase
-        const afterDisable = await counterText.textContent();
-        expect(afterDisable).not.toBe(initialText);
-      }
-
-      // Re-enable if possible
-      if (await enableAllBtn.isVisible().catch(() => false)) {
-        await enableAllBtn.click();
-      }
-    }
+    // Revert without saving so we leave no residue on the shared DB.
+    await firstSwitch.click();
+    const revertedCount = parseInt((await counter.textContent())?.match(/(\d+)/)?.[1] || "0", 10);
+    expect(revertedCount).toBe(initialCount);
   });
 });
 
-test.describe("GUI Settings - Product Analytics Tab", () => {
-  test("displays analytics consent section", async ({ loggedInPage: page }) => {
+test.describe("GUI Settings - Usage Tab", () => {
+  test("displays usage section heading and description", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /usage/i }).click();
 
-    await expect(page.getByText("Product Analytics").first()).toBeVisible();
-    await expect(page.getByText(/share anonymous usage data/i)).toBeVisible();
+    await expect(dialog.locator("h3").filter({ hasText: "Usage" }).first()).toBeVisible();
+    await expect(
+      dialog.getByText("Local usage statistics from jobs and file storage."),
+    ).toBeVisible();
   });
 
-  test("analytics toggle is present", async ({ loggedInPage: page }) => {
+  test("shows the time period selector", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /usage/i }).click();
 
-    // Either the toggle button is present, or the admin-disabled message is shown
-    const toggle = page.locator("button.rounded-full");
-    const disabledMsg = page.getByText(/has been disabled by the server administrator/i);
-
-    const toggleVisible = await toggle.isVisible().catch(() => false);
-    const disabledVisible = await disabledMsg.isVisible().catch(() => false);
-
-    // One of the two states must be true
-    expect(toggleVisible || disabledVisible).toBe(true);
+    // The period selector is always rendered (outside the loading branch).
+    await expect(dialog.getByRole("button", { name: "7 days" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "30 days" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "90 days" })).toBeVisible();
   });
 
-  test("privacy policy link is present", async ({ loggedInPage: page }) => {
+  test("switching the period updates the active selection", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.getByRole("button", { name: /product analytics/i }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /usage/i }).click();
 
-    await expect(page.getByRole("link", { name: /learn more/i })).toBeVisible();
+    // 30 days is the default; switching to 7 days marks that pill active
+    // (active pills carry the primary background).
+    const sevenDays = dialog.getByRole("button", { name: "7 days" });
+    await sevenDays.click();
+    await expect(sevenDays).toHaveClass(/bg-primary/);
   });
 });

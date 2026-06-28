@@ -12,7 +12,7 @@
  *
  * All tests are tagged @tablet so the device projects' grep filter picks them up.
  */
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import { expect, openSettings, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Core flow: load -> navigate -> upload -> process -> download
@@ -28,16 +28,26 @@ test.describe("@tablet Core flow", () => {
     // Verify file appeared
     await expect(page.locator("img").first()).toBeVisible();
 
-    // Process
-    const processBtn = page.getByRole("button", { name: /process|apply/i }).first();
-    await expect(processBtn).toBeVisible();
-    await processBtn.click();
+    // In mobile mode (Galaxy Tab S9 at 640px) the settings live in a bottom
+    // sheet that the "Process" section expands; on iPad the panel is already
+    // open. Expand it if present so the width input is reachable.
+    const processSection = page.getByText("Process").last();
+    if (await processSection.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await processSection.click();
+      await page.waitForTimeout(300);
+    }
+
+    // Set a width so the submit button enables, then process.
+    await page.getByRole("spinbutton", { name: /width/i }).first().fill("200");
+    await page.getByTestId("resize-submit").click();
 
     await waitForProcessing(page);
 
-    // Download should appear
-    const downloadBtn = page.getByRole("button", { name: /download/i }).first();
-    await expect(downloadBtn).toBeVisible({ timeout: 15_000 });
+    // Download affordance: side-by-side tools expose an <a data-testid>, others
+    // the review panel's [data-download-button].
+    await expect(
+      page.locator("[data-download-button], a[data-testid$='-download']").first(),
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -89,20 +99,9 @@ test.describe("@tablet Responsive chrome", () => {
   });
 
   test("settings dialog fits within tablet viewport", async ({ loggedInPage: page }) => {
-    // Open settings -- method depends on whether we're in mobile mode
-    // (Galaxy Tab S9 at 640px is mobile; iPad at 810px is not)
-    const bottomNav = page.locator("nav.fixed");
-    const sidebar = page.locator("aside");
-
-    if (await bottomNav.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Mobile layout (Galaxy Tab S9)
-      await bottomNav.getByText("Settings").click();
-    } else if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Desktop layout (iPad gen 7)
-      await sidebar.getByText("Settings").click();
-    } else {
-      await page.getByRole("button", { name: /settings/i }).click();
-    }
+    // openSettings handles both layouts: Galaxy Tab S9 at 640px is mobile
+    // (bottom nav), iPad at 810px is desktop (top-nav avatar dropdown).
+    await openSettings(page);
 
     await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
 

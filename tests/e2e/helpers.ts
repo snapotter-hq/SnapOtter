@@ -192,9 +192,16 @@ export const test = base.extend<{ loggedInPage: Page }>({
     // storageState is already loaded by the project config, just navigate
     await page.goto("/");
     // Self-heal global server settings a crashed predecessor may have left
-    // mutated (e.g. defaultToolView=fullscreen redirects "/" and hides the
-    // sidebar, cascading failures through every later test on the shared DB).
-    const healed = await putSettings(page, { defaultToolView: "sidebar", defaultLocale: "en" });
+    // mutated. defaultToolView=fullscreen would redirect "/"; a stale locale
+    // would translate the whole UI. loginAttemptLimit is the important one:
+    // saving System Settings persists it at the UI default ("5"), which
+    // overrides the env LOGIN_ATTEMPT_LIMIT=100000 and 429s every later admin
+    // login, cascading into "create user 401" failures across the serial run.
+    const healed = await putSettings(page, {
+      defaultToolView: "sidebar",
+      defaultLocale: "en",
+      loginAttemptLimit: "100000",
+    });
     if (!healed.ok) {
       console.warn(`loggedInPage settings heal failed with status ${healed.status}`);
     }
@@ -225,18 +232,22 @@ export async function isAiSidecarRunning(page: Page): Promise<boolean> {
 // openSettings() — reliably open the Settings dialog across all viewports
 // ---------------------------------------------------------------------------
 export async function openSettings(page: Page): Promise<void> {
-  const sidebar = page.locator("aside");
-  if (!(await sidebar.isVisible({ timeout: 2000 }).catch(() => false))) {
-    // Fullscreen grid layout hides the aside behind a banner "Sidebar" toggle.
-    const sidebarToggle = page.getByRole("button", { name: /^sidebar$/i });
-    if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await sidebarToggle.click();
-    }
-  }
-  if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sidebar.getByText("Settings").click();
+  // 2.0 removed the desktop sidebar. Settings now opens from the mobile bottom
+  // nav (below the 768px breakpoint) or the top-nav avatar (user) dropdown
+  // above it. Branch on viewport width rather than probing element visibility:
+  // WebKit can take longer than a short visibility timeout to paint the avatar,
+  // which would otherwise misroute to the mobile path. The avatar button
+  // carries data-testid="user-menu" so this works for any logged-in user.
+  const width = page.viewportSize()?.width ?? 1280;
+  if (width < 768) {
+    // Mobile: Settings lives in the fixed bottom nav.
+    await page
+      .getByRole("button", { name: /settings/i })
+      .first()
+      .click();
   } else {
-    await page.getByRole("button", { name: /settings/i }).click();
+    await page.getByTestId("user-menu").click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
   }
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
 }

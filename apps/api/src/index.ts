@@ -33,6 +33,7 @@ import {
   ensureAnonymousUser,
   ensureBuiltinRoles,
   ensureDefaultAdmin,
+  ensureDefaultTeam,
   getAuthUser,
 } from "./plugins/auth.js";
 import { registerMfa } from "./plugins/mfa.js";
@@ -54,6 +55,7 @@ import { filePreviewRoutes } from "./routes/file-preview.js";
 import { fileRoutes } from "./routes/files.js";
 import { registerMemeTemplates } from "./routes/meme-templates.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
+import { preferencesRoutes } from "./routes/preferences.js";
 import { registerProgressRoutes } from "./routes/progress.js";
 import { rolesRoutes } from "./routes/roles.js";
 import { settingsRoutes } from "./routes/settings.js";
@@ -123,6 +125,7 @@ if (env.SQLITE_MIGRATE_PATH) {
 // inserted via data statements.  The pg baseline is DDL-only, so roles are
 // seeded here at boot time.  onConflictDoNothing makes this idempotent.
 await ensureBuiltinRoles();
+await ensureDefaultTeam();
 
 if (env.AUTH_ENABLED) {
   await ensureDefaultAdmin();
@@ -365,6 +368,9 @@ await registerIpAllowlist(app);
 
 // Public config routes (no auth required)
 await configRoutes(app);
+
+// Per-user preferences (any authenticated user)
+await preferencesRoutes(app);
 
 // Auth middleware (must be registered before routes it protects)
 await authMiddleware(app);

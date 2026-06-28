@@ -61,7 +61,9 @@ test.describe("GUI AI Tools", () => {
       await expect(settings.getByRole("button", { name: "Transparent" })).toBeVisible();
       await expect(settings.getByRole("button", { name: "Color" })).toBeVisible();
       await expect(settings.getByRole("button", { name: "Gradient" })).toBeVisible();
-      await expect(settings.getByRole("button", { name: "Image" })).toBeVisible();
+      // exact match avoids colliding with the file-list button, whose name
+      // contains the uploaded filename "test-image.png" (substring "image")
+      await expect(settings.getByRole("button", { name: "Image", exact: true })).toBeVisible();
     });
 
     test("color presets appear when Color background is selected", async ({
@@ -107,8 +109,10 @@ test.describe("GUI AI Tools", () => {
     }) => {
       await page.goto("/image/remove-background");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("remove-background-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -121,8 +125,10 @@ test.describe("GUI AI Tools", () => {
       await uploadTestImage(page);
 
       // Scope to the settings panel to avoid matching the file list item button
+      // exact match avoids colliding with the file-list button, whose name
+      // contains the uploaded filename "test-image.png" (substring "image")
       const settings = page.locator(".w-72");
-      await settings.getByRole("button", { name: "Image" }).click();
+      await settings.getByRole("button", { name: "Image", exact: true }).click();
       await expect(page.getByText(/upload|choose/i).first()).toBeVisible();
     });
 
@@ -196,8 +202,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/upscale");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("upscale-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -272,8 +280,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/ocr");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("ocr-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -333,8 +343,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/blur-faces");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("blur-faces-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -414,8 +426,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/enhance-faces");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("enhance-faces-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -574,8 +588,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/smart-crop");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("smart-crop-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -608,7 +624,7 @@ test.describe("GUI AI Tools", () => {
   test.describe("Colorize", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/colorize");
-      await expect(page.getByText("Colorize").first()).toBeVisible();
+      await expect(page.getByText("AI Colorization").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
@@ -633,8 +649,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/colorize");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("colorize-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -690,7 +708,9 @@ test.describe("GUI AI Tools", () => {
       const settings = page.locator(".w-72");
       await expect(settings.getByText("Output Format").first()).toBeVisible();
       await expect(settings.getByRole("button", { name: "Original" })).toBeVisible();
-      await expect(settings.getByRole("button", { name: "PNG" })).toBeVisible();
+      // exact match avoids the file-list button, whose accessible name contains
+      // the uploaded filename "test-image.png" (case-insensitive substring "png")
+      await expect(settings.getByRole("button", { name: "PNG", exact: true })).toBeVisible();
       await expect(settings.getByRole("button", { name: "JPEG" })).toBeVisible();
     });
 
@@ -711,8 +731,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/noise-removal");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("noise-removal-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -733,7 +755,9 @@ test.describe("GUI AI Tools", () => {
 
       // Scope to the settings panel to avoid matching the file list item button
       const settings = page.locator(".w-72");
-      await settings.getByRole("button", { name: "PNG" }).click();
+      // exact match avoids the file-list button, whose accessible name contains
+      // the uploaded filename "test-image.png" (case-insensitive substring "png")
+      await settings.getByRole("button", { name: "PNG", exact: true }).click();
       await expect(page.getByTestId("quality-slider")).not.toBeVisible();
     });
   });
@@ -848,15 +872,19 @@ test.describe("GUI AI Tools", () => {
       const settings = page.locator(".w-72");
       await expect(settings.getByText("Output Format").first()).toBeVisible();
       await expect(settings.getByRole("button", { name: "Original" })).toBeVisible();
-      await expect(settings.getByRole("button", { name: "PNG" })).toBeVisible();
+      // exact match avoids the file-list button, whose accessible name contains
+      // the uploaded filename "test-image.png" (case-insensitive substring "png")
+      await expect(settings.getByRole("button", { name: "PNG", exact: true })).toBeVisible();
       await expect(settings.getByRole("button", { name: "JPEG" })).toBeVisible();
     });
 
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/red-eye-removal");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("red-eye-removal-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -877,7 +905,9 @@ test.describe("GUI AI Tools", () => {
 
       // Scope to the settings panel to avoid matching the file list item button
       const settings = page.locator(".w-72");
-      await settings.getByRole("button", { name: "PNG" }).click();
+      // exact match avoids the file-list button, whose accessible name contains
+      // the uploaded filename "test-image.png" (case-insensitive substring "png")
+      await settings.getByRole("button", { name: "PNG", exact: true }).click();
       await settings.getByRole("button", { name: "JPEG" }).click();
       await settings.getByRole("button", { name: "Original" }).click();
     });
@@ -939,8 +969,10 @@ test.describe("GUI AI Tools", () => {
     test("submit disabled without file, enabled with file", async ({ loggedInPage: page }) => {
       await page.goto("/image/restore-photo");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("restore-photo-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -1069,8 +1101,10 @@ test.describe("GUI AI Tools", () => {
     }) => {
       await page.goto("/image/transparency-fixer");
 
+      // Pre-upload the page renders only the dropzone, so the settings panel
+      // (and its submit button) is not in the DOM yet.
       const submitBtn = page.getByTestId("transparency-fixer-submit");
-      await expect(submitBtn).toBeDisabled();
+      await expect(submitBtn).toHaveCount(0);
 
       await uploadTestImage(page);
       await expect(submitBtn).toBeEnabled();
@@ -1084,7 +1118,8 @@ test.describe("GUI AI Tools", () => {
       await page.locator("[class*='border-dashed']").first().click();
       const fileChooser = await fileChooserPromise;
       const path = await import("node:path");
-      const fixtures = path.join(process.cwd(), "tests", "fixtures");
+      // 2.0 moved fixtures under tests/fixtures/<modality>/valid/
+      const fixtures = path.join(process.cwd(), "tests", "fixtures", "image", "valid");
       await fileChooser.setFiles([
         path.join(fixtures, "test-200x150.png"),
         path.join(fixtures, "test-100x100.jpg"),

@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { expect, test, waitForProcessing } from "./helpers";
 
 const PDF_FIXTURE = path.join(
@@ -10,13 +11,23 @@ const PDF_FIXTURE = path.join(
   "test-3page.pdf",
 );
 
+// The dropzone opens a native file chooser on click rather than exposing a
+// persistent <input type="file">, so upload through the chooser event.
+async function uploadPdf(page: Page): Promise<void> {
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: /upload from computer/i })
+    .first()
+    .click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(PDF_FIXTURE);
+  await page.waitForTimeout(500);
+}
+
 test.describe("PDF to Image tool", () => {
   test("shows page thumbnails after uploading a PDF", async ({ loggedInPage: page }) => {
     await page.goto("/pdf/pdf-to-image");
-
-    // Upload PDF via file input
-    const fileInput = page.locator("input[type='file'][accept='application/pdf']");
-    await fileInput.setInputFiles(PDF_FIXTURE);
+    await uploadPdf(page);
 
     // Wait for page count to appear
     await expect(page.locator(".bg-muted").getByText("3 pages")).toBeVisible({ timeout: 15_000 });
@@ -27,10 +38,7 @@ test.describe("PDF to Image tool", () => {
 
   test("converts a PDF page to an image and shows results", async ({ loggedInPage: page }) => {
     await page.goto("/pdf/pdf-to-image");
-
-    // Upload PDF
-    const fileInput = page.locator("input[type='file'][accept='application/pdf']");
-    await fileInput.setInputFiles(PDF_FIXTURE);
+    await uploadPdf(page);
     await expect(page.locator(".bg-muted").getByText("3 pages")).toBeVisible({ timeout: 15_000 });
 
     // Set pages to just page 1
@@ -52,10 +60,7 @@ test.describe("PDF to Image tool", () => {
 
   test("can select and deselect pages via thumbnails", async ({ loggedInPage: page }) => {
     await page.goto("/pdf/pdf-to-image");
-
-    // Upload PDF
-    const fileInput = page.locator("input[type='file'][accept='application/pdf']");
-    await fileInput.setInputFiles(PDF_FIXTURE);
+    await uploadPdf(page);
     await expect(page.locator("text=3 of 3 pages selected")).toBeVisible({ timeout: 15_000 });
 
     // Click "Deselect All"

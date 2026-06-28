@@ -5,8 +5,10 @@ test.describe("Landing Homepage", () => {
     await page.goto("/");
   });
 
-  test("page loads with enterprise title", async ({ page }) => {
-    await expect(page).toHaveTitle(/SnapOtter \| Self-Hosted File Processing for Enterprise/);
+  test("page loads with self-hosted title", async ({ page }) => {
+    await expect(page).toHaveTitle(
+      /SnapOtter \| Self-Hosted File Processing \(Image, Video, Audio, PDF, Files\)/,
+    );
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
@@ -22,7 +24,7 @@ test.describe("Landing Homepage", () => {
 
   test("hero renders the rotating headline and privacy promise", async ({ page }) => {
     await expect(page.locator("h1")).toContainText("tool you need.");
-    await expect(page.locator("h1")).toContainText("Nothing leaves your network.");
+    await expect(page.locator("h1")).toContainText("Your files never leave your network.");
   });
 
   test("hero renders the enterprise subtitle", async ({ page }) => {

@@ -8,7 +8,7 @@ import { expect, getTestHeicPath, test } from "./helpers";
 // ---------------------------------------------------------------------------
 
 function getFixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
 }
 
 function _uploadMultipleFiles(page: import("@playwright/test").Page, filePaths: string[]) {
@@ -48,7 +48,7 @@ test.describe("Batch processing preview and download", () => {
     await expect(page.getByText(/conversion complete/i)).not.toBeVisible({ timeout: 30_000 });
 
     // The image preview area should show an actual image
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 15_000,
     });
 
@@ -86,13 +86,13 @@ test.describe("Batch processing preview and download", () => {
 
     // Wait for processing - should show image preview
     await page.waitForTimeout(3000);
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 20_000,
     });
 
     // Navigate to second image and verify it also has a preview
-    await page.getByRole("button", { name: "Next image" }).click();
-    await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible({
+    await page.getByRole("button", { name: "Next file" }).click();
+    await expect(page.locator("section[aria-label='Preview area'] img").first()).toBeVisible({
       timeout: 5_000,
     });
   });
@@ -102,7 +102,7 @@ test.describe("Batch processing preview and download", () => {
   }) => {
     await page.goto("/brightness-contrast");
     await page.waitForURL("/image/adjust-colors");
-    await expect(page.getByText("Adjust Colors")).toBeVisible();
+    await expect(page.getByText("Adjust Colors").first()).toBeVisible();
   });
 });
 
