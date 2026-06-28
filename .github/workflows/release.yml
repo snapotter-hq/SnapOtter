@@ -239,6 +239,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             SNAPOTTER_ANALYTICS=on
+            SNAPOTTER_POSTHOG_KEY=${{ secrets.SNAPOTTER_POSTHOG_KEY }}
+            SNAPOTTER_SENTRY_DSN=${{ secrets.SNAPOTTER_SENTRY_DSN }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=snapotter/snapotter,ghcr.io/snapotter-hq/snapotter",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }}

@@ -62,9 +62,16 @@ COPY apps/web/public ./apps/web/public
 # Bake analytics config into the shared package before building the frontend.
 # The published image ships with analytics ON; self-builders can override:
 #   docker compose build --build-arg SNAPOTTER_ANALYTICS=off
+# The real Sentry DSN + PostHog key are supplied as build args (public values,
+# sourced from CI secrets in the official build); a build without them stays
+# silent, so building from source never phones home.
 ARG SNAPOTTER_ANALYTICS=on
+ARG SNAPOTTER_POSTHOG_KEY=
+ARG SNAPOTTER_SENTRY_DSN=
 COPY scripts/bake-analytics.mjs ./scripts/
-RUN node scripts/bake-analytics.mjs ${SNAPOTTER_ANALYTICS}
+RUN SNAPOTTER_POSTHOG_KEY="${SNAPOTTER_POSTHOG_KEY}" \
+    SNAPOTTER_SENTRY_DSN="${SNAPOTTER_SENTRY_DSN}" \
+    node scripts/bake-analytics.mjs ${SNAPOTTER_ANALYTICS}
 
 # Build only the web frontend (API runs from TS source via tsx)
 RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
