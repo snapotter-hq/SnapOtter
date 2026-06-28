@@ -63,16 +63,22 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // Flips true once the document is loaded. Drives the render effect to run for
+  // the first page, since setPage(0) is a no-op when page is already 0 (and
+  // pageCount never changes for single-page PDFs).
+  const [docReady, setDocReady] = useState(false);
 
   // Load the document once per file.
   useEffect(() => {
     let cancelled = false;
+    setDocReady(false);
     (async () => {
       const doc = await pdfjs.getDocument({ url: fileUrl }).promise;
       if (cancelled) return;
       docRef.current = doc;
       setPageCount(doc.numPages);
       setPage(0);
+      setDocReady(true);
     })();
     return () => {
       cancelled = true;
@@ -84,6 +90,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   // created once (lazily) and reused; switching pages resizes it and swaps which
   // signature nodes are attached.
   useEffect(() => {
+    if (!docReady) return;
     let cancelled = false;
     (async () => {
       const doc = docRef.current;
@@ -153,7 +160,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     return () => {
       cancelled = true;
     };
-  }, [page, onSelectionChange]);
+  }, [page, docReady, onSelectionChange]);
 
   // Destroy the stage and all nodes on unmount.
   useEffect(() => {
