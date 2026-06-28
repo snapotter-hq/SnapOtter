@@ -97,6 +97,7 @@ DOCS_SCRIPTS = {
     "doc_to_word",
     "doc_metadata",
     "doc_html_pdf",
+    "doc_sign",
 }
 
 if DISPATCHER_PROFILE == "docs":
