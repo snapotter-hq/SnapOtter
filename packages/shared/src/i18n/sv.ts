@@ -3163,6 +3163,7 @@ export const sv: TranslationKeys = {
     toolPalette: "Verktygspalett",
     clickToAdd: "Klicka för att lägga till i pipeline",
     savedLabel: "Sparad",
+    templatesLabel: "Mallar",
     importButton: "Importera",
     noSavedPipelines: "Inga sparade pipelines",
     stepCount: "({count} steg)",
@@ -3447,5 +3448,45 @@ export const sv: TranslationKeys = {
     helpDialog: "Hjälp",
     navigationMenu: "Navigering",
     homeLink: "SnapOtter hem",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Webboptimera",
+      description:
+        "Ändra storlek, konvertera till WebP och komprimera en bild för snabb webbinläsning.",
+    },
+    "email-friendly": {
+      name: "E-postvänlig",
+      description:
+        "Krymp en bild så att den blir tillräckligt liten för att bifoga i ett e-postmeddelande.",
+    },
+    "privacy-scrub": {
+      name: "Integritetsrensning",
+      description: "Ta bort EXIF, GPS och andra metadata, och komprimera sedan.",
+    },
+    "social-square": {
+      name: "Social kvadrat",
+      description: "Beskär till en kvadrat på 1:1 och komprimera för inlägg på sociala medier.",
+    },
+    "watermark-batch": {
+      name: "Vattenstämpel i grupp",
+      description: "Stämpla en textvattenstämpel på bilder och komprimera sedan.",
+    },
+    "shrink-pdf-email": {
+      name: "Krymp PDF för e-post",
+      description: "Platta ut och komprimera en PDF kraftigt så att den ryms inom e-postgränserna.",
+    },
+    "podcast-polish": {
+      name: "Putsa podd",
+      description: "Ta bort tystnad, normalisera ljudnivån och lägg till toningar i en inspelning.",
+    },
+    "cut-out-subject": {
+      name: "Klipp ut motivet",
+      description: "Ta bort bakgrunden med AI och komprimera den transparenta urklippsbilden.",
+    },
+    "restore-old-photo": {
+      name: "Återställ gammalt foto",
+      description: "Reparera, färglägg och skala upp ett gammalt eller skadat foto med AI.",
+    },
   },
 } as const;

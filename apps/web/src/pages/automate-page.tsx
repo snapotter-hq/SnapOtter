@@ -1,4 +1,4 @@
-import { modalityForExtension } from "@snapotter/shared";
+import { modalityForExtension, type PipelineTemplate } from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronDown,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { TemplatesSection } from "@/components/automate/templates-section";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { Dropzone } from "@/components/common/dropzone";
 import { FileLibraryModal } from "@/components/common/file-library-modal";
@@ -273,6 +274,13 @@ export function AutomatePage() {
   const handleLoadPipeline = useCallback(
     (pipeline: SavedPipeline) => {
       loadSteps(pipeline.steps);
+    },
+    [loadSteps],
+  );
+
+  const handleUseTemplate = useCallback(
+    (template: PipelineTemplate) => {
+      loadSteps(template.steps);
     },
     [loadSteps],
   );
@@ -738,6 +746,9 @@ export function AutomatePage() {
 
           {/* Tool catalog */}
           <ToolPalette onAddStep={handleAddStep} className="flex-1 min-h-0" />
+
+          {/* Pipeline templates */}
+          <TemplatesSection onUse={handleUseTemplate} emphasized={steps.length === 0} />
 
           {/* Saved pipelines */}
           <div className="px-3 py-2 border-t border-border shrink-0">

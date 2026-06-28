@@ -3118,6 +3118,7 @@ export const ja: TranslationKeys = {
     toolPalette: "ツールパレット",
     clickToAdd: "クリックでPipelineに追加",
     savedLabel: "保存済み",
+    templatesLabel: "テンプレート",
     importButton: "インポート",
     noSavedPipelines: "保存されたPipelineはありません",
     stepCount: "（{count}ステップ）",
@@ -3404,6 +3405,44 @@ export const ja: TranslationKeys = {
     helpDialog: "ヘルプ",
     navigationMenu: "ナビゲーション",
     homeLink: "SnapOtter ホーム",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Web向けに最適化",
+      description: "画像をリサイズし、WebPに変換して圧縮し、Webでの読み込みを高速化します。",
+    },
+    "email-friendly": {
+      name: "メール添付向け",
+      description: "メールに添付できるよう、画像を十分に小さく縮小します。",
+    },
+    "privacy-scrub": {
+      name: "プライバシー消去",
+      description: "EXIF、GPS、その他のメタデータを削除してから圧縮します。",
+    },
+    "social-square": {
+      name: "SNS用スクエア",
+      description: "1:1の正方形にトリミングし、SNS投稿向けに圧縮します。",
+    },
+    "watermark-batch": {
+      name: "透かし一括",
+      description: "画像にテキストの透かしを入れてから圧縮します。",
+    },
+    "shrink-pdf-email": {
+      name: "メール用にPDFを縮小",
+      description: "PDFをフラット化し、メールの制限に収まるよう強力に圧縮します。",
+    },
+    "podcast-polish": {
+      name: "ポッドキャスト仕上げ",
+      description: "無音部分を削除し、音量を正規化して、録音にフェードを追加します。",
+    },
+    "cut-out-subject": {
+      name: "被写体を切り抜き",
+      description: "AIで背景を除去し、透明な切り抜きを圧縮します。",
+    },
+    "restore-old-photo": {
+      name: "古い写真を復元",
+      description: "AIで古い写真や傷んだ写真を修復し、着色して拡大します。",
+    },
   },
 } as const;
 

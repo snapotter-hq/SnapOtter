@@ -3115,6 +3115,7 @@ export const en = {
     toolPalette: "Tool Palette",
     clickToAdd: "Click to add to pipeline",
     savedLabel: "Saved",
+    templatesLabel: "Templates",
     importButton: "Import",
     noSavedPipelines: "No saved pipelines",
     stepCount: "({count} step)",
@@ -3399,6 +3400,44 @@ export const en = {
     helpDialog: "Help",
     navigationMenu: "Navigation",
     homeLink: "SnapOtter home",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Web-optimize",
+      description: "Resize, convert to WebP, and compress an image for fast web loading.",
+    },
+    "email-friendly": {
+      name: "Email-friendly",
+      description: "Shrink an image so it's small enough to attach to an email.",
+    },
+    "privacy-scrub": {
+      name: "Privacy scrub",
+      description: "Strip EXIF, GPS, and other metadata, then compress.",
+    },
+    "social-square": {
+      name: "Social square",
+      description: "Crop to a 1:1 square and compress for social posts.",
+    },
+    "watermark-batch": {
+      name: "Watermark batch",
+      description: "Stamp a text watermark on images, then compress.",
+    },
+    "shrink-pdf-email": {
+      name: "Shrink PDF for email",
+      description: "Flatten and aggressively compress a PDF to fit email limits.",
+    },
+    "podcast-polish": {
+      name: "Podcast polish",
+      description: "Remove dead air, normalize loudness, and add fades to a recording.",
+    },
+    "cut-out-subject": {
+      name: "Cut out subject",
+      description: "Remove the background with AI and compress the transparent cutout.",
+    },
+    "restore-old-photo": {
+      name: "Restore old photo",
+      description: "Repair, colorize, and upscale an old or damaged photo with AI.",
+    },
   },
 } as const;
 

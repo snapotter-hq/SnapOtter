@@ -3166,6 +3166,7 @@ export const es: TranslationKeys = {
     toolPalette: "Paleta de herramientas",
     clickToAdd: "Clic para agregar al Pipeline",
     savedLabel: "Guardado",
+    templatesLabel: "Plantillas",
     importButton: "Importar",
     noSavedPipelines: "No hay Pipelines guardados",
     stepCount: "({count} paso)",
@@ -3452,5 +3453,46 @@ export const es: TranslationKeys = {
     helpDialog: "Ayuda",
     navigationMenu: "Navegación",
     homeLink: "Inicio de SnapOtter",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Optimizar para web",
+      description:
+        "Redimensiona, convierte a WebP y comprime una imagen para una carga web rápida.",
+    },
+    "email-friendly": {
+      name: "Apto para correo",
+      description:
+        "Reduce una imagen para que sea lo bastante pequeña para adjuntarla a un correo.",
+    },
+    "privacy-scrub": {
+      name: "Limpieza de privacidad",
+      description: "Elimina los datos EXIF, GPS y otros metadatos, y luego comprime.",
+    },
+    "social-square": {
+      name: "Cuadrado social",
+      description: "Recorta a un cuadrado 1:1 y comprime para publicaciones en redes sociales.",
+    },
+    "watermark-batch": {
+      name: "Marca de agua por lotes",
+      description: "Estampa una marca de agua de texto en las imágenes y luego comprime.",
+    },
+    "shrink-pdf-email": {
+      name: "Reducir PDF para correo",
+      description:
+        "Aplana y comprime de forma agresiva un PDF para que cumpla los límites del correo.",
+    },
+    "podcast-polish": {
+      name: "Pulido de pódcast",
+      description: "Elimina los silencios, normaliza el volumen y añade fundidos a una grabación.",
+    },
+    "cut-out-subject": {
+      name: "Recortar el sujeto",
+      description: "Quita el fondo con IA y comprime el recorte transparente.",
+    },
+    "restore-old-photo": {
+      name: "Restaurar foto antigua",
+      description: "Repara, colorea y amplía una foto antigua o dañada con IA.",
+    },
   },
 } as const;

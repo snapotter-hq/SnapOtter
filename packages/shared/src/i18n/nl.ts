@@ -3175,6 +3175,7 @@ export const nl: TranslationKeys = {
     toolPalette: "Gereedschapspalet",
     clickToAdd: "Klik om toe te voegen aan pipeline",
     savedLabel: "Opgeslagen",
+    templatesLabel: "Sjablonen",
     importButton: "Importeren",
     noSavedPipelines: "Geen opgeslagen pipelines",
     stepCount: "({count} stap)",
@@ -3460,5 +3461,46 @@ export const nl: TranslationKeys = {
     helpDialog: "Help",
     navigationMenu: "Navigatie",
     homeLink: "SnapOtter startpagina",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Optimaliseren voor web",
+      description:
+        "Verklein, converteer naar WebP en comprimeer een afbeelding voor snel laden op het web.",
+    },
+    "email-friendly": {
+      name: "E-mailvriendelijk",
+      description:
+        "Verklein een afbeelding zodat die klein genoeg is om aan een e-mail toe te voegen.",
+    },
+    "privacy-scrub": {
+      name: "Privacy opschonen",
+      description: "Verwijder EXIF, GPS en andere metadata en comprimeer daarna.",
+    },
+    "social-square": {
+      name: "Sociaal vierkant",
+      description:
+        "Bijsnijden tot een vierkant van 1:1 en comprimeren voor berichten op sociale media.",
+    },
+    "watermark-batch": {
+      name: "Watermerk in batch",
+      description: "Plaats een tekstwatermerk op afbeeldingen en comprimeer daarna.",
+    },
+    "shrink-pdf-email": {
+      name: "PDF verkleinen voor e-mail",
+      description: "Plat maken en een PDF stevig comprimeren zodat die binnen e-maillimieten past.",
+    },
+    "podcast-polish": {
+      name: "Podcast bijschaven",
+      description: "Verwijder stiltes, normaliseer het volume en voeg fades toe aan een opname.",
+    },
+    "cut-out-subject": {
+      name: "Onderwerp uitsnijden",
+      description: "Verwijder de achtergrond met AI en comprimeer de transparante uitsnede.",
+    },
+    "restore-old-photo": {
+      name: "Oude foto herstellen",
+      description: "Repareer, kleur in en vergroot een oude of beschadigde foto met AI.",
+    },
   },
 } as const;

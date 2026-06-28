@@ -3175,6 +3175,7 @@ export const tr: TranslationKeys = {
     toolPalette: "Araç Paleti",
     clickToAdd: "Pipeline'a eklemek için tıklayın",
     savedLabel: "Kaydedildi",
+    templatesLabel: "Şablonlar",
     importButton: "İçe Aktar",
     noSavedPipelines: "Kayıtlı Pipeline yok",
     stepCount: "({count} adım)",
@@ -3460,5 +3461,45 @@ export const tr: TranslationKeys = {
     helpDialog: "Yardım",
     navigationMenu: "Gezinme",
     homeLink: "SnapOtter ana sayfa",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Web için optimize et",
+      description:
+        "Hızlı web yüklemesi için bir görseli yeniden boyutlandır, WebP'ye dönüştür ve sıkıştır.",
+    },
+    "email-friendly": {
+      name: "E-postaya uygun",
+      description: "Bir görseli e-postaya eklenebilecek kadar küçült.",
+    },
+    "privacy-scrub": {
+      name: "Gizlilik temizliği",
+      description: "EXIF, GPS ve diğer meta verileri kaldır, ardından sıkıştır.",
+    },
+    "social-square": {
+      name: "Sosyal kare",
+      description: "1:1 kareye kırp ve sosyal medya gönderileri için sıkıştır.",
+    },
+    "watermark-batch": {
+      name: "Toplu filigran",
+      description: "Görsellere metin filigranı bas, ardından sıkıştır.",
+    },
+    "shrink-pdf-email": {
+      name: "E-posta için PDF'yi küçült",
+      description:
+        "Bir PDF'yi düzleştir ve e-posta sınırlarına sığması için güçlü biçimde sıkıştır.",
+    },
+    "podcast-polish": {
+      name: "Podcast rötuşu",
+      description: "Sessizlikleri kaldır, ses düzeyini normalleştir ve kayda geçişler ekle.",
+    },
+    "cut-out-subject": {
+      name: "Özneyi kes",
+      description: "Arka planı yapay zekâ ile kaldır ve saydam kesiti sıkıştır.",
+    },
+    "restore-old-photo": {
+      name: "Eski fotoğrafı onar",
+      description: "Eski veya hasarlı bir fotoğrafı yapay zekâ ile onar, renklendir ve büyüt.",
+    },
   },
 } as const;

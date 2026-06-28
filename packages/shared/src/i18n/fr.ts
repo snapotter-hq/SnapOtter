@@ -3190,6 +3190,7 @@ export const fr: TranslationKeys = {
     toolPalette: "Palette d'outils",
     clickToAdd: "Cliquez pour ajouter au Pipeline",
     savedLabel: "Enregistré",
+    templatesLabel: "Modèles",
     importButton: "Importer",
     noSavedPipelines: "Aucun Pipeline enregistré",
     stepCount: "({count} étape)",
@@ -3475,5 +3476,46 @@ export const fr: TranslationKeys = {
     helpDialog: "Aide",
     navigationMenu: "Navigation",
     homeLink: "Accueil SnapOtter",
+  },
+  pipelineTemplates: {
+    "web-optimize": {
+      name: "Optimiser pour le web",
+      description:
+        "Redimensionne, convertit en WebP et compresse une image pour un chargement web rapide.",
+    },
+    "email-friendly": {
+      name: "Adapté aux e-mails",
+      description: "Réduit une image pour qu'elle soit assez petite pour être jointe à un e-mail.",
+    },
+    "privacy-scrub": {
+      name: "Nettoyage de confidentialité",
+      description: "Supprime les métadonnées EXIF, GPS et autres, puis compresse.",
+    },
+    "social-square": {
+      name: "Carré pour réseaux sociaux",
+      description:
+        "Recadre au format carré 1:1 et compresse pour les publications sur les réseaux sociaux.",
+    },
+    "watermark-batch": {
+      name: "Filigrane par lot",
+      description: "Appose un filigrane texte sur les images, puis compresse.",
+    },
+    "shrink-pdf-email": {
+      name: "Réduire un PDF pour e-mail",
+      description: "Aplatit et compresse fortement un PDF pour respecter les limites des e-mails.",
+    },
+    "podcast-polish": {
+      name: "Peaufiner un podcast",
+      description:
+        "Supprime les silences, normalise le volume et ajoute des fondus à un enregistrement.",
+    },
+    "cut-out-subject": {
+      name: "Détourer le sujet",
+      description: "Supprime l'arrière-plan avec l'IA et compresse le détourage transparent.",
+    },
+    "restore-old-photo": {
+      name: "Restaurer une vieille photo",
+      description: "Répare, colorise et agrandit une photo ancienne ou abîmée avec l'IA.",
+    },
   },
 } as const;
