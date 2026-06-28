@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <strong>Self-hosted file toolkit. 157 tools across image, video, audio, PDF, and files.</strong><br />
+  <strong>Self-hosted file toolkit. 240 tools across image, video, audio, PDF, and files.</strong><br />
   The open-source alternative to Smallpdf, iLovePDF, TinyPNG, CloudConvert, and Otter.ai, in one stack you host yourself.
 </p>
 
