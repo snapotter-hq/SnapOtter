@@ -96,10 +96,11 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       expect(mockPosthogInit).toHaveBeenCalledOnce();
     });
 
-    it("track() forwards to posthog.capture", async () => {
+    it("track() forwards only allow-listed properties to posthog.capture", async () => {
       await mod.initAnalytics(enabledConfig);
-      mod.track("tool_used", { tool: "resize" });
-      expect(mockCapture).toHaveBeenCalledWith("tool_used", { tool: "resize" });
+      mod.track("tool_opened", { tool_id: "resize", filename: "secret.png" });
+      // filename is free-text and never allow-listed, so it is stripped.
+      expect(mockCapture).toHaveBeenCalledWith("tool_opened", { tool_id: "resize" });
     });
 
     it("initAnalytics initializes Sentry when sentryDsn provided", async () => {
@@ -115,7 +116,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
   });
 
   describe("PII never leaks even when analytics enabled", () => {
-    it("Sentry strips user.email and user.username from events", async () => {
+    it("Sentry strips the entire user object from events", async () => {
       await mod.initAnalytics(enabledConfig);
       const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
       const beforeSend = sentryCall?.[0].beforeSend;
@@ -126,12 +127,11 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
         exception: { values: [] },
       };
       const result = beforeSend(event);
-      expect(result.user.email).toBeUndefined();
-      expect(result.user.username).toBeUndefined();
-      expect(result.user.id).toBe("123");
+      // The hardened model removes the whole user object, not just email/username.
+      expect(result.user).toBeUndefined();
     });
 
-    it("Sentry redacts file paths from exception values", async () => {
+    it("Sentry removes free-text and paths from exception values", async () => {
       await mod.initAnalytics(enabledConfig);
       const sentryCall = mockSentryInit.mock.calls.find((call: unknown[]) => call[0]?.beforeSend);
       const beforeSend = sentryCall?.[0].beforeSend;
@@ -141,6 +141,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
         exception: {
           values: [
             {
+              type: "Error",
               value: "Error processing /tmp/workspace/photo.jpg",
               stacktrace: {
                 frames: [{ filename: "/Users/test/project/handler.png" }],
@@ -150,9 +151,11 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
         },
       };
       const result = beforeSend(event);
+      // Free-text message is replaced by the bare error type; the path cannot leak.
+      expect(result.exception.values[0].value).toBe("Error");
       expect(result.exception.values[0].value).not.toContain("photo.jpg");
-      expect(result.exception.values[0].value).toContain("[REDACTED]");
-      expect(result.exception.values[0].stacktrace.frames[0].filename).toContain("[REDACTED]");
+      // Stack frame keeps only the basename.
+      expect(result.exception.values[0].stacktrace.frames[0].filename).toBe("handler.png");
     });
 
     it("Sentry blocks ui.click breadcrumbs", async () => {

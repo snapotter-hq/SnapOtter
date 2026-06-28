@@ -2732,10 +2732,16 @@ describe("useAnalyticsStore", () => {
     expect(s.configLoaded).toBe(true);
   });
 
-  it("fetchConfig skips when already loaded", async () => {
+  it("fetchConfig refetches even when already loaded so opt-out converges", async () => {
     useAnalyticsStore.setState({ configLoaded: true });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ enabled: false }),
+    });
     await useAnalyticsStore.getState().fetchConfig();
-    expect(fetchMock).not.toHaveBeenCalled();
+    // No one-shot guard: an already-open tab must pick up an instance-wide opt-out.
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/config/analytics");
+    expect(useAnalyticsStore.getState().config).toEqual({ enabled: false });
   });
 
   it("fetchConfig sets configLoaded=true on error", async () => {

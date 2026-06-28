@@ -175,17 +175,22 @@ describe("trackEvent", () => {
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
-  it("captures event when enabled and initialized", async () => {
+  it("captures event with only allow-listed properties when enabled", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
     bakedConfig.sampleRate = 1.0;
     await mod.initAnalytics();
 
-    await mod.trackEvent("tool_used", { tool: "resize" });
+    await mod.trackEvent("tool_used", {
+      tool_id: "resize",
+      status: "completed",
+      error_message: "secret detail",
+    });
     expect(mockCapture).toHaveBeenCalledWith({
       distinctId: "unknown",
       event: "tool_used",
-      properties: { tool: "resize" },
+      // error_message is free-text and never allow-listed.
+      properties: { tool_id: "resize", status: "completed" },
     });
   });
 

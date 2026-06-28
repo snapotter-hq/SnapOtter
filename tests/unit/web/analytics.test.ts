@@ -125,16 +125,26 @@ describe("analytics lib (baked model)", () => {
   });
 
   describe("track", () => {
-    it("calls capture when initialized", async () => {
+    it("forwards only allow-listed primitive properties for a known event", async () => {
       await mod.initAnalytics(enabledConfig);
-      mod.track("tool_used", { tool: "resize" });
-      expect(mockCapture).toHaveBeenCalledWith("tool_used", { tool: "resize" });
+      mod.track("tool_opened", { tool_id: "resize", category: "image", secret: "leak" });
+      // Allow-listed keys pass through; anything else is dropped at the boundary.
+      expect(mockCapture).toHaveBeenCalledWith("tool_opened", {
+        tool_id: "resize",
+        category: "image",
+      });
     });
 
-    it("works without properties", async () => {
+    it("sends an empty property bag when none are provided", async () => {
       await mod.initAnalytics(enabledConfig);
-      mod.track("simple_event");
-      expect(mockCapture).toHaveBeenCalledWith("simple_event", undefined);
+      mod.track("tool_opened");
+      expect(mockCapture).toHaveBeenCalledWith("tool_opened", {});
+    });
+
+    it("drops all properties for an unknown event", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mod.track("not_allow_listed", { tool_id: "resize" });
+      expect(mockCapture).toHaveBeenCalledWith("not_allow_listed", {});
     });
 
     it("does not throw before initialization", () => {
@@ -175,15 +185,19 @@ describe("analytics lib (baked model)", () => {
       return sentryCall ? sentryCall[0].beforeSend : null;
     }
 
-    it("scrubs file extensions from exception values", async () => {
+    it("strips identity and free-text channels from exception events", async () => {
       const beforeSend = await getBeforeSend();
       if (!beforeSend) return;
 
       const event = {
-        user: { email: "test@example.com", username: "user1" },
+        user: { email: "test@example.com", username: "user1", id: "42" },
+        message: "boom at /tmp/workspace/image.jpg",
+        request: { url: "https://app/secret" },
+        breadcrumbs: [{ message: "/Users/test/file.png" }],
         exception: {
           values: [
             {
+              type: "TypeError",
               value: "Failed to load /tmp/workspace/image.jpg",
               stacktrace: {
                 frames: [
@@ -199,11 +213,16 @@ describe("analytics lib (baked model)", () => {
       };
 
       const result = beforeSend(event);
-      expect(result.user.email).toBeUndefined();
-      expect(result.user.username).toBeUndefined();
-      expect(result.exception.values[0].value).toContain("[REDACTED]");
-      expect(result.exception.values[0].stacktrace.frames[0].filename).toContain("[REDACTED]");
-      expect(result.exception.values[0].stacktrace.frames[0].abs_path).toContain("[REDACTED]");
+      // Identity and free-text channels are removed wholesale.
+      expect(result.user).toBeUndefined();
+      expect(result.message).toBeUndefined();
+      expect(result.request).toBeUndefined();
+      expect(result.breadcrumbs).toBeUndefined();
+      // The exception message is replaced by its type so no free text leaves.
+      expect(result.exception.values[0].value).toBe("TypeError");
+      // Stack frames keep only the basename; absolute paths are dropped.
+      expect(result.exception.values[0].stacktrace.frames[0].filename).toBe("file.png");
+      expect(result.exception.values[0].stacktrace.frames[0].abs_path).toBeUndefined();
     });
 
     it("handles event without user or exception fields", async () => {
@@ -214,16 +233,16 @@ describe("analytics lib (baked model)", () => {
       expect(result).toBeDefined();
     });
 
-    it("handles exception values without stacktrace", async () => {
+    it("replaces the exception message with its type when there is no stacktrace", async () => {
       const beforeSend = await getBeforeSend();
       if (!beforeSend) return;
 
       const event = {
-        exception: { values: [{ value: "plain error" }] },
+        exception: { values: [{ type: "RangeError", value: "plain error at /tmp/x.png" }] },
       };
       const result = beforeSend(event);
       expect(result).toBeDefined();
-      expect(result.exception.values[0].value).toBe("plain error");
+      expect(result.exception.values[0].value).toBe("RangeError");
     });
   });
 
@@ -256,38 +275,34 @@ describe("analytics lib (baked model)", () => {
       expect(result).toBeNull();
     });
 
-    it("scrubs messages containing file paths", async () => {
+    it("drops console breadcrumbs even with file paths", async () => {
       const beforeBreadcrumb = await getBeforeBreadcrumb();
       if (!beforeBreadcrumb) return;
 
-      const breadcrumb = {
+      const result = beforeBreadcrumb({
         category: "console",
         message: "Error loading /tmp/workspace/file.jpg",
-      };
-      const result = beforeBreadcrumb(breadcrumb);
-      expect(result).not.toBeNull();
-      expect(result.message).toContain("[REDACTED]");
+      });
+      expect(result).toBeNull();
     });
 
-    it("passes through fetch breadcrumbs without file extension URLs", async () => {
+    it("drops fetch breadcrumbs to non-file URLs too", async () => {
       const beforeBreadcrumb = await getBeforeBreadcrumb();
       if (!beforeBreadcrumb) return;
 
-      const breadcrumb = {
+      const result = beforeBreadcrumb({
         category: "fetch",
         data: { url: "https://example.com/api/v1/health" },
-      };
-      const result = beforeBreadcrumb(breadcrumb);
-      expect(result).not.toBeNull();
+      });
+      expect(result).toBeNull();
     });
 
-    it("passes through breadcrumbs without message field", async () => {
+    it("drops navigation breadcrumbs without a message", async () => {
       const beforeBreadcrumb = await getBeforeBreadcrumb();
       if (!beforeBreadcrumb) return;
 
-      const breadcrumb = { category: "navigation" };
-      const result = beforeBreadcrumb(breadcrumb);
-      expect(result).not.toBeNull();
+      const result = beforeBreadcrumb({ category: "navigation" });
+      expect(result).toBeNull();
     });
   });
 });
