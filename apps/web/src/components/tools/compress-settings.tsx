@@ -22,11 +22,18 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
   const [sizeUnit, setSizeUnit] = useState<SizeUnit>("KB");
 
   const prevSettingsKeyRef = useRef<string | null>(null);
+  // When local state is synced FROM props (initialSettings), the resulting emit
+  // effect must not echo those values back through onChange. Doing so feeds a
+  // new initialSettings object in (e.g. via the pipeline store), and a preset
+  // that differs from the default state ping-pongs the two effects into an
+  // infinite render loop (React error #185).
+  const syncingRef = useRef(false);
   useEffect(() => {
     if (!initialSettings) return;
     const key = JSON.stringify(initialSettings);
     if (prevSettingsKeyRef.current === key) return;
     prevSettingsKeyRef.current = key;
+    syncingRef.current = true;
     if (initialSettings.mode != null) setMode(initialSettings.mode as CompressMode);
     if (initialSettings.quality != null) setQuality(Number(initialSettings.quality));
     if (initialSettings.targetSizeKb != null)
@@ -39,6 +46,10 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
   });
 
   useEffect(() => {
+    if (syncingRef.current) {
+      syncingRef.current = false;
+      return;
+    }
     if (mode === "quality") {
       onChangeRef.current?.({ mode, quality });
     } else {
