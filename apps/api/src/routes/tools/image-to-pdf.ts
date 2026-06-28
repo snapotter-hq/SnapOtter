@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { apiToolPath } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
@@ -86,6 +87,12 @@ async function compressImagesForTarget(
   return { buffers: bestBuffers, quality: bestQuality, targetMet: finalSize <= budget };
 }
 
+/** Case-insensitive check that a filename ends with one of the accepted extensions. */
+function matchesAccept(filename: string, accept: string[]): boolean {
+  const lower = filename.toLowerCase();
+  return accept.some((ext) => lower.endsWith(ext.toLowerCase()));
+}
+
 async function flattenAlpha(buf: Buffer): Promise<Buffer> {
   const meta = await sharp(buf).metadata();
   if (meta.hasAlpha) {
@@ -96,8 +103,11 @@ async function flattenAlpha(buf: Buffer): Promise<Buffer> {
   return buf;
 }
 
-export function registerImageToPdf(app: FastifyInstance) {
-  app.post("/api/v1/tools/image/image-to-pdf", async (request, reply) => {
+export function registerImageToPdfRoute(
+  app: FastifyInstance,
+  opts: { toolId: string; accept?: string[] },
+) {
+  app.post(apiToolPath(opts.toolId), async (request, reply) => {
     const files: Array<{ buffer: Buffer; filename: string }> = [];
     let settingsRaw: string | null = null;
 
@@ -129,6 +139,16 @@ export function registerImageToPdf(app: FastifyInstance) {
 
     if (files.length === 0) {
       return reply.status(400).send({ error: "No image files provided" });
+    }
+
+    if (opts.accept) {
+      const accept = opts.accept;
+      const invalid = files.find((file) => !matchesAccept(file.filename, accept));
+      if (invalid) {
+        return reply.status(400).send({
+          error: `Invalid image "${invalid.filename}": this converter only accepts ${accept.join(", ")} files`,
+        });
+      }
     }
 
     let settings: z.infer<typeof settingsSchema>;
@@ -337,4 +357,16 @@ export function registerImageToPdf(app: FastifyInstance) {
       });
     }
   });
+}
+
+export function registerImageToPdf(app: FastifyInstance) {
+  registerImageToPdfRoute(app, { toolId: "image-to-pdf" });
+}
+
+/**
+ * Register an "<image format> to PDF" conversion preset that reuses the
+ * image-to-pdf route logic with inputs narrowed to the given extensions.
+ */
+export function registerImageToPdfPreset(app: FastifyInstance, toolId: string, accept: string[]) {
+  registerImageToPdfRoute(app, { toolId, accept });
 }
