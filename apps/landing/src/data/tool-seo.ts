@@ -6795,6 +6795,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "sign-pdf": {
+    searchTitle: "Sign a PDF Online Free",
+    longDescription:
+      "Add a signature to a PDF by drawing it, typing it, or uploading a signature image, then drag it onto the page and resize it to fit. This is a visual electronic signature for approvals and sign-off, not a cryptographic certificate-based digital signature. Runs locally on your SnapOtter instance, so contracts and agreements never leave your network.",
+    useCases: [
+      "Signing a contract or agreement before sending it back",
+      "Filling in and signing an onboarding or HR form",
+      "Placing initials on each page of a multi-page document",
+      "Signing an invoice without printing and scanning it",
+    ],
+    features: [
+      "Draw, type, or upload a signature image",
+      "Drag to position and resize the signature anywhere on a page",
+      "Add signatures or initials across one page or many",
+      "Reuse saved signatures stored locally in your browser",
+      "Visual electronic signature applied as a non-destructive overlay",
+    ],
+    faqs: [
+      {
+        q: "How do I sign a PDF?",
+        a: "Draw your signature, type it, or upload an image of it, then drag it onto the page and resize it to fit. Everything is processed locally on your SnapOtter instance.",
+      },
+      {
+        q: "Is this a cryptographic digital signature?",
+        a: "No. SnapOtter adds a visual electronic signature that you draw, type, or upload and place on the page. It does not apply a cryptographic certificate-based digital signature or embed a PKI certificate, so use a dedicated PKI tool if you need a tamper-evident certified signature.",
+      },
+      {
+        q: "Are my signed documents kept private?",
+        a: "Yes. SnapOtter signs PDFs entirely on your self-hosted instance, so your documents and signatures are never uploaded to an external server or cloud service.",
+      },
+    ],
+  },
   "pdf-page-numbers": {
     searchTitle: "Add Page Numbers to PDF Free",
     longDescription:

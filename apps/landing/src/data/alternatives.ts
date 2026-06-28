@@ -91,11 +91,11 @@ export const ALTERNATIVES: Alternative[] = [
     pageTitle: "The Open-Source, Self-Hosted Alternative to Smallpdf",
     h1: "The open-source, self-hosted alternative to Smallpdf",
     metaDescription:
-      "Smallpdf uploads your documents to its servers. SnapOtter runs the same PDF tools on yours. 28 PDF tools plus 212 more for image, video, audio, and files. Open source, AGPLv3.",
+      "Smallpdf uploads your documents to its servers. SnapOtter runs the same PDF tools on yours. 29 PDF tools plus 212 more for image, video, audio, and files. Open source, AGPLv3.",
     intro:
       "Smallpdf is a cloud PDF suite, so every file you touch goes up to its servers. SnapOtter runs the same kinds of tools on hardware you own, and the file never leaves it.",
     breadth:
-      "Smallpdf does PDFs. SnapOtter ships 28 PDF tools (merge, split, compress, convert, redact, OCR, and more) and another 212 across image, video, audio, and files, so one stack covers what you'd otherwise spread across several accounts.",
+      "Smallpdf does PDFs. SnapOtter ships 29 PDF tools (merge, split, compress, convert, redact, OCR, and more) and another 212 across image, video, audio, and files, so one stack covers what you'd otherwise spread across several accounts.",
     competitorOpenSource: false,
     rows: cloudRows("PDFs", "Subscription, free tier with daily limits", "PDF only"),
     faqs: [
@@ -124,7 +124,7 @@ export const ALTERNATIVES: Alternative[] = [
     intro:
       "iLovePDF is a hosted PDF service, which means your documents are uploaded to process them. SnapOtter gives you the same toolset to run yourself, with the file staying on your server.",
     breadth:
-      "iLovePDF stays inside PDFs. SnapOtter pairs 28 PDF tools with image, video, audio, and file tools, so the same deployment handles a contract, a screen recording, and a podcast edit.",
+      "iLovePDF stays inside PDFs. SnapOtter pairs 29 PDF tools with image, video, audio, and file tools, so the same deployment handles a contract, a screen recording, and a podcast edit.",
     competitorOpenSource: false,
     rows: cloudRows("PDFs", "Subscription, free tier with limits", "PDF only"),
     faqs: [
@@ -174,7 +174,7 @@ export const ALTERNATIVES: Alternative[] = [
     intro:
       "CloudConvert is a hosted converter, so files are uploaded and conversions are metered. SnapOtter converts across every modality on hardware you own, with no metering and no upload.",
     breadth:
-      "CloudConvert converts. SnapOtter converts too, across image, video, audio, PDF, and data formats, and then adds compression, editing, OCR, transcription, and pipelines, so conversion is one of 240 things it does.",
+      "CloudConvert converts. SnapOtter converts too, across image, video, audio, PDF, and data formats, and then adds compression, editing, OCR, transcription, and pipelines, so conversion is one of 241 things it does.",
     competitorOpenSource: false,
     rows: cloudRows("file conversion", "Pay per conversion / minutes", "Conversion only"),
     faqs: [
@@ -284,7 +284,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         feature: "Tool count",
-        snapotter: "240",
+        snapotter: "241",
         competitor: "50+ PDF tools",
         snapotterWins: true,
       },
@@ -358,7 +358,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         feature: "Tool count",
-        snapotter: "240",
+        snapotter: "241",
         competitor: "Conversion-focused",
         snapotterWins: true,
       },
