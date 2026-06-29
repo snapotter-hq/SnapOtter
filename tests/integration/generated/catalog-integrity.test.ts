@@ -50,6 +50,7 @@ const REGISTRY_EXEMPT = new Set([
   "ocr-pdf",
   "pdf-to-image",
   "qr-generate",
+  "sign-pdf",
   "stitch",
   "svg-to-raster",
   "transcribe-audio",
