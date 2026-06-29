@@ -4,6 +4,9 @@ set -e
 # Shared permission helpers (dir_writable, ensure_writable). Lives beside this
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
+# Embedded-mode helpers (decide_run_mode, embedded_requires_root,
+# sqlite_autodetect_path, check_pg_version). Same no-side-effects contract.
+. /usr/local/bin/embedded-lib.sh
 
 # --- Docker secret file convention (_FILE suffix) ---
 # For each supported var, if VAR_FILE is set, read the secret from that file
@@ -48,6 +51,25 @@ resolve_file_env SNAPOTTER_LICENSE_KEY
 export AUTH_ENABLED="${AUTH_ENABLED:-true}"
 export DEFAULT_USERNAME="${DEFAULT_USERNAME:-admin}"
 export DEFAULT_PASSWORD="${DEFAULT_PASSWORD:-admin}"
+
+# Embedded mode detection (in-container Postgres + Redis). Decide the run mode
+# before any DB-dependent step. EMBEDDED_MODE is exported so later branches (the
+# wait loop, security warnings, chown, final exec) can key off it.
+RUN_MODE="$(decide_run_mode)" || exit $?   # exits 2 on ambiguous partial config
+if [ "$RUN_MODE" = "embedded" ]; then
+  embedded_requires_root "$(id -u)" || exit 1
+  EMBEDDED_MODE=1
+  export EMBEDDED_MODE
+  export DATABASE_URL="postgres://snapotter:snapotter@127.0.0.1:5432/snapotter"
+  export REDIS_URL="redis://127.0.0.1:6379"
+  # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
+  # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
+  SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")"
+  export SQLITE_MIGRATE_PATH
+  printf '\n  \033[1;33m🦦 SnapOtter embedded mode\033[0m\n' >&2
+  printf '  \033[2mRunning an in-container Postgres + Redis for quick start.\033[0m\n' >&2
+  printf '  \033[2mFor production, use the Compose 3-container stack. See docs.\033[0m\n\n' >&2
+fi
 
 # Writable directories the runtime needs: WS = processing scratch, DD = data
 # root (holds files, logs, and the AI venv/models). Honor env overrides.
@@ -110,8 +132,9 @@ if [ -d "/opt/venv" ]; then
   fi
 fi
 
-# Wait for Postgres to be reachable before starting the app
-if [ -n "${DATABASE_URL:-}" ]; then
+# Wait for Postgres to be reachable before starting the app (external mode only;
+# in embedded mode s6 starts Postgres and gates the app on a pg_isready oneshot).
+if [ -z "${EMBEDDED_MODE:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
   echo "Waiting for Postgres..."
   i=0
   until node /app/docker/wait-for-postgres.mjs; do
@@ -126,11 +149,15 @@ print_security_warnings() {
   if [ "${DEFAULT_PASSWORD}" = "admin" ]; then
     printf '  \033[33mWARNING:%b Default admin password is still "admin". Change it for any non-local deployment.\n' '\033[0m' >&2
   fi
-  if echo "${DATABASE_URL:-}" | grep -q "snapotter:snapotter@"; then
-    printf '  \033[33mWARNING:%b Default Postgres credentials in use. Set POSTGRES_PASSWORD for production.\n' '\033[0m' >&2
-  fi
-  if echo "${REDIS_URL:-}" | grep -q ":snapotter@"; then
-    printf '  \033[33mWARNING:%b Default Redis password in use. Set REDIS_PASSWORD for production.\n' '\033[0m' >&2
+  # Embedded Postgres/Redis are loopback-only and never network-exposed, so the
+  # default-credential warnings below only apply to external (Compose) mode.
+  if [ -z "${EMBEDDED_MODE:-}" ]; then
+    if echo "${DATABASE_URL:-}" | grep -q "snapotter:snapotter@"; then
+      printf '  \033[33mWARNING:%b Default Postgres credentials in use. Set POSTGRES_PASSWORD for production.\n' '\033[0m' >&2
+    fi
+    if echo "${REDIS_URL:-}" | grep -q ":snapotter@"; then
+      printf '  \033[33mWARNING:%b Default Redis password in use. Set REDIS_PASSWORD for production.\n' '\033[0m' >&2
+    fi
   fi
 }
 
@@ -187,11 +214,23 @@ if [ "$(id -u)" = "0" ]; then
 
   # Ensure all writable subdirectories exist before chown
   mkdir -p /data/files /data/logs /data/ai/models /data/ai/pip-cache /data/ai/venv /tmp/workspace
+  [ -n "${EMBEDDED_MODE:-}" ] && mkdir -p /data/redis
 
-  # Chown writable directories (/data is the persistent volume, /tmp/workspace is ephemeral).
-  # /app and /opt/venv are read-only at runtime -- no chown needed.
-  chown -R snapotter:snapotter /data /tmp/workspace 2>&1 || \
-    echo "WARNING: Could not fix volume permissions. Use named volumes (not Windows bind mounts) to avoid this. See docs for details." >&2
+  # Chown writable directories (/data is the persistent volume, /tmp/workspace is
+  # ephemeral). /app and /opt/venv are read-only at runtime, so no chown needed.
+  # Embedded carve-out: /data/postgres must stay owned by the postgres user
+  # (Postgres refuses a foreign-owned PGDATA), so exclude it from the snapotter
+  # sweep and chown it separately when it already exists.
+  if [ -n "${EMBEDDED_MODE:-}" ]; then
+    find /data -mindepth 1 -maxdepth 1 ! -name postgres -exec chown -R snapotter:snapotter {} + 2>&1 || \
+      echo "WARNING: Could not fix /data permissions. Use named volumes to avoid this. See docs." >&2
+    chown snapotter:snapotter /data 2>/dev/null || true
+    chown -R snapotter:snapotter /tmp/workspace 2>&1 || true
+    [ -d /data/postgres ] && chown -R postgres:postgres /data/postgres 2>/dev/null || true
+  else
+    chown -R snapotter:snapotter /data /tmp/workspace 2>&1 || \
+      echo "WARNING: Could not fix volume permissions. Use named volumes (not Windows bind mounts) to avoid this. See docs for details." >&2
+  fi
 
   # Root can write anywhere, so verify as the unprivileged snapotter user that
   # actually runs the app. This catches root-squashed or foreign-owned mounts
@@ -201,6 +240,11 @@ if [ "$(id -u)" = "0" ]; then
   fi
 
   print_banner
+  if [ -n "${EMBEDDED_MODE:-}" ]; then
+    # Hand off to s6-overlay, which supervises postgres + redis + the app and
+    # drops privileges per service. tini remains PID 1 above /init.
+    exec /init
+  fi
   exec gosu snapotter "$@"
 fi
 
