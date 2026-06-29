@@ -1,2 +1,1 @@
-#!/command/with-contenv sh
-until redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -q PONG; do sleep 1; done
+/command/with-contenv sh -c "until redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -q PONG; do sleep 1; done"

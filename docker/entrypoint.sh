@@ -241,13 +241,16 @@ if [ "$(id -u)" = "0" ]; then
 
   print_banner
   if [ -n "${EMBEDDED_MODE:-}" ]; then
-    # Hand off to s6-overlay, which supervises postgres + redis + the app and
-    # drops privileges per service. tini remains PID 1 above /init.
+    # Hand off to s6-overlay as PID 1 (s6-overlay-suexec requires PID 1); it
+    # supervises postgres + redis + the app and drops privileges per service.
     exec /init
   fi
-  exec gosu snapotter "$@"
+  # External mode: tini becomes PID 1 (reaps zombies, forwards signals) and runs
+  # the app as snapotter, the same end state as the prior tini ENTRYPOINT.
+  exec tini -- gosu snapotter "$@"
 fi
 
-# Already running as snapotter (e.g. Kubernetes runAsUser)
+# Already running as snapotter (e.g. Kubernetes runAsUser). External mode only:
+# embedded mode requires root and exited earlier. tini becomes PID 1.
 print_banner
-exec "$@"
+exec tini -- "$@"
