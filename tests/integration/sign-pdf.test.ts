@@ -6,10 +6,11 @@ import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from
 const PDF = readFixture(fixtures.document.pdf3);
 const SIG = readFixture(fixtures.image.base.png200);
 
-// Stamping invokes the docs profile's doc_sign script (PyMuPDF). Gate the whole
-// suite on fitz so it skips cleanly where PyMuPDF is not installed; the app
-// setup lives inside the block so a skip needs no Postgres/Redis.
-describe.skipIf(!hasFitz)("sign-pdf (requires PyMuPDF)", () => {
+// The stamping test invokes the docs profile's doc_sign script (PyMuPDF) and is
+// gated on fitz so it skips where PyMuPDF is not installed (e.g. CI integration
+// shards). The validation test returns 400 before any Python call, so it always
+// runs (it needs only Postgres/Redis, which CI provides).
+describe("sign-pdf", () => {
   let testApp: TestApp;
   let adminToken: string;
 
@@ -36,15 +37,19 @@ describe.skipIf(!hasFitz)("sign-pdf (requires PyMuPDF)", () => {
     });
   }
 
-  it("stamps a signature and returns a PDF", async () => {
-    const res = await runTool([{ sig: 0, page: 0, x: 0.5, y: 0.5, w: 0.25, h: 0.05 }]);
-    expect([200, 202]).toContain(res.statusCode);
-    const body = JSON.parse(res.body);
-    expect(body.jobId).toBeTruthy();
-    if (res.statusCode === 200) {
-      expect(body.downloadUrl).toContain("/api/v1/download/");
-    }
-  }, 60_000);
+  (hasFitz ? it : it.skip)(
+    "stamps a signature and returns a PDF",
+    async () => {
+      const res = await runTool([{ sig: 0, page: 0, x: 0.5, y: 0.5, w: 0.25, h: 0.05 }]);
+      expect([200, 202]).toContain(res.statusCode);
+      const body = JSON.parse(res.body);
+      expect(body.jobId).toBeTruthy();
+      if (res.statusCode === 200) {
+        expect(body.downloadUrl).toContain("/api/v1/download/");
+      }
+    },
+    60_000,
+  );
 
   it("rejects when no placements are provided", async () => {
     const res = await runTool([]);
