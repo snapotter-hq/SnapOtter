@@ -242,6 +242,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     libopenjp2-tools \
     curl \
     gosu \
+    xz-utils \
     libde265-0 \
     libimage-exiftool-perl \
     python3 python3-pip python3-venv python3-dev \
