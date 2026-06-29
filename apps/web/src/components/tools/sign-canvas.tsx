@@ -68,10 +68,21 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   // pageCount never changes for single-page PDFs).
   const [docReady, setDocReady] = useState(false);
 
-  // Load the document once per file.
+  // Load the document once per file. A replaced file starts clean: drop the
+  // previous document's placements and stage so they don't carry over.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset + reload run only on file change; the parent callbacks are stable setters
   useEffect(() => {
     let cancelled = false;
     setDocReady(false);
+    for (const placed of placementsRef.current) placed.node.destroy();
+    placementsRef.current = [];
+    pageMetaRef.current.clear();
+    stageRef.current?.destroy();
+    stageRef.current = null;
+    layerRef.current = null;
+    trRef.current = null;
+    onCountChange?.(0);
+    onSelectionChange?.(false);
     (async () => {
       const doc = await pdfjs.getDocument({ url: fileUrl }).promise;
       if (cancelled) return;
@@ -125,6 +136,20 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           rotateEnabled: true,
           keepRatio: true,
           enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right"],
+          // Keep resize/rotate within the page bounds.
+          boundBoxFunc: (oldBox, newBox) => {
+            const s = stageRef.current;
+            if (!s) return newBox;
+            if (
+              newBox.x < 0 ||
+              newBox.y < 0 ||
+              newBox.x + newBox.width > s.width() ||
+              newBox.y + newBox.height > s.height()
+            ) {
+              return oldBox;
+            }
+            return newBox;
+          },
         });
         layer.add(tr);
         stage.add(layer);
@@ -193,6 +218,21 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
             width: img.width * scale,
             height: img.height * scale,
             draggable: true,
+          });
+          // Keep the dragged signature's bounding box within the page.
+          node.dragBoundFunc((pos) => {
+            const s = stageRef.current;
+            if (!s) return pos;
+            const box = node.getClientRect({ relativeTo: s });
+            const dx = box.x - node.x();
+            const dy = box.y - node.y();
+            let x = pos.x;
+            let y = pos.y;
+            if (x + dx < 0) x = -dx;
+            if (y + dy < 0) y = -dy;
+            if (x + dx + box.width > s.width()) x = s.width() - box.width - dx;
+            if (y + dy + box.height > s.height()) y = s.height() - box.height - dy;
+            return { x, y };
           });
           node.on("click tap", () => {
             tr.nodes([node]);
