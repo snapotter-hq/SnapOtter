@@ -3012,14 +3012,14 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Can I remove backgrounds from hundreds of product images at once?",
-        a: "Yes. Upload your entire product catalog and batch process them all. Each image gets the same AI treatment. Processing time depends on your hardware, but GPU acceleration is supported.",
+        a: "Yes. Upload your entire product catalog and batch process them all. Each image gets the same AI treatment. Processing time depends on your hardware, and NVIDIA CUDA acceleration is supported.",
       },
     ],
   },
   upscale: {
     searchTitle: "Upscale Image with AI - Enhance Resolution",
     longDescription:
-      "Upscale images using AI super-resolution models that add genuine detail, not just interpolated blur. Supports 2x and 4x scaling with models trained on real-world photography. Runs locally with GPU acceleration when available.",
+      "Upscale images using AI super-resolution models that add genuine detail, not just interpolated blur. Supports 2x and 4x scaling with models trained on real-world photography. Runs locally with NVIDIA CUDA acceleration when available.",
     useCases: [
       "Upscale low-resolution product images for high-DPI displays",
       "Enlarge social media photos for print without losing quality",
@@ -3029,7 +3029,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     features: [
       "2x and 4x AI upscaling with RealESRGAN",
       "Adds genuine detail, not interpolation blur",
-      "GPU acceleration (CUDA) when available",
+      "NVIDIA CUDA acceleration when available",
       "Optimized models for photos, anime, and general content",
       "Runs 100% locally with no cloud dependency",
     ],
@@ -3040,11 +3040,11 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "How large can I upscale an image?",
-        a: "SnapOtter supports 2x and 4x scaling. A 500x500 image becomes 1000x1000 at 2x or 2000x2000 at 4x. Processing time increases with the output size and depends on whether you have GPU acceleration.",
+        a: "SnapOtter supports 2x and 4x scaling. A 500x500 image becomes 1000x1000 at 2x or 2000x2000 at 4x. Processing time increases with the output size and depends on whether NVIDIA CUDA acceleration is available.",
       },
       {
         q: "Do I need a GPU for AI upscaling?",
-        a: "A GPU (NVIDIA CUDA) significantly speeds up processing, but it is not required. CPU-only mode works on any hardware, just slower. A typical photo takes seconds on GPU, minutes on CPU.",
+        a: "An NVIDIA CUDA GPU significantly speeds up processing, but it is not required. CPU-only mode works on any hardware, just slower. A typical photo takes seconds on CUDA, minutes on CPU.",
       },
     ],
   },

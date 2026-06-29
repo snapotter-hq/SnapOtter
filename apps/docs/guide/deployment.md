@@ -4,7 +4,7 @@ description: Deploy SnapOtter to production with Docker. Hardware requirements, 
 
 # Deployment
 
-SnapOtter deploys as a 3-container Docker Compose stack: the SnapOtter app image, PostgreSQL 17, and Redis 8. The app image supports **linux/amd64** (with NVIDIA CUDA) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5.
+SnapOtter deploys as a 3-container Docker Compose stack: the SnapOtter app image, PostgreSQL 17, and Redis 8. The app image supports **linux/amd64** (with NVIDIA CUDA for AI acceleration) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today.
 
 See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
@@ -108,9 +108,9 @@ The app is then available at `http://localhost:1349`.
 
 > **Docker Hub rate limits?** Replace `snapotter/snapotter:latest` with `ghcr.io/snapotter-hq/snapotter:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
 
-## Quick Start (GPU)
+## Quick Start (NVIDIA CUDA)
 
-For NVIDIA GPU acceleration on AI tools (background removal, upscaling, face enhancement, OCR):
+For NVIDIA CUDA acceleration on AI tools (background removal, upscaling, face enhancement, OCR):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -198,11 +198,11 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Check GPU detection in the logs:
+Check CUDA detection in the logs:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
-# Look for: [INFO] GPU detected — AI tools will use CUDA acceleration
+# Look for: [gpu] CUDA available via torch
 ```
 
 ## Hardware Requirements
@@ -215,7 +215,7 @@ These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ry
 |------|----------|-----|-----|-----|---------|
 | Minimum | Core tools, single user | 1 core | 1 GB | None | 5 GB |
 | Recommended | All tools + AI on CPU | 4 cores | 4 GB | None | 20 GB |
-| Full | All tools + AI on GPU | 4+ cores | 8 GB | NVIDIA 8 GB+ | 30 GB |
+| Full | All tools + AI on NVIDIA CUDA | 4+ cores | 8 GB | NVIDIA 8 GB+ | 30 GB |
 
 ### Minimum (core tools, no AI)
 
@@ -275,7 +275,7 @@ deploy:
       memory: 4G
 ```
 
-### Full (AI tools on GPU)
+### Full (AI tools on NVIDIA CUDA)
 
 | Resource | Requirement |
 |---|---|
@@ -284,7 +284,7 @@ deploy:
 | GPU | NVIDIA with 8+ GB VRAM (12 GB recommended) |
 | Disk | 30 GB total |
 
-GPU acceleration gives 3-13,000x speedup depending on the operation. Measured on an RTX 4070 vs Intel i7-7600U:
+NVIDIA CUDA acceleration gives 3-13,000x speedup depending on the operation. Measured on an RTX 4070 vs Intel i7-7600U:
 
 | AI Tool | GPU Time | CPU Time | Speedup |
 |---|---|---|---|
@@ -297,7 +297,9 @@ GPU acceleration gives 3-13,000x speedup depending on the operation. Measured on
 | restore-photo | 31s | 90s | 2.9x |
 | colorize | 10s | 13s | 1.3x |
 
-Peak VRAM usage reaches 7.5 GB during upscale with face enhancement. A 6 GB GPU works for most AI tools individually but will fail on upscale. 8-12 GB VRAM handles everything.
+Peak VRAM usage reaches 7.5 GB during upscale with face enhancement. A 6 GB NVIDIA GPU works for most AI tools individually but will fail on upscale. 8-12 GB VRAM handles everything.
+
+Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. Mapping `/dev/dri` into the container does not enable AI GPU acceleration; SnapOtter will run AI tools on CPU unless NVIDIA CUDA is available.
 
 ```yaml
 deploy:

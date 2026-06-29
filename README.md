@@ -92,10 +92,10 @@ docker compose up -d
 ```
 
 <details>
-<summary><sub>Have an NVIDIA GPU? Click here for GPU acceleration.</sub></summary>
+<summary><sub>Have an NVIDIA GPU? Click here for CUDA acceleration.</sub></summary>
 <br>
 
-Use the GPU Compose file for GPU-accelerated background removal, upscaling, transcription, and OCR. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
+Use the GPU Compose file for NVIDIA CUDA-accelerated background removal, upscaling, transcription, and OCR. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today; those systems run AI tools on CPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
 
 </details>
 
@@ -108,7 +108,7 @@ Use the GPU Compose file for GPU-accelerated background removal, upscaling, tran
 
 You will be asked to change your password on first login.
 
-For Docker Compose, persistent storage, and other setup options, see the [Getting Started Guide](https://docs.snapotter.com/guide/getting-started). For GPU acceleration and tag details, see [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
+For Docker Compose, persistent storage, and other setup options, see the [Getting Started Guide](https://docs.snapotter.com/guide/getting-started). For NVIDIA CUDA acceleration and tag details, see [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
 
 ## Documentation
 

@@ -195,7 +195,7 @@ export const ALTERNATIVES: Alternative[] = [
     pageTitle: "The Open-Source, Self-Hosted Alternative to Otter.ai",
     h1: "The open-source, self-hosted alternative to Otter.ai",
     metaDescription:
-      "Otter.ai transcribes audio in the cloud. SnapOtter transcribes on your own GPU or CPU with local Whisper models. No upload, no per-minute fees. Open source, AGPLv3.",
+      "Otter.ai transcribes audio in the cloud. SnapOtter transcribes on your own CPU or NVIDIA CUDA GPU with local Whisper models. No upload, no per-minute fees. Open source, AGPLv3.",
     intro:
       "Otter.ai uploads your recordings to transcribe them in the cloud. SnapOtter runs speech-to-text on your own hardware with local models, so sensitive recordings never leave your network.",
     breadth:
@@ -204,7 +204,7 @@ export const ALTERNATIVES: Alternative[] = [
     rows: [
       {
         feature: "Where your audio goes",
-        snapotter: "Your own server / GPU",
+        snapotter: "Your own server",
         competitor: "Their cloud",
         snapotterWins: true,
       },
@@ -242,7 +242,7 @@ export const ALTERNATIVES: Alternative[] = [
     faqs: [
       {
         q: "Is there a self-hosted Otter.ai alternative?",
-        a: "Yes. SnapOtter runs transcription locally with Whisper models on your own GPU or CPU. No audio is uploaded to a third party.",
+        a: "Yes. SnapOtter runs transcription locally with Whisper models on your own CPU or NVIDIA CUDA GPU. No audio is uploaded to a third party.",
       },
       {
         q: "Do I need a GPU?",

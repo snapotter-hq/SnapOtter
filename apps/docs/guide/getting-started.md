@@ -18,14 +18,14 @@ This single container runs everything it needs: with no `DATABASE_URL` set, it s
 
 You will be asked to change your password on first login.
 
-::: tip NVIDIA GPU acceleration
-Add `--gpus all` for GPU-accelerated background removal, upscaling, OCR, face enhancement, and restoration:
+::: tip NVIDIA CUDA acceleration
+Add `--gpus all` for NVIDIA CUDA-accelerated background removal, upscaling, OCR, face enhancement, and restoration:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU automatically. See [Docker Tags](/guide/docker-tags) for benchmarks.
+Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU automatically when CUDA is unavailable. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. See [Docker Tags](/guide/docker-tags) for benchmarks.
 :::
 
 ::: details Also on GHCR

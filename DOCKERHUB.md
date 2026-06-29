@@ -79,10 +79,10 @@ You will be asked to change your password on first login. Change `DEFAULT_PASSWO
 
 | Architecture | GPU support | Notes |
 |--------------|-------------|-------|
-| `linux/amd64` | NVIDIA CUDA | Full GPU acceleration for AI tools |
+| `linux/amd64` | NVIDIA CUDA | Full CUDA acceleration for AI tools |
 | `linux/arm64` | CPU only | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
 
-The same image runs on CPU or GPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for benchmarks and version-pinning details.
+The same image runs on CPU or NVIDIA CUDA. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today; those systems run AI tools on CPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for benchmarks and version-pinning details.
 
 ## Features
 
@@ -139,7 +139,7 @@ PostgreSQL and Redis keep their own volumes (`snapotter-pgdata`, `snapotter-redi
 |------|---------|
 | `1349` | Web UI and REST API |
 
-## GPU acceleration
+## NVIDIA CUDA acceleration
 
 The `amd64` image bundles CUDA. With an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add this to the `snapotter` service to accelerate background removal, upscaling, OCR, and transcription:
 
@@ -153,7 +153,7 @@ The `amd64` image bundles CUDA. With an NVIDIA GPU and the [NVIDIA Container Too
               capabilities: [gpu]
 ```
 
-The image auto-detects the GPU at runtime and falls back to CPU when none is present. Benchmarks are in [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
+The image auto-detects NVIDIA CUDA at runtime and falls back to CPU when CUDA is unavailable. Mapping `/dev/dri` for Intel or AMD GPUs does not accelerate SnapOtter AI tools today. Benchmarks are in [Docker Tags](https://docs.snapotter.com/guide/docker-tags).
 
 ## Upgrading from SnapOtter 1.x
 

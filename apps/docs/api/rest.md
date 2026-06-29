@@ -145,7 +145,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### AI Tools
 
-All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
+All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a supported NVIDIA GPU is available. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. No internet required.
 
 | Tool ID | Name | AI Model | Key settings |
 |---------|------|---------|-------------|

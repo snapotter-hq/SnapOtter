@@ -14,15 +14,17 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 With no `DATABASE_URL` set, this runs in embedded mode: PostgreSQL and Redis start inside the container on loopback, with all data under the `SnapOtter-data` volume. Set `DATABASE_URL` and `REDIS_URL` (as the [Compose](#docker-compose) stack does) to use external services instead. See [Configuration](/guide/configuration#embedded-mode).
 
-## GPU acceleration
+## NVIDIA CUDA acceleration
 
-The image includes CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
+The image includes NVIDIA CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-The image auto-detects your GPU at runtime. Without `--gpus all`, it runs on CPU. Same image either way.
+The image auto-detects CUDA at runtime. Without `--gpus all`, or when CUDA is unavailable, AI tools run on CPU. Same image either way.
+
+Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for SnapOtter AI inference today. Mapping `/dev/dri` into the container can expose the render device, but the AI runtime will still use CPU unless CUDA is available.
 
 ### Benchmarks
 
@@ -47,9 +49,9 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 | OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
 
-### GPU health check
+### CUDA health check
 
-After the first AI request, the admin health endpoint reports GPU status:
+After the first AI request, the admin health endpoint reports CUDA GPU status:
 
 ```
 GET /api/v1/admin/health
@@ -118,7 +120,7 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-For GPU acceleration via Docker Compose, add the deploy section to the SnapOtter service:
+For NVIDIA CUDA acceleration via Docker Compose, add the deploy section to the SnapOtter service:
 
 ```yaml
     deploy:
@@ -143,7 +145,7 @@ For GPU acceleration via Docker Compose, add the deploy section to the SnapOtter
 
 | Architecture | GPU support | Notes |
 |---|---|---|
-| linux/amd64 | NVIDIA CUDA | Full GPU acceleration for AI tools |
+| linux/amd64 | NVIDIA CUDA | Full CUDA acceleration for AI tools |
 | linux/arm64 | CPU only | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
 
 ## Migration from previous tags

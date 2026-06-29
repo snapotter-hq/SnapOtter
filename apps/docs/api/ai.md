@@ -4,7 +4,9 @@ description: AI engine reference with all local ML tools. Background removal, up
 
 # AI Engine Reference
 
-The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. GPU is auto-detected at startup and used when available.
+The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. NVIDIA CUDA is auto-detected at startup and used when available; otherwise AI tools run on CPU.
+
+Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. Mapping `/dev/dri` into a container does not accelerate these Python sidecar tools unless a CUDA-capable NVIDIA GPU is available.
 
 19 Python sidecar AI tools across four modalities (image, audio, video, document), plus 2 tools with optional AI capabilities. All models run locally - no internet required after initial model download.
 
@@ -278,7 +280,7 @@ The mask is sent as a **second file part** (fieldname `mask`), not as base64. Wh
 | `format` | string | `"auto"` | Output format: `auto`, `png`, `jpg`, `jpeg`, `webp`, `tiff`, `gif`, `avif`, `heic`, `heif`, `jxl` |
 | `quality` | integer (1-100) | `95` | Output quality |
 
-GPU-accelerated when an NVIDIA GPU is available.
+CUDA-accelerated when an NVIDIA GPU is available.
 
 ## AI Canvas Expand
 
