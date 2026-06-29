@@ -64,3 +64,16 @@ export interface SocialMediaPreset {
   width: number;
   height: number;
 }
+
+/**
+ * A signature placed on a PDF page by the sign-pdf tool. Coordinates are page
+ * fractions (0..1), top-left origin; `sig` indexes the uploaded signature PNGs.
+ */
+export interface SignPlacement {
+  sig: number;
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}

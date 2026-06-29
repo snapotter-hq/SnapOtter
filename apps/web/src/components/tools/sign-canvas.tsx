@@ -1,4 +1,4 @@
-import type { SignPlacement } from "@snapotter/doc-engine";
+import type { SignPlacement } from "@snapotter/shared";
 import Konva from "konva";
 import * as pdfjs from "pdfjs-dist";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";

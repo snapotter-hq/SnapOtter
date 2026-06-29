@@ -38,7 +38,6 @@ export {
   pdfcpuTextStamp,
   type TextStampOptions,
 } from "./pdfcpu.js";
-export type { SignPlacement } from "./python-docs.js";
 export {
   htmlToPdfPy,
   pdfFlattenPy,

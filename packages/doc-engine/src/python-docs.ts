@@ -1,4 +1,5 @@
 import { runDocsScript } from "@snapotter/ai";
+import type { SignPlacement } from "@snapotter/shared";
 
 /** Page count via the docs-profile Python dispatcher (pikepdf). */
 export async function pdfPageCountPy(absPath: string): Promise<number> {
@@ -118,15 +119,6 @@ export async function htmlToPdfPy(
   if (parsed.error) {
     throw new Error(`doc_html_pdf failed: ${parsed.error}`);
   }
-}
-
-export interface SignPlacement {
-  sig: number;
-  page: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 /** Stamp signature images onto a PDF (PyMuPDF insert_image), flattened. */
