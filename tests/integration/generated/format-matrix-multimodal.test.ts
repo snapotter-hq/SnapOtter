@@ -177,6 +177,10 @@ describe("multi-modality tool x format matrix", () => {
 
     describe(toolId, () => {
       for (const fixture of effectiveFixtures) {
+        // 60s per-case timeout clears the 30s SYNC_WAIT_MS test floor (per-fork-env.ts):
+        // under load a contended docs/media job can ride the full sync-wait window and
+        // return a valid 202 (which this matrix accepts), so the timeout must sit above
+        // that floor or a slow-but-valid job is wrongly flagged as a hang.
         it(`${fixture.filename} -> clean status`, async () => {
           const content = readFileSync(join(fixture.dir, fixture.filename));
           const settings = defaultSettingsFor(toolId);
@@ -281,7 +285,7 @@ describe("multi-modality tool x format matrix", () => {
               `${toolId} x ${fixture.filename}: 501 without error/code`,
             ).toBeDefined();
           }
-        }, 30_000);
+        }, 60_000);
       }
     });
   }
