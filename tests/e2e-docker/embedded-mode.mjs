@@ -6,7 +6,7 @@
 // container), these drive `docker run`/`stop` directly to exercise the container
 // lifecycle: bare-run boot, restart persistence, clean shutdown, the non-root and
 // partial-config fail-fast guards, and the 1.x SQLite auto-detect upgrade.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const IMAGE = process.env.SNAPOTTER_IMAGE || "snapotter:embed-wip";
 const NAME = "so-embed-test";
@@ -38,6 +38,13 @@ const combined = (args) => {
   } catch (e) {
     return `${e.stdout || ""}${e.stderr || ""}`;
   }
+};
+// `docker logs` writes the container's stdout and stderr to docker's own stdout
+// and stderr respectively. The embedded banner (entrypoint >&2) and Postgres
+// logs go to stderr, so capture BOTH streams or those assertions miss them.
+const dockerLogs = (name) => {
+  const res = spawnSync("docker", ["logs", name], { encoding: "utf-8" });
+  return `${res.stdout || ""}${res.stderr || ""}`;
 };
 const cleanup = () => {
   quiet(["rm", "-f", NAME]);
@@ -75,7 +82,7 @@ async function main() {
     ? ok("embedded container reached healthy")
     : bad("embedded container never became healthy");
 
-  const logs1 = quiet(["logs", NAME]);
+  const logs1 = dockerLogs(NAME);
   logs1.includes("embedded mode") ? ok("embedded banner printed") : bad("no embedded banner");
   countMatches(logs1, /first-boot initdb/g) === 1
     ? ok("initdb ran exactly once")
@@ -85,7 +92,7 @@ async function main() {
   console.log("\n[2] restart persists data, no re-init");
   docker(["restart", NAME]);
   (await waitHealthy(180000)) ? ok("healthy after restart") : bad("unhealthy after restart");
-  countMatches(quiet(["logs", NAME]), /first-boot initdb/g) === 1
+  countMatches(dockerLogs(NAME), /first-boot initdb/g) === 1
     ? ok("no second initdb on restart")
     : bad("re-initialized on restart (data loss risk)");
 
@@ -97,7 +104,7 @@ async function main() {
   stopMs < 9000
     ? ok(`stopped in ${stopMs}ms (before kill timeout)`)
     : bad(`stop took ${stopMs}ms (likely SIGKILL)`);
-  quiet(["logs", NAME]).includes("database system is shut down")
+  dockerLogs(NAME).includes("database system is shut down")
     ? ok("Postgres logged a clean shutdown")
     : bad("no clean Postgres shutdown line");
   cleanup();
@@ -149,7 +156,7 @@ async function main() {
   (await waitHealthy(300000))
     ? ok("healthy after upgrade boot")
     : bad("unhealthy after upgrade boot");
-  quiet(["logs", NAME]).includes("Imported 1.x SQLite database")
+  dockerLogs(NAME).includes("Imported 1.x SQLite database")
     ? ok("auto-detected and imported the 1.x SQLite DB")
     : bad("did not auto-import the 1.x SQLite DB");
 
@@ -158,7 +165,7 @@ async function main() {
   (await waitHealthy(180000))
     ? ok("healthy after second boot")
     : bad("unhealthy after second boot");
-  countMatches(quiet(["logs", NAME]), /Imported 1\.x SQLite database/g) === 1
+  countMatches(dockerLogs(NAME), /Imported 1\.x SQLite database/g) === 1
     ? ok("did not re-import on the second boot")
     : bad("re-imported on the second boot");
   cleanup();
