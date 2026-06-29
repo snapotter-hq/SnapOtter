@@ -349,6 +349,7 @@ describe("toolRegistry", () => {
       "interactive-crop",
       "interactive-eraser",
       "interactive-split",
+      "interactive-sign",
       "no-dropzone",
       "custom-results",
       "media-player",
