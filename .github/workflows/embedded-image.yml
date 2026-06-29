@@ -1,0 +1,33 @@
+name: Embedded Image Lifecycle
+
+# Heavy and manual on purpose. This builds the full production image (~8GB on
+# amd64 because of the CUDA base) and boots it through the embedded single
+# container lifecycle. That is too large and slow for PR or scheduled CI, so it
+# runs only from the Actions tab. Run it when touching docker/ (entrypoint, the
+# s6 tree, embedded-lib, the Dockerfile) or tests/e2e-docker/embedded-mode.mjs.
+# It frees runner disk first so the image fits on a standard ubuntu-latest
+# runner; if that ever stops being enough, move this job to a self-hosted runner.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  embedded-image:
+    name: Build + embedded lifecycle (amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune -af || true
+          df -h /
+      - name: Build production image (amd64, CPU)
+        run: docker build -f docker/Dockerfile -t snapotter:embed-ci .
+      - name: Embedded-mode lifecycle test
+        run: SNAPOTTER_IMAGE=snapotter:embed-ci node tests/e2e-docker/embedded-mode.mjs
