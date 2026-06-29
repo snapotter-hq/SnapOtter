@@ -176,6 +176,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     form.append("file", file);
     form.append("placements", JSON.stringify(placements));
     form.append("clientJobId", clientJobId);
+    // Forward the library file id (when the PDF came from the library) so the
+    // worker auto-saves the signed result as a new version.
+    if (currentEntry?.serverFileId) form.append("fileId", currentEntry.serverFileId);
     pngs.forEach((png, i) => {
       form.append(`sig${i}`, new File([png], `sig${i}.png`, { type: "image/png" }));
     });
