@@ -39,6 +39,19 @@ All configuration is done through environment variables. Every variable has a se
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). |
 
+### Embedded mode
+
+Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own PostgreSQL 17 and Redis inside the container, bound to loopback, with all data on the `/data` volume. This restores the single-command `docker run` experience for quick start, homelab, and upgrades from 1.x. It is a convenience path, not a production deployment: for production, run the 3-container Compose stack with separate PostgreSQL and Redis. Embedded mode requires running the container as root and is incompatible with arbitrary-UID runtimes (OpenShift, Kubernetes `runAsNonRoot`); use Compose there.
+
+| Variable | Default | Description |
+|---|---|---|
+| `EMBEDDED` | `auto` | Auto-enabled when both `DATABASE_URL` and `REDIS_URL` are unset. Set to `0` to disable it (the app then fails fast if no external `DATABASE_URL`/`REDIS_URL` is set, rather than silently starting an in-container database). |
+| `REDIS_MAXMEMORY` | `512mb` | Memory cap for the embedded Redis (embedded mode only). Lower it on memory-constrained hosts such as a Raspberry Pi. |
+
+Upgrading from 1.x: put your old `snapotter.db` at `/data/snapotter.db` in the volume and embedded mode imports it into the embedded PostgreSQL on first boot. The import runs once; later boots skip it.
+
+Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, or use the in-app admin opt-out, to disable it.
+
 ### Processing limits
 
 | Variable | Default | Description |

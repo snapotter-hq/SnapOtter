@@ -1,12 +1,16 @@
 # SnapOtter
 
-Open-source, self-hostable file processing suite with 200+ tools across image, video, audio, PDF, and files, plus a layer-based image editor and local AI. Runs as a small Docker Compose stack, no external services. Dual-licensed AGPLv3 and commercial.
+Open-source, self-hostable file processing suite with 200+ tools across image, video, audio, PDF, and files, plus a layer-based image editor and local AI. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial.
 
 All processing happens locally. Files never leave your infrastructure.
 
-## Quick Start (Docker Compose)
+## Quick Start
 
-SnapOtter runs alongside PostgreSQL 17 and Redis 8. Minimal compose.yaml:
+Single container (embedded Postgres + Redis), the fastest way to start:
+
+  docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
+
+For production, run alongside PostgreSQL 17 and Redis 8 with Compose. Minimal compose.yaml:
 
   services:
     snapotter:

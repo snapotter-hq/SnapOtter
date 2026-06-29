@@ -4,13 +4,15 @@ description: SnapOtter Docker image tags, GPU benchmarks, version pinning, and m
 
 # Docker Image
 
-SnapOtter ships as a Docker image that runs alongside PostgreSQL 17 and Redis 8 in a Compose stack. The app image works on all platforms.
+SnapOtter ships as a single Docker image. Run it on its own and it starts an embedded PostgreSQL 17 and Redis on the loopback interface (embedded mode); for production, run it alongside separate PostgreSQL 17 and Redis 8 containers with Compose. The app image works on all platforms.
 
 ## Quick start
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
+
+With no `DATABASE_URL` set, this runs in embedded mode: PostgreSQL and Redis start inside the container on loopback, with all data under the `SnapOtter-data` volume. Set `DATABASE_URL` and `REDIS_URL` (as the [Compose](#docker-compose) stack does) to use external services instead. See [Configuration](/guide/configuration#embedded-mode).
 
 ## GPU acceleration
 
