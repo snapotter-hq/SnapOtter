@@ -204,9 +204,11 @@ FROM node:22-bookworm@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926
 # ============================================
 ARG TARGETOS
 ARG TARGETARCH
+ARG PANDOC_VERSION=3.10
 FROM base-${TARGETOS}-${TARGETARCH} AS production
 
 ARG TARGETARCH
+ARG PANDOC_VERSION
 
 # Pin corepack's cache to a system-wide path so all users share the same pnpm
 # binary without downloading it on each container start.
@@ -248,9 +250,8 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
     tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
-    # Document engine: qpdf + LibreOffice headless + pandoc + WeasyPrint runtime deps
+    # Document engine: qpdf + LibreOffice headless + WeasyPrint runtime deps
     # calibre deferred (5.2 GB ruling; pandoc covers epub/markdown families)
-    pandoc \
     qpdf \
     libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
     fonts-dejavu-core \
@@ -272,6 +273,15 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && if apt-cache show libcublas-12-6 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libcublas-12-6; \
        fi \
+    && case "$TARGETARCH" in \
+         amd64) PANDOC_ARCH=amd64 ;; \
+         arm64) PANDOC_ARCH=arm64 ;; \
+         *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-${PANDOC_ARCH}.deb" -o /tmp/pandoc.deb \
+    && apt-get install -y --no-install-recommends /tmp/pandoc.deb \
+    && rm -f /tmp/pandoc.deb \
+    && pandoc --version \
     && rm -rf /var/lib/apt/lists/*
 
 # Embedded-mode databases: PostgreSQL 17 (PGDG, to match the Compose postgres:17

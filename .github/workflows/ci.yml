@@ -89,8 +89,14 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Install system dependencies (image formats + doc-engine qpdf/pandoc/LibreOffice)
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools qpdf pandoc libreoffice-calc libreoffice-impress libreoffice-writer
+      - name: Install system dependencies (image formats + doc-engine qpdf/LibreOffice)
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools qpdf libreoffice-calc libreoffice-impress libreoffice-writer
+
+      - name: Install Pandoc 3.10 (sandboxed DOCX/EPUB)
+        run: |
+          curl -fsSL https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-1-amd64.deb -o /tmp/pandoc.deb
+          sudo apt-get install -y --no-install-recommends /tmp/pandoc.deb
+          pandoc --version
 
       - name: Install pdfcpu (doc-engine PDF layout binary; matches docker/Dockerfile v0.13.0)
         run: |
