@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+exec s6-setuidgid snapotter redis-server \
+  --dir /data/redis \
+  --bind 127.0.0.1 \
+  --port 6379 \
+  --maxmemory-policy noeviction \
+  --appendonly yes \
+  --maxmemory "${REDIS_MAXMEMORY:-512mb}"

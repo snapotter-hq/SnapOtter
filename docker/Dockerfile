@@ -506,8 +506,16 @@ RUN chown -R snapotter:snapotter /app /opt/venv && \
 # entrypoint-lib.sh holds the writability helpers it sources at startup.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY docker/entrypoint-lib.sh /usr/local/bin/entrypoint-lib.sh
+COPY docker/embedded-lib.sh /usr/local/bin/embedded-lib.sh
+COPY docker/embedded/postgres-bootstrap.sh /usr/local/bin/embedded-postgres-bootstrap.sh
 COPY docker/wait-for-postgres.mjs /app/docker/wait-for-postgres.mjs
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# s6-overlay reads its service tree from /etc/s6-overlay/s6-rc.d (embedded mode)
+COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/embedded-postgres-bootstrap.sh \
+    && chmod +x /etc/s6-overlay/s6-rc.d/postgres/run /etc/s6-overlay/s6-rc.d/redis/run \
+                /etc/s6-overlay/s6-rc.d/snapotter/run \
+                /etc/s6-overlay/s6-rc.d/postgres-init/up /etc/s6-overlay/s6-rc.d/postgres-ready/up \
+                /etc/s6-overlay/s6-rc.d/redis-ready/up
 
 EXPOSE 1349
 

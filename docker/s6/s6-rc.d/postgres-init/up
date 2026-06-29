@@ -1,0 +1,2 @@
+#!/command/with-contenv sh
+/usr/local/bin/embedded-postgres-bootstrap.sh
