@@ -10,7 +10,7 @@ AI-powered passport and ID photo generator. Two-phase workflow: analyze (face de
 
 This tool uses a two-phase flow with separate endpoints for analysis and generation.
 
-**Model bundle:** `background-removal` (4-5 GB)
+**Model bundles:** `background-removal` and `face-detection`
 
 ---
 
@@ -88,7 +88,7 @@ Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached i
 | countryCode | string | Yes | - | Country code for passport spec (e.g., `US`, `GB`, `IN`) |
 | documentType | string | No | `"passport"` | Document type (from country spec) |
 | bgColor | string | No | `"#FFFFFF"` | Background color hex |
-| printLayout | string | No | `"none"` | Print paper layout: `none`, `4x6`, `a4`, `letter` |
+| printLayout | string | No | `"none"` | Print paper layout: `none`, `4x6`, `a4` |
 | maxFileSizeKb | number | No | `0` | Max file size constraint in KB (0 = no limit) |
 | dpi | number | No | `300` | Output DPI (72-1200) |
 | customWidthMm | number | No | - | Custom photo width in mm (overrides country spec) |
@@ -161,10 +161,10 @@ Returns guidance to use the correct sub-endpoint.
 
 ## Notes
 
-- Requires the `background-removal` model bundle to be installed (4-5 GB).
+- Requires the `background-removal` and `face-detection` model bundles to be installed.
 - Phase 1 runs AI (face landmarks + background removal) and caches results. Phase 2 is pure Sharp image manipulation (fast, no AI needed).
 - Landmarks are returned as normalized coordinates (0-1 range relative to image dimensions).
 - The `preview` field in the analyze response is a base64-encoded PNG (max 800px wide) for fast display.
 - Country specs include document dimensions, head height ratios, and eye-line positioning based on official passport photo requirements.
-- The `printLayout` option generates a tiled sheet on standard paper sizes (4x6", A4, Letter) with 2mm gutters between photos.
+- The `printLayout` option generates a tiled sheet on 4x6" or A4 paper with 2mm gutters between photos.
 - When `maxFileSizeKb` is set, the output is iteratively compressed to fit within the size limit.

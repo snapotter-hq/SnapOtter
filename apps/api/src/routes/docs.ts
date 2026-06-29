@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import scalarPlugin from "@scalar/fastify-api-reference";
+import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
 
@@ -59,9 +60,20 @@ function generateLlmsTxt(spec: OpenAPISpec): string {
   }
 
   lines.push("");
+  lines.push("## Tools");
+  for (const section of SECTIONS) {
+    const tools = TOOLS.filter((tool) => toolSection(tool) === section.id);
+    lines.push(`- ${section.name} (${tools.length} tools)`);
+    for (const tool of tools) {
+      const mode = tool.executionHint === "long" ? "async" : "sync";
+      lines.push(`  - ${tool.name} - ${tool.description} (${tool.id}, ${mode})`);
+    }
+  }
+
+  lines.push("");
   lines.push("## Authentication");
-  lines.push("- Session token via `POST /api/auth/login` → `Authorization: Bearer <token>`");
-  lines.push("- API key (prefixed `si_`) → `Authorization: Bearer si_...`");
+  lines.push("- Session token via `POST /api/auth/login` -> `Authorization: Bearer <token>`");
+  lines.push("- API key (prefixed `si_`) -> `Authorization: Bearer si_...`");
 
   return lines.join("\n");
 }

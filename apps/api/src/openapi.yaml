@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SnapOtter API
-  version: 1.17.1
+  version: 2.0.0
   description: |
     REST API for SnapOtter, a self-hosted file processing suite with 200+ tools across image, video, audio, document, and data.
 
@@ -3809,8 +3809,7 @@ paths:
                   bitDepth:
                     type: string
                   density:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                   hasAlpha:
                     type: boolean
                   fileSize:
@@ -3820,8 +3819,7 @@ paths:
                   isProgressive:
                     type: boolean
                   orientation:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                   hasProfile:
                     type: boolean
                   hasIcc:
@@ -3982,11 +3980,9 @@ paths:
                                 x: { type: number }
                                 y: { type: number }
                   annotatedUrl:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                   previewUrl:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
         "400":
           description: Invalid input
           content:
@@ -4070,8 +4066,7 @@ paths:
                               isBest:
                                 type: boolean
                               thumbnail:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                   uniqueImages:
                     type: integer
                   spaceSaveable:
@@ -5186,8 +5181,7 @@ paths:
                       version:
                         type: integer
                       parentId:
-                        type: string
-                        nullable: true
+                        type: [string, "null"]
                       toolChain:
                         type: array
                         items:
@@ -5343,8 +5337,7 @@ paths:
                         downloadUrl:
                           type: string
                         previewUrl:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         error:
                           type: string
                           description: Present only when success is false
@@ -5501,9 +5494,8 @@ paths:
                         items:
                           type: string
                   expiresAt:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
   /api/auth/change-password:
     post:
@@ -5861,14 +5853,12 @@ paths:
                   name:
                     type: string
                   permissions:
-                    type: array
+                    type: [array, "null"]
                     items:
                       type: string
-                    nullable: true
                   expiresAt:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                   createdAt:
                     type: string
                     format: date-time
@@ -5909,21 +5899,18 @@ paths:
                         name:
                           type: string
                         permissions:
-                          type: array
+                          type: [array, "null"]
                           items:
                             type: string
-                          nullable: true
                         createdAt:
                           type: string
                           format: date-time
                         lastUsedAt:
-                          type: string
+                          type: [string, "null"]
                           format: date-time
-                          nullable: true
                         expiresAt:
-                          type: string
+                          type: [string, "null"]
                           format: date-time
-                          nullable: true
         "401":
           description: Authentication required
           content:
@@ -6465,8 +6452,7 @@ paths:
                           type: string
                           enum: [installed, not_installed, installing, error]
                         installedVersion:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         estimatedSize:
                           type: string
                         enablesTools:
@@ -6474,16 +6460,14 @@ paths:
                           items:
                             type: string
                         progress:
-                          type: object
-                          nullable: true
+                          type: [object, "null"]
                           properties:
                             percent:
                               type: number
                             stage:
                               type: string
                         error:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
         "401":
           description: Authentication required
           content:
@@ -6692,27 +6676,21 @@ paths:
                         id:
                           type: string
                         actorId:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         actorUsername:
                           type: string
                         action:
                           type: string
                         targetType:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         targetId:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         details:
-                          type: object
-                          nullable: true
+                          type: [object, "null"]
                         ipAddress:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         requestId:
-                          type: string
-                          nullable: true
+                          type: [string, "null"]
                         createdAt:
                           type: string
                           format: date-time
@@ -12162,3 +12140,4940 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+
+  # Generated catalog and docs parity paths. Keep in sync with packages/shared/src/constants.ts.
+  /api/v1/tools/image/passport-photo:
+    post:
+      operationId: passportPhotoTool
+      tags: [Tools]
+      summary: "Passport Photo"
+      description: |
+        Guidance endpoint for the two-phase passport photo flow. Use
+        `/api/v1/tools/image/passport-photo/analyze` to analyze an image,
+        then `/api/v1/tools/image/passport-photo/generate` to create the final
+        passport photo. This base route returns a 400 guidance error when the
+        required feature bundles are installed, or 501 when they are missing.
+      security:
+        - bearerAuth: []
+      responses:
+        "400":
+          description: Use the analyze or generate endpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "501":
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureNotInstalledError"
+
+  /api/v1/tools/pdf/sign-pdf:
+    post:
+      operationId: signPdfTool
+      tags: [Tools]
+      summary: Sign PDF
+      description: Stamp one or more signature PNG images onto a PDF using normalized page placements.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, placements, sig0]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to sign
+                sig0:
+                  type: string
+                  format: binary
+                  description: First signature image. Additional signatures use sig1, sig2, and so on.
+                placements:
+                  type: string
+                  description: JSON array of placement objects with sig, page, x, y, w, and h. Coordinates are page fractions with top-left origin.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+                fileId:
+                  type: string
+                  description: Optional file library ID to save the signed result as a new version
+      responses:
+        "200":
+          description: Signed PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-png:
+    post:
+      operationId: jpgToPngTool
+      tags: [Tools]
+      summary: "JPG to PNG"
+      description: |
+        Convert JPG to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to PNG input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-jpg:
+    post:
+      operationId: pngToJpgTool
+      tags: [Tools]
+      summary: "PNG to JPG"
+      description: |
+        Convert PNG to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to JPG input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-webp:
+    post:
+      operationId: jpgToWebpTool
+      tags: [Tools]
+      summary: "JPG to WebP"
+      description: |
+        Convert JPG to WebP
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to WebP input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to WebP converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-webp:
+    post:
+      operationId: pngToWebpTool
+      tags: [Tools]
+      summary: "PNG to WebP"
+      description: |
+        Convert PNG to WebP
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to WebP input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to WebP converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/webp-to-jpg:
+    post:
+      operationId: webpToJpgTool
+      tags: [Tools]
+      summary: "WebP to JPG"
+      description: |
+        Convert WebP to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WebP to JPG input file (.webp)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WebP to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/webp-to-png:
+    post:
+      operationId: webpToPngTool
+      tags: [Tools]
+      summary: "WebP to PNG"
+      description: |
+        Convert WebP to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WebP to PNG input file (.webp)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WebP to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-avif:
+    post:
+      operationId: jpgToAvifTool
+      tags: [Tools]
+      summary: "JPG to AVIF"
+      description: |
+        Convert JPG to AVIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to AVIF input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to AVIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-avif:
+    post:
+      operationId: pngToAvifTool
+      tags: [Tools]
+      summary: "PNG to AVIF"
+      description: |
+        Convert PNG to AVIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to AVIF input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to AVIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/webp-to-avif:
+    post:
+      operationId: webpToAvifTool
+      tags: [Tools]
+      summary: "WebP to AVIF"
+      description: |
+        Convert WebP to AVIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WebP to AVIF input file (.webp)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WebP to AVIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/heic-to-jpg:
+    post:
+      operationId: heicToJpgTool
+      tags: [Tools]
+      summary: "HEIC to JPG"
+      description: |
+        Convert HEIC to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "HEIC to JPG input file (.heic, .heif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated HEIC to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/heic-to-png:
+    post:
+      operationId: heicToPngTool
+      tags: [Tools]
+      summary: "HEIC to PNG"
+      description: |
+        Convert HEIC to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "HEIC to PNG input file (.heic, .heif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated HEIC to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/heic-to-avif:
+    post:
+      operationId: heicToAvifTool
+      tags: [Tools]
+      summary: "HEIC to AVIF"
+      description: |
+        Convert HEIC to AVIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "HEIC to AVIF input file (.heic, .heif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated HEIC to AVIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-gif:
+    post:
+      operationId: jpgToGifTool
+      tags: [Tools]
+      summary: "JPG to GIF"
+      description: |
+        Convert JPG to GIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to GIF input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to GIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-gif:
+    post:
+      operationId: pngToGifTool
+      tags: [Tools]
+      summary: "PNG to GIF"
+      description: |
+        Convert PNG to GIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to GIF input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to GIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/gif-to-jpg:
+    post:
+      operationId: gifToJpgTool
+      tags: [Tools]
+      summary: "GIF to JPG"
+      description: |
+        Convert GIF to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "GIF to JPG input file (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/gif-to-png:
+    post:
+      operationId: gifToPngTool
+      tags: [Tools]
+      summary: "GIF to PNG"
+      description: |
+        Convert GIF to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "GIF to PNG input file (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/webp-to-gif:
+    post:
+      operationId: webpToGifTool
+      tags: [Tools]
+      summary: "WebP to GIF"
+      description: |
+        Convert WebP to GIF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WebP to GIF input file (.webp)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WebP to GIF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-tiff:
+    post:
+      operationId: jpgToTiffTool
+      tags: [Tools]
+      summary: "JPG to TIFF"
+      description: |
+        Convert JPG to TIFF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to TIFF input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to TIFF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-tiff:
+    post:
+      operationId: pngToTiffTool
+      tags: [Tools]
+      summary: "PNG to TIFF"
+      description: |
+        Convert PNG to TIFF
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to TIFF input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to TIFF converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/tiff-to-jpg:
+    post:
+      operationId: tiffToJpgTool
+      tags: [Tools]
+      summary: "TIFF to JPG"
+      description: |
+        Convert TIFF to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "TIFF to JPG input file (.tiff, .tif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TIFF to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/tiff-to-png:
+    post:
+      operationId: tiffToPngTool
+      tags: [Tools]
+      summary: "TIFF to PNG"
+      description: |
+        Convert TIFF to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "TIFF to PNG input file (.tiff, .tif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TIFF to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/psd-to-jpg:
+    post:
+      operationId: psdToJpgTool
+      tags: [Tools]
+      summary: "PSD to JPG"
+      description: |
+        Convert PSD to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PSD to JPG input file (.psd)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PSD to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/psd-to-png:
+    post:
+      operationId: psdToPngTool
+      tags: [Tools]
+      summary: "PSD to PNG"
+      description: |
+        Convert PSD to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PSD to PNG input file (.psd)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PSD to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-eps:
+    post:
+      operationId: pngToEpsTool
+      tags: [Tools]
+      summary: "PNG to EPS"
+      description: |
+        Convert PNG to EPS
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to EPS input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to EPS converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-eps:
+    post:
+      operationId: jpgToEpsTool
+      tags: [Tools]
+      summary: "JPG to EPS"
+      description: |
+        Convert JPG to EPS
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to EPS input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to EPS converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/eps-to-png:
+    post:
+      operationId: epsToPngTool
+      tags: [Tools]
+      summary: "EPS to PNG"
+      description: |
+        Convert EPS to PNG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "EPS to PNG input file (.eps)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated EPS to PNG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/eps-to-jpg:
+    post:
+      operationId: epsToJpgTool
+      tags: [Tools]
+      summary: "EPS to JPG"
+      description: |
+        Convert EPS to JPG
+        This is a dedicated conversion preset endpoint backed by `convert`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "EPS to JPG input file (.eps)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated EPS to JPG converter using the convert pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-svg:
+    post:
+      operationId: pngToSvgTool
+      tags: [Tools]
+      summary: "PNG to SVG"
+      description: |
+        Convert PNG to SVG
+        This is a dedicated conversion preset endpoint backed by `vectorize`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PNG to SVG input file (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to SVG converter using the vectorize pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-svg:
+    post:
+      operationId: jpgToSvgTool
+      tags: [Tools]
+      summary: "JPG to SVG"
+      description: |
+        Convert JPG to SVG
+        This is a dedicated conversion preset endpoint backed by `vectorize`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "JPG to SVG input file (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to SVG converter using the vectorize pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/tiff-to-svg:
+    post:
+      operationId: tiffToSvgTool
+      tags: [Tools]
+      summary: "TIFF to SVG"
+      description: |
+        Convert TIFF to SVG
+        This is a dedicated conversion preset endpoint backed by `vectorize`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "TIFF to SVG input file (.tiff, .tif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TIFF to SVG converter using the vectorize pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/psd-to-svg:
+    post:
+      operationId: psdToSvgTool
+      tags: [Tools]
+      summary: "PSD to SVG"
+      description: |
+        Convert PSD to SVG
+        This is a dedicated conversion preset endpoint backed by `vectorize`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PSD to SVG input file (.psd)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PSD to SVG converter using the vectorize pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/eps-to-svg:
+    post:
+      operationId: epsToSvgTool
+      tags: [Tools]
+      summary: "EPS to SVG"
+      description: |
+        Convert EPS to SVG
+        This is a dedicated conversion preset endpoint backed by `vectorize`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "EPS to SVG input file (.eps)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated EPS to SVG converter using the vectorize pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/svg-to-png:
+    post:
+      operationId: svgToPngTool
+      tags: [Tools]
+      summary: "SVG to PNG"
+      description: |
+        Convert SVG to PNG
+        This is a dedicated conversion preset endpoint backed by `svg-to-raster`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SVG to PNG input file (.svg, .svgz)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated SVG to PNG converter using the svg-to-raster pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/svg-to-jpg:
+    post:
+      operationId: svgToJpgTool
+      tags: [Tools]
+      summary: "SVG to JPG"
+      description: |
+        Convert SVG to JPG
+        This is a dedicated conversion preset endpoint backed by `svg-to-raster`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SVG to JPG input file (.svg, .svgz)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated SVG to JPG converter using the svg-to-raster pipeline.
+                    Optional settings: quality (number 1-100). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/jpg-to-pdf:
+    post:
+      operationId: jpgToPdfTool
+      tags: [Tools]
+      summary: "JPG to PDF"
+      description: |
+        Convert JPG to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "JPG to PDF input files (.jpg, .jpeg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated JPG to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/png-to-pdf:
+    post:
+      operationId: pngToPdfTool
+      tags: [Tools]
+      summary: "PNG to PDF"
+      description: |
+        Convert PNG to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "PNG to PDF input files (.png)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PNG to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/heic-to-pdf:
+    post:
+      operationId: heicToPdfTool
+      tags: [Tools]
+      summary: "HEIC to PDF"
+      description: |
+        Convert HEIC to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "HEIC to PDF input files (.heic, .heif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated HEIC to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/tiff-to-pdf:
+    post:
+      operationId: tiffToPdfTool
+      tags: [Tools]
+      summary: "TIFF to PDF"
+      description: |
+        Convert TIFF to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "TIFF to PDF input files (.tiff, .tif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TIFF to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/webp-to-pdf:
+    post:
+      operationId: webpToPdfTool
+      tags: [Tools]
+      summary: "WebP to PDF"
+      description: |
+        Convert WebP to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "WebP to PDF input files (.webp)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WebP to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/gif-to-pdf:
+    post:
+      operationId: gifToPdfTool
+      tags: [Tools]
+      summary: "GIF to PDF"
+      description: |
+        Convert GIF to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "GIF to PDF input files (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/image/eps-to-pdf:
+    post:
+      operationId: epsToPdfTool
+      tags: [Tools]
+      summary: "EPS to PDF"
+      description: |
+        Convert EPS to PDF
+        This is a dedicated conversion preset endpoint backed by `image-to-pdf`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "EPS to PDF input files (.eps)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated EPS to PDF converter using the image-to-pdf pipeline.
+                    Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/pdf/pdf-to-jpg:
+    post:
+      operationId: pdfToJpgTool
+      tags: [Tools]
+      summary: "PDF to JPG"
+      description: |
+        Convert PDF to JPG
+        This is a dedicated conversion preset endpoint backed by `pdf-to-image`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PDF to JPG input file (.pdf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PDF to JPG converter using the pdf-to-image pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/pdf/pdf-to-png:
+    post:
+      operationId: pdfToPngTool
+      tags: [Tools]
+      summary: "PDF to PNG"
+      description: |
+        Convert PDF to PNG
+        This is a dedicated conversion preset endpoint backed by `pdf-to-image`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PDF to PNG input file (.pdf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PDF to PNG converter using the pdf-to-image pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/pdf/pdf-to-tiff:
+    post:
+      operationId: pdfToTiffTool
+      tags: [Tools]
+      summary: "PDF to TIFF"
+      description: |
+        Convert PDF to TIFF
+        This is a dedicated conversion preset endpoint backed by `pdf-to-image`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "PDF to TIFF input file (.pdf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated PDF to TIFF converter using the pdf-to-image pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mov-to-mp4:
+    post:
+      operationId: movToMp4Tool
+      tags: [Tools]
+      summary: "MOV to MP4"
+      description: |
+        Convert MOV to MP4
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MOV to MP4 input file (.mov)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MOV to MP4 converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/webm-to-mp4:
+    post:
+      operationId: webmToMp4Tool
+      tags: [Tools]
+      summary: "WEBM to MP4"
+      description: |
+        Convert WEBM to MP4
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WEBM to MP4 input file (.webm)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WEBM to MP4 converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mkv-to-mp4:
+    post:
+      operationId: mkvToMp4Tool
+      tags: [Tools]
+      summary: "MKV to MP4"
+      description: |
+        Convert MKV to MP4
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MKV to MP4 input file (.mkv)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MKV to MP4 converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/avi-to-mp4:
+    post:
+      operationId: aviToMp4Tool
+      tags: [Tools]
+      summary: "AVI to MP4"
+      description: |
+        Convert AVI to MP4
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AVI to MP4 input file (.avi)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AVI to MP4 converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-mov:
+    post:
+      operationId: mp4ToMovTool
+      tags: [Tools]
+      summary: "MP4 to MOV"
+      description: |
+        Convert MP4 to MOV
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to MOV input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to MOV converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-webm:
+    post:
+      operationId: mp4ToWebmTool
+      tags: [Tools]
+      summary: "MP4 to WEBM"
+      description: |
+        Convert MP4 to WEBM
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to WEBM input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to WEBM converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/webm-to-mov:
+    post:
+      operationId: webmToMovTool
+      tags: [Tools]
+      summary: "WEBM to MOV"
+      description: |
+        Convert WEBM to MOV
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WEBM to MOV input file (.webm)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WEBM to MOV converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mkv-to-mov:
+    post:
+      operationId: mkvToMovTool
+      tags: [Tools]
+      summary: "MKV to MOV"
+      description: |
+        Convert MKV to MOV
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MKV to MOV input file (.mkv)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MKV to MOV converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/avi-to-mov:
+    post:
+      operationId: aviToMovTool
+      tags: [Tools]
+      summary: "AVI to MOV"
+      description: |
+        Convert AVI to MOV
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AVI to MOV input file (.avi)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AVI to MOV converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-avi:
+    post:
+      operationId: mp4ToAviTool
+      tags: [Tools]
+      summary: "MP4 to AVI"
+      description: |
+        Convert MP4 to AVI
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to AVI input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to AVI converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mov-to-avi:
+    post:
+      operationId: movToAviTool
+      tags: [Tools]
+      summary: "MOV to AVI"
+      description: |
+        Convert MOV to AVI
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MOV to AVI input file (.mov)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MOV to AVI converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mkv-to-avi:
+    post:
+      operationId: mkvToAviTool
+      tags: [Tools]
+      summary: "MKV to AVI"
+      description: |
+        Convert MKV to AVI
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MKV to AVI input file (.mkv)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MKV to AVI converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/avi-to-mkv:
+    post:
+      operationId: aviToMkvTool
+      tags: [Tools]
+      summary: "AVI to MKV"
+      description: |
+        Convert AVI to MKV
+        This is a dedicated conversion preset endpoint backed by `convert-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AVI to MKV input file (.avi)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AVI to MKV converter using the convert-video pipeline.
+                    Optional settings: quality (high, balanced, small). The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-gif:
+    post:
+      operationId: mp4ToGifTool
+      tags: [Tools]
+      summary: "MP4 to GIF"
+      description: |
+        Convert MP4 to GIF
+        This is a dedicated conversion preset endpoint backed by `video-to-gif`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to GIF input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to GIF converter using the video-to-gif pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mov-to-gif:
+    post:
+      operationId: movToGifTool
+      tags: [Tools]
+      summary: "MOV to GIF"
+      description: |
+        Convert MOV to GIF
+        This is a dedicated conversion preset endpoint backed by `video-to-gif`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MOV to GIF input file (.mov)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MOV to GIF converter using the video-to-gif pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mkv-to-gif:
+    post:
+      operationId: mkvToGifTool
+      tags: [Tools]
+      summary: "MKV to GIF"
+      description: |
+        Convert MKV to GIF
+        This is a dedicated conversion preset endpoint backed by `video-to-gif`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MKV to GIF input file (.mkv)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MKV to GIF converter using the video-to-gif pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/avi-to-gif:
+    post:
+      operationId: aviToGifTool
+      tags: [Tools]
+      summary: "AVI to GIF"
+      description: |
+        Convert AVI to GIF
+        This is a dedicated conversion preset endpoint backed by `video-to-gif`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AVI to GIF input file (.avi)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AVI to GIF converter using the video-to-gif pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/gif-to-mp4:
+    post:
+      operationId: gifToMp4Tool
+      tags: [Tools]
+      summary: "GIF to MP4"
+      description: |
+        Convert GIF to MP4
+        This is a dedicated conversion preset endpoint backed by `gif-to-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "GIF to MP4 input file (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to MP4 converter using the gif-to-video pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/gif-to-webm:
+    post:
+      operationId: gifToWebmTool
+      tags: [Tools]
+      summary: "GIF to WEBM"
+      description: |
+        Convert GIF to WEBM
+        This is a dedicated conversion preset endpoint backed by `gif-to-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "GIF to WEBM input file (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to WEBM converter using the gif-to-video pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/gif-to-mov:
+    post:
+      operationId: gifToMovTool
+      tags: [Tools]
+      summary: "GIF to MOV"
+      description: |
+        Convert GIF to MOV
+        This is a dedicated conversion preset endpoint backed by `gif-to-video`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "GIF to MOV input file (.gif)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated GIF to MOV converter using the gif-to-video pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-mp3:
+    post:
+      operationId: mp4ToMp3Tool
+      tags: [Tools]
+      summary: "MP4 to MP3"
+      description: |
+        Convert MP4 to MP3
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to MP3 input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to MP3 converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mov-to-mp3:
+    post:
+      operationId: movToMp3Tool
+      tags: [Tools]
+      summary: "MOV to MP3"
+      description: |
+        Convert MOV to MP3
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MOV to MP3 input file (.mov)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MOV to MP3 converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mkv-to-mp3:
+    post:
+      operationId: mkvToMp3Tool
+      tags: [Tools]
+      summary: "MKV to MP3"
+      description: |
+        Convert MKV to MP3
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MKV to MP3 input file (.mkv)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MKV to MP3 converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/webm-to-mp3:
+    post:
+      operationId: webmToMp3Tool
+      tags: [Tools]
+      summary: "WEBM to MP3"
+      description: |
+        Convert WEBM to MP3
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WEBM to MP3 input file (.webm)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WEBM to MP3 converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/avi-to-mp3:
+    post:
+      operationId: aviToMp3Tool
+      tags: [Tools]
+      summary: "AVI to MP3"
+      description: |
+        Convert AVI to MP3
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AVI to MP3 input file (.avi)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AVI to MP3 converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-wav:
+    post:
+      operationId: mp4ToWavTool
+      tags: [Tools]
+      summary: "MP4 to WAV"
+      description: |
+        Convert MP4 to WAV
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to WAV input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to WAV converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mov-to-wav:
+    post:
+      operationId: movToWavTool
+      tags: [Tools]
+      summary: "MOV to WAV"
+      description: |
+        Convert MOV to WAV
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MOV to WAV input file (.mov)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MOV to WAV converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/mp4-to-ogg:
+    post:
+      operationId: mp4ToOggTool
+      tags: [Tools]
+      summary: "MP4 to OGG"
+      description: |
+        Convert MP4 to OGG
+        This is a dedicated conversion preset endpoint backed by `extract-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP4 to OGG input file (.mp4)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP4 to OGG converter using the extract-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/m4a-to-mp3:
+    post:
+      operationId: m4aToMp3Tool
+      tags: [Tools]
+      summary: "M4A to MP3"
+      description: |
+        Convert M4A to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "M4A to MP3 input file (.m4a)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated M4A to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/m4a-to-wav:
+    post:
+      operationId: m4aToWavTool
+      tags: [Tools]
+      summary: "M4A to WAV"
+      description: |
+        Convert M4A to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "M4A to WAV input file (.m4a)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated M4A to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aac-to-mp3:
+    post:
+      operationId: aacToMp3Tool
+      tags: [Tools]
+      summary: "AAC to MP3"
+      description: |
+        Convert AAC to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AAC to MP3 input file (.aac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AAC to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aac-to-wav:
+    post:
+      operationId: aacToWavTool
+      tags: [Tools]
+      summary: "AAC to WAV"
+      description: |
+        Convert AAC to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AAC to WAV input file (.aac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AAC to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aac-to-flac:
+    post:
+      operationId: aacToFlacTool
+      tags: [Tools]
+      summary: "AAC to FLAC"
+      description: |
+        Convert AAC to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AAC to FLAC input file (.aac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AAC to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/ogg-to-mp3:
+    post:
+      operationId: oggToMp3Tool
+      tags: [Tools]
+      summary: "OGG to MP3"
+      description: |
+        Convert OGG to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OGG to MP3 input file (.ogg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OGG to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/ogg-to-wav:
+    post:
+      operationId: oggToWavTool
+      tags: [Tools]
+      summary: "OGG to WAV"
+      description: |
+        Convert OGG to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OGG to WAV input file (.ogg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OGG to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wav-to-mp3:
+    post:
+      operationId: wavToMp3Tool
+      tags: [Tools]
+      summary: "WAV to MP3"
+      description: |
+        Convert WAV to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WAV to MP3 input file (.wav)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WAV to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/mp3-to-wav:
+    post:
+      operationId: mp3ToWavTool
+      tags: [Tools]
+      summary: "MP3 to WAV"
+      description: |
+        Convert MP3 to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP3 to WAV input file (.mp3)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP3 to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/flac-to-mp3:
+    post:
+      operationId: flacToMp3Tool
+      tags: [Tools]
+      summary: "FLAC to MP3"
+      description: |
+        Convert FLAC to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "FLAC to MP3 input file (.flac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated FLAC to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/excel-to-csv:
+    post:
+      operationId: excelToCsvTool
+      tags: [Tools]
+      summary: "Excel to CSV"
+      description: |
+        Convert Excel to CSV
+        This is a dedicated conversion preset endpoint backed by `convert-spreadsheet`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Excel to CSV input file (.xlsx, .xls)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Excel to CSV converter using the convert-spreadsheet pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /llms.txt:
+    get:
+      operationId: getLlmsTxt
+      tags: [System]
+      summary: LLM summary
+      description: LLM-friendly plain-text API summary generated from the OpenAPI spec.
+      security: []
+      responses:
+        "200":
+          description: Plain-text LLM summary
+          content:
+            text/plain:
+              schema:
+                type: string
+  /llms-full.txt:
+    get:
+      operationId: getLlmsFullTxt
+      tags: [System]
+      summary: Full LLM API docs
+      description: Complete plain-text API documentation generated from the OpenAPI spec.
+      security: []
+      responses:
+        "200":
+          description: Full plain-text API docs
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/openapi.yaml:
+    get:
+      operationId: getOpenApiYaml
+      tags: [System]
+      summary: OpenAPI YAML
+      description: Machine-readable OpenAPI 3.1 specification for this SnapOtter instance.
+      security: []
+      responses:
+        "200":
+          description: OpenAPI YAML document
+          content:
+            text/yaml:
+              schema:
+                type: string
+  /api/v1/tools/popular:
+    get:
+      operationId: getPopularTools
+      tags: [Tools]
+      summary: Popular tools
+      description: Return up to 12 popular tool IDs, falling back to a curated default list when usage data is sparse.
+      security: []
+      responses:
+        "200":
+          description: Popular tool IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      type: string

@@ -56,7 +56,7 @@ Transcribe Audio, Convert Audio, Trim Audio, Volume Adjust, Normalize Audio, Fad
 
 ### PDF
 
-PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Convert, Crop PDF, N-up PDF, Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, PDF to Text, PDF to Word, PDF Metadata, PDF to JPG, PDF to PNG, PDF to TIFF.
+PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Convert, Crop PDF, N-up PDF, Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF Metadata, PDF to JPG, PDF to PNG, PDF to TIFF.
 
 ### Files
 
@@ -69,10 +69,9 @@ Background removal (rembg), image upscaling 2x/4x (RealESRGAN), object eraser (L
 ## REST API
 
 Base URL: http://localhost:1349/api/v1
-Interactive docs: http://localhost:1349/api/docs (Swagger UI)
-Machine-readable spec: http://localhost:1349/api/docs/json (OpenAPI 3.1)
+Interactive docs: http://localhost:1349/api/docs (Scalar UI)
 OpenAPI YAML: http://localhost:1349/api/v1/openapi.yaml
-LLM-optimized spec: http://localhost:1349/llms.txt (generated from OpenAPI at runtime)
+Runtime LLM summary: http://localhost:1349/llms.txt
 Full plain-text API docs: http://localhost:1349/llms-full.txt
 
 Authentication methods:

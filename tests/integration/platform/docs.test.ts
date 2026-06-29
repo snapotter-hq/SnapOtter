@@ -1,3 +1,4 @@
+import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, type TestApp } from "../test-server";
 
@@ -11,6 +12,10 @@ describe("API docs", () => {
   afterAll(async () => {
     await testApp.cleanup();
   });
+
+  function openApiPathSet(body: string): Set<string> {
+    return new Set([...body.matchAll(/^ {2}(\/[^:]+):/gm)].map((match) => match[1]));
+  }
 
   it("serves the OpenAPI spec as YAML", async () => {
     const res = await testApp.app.inject({
@@ -54,15 +59,43 @@ describe("API docs", () => {
     expect(res.headers["content-type"]).toContain("text/html");
   });
 
-  it("includes all tool endpoints in the spec", async () => {
+  it("includes every catalog tool endpoint in the spec", async () => {
     const res = await testApp.app.inject({
       method: "GET",
       url: "/api/v1/openapi.yaml",
     });
-    const body = res.body;
-    expect(body).toContain("/api/v1/tools/image/resize");
-    expect(body).toContain("/api/v1/tools/image/compress");
-    expect(body).toContain("/api/v1/tools/image/remove-background");
-    expect(body).toContain("/api/v1/tools/image/ocr");
+    const paths = openApiPathSet(res.body);
+    const missing = TOOLS.map((tool) => apiToolPath(tool.id)).filter((path) => !paths.has(path));
+
+    expect(missing, `OpenAPI missing tool paths: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("documents public docs metadata routes", async () => {
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/openapi.yaml",
+    });
+    const paths = openApiPathSet(res.body);
+    const expectedPaths = [
+      "/llms.txt",
+      "/llms-full.txt",
+      "/api/v1/openapi.yaml",
+      "/api/v1/tools/popular",
+    ];
+    const missing = expectedPaths.filter((path) => !paths.has(path));
+
+    expect(missing, `OpenAPI missing docs metadata paths: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("serves an LLM summary with live catalog tools", async () => {
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: "/llms.txt",
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("## Tools");
+    expect(res.body).toContain("- Image (105 tools)");
+    expect(res.body).toContain("Resize - Resize by pixels");
+    expect(res.body).toContain("Sign PDF -");
   });
 });

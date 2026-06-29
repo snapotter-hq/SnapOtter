@@ -135,6 +135,7 @@ export default defineConfig({
       {
         text: "Tools",
         items: [
+          { text: "Conversion Presets", link: "/tools/conversion-presets" },
           {
             text: "Image",
             collapsed: false,
@@ -325,6 +326,7 @@ export default defineConfig({
               { text: "PDF Page Numbers", link: "/tools/pdf/pdf-page-numbers" },
               { text: "Flatten PDF", link: "/tools/pdf/flatten-pdf" },
               { text: "Redact PDF", link: "/tools/pdf/redact-pdf" },
+              { text: "Sign PDF", link: "/tools/pdf/sign-pdf" },
               { text: "PDF to Text", link: "/tools/pdf/pdf-to-text" },
               { text: "PDF to Word", link: "/tools/pdf/pdf-to-word" },
               { text: "PDF Metadata", link: "/tools/pdf/pdf-metadata" },

@@ -110,6 +110,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ## Tools Reference
 
+### Conversion Presets
+
+The shared catalog includes 83 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
+
+`POST /api/v1/tools/<section>/<presetId>`
+
+Each preset locks the output format and delegates to a base tool such as `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, or `convert-spreadsheet`. See [Conversion Presets](/tools/conversion-presets) for the complete route table and optional settings.
+
 ### Essentials
 
 | Tool ID | Name | Key settings |
@@ -161,7 +169,7 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `noise-removal` | Noise Removal | Tiered denoising | `tier` (quick/balanced/quality/maximum), `strength`, `detailPreservation`, `colorNoise`, `format`, `quality` |
 | `red-eye-removal` | Red Eye Removal | Face landmark + color analysis | `sensitivity`, `strength` |
 | `restore-photo` | Photo Restoration | Multi-step pipeline | `mode` (auto/light/heavy), `scratchRemoval`, `faceEnhancement`, `fidelity`, `denoise`, `denoiseStrength`, `colorize` |
-| `passport-photo` | Passport Photo | MediaPipe landmarks | `country` (37 countries), `printLayout` (4x6/A4/none), `backgroundColor` |
+| `passport-photo` | Passport Photo | MediaPipe landmarks | Two-phase flow. Analyze uses multipart `file`; generate uses JSON with `countryCode`, `bgColor`, `printLayout` (none/4x6/a4), landmarks, image dimensions |
 | `content-aware-resize` | Content-Aware Resize | Seam carving (caire) | `width`, `height`, `protectFaces`, `blurRadius`, `sobelThreshold`, `square` |
 | `transparency-fixer` | PNG Transparency Fixer | BiRefNet HR-matting | `defringe` (0-100), `outputFormat` (png/webp) |
 | `background-replace` | Background Replace | rembg (BiRefNet) | `backgroundType` (color/gradient), `color` (hex), `gradientColor1`, `gradientColor2`, `gradientAngle`, `feather` (0-20), `format` (png/webp) |
@@ -297,6 +305,7 @@ All AI tools run on your hardware (CPU or NVIDIA GPU). No internet required.
 | `pdf-page-numbers` | PDF Page Numbers | `position` (bl/bc/br/tl/tc/tr), `fontSize` |
 | `flatten-pdf` | Flatten PDF | - (bakes forms and annotations) |
 | `redact-pdf` | Redact PDF | `terms` (string[]), `caseSensitive` (bool) |
+| `sign-pdf` | Sign PDF | Custom multipart route with PDF `file`, signature files `sig0`, `sig1`, and `placements` JSON array |
 | `pdf-to-text` | PDF to Text | - |
 | `pdf-to-word` | PDF to Word | - |
 | `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords` |
@@ -373,6 +382,7 @@ Some tools expose additional endpoints beyond the standard `POST /api/v1/tools/<
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/api/v1/tools/popular` | Return popular tool IDs, falling back to a curated default list when usage data is sparse |
 | `POST` | `/api/v1/tools/image/remove-background/effects` | Apply background effects (color/gradient/blur/shadow) without re-running AI. Uses cached mask from initial removal. |
 | `POST` | `/api/v1/tools/image/edit-metadata/inspect` | Read existing EXIF/IPTC/XMP metadata from an image |
 | `POST` | `/api/v1/tools/image/strip-metadata/inspect` | Inspect metadata fields before stripping |
@@ -464,6 +474,7 @@ Persistent file storage with version history.
 | `GET` | `/api/v1/files/:id/download` | Download file |
 | `GET` | `/api/v1/files/:id/thumbnail` | Get 300px JPEG thumbnail |
 | `DELETE` | `/api/v1/files` | Bulk delete files and their version chains (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/fetch-urls` | Fetch remote URLs into the workspace for URL-based imports |
 | `POST` | `/api/v1/preview` | Generate a browser-compatible WebP preview (for HEIC/HEIF/RAW formats) |
 | `GET` | `/api/v1/download/:jobId/:filename` | Download a processed file from a workspace |
 

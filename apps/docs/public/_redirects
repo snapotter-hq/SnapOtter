@@ -208,6 +208,8 @@
 /tools/red-eye-removal.html /tools/image/red-eye-removal 301
 /tools/redact-pdf /tools/pdf/redact-pdf 301
 /tools/redact-pdf.html /tools/pdf/redact-pdf 301
+/tools/sign-pdf /tools/pdf/sign-pdf 301
+/tools/sign-pdf.html /tools/pdf/sign-pdf 301
 /tools/remove-background /tools/image/remove-background 301
 /tools/remove-background.html /tools/image/remove-background 301
 /tools/remove-pages /tools/pdf/remove-pages 301
