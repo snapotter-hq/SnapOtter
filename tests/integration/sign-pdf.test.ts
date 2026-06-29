@@ -37,6 +37,18 @@ describe("sign-pdf", () => {
     });
   }
 
+  function postFields(
+    fields: Parameters<typeof createMultipartPayload>[0],
+  ): ReturnType<typeof testApp.app.inject> {
+    const { body, contentType } = createMultipartPayload(fields);
+    return testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/sign-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
   (hasFitz ? it : it.skip)(
     "stamps a signature and returns a PDF",
     async () => {
@@ -54,5 +66,92 @@ describe("sign-pdf", () => {
   it("rejects when no placements are provided", async () => {
     const res = await runTool([]);
     expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects when the PDF file part is missing", async () => {
+    const res = await postFields([
+      { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ error: "No PDF file provided" });
+  });
+
+  it("rejects when the placements field is missing", async () => {
+    const res = await postFields([
+      { name: "file", filename: "in.pdf", contentType: "application/pdf", content: PDF },
+      { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ error: "No placements provided" });
+  });
+
+  it("rejects malformed placement JSON", async () => {
+    const res = await postFields([
+      { name: "file", filename: "in.pdf", contentType: "application/pdf", content: PDF },
+      { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+      { name: "placements", content: "[not-json" },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ error: "Invalid placements" });
+  });
+
+  it("rejects placements that reference an omitted signature image", async () => {
+    const res = await postFields([
+      { name: "file", filename: "in.pdf", contentType: "application/pdf", content: PDF },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      error: "Missing signature image for placement (sig 0)",
+    });
+  });
+
+  it("rejects an invalid PDF before enqueueing work", async () => {
+    const res = await postFields([
+      {
+        name: "file",
+        filename: "not-a-pdf.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+      { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ error: "Invalid PDF" });
+  });
+
+  it("rejects an invalid signature image before enqueueing work", async () => {
+    const res = await postFields([
+      { name: "file", filename: "in.pdf", contentType: "application/pdf", content: PDF },
+      {
+        name: "sig0",
+        filename: "sig0.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid signature image:/);
   });
 });
