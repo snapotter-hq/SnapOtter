@@ -27,4 +27,14 @@ describe("Dockerfile build args", () => {
       production.indexOf("pandoc-${PANDOC_VERSION}"),
     );
   });
+
+  it("keeps the amd64 CUDA base on the cu126 runtime family", () => {
+    const baseLine = dockerfile
+      .split(/\r?\n/)
+      .find((line) => line.includes(" AS base-linux-amd64"));
+
+    expect(baseLine).toContain("nvidia/cuda:12.6.");
+    expect(baseLine).toContain("cudnn-runtime-ubuntu24.04");
+    expect(baseLine).not.toContain("nvidia/cuda:12.9.");
+  });
 });
