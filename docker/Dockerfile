@@ -204,11 +204,10 @@ FROM node:22-bookworm@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926
 # ============================================
 ARG TARGETOS
 ARG TARGETARCH
-ARG PANDOC_VERSION=3.10
 FROM base-${TARGETOS}-${TARGETARCH} AS production
 
 ARG TARGETARCH
-ARG PANDOC_VERSION
+ARG PANDOC_VERSION=3.10
 
 # Pin corepack's cache to a system-wide path so all users share the same pnpm
 # binary without downloading it on each container start.
