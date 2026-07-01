@@ -8,6 +8,7 @@ import {
   type FeedbackImportantArea,
   type FeedbackInstallMethod,
   type FeedbackPayload,
+  type FeedbackPromptVariant,
   type FeedbackSentiment,
   type FeedbackSource,
   type FeedbackType,
@@ -16,6 +17,8 @@ import {
   submitFeedback,
   surveyIdForSource,
 } from "@/lib/feedback";
+import { format } from "@/lib/format";
+import { buildToolRequestDiscussionUrl } from "@/lib/tool-request";
 import { cn } from "@/lib/utils";
 
 interface FeedbackDialogProps {
@@ -25,6 +28,8 @@ interface FeedbackDialogProps {
   jobStatus?: "completed" | "failed";
   errorCategory?: FeedbackErrorCategory;
   initialSentiment?: FeedbackSentiment;
+  searchQuery?: string;
+  promptVariant?: FeedbackPromptVariant;
   onClose: () => void;
   onSubmitted?: () => void;
 }
@@ -79,6 +84,8 @@ export function FeedbackDialog({
   jobStatus,
   errorCategory,
   initialSentiment,
+  searchQuery,
+  promptVariant: promptVariantProp,
   onClose,
   onSubmitted,
 }: FeedbackDialogProps) {
@@ -97,6 +104,7 @@ export function FeedbackDialog({
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [accepted, setAccepted] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useFocusTrap(dialogRef, open);
@@ -104,7 +112,9 @@ export function FeedbackDialog({
   useEffect(() => {
     if (!open) return;
     setSentiment(initialSentiment ?? "");
-    setFeedbackType(source === "failed_job" ? "bug" : "other");
+    setFeedbackType(
+      source === "failed_job" ? "bug" : source === "search_miss" ? "feature_request" : "other",
+    );
     setMessage("");
     setContactOk(false);
     setContactEmail("");
@@ -116,6 +126,7 @@ export function FeedbackDialog({
     setImportantAreas([]);
     setSubmitting(false);
     setSubmitted(false);
+    setAccepted(true);
     setError(null);
   }, [open, initialSentiment, source]);
 
@@ -132,10 +143,12 @@ export function FeedbackDialog({
     if (source === "tool_result") return t.feedback.toolDialogTitle;
     if (source === "failed_job") return t.feedback.failedDialogTitle;
     if (source === "admin_installer") return t.feedback.adminDialogTitle;
+    if (source === "search_miss") return t.feedback.searchMissTitle;
     return t.feedback.dialogTitle;
   }, [source, t.feedback]);
 
   const isAdminInstall = source === "admin_installer";
+  const isSearchMiss = source === "search_miss";
   const canSubmit = Boolean(
     message.trim() || sentiment || feedbackType !== "other" || isAdminInstall,
   );
@@ -155,7 +168,8 @@ export function FeedbackDialog({
     const payload: FeedbackPayload = {
       source,
       surveyId: surveyIdForSource(source),
-      promptVariant: promptVariantForSource(source),
+      promptVariant: promptVariantProp ?? promptVariantForSource(source),
+      searchQuery: isSearchMiss ? searchQuery : undefined,
       ...(sentiment ? { sentiment } : {}),
       feedbackType,
       message: message.trim() || undefined,
@@ -177,7 +191,8 @@ export function FeedbackDialog({
     };
 
     try {
-      await submitFeedback(payload);
+      const response = await submitFeedback(payload);
+      setAccepted(response.accepted);
       setSubmitted(true);
       onSubmitted?.();
     } catch {
@@ -222,27 +237,53 @@ export function FeedbackDialog({
         </div>
 
         {submitted ? (
-          <div className="p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">{t.feedback.thanksTitle}</p>
-                <p className="text-sm text-muted-foreground">{t.feedback.thanksDescription}</p>
-              </div>
+          isSearchMiss && !accepted ? (
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-foreground">
+                <a
+                  href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {t.feedback.searchMissDiscussionsFallback}
+                </a>
+              </p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+              >
+                {t.common.close}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-            >
-              {t.common.close}
-            </button>
-          </div>
+          ) : (
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">{t.feedback.thanksTitle}</p>
+                  <p className="text-sm text-muted-foreground">{t.feedback.thanksDescription}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+              >
+                {t.common.close}
+              </button>
+            </div>
+          )
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
             <p className="text-sm text-muted-foreground">{t.feedback.privacyNote}</p>
 
-            {isAdminInstall ? (
+            {isSearchMiss ? (
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {format(t.feedback.searchMissContext, { query: searchQuery ?? "" })}
+              </div>
+            ) : isAdminInstall ? (
               <AdminInstallFields
                 installMethod={installMethod}
                 setInstallMethod={setInstallMethod}
