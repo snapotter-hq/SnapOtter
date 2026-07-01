@@ -8,8 +8,13 @@ import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
 let posthogClient: PostHog | null = null;
 
 export interface FeedbackEventProperties {
-  source: "global" | "tool_result" | "failed_job" | "admin_installer";
-  survey_id?: "global-feedback-v1" | "tool-result-v1" | "failed-job-v1" | "admin-install-v1";
+  source: "global" | "tool_result" | "failed_job" | "admin_installer" | "search_miss";
+  survey_id?:
+    | "global-feedback-v1"
+    | "tool-result-v1"
+    | "failed-job-v1"
+    | "admin-install-v1"
+    | "search-miss-v1";
   prompt_variant?: string;
   sentiment?: "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
   feedback_type?: "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
@@ -19,6 +24,7 @@ export interface FeedbackEventProperties {
   contact_name?: string;
   company?: string;
   tool_id?: string;
+  search_query?: string;
   job_status?: "completed" | "failed";
   install_method?: "docker" | "docker_compose" | "source" | "cloud" | "other";
   usage_type?: "personal" | "team_internal" | "business_workflow" | "education" | "evaluating";
@@ -128,6 +134,7 @@ function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<st
   copyString("contact_name");
   copyString("company");
   copyString("tool_id");
+  copyString("search_query");
   copyString("job_status");
   copyString("install_method");
   copyString("usage_type");

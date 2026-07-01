@@ -4,12 +4,19 @@ import { captureFeedback, type FeedbackEventProperties } from "../lib/analytics.
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { requireAuth } from "../plugins/auth.js";
 
-const SOURCE_VALUES = ["global", "tool_result", "failed_job", "admin_installer"] as const;
+const SOURCE_VALUES = [
+  "global",
+  "tool_result",
+  "failed_job",
+  "admin_installer",
+  "search_miss",
+] as const;
 const SURVEY_ID_VALUES = [
   "global-feedback-v1",
   "tool-result-v1",
   "failed-job-v1",
   "admin-install-v1",
+  "search-miss-v1",
 ] as const;
 const SENTIMENT_VALUES = ["great", "okay", "issue", "missing", "bug", "idea", "other"] as const;
 const FEEDBACK_TYPE_VALUES = [
@@ -93,6 +100,7 @@ const feedbackBodySchema = z
     contactName: optionalText(120),
     company: optionalText(160),
     toolId: toolIdSchema.optional(),
+    searchQuery: optionalText(200),
     jobStatus: z.enum(["completed", "failed"]).optional(),
     installMethod: z.enum(INSTALL_METHOD_VALUES).optional(),
     usageType: z.enum(USAGE_TYPE_VALUES).optional(),
@@ -103,7 +111,11 @@ const feedbackBodySchema = z
   .superRefine((value, ctx) => {
     const hasText = Boolean(value.message?.trim());
     const hasChoice = Boolean(
-      value.sentiment || value.feedbackType || value.installMethod || value.usageType,
+      value.sentiment ||
+        value.feedbackType ||
+        value.installMethod ||
+        value.usageType ||
+        value.searchQuery,
     );
     if (!hasText && !hasChoice) {
       ctx.addIssue({
@@ -127,6 +139,7 @@ function toPostHogProperties(body: z.infer<typeof feedbackBodySchema>): Feedback
     contact_name: body.contactOk ? body.contactName || undefined : undefined,
     company: body.contactOk ? body.company || undefined : undefined,
     tool_id: body.toolId,
+    search_query: body.searchQuery,
     job_status: body.jobStatus,
     install_method: body.installMethod,
     usage_type: body.usageType,

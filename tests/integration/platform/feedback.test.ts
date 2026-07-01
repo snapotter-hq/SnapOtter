@@ -226,4 +226,78 @@ describe("POST /api/v1/feedback", () => {
       expect.objectContaining({ path: "frictionArea" }),
     );
   });
+
+  it("accepts a search_miss tool request and forwards the search query", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+    const token = await loginAsAdmin(testApp.app);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        source: "search_miss",
+        surveyId: "search-miss-v1",
+        promptVariant: "search-empty-v1",
+        feedbackType: "feature_request",
+        searchQuery: "convert to dicom",
+        message: "Radiology workflow.",
+        contactOk: false,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, accepted: true });
+    expect(captureFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "search_miss",
+        survey_id: "search-miss-v1",
+        prompt_variant: "search-empty-v1",
+        feedback_type: "feature_request",
+        search_query: "convert to dicom",
+      }),
+      undefined,
+    );
+  });
+
+  it("accepts a bare search_miss query with no message or rating", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+    const token = await loginAsAdmin(testApp.app);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        source: "search_miss",
+        surveyId: "search-miss-v1",
+        searchQuery: "make animated gif",
+        contactOk: false,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, accepted: true });
+  });
+
+  it("declines search_miss capture when analytics is disabled", async () => {
+    const token = await loginAsAdmin(testApp.app);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        source: "search_miss",
+        surveyId: "search-miss-v1",
+        searchQuery: "convert to dicom",
+        contactOk: false,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, accepted: false });
+    expect(captureFeedback).not.toHaveBeenCalled();
+  });
 });
