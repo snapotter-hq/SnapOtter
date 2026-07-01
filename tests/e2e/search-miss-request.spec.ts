@@ -42,7 +42,7 @@ test.describe("search-miss tool request", () => {
     const request = page.getByTestId("request-tool").first();
     await expect(request).toBeVisible();
     // With analytics "on" the affordance is a button (no href) that opens the dialog.
-    expect(await request.getAttribute("href")).toBeNull();
+    await expect(request).not.toHaveAttribute("href", /.+/);
     await request.click();
 
     const dialog = page.getByRole("dialog");

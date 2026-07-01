@@ -329,7 +329,7 @@ function RequestToolAffordance({
         onClick={() => onRequest(promptVariant)}
         className={className}
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-4 w-4" aria-hidden="true" />
         {label}
       </button>
     );
@@ -343,7 +343,7 @@ function RequestToolAffordance({
       data-testid="request-tool"
       className={className}
     >
-      <Plus className="h-4 w-4" />
+      <Plus className="h-4 w-4" aria-hidden="true" />
       {label}
     </a>
   );

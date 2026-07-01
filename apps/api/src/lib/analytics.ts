@@ -134,6 +134,8 @@ function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<st
   copyString("contact_name");
   copyString("company");
   copyString("tool_id");
+  // Intentional: this is the user-typed query from a missing-tool feature request,
+  // not the tool-telemetry "search query" that analytics-allowlist.ts never forwards.
   copyString("search_query");
   copyString("job_status");
   copyString("install_method");

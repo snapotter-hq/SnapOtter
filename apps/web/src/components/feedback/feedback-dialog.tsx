@@ -237,8 +237,8 @@ export function FeedbackDialog({
         </div>
 
         {submitted ? (
-          isSearchMiss && !accepted ? (
-            <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4">
+            {isSearchMiss && !accepted ? (
               <p className="text-sm text-foreground">
                 <a
                   href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
@@ -249,16 +249,7 @@ export function FeedbackDialog({
                   {t.feedback.searchMissDiscussionsFallback}
                 </a>
               </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-              >
-                {t.common.close}
-              </button>
-            </div>
-          ) : (
-            <div className="p-6 space-y-4">
+            ) : (
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -266,15 +257,15 @@ export function FeedbackDialog({
                   <p className="text-sm text-muted-foreground">{t.feedback.thanksDescription}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-              >
-                {t.common.close}
-              </button>
-            </div>
-          )
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+            >
+              {t.common.close}
+            </button>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
             <p className="text-sm text-muted-foreground">{t.feedback.privacyNote}</p>
