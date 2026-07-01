@@ -5,20 +5,23 @@ export type FeedbackSource =
   | "tool_result"
   | "failed_job"
   | "admin_installer"
-  | "search_miss";
+  | "search_miss"
+  | "onboarding";
 export type FeedbackSurveyId =
   | "global-feedback-v1"
   | "tool-result-v1"
   | "failed-job-v1"
   | "admin-install-v1"
-  | "search-miss-v1";
+  | "search-miss-v1"
+  | "onboarding-usage-v1";
 export type FeedbackPromptVariant =
   | "nav-v1"
   | "inline-v1"
   | "failed-button-v1"
   | "settings-card-v1"
   | "search-empty-v1"
-  | "search-results-v1";
+  | "search-results-v1"
+  | "onboarding-overlay-v1";
 export type FeedbackSentiment = "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
 export type FeedbackType = "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
 export type FeedbackInstallMethod = "docker" | "docker_compose" | "source" | "cloud" | "other";
@@ -100,6 +103,8 @@ export function surveyIdForSource(source: FeedbackSource): FeedbackSurveyId {
       return "search-miss-v1";
     case "global":
       return "global-feedback-v1";
+    case "onboarding":
+      return "onboarding-usage-v1";
   }
 }
 
@@ -115,6 +120,8 @@ export function promptVariantForSource(source: FeedbackSource): FeedbackPromptVa
       return "search-empty-v1";
     case "global":
       return "nav-v1";
+    case "onboarding":
+      return "onboarding-overlay-v1";
   }
 }
 
@@ -148,6 +155,26 @@ export function shouldShowInstallFeedbackCard({
 
   const parsedSnooze = Date.parse(snoozedUntil);
   return !Number.isFinite(parsedSnooze) || parsedSnooze <= now;
+}
+
+interface UsageSurveyVisibilityOptions {
+  settings: Record<string, string>;
+  role: string | null;
+  analyticsConfigLoaded: boolean;
+  analyticsEnabled: boolean;
+}
+
+export function shouldShowUsageSurvey({
+  settings,
+  role,
+  analyticsConfigLoaded,
+  analyticsEnabled,
+}: UsageSurveyVisibilityOptions): boolean {
+  if (!analyticsConfigLoaded || !analyticsEnabled || role !== "admin") return false;
+  return (
+    !settings["onboarding.usageSurvey.answeredAt"] &&
+    !settings["onboarding.usageSurvey.dismissedAt"]
+  );
 }
 
 export async function submitFeedback(payload: FeedbackPayload): Promise<FeedbackResponse> {
