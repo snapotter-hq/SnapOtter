@@ -3,12 +3,15 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
+import type { ModalityFilter, ToolSearchItem } from "../lib/tool-search";
 import SectionHeading from "./SectionHeading.astro";
 
 const toolCount = TOOLS.length;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 
-const modalities = [
+type ToolModality = ToolSearchItem["modality"];
+
+const modalities: { id: ModalityFilter; label: string; count: number }[] = [
   { id: "all", label: "All", count: TOOLS.length },
   { id: "image", label: "Image", count: TOOLS.filter((t) => t.modality === "image").length },
   { id: "video", label: "Video", count: TOOLS.filter((t) => t.modality === "video").length },
@@ -18,6 +21,94 @@ const modalities = [
     label: "PDF & Files",
     count: TOOLS.filter((t) => t.modality === "document" || t.modality === "file").length,
   },
+];
+
+const workflows = [
+  {
+    id: "optimize",
+    label: "Optimize delivery",
+    description: "Compress, resize, convert, and tune assets for fast delivery.",
+    query: "optimize files for web",
+    icon: "Gauge",
+    metric: "Media + PDF",
+  },
+  {
+    id: "convert",
+    label: "Convert formats",
+    description: "Find exact converters by input, output, or plain-language intent.",
+    query: "convert files to another format",
+    icon: "Repeat2",
+    metric: "100+ routes",
+  },
+  {
+    id: "pdf",
+    label: "Prepare documents",
+    description: "Merge, split, compress, protect, redact, and normalize PDFs.",
+    query: "prepare pdf documents",
+    icon: "FileStack",
+    metric: "PDF workflows",
+  },
+  {
+    id: "metadata",
+    label: "Clean metadata",
+    description: "Strip EXIF, GPS, document, media, and archive metadata.",
+    query: "remove metadata",
+    icon: "ShieldCheck",
+    metric: "Privacy",
+  },
+  {
+    id: "batch",
+    label: "Batch operations",
+    description: "Rename, archive, extract, and process repeatable file sets.",
+    query: "batch file operations",
+    icon: "ListChecks",
+    metric: "Bulk tools",
+  },
+  {
+    id: "ai",
+    label: "Enhance with AI",
+    description: "Restore, upscale, remove backgrounds, OCR, and transcribe locally.",
+    query: "ai enhance extract text remove background",
+    icon: "Sparkles",
+    metric: "Local AI",
+  },
+];
+
+const workflowAliasesByToolId: Record<string, string[]> = {
+  "bulk-rename": ["batch file operations", "rename many files"],
+  "compress-pdf": ["prepare pdf documents", "optimize delivery"],
+  "compress-video": ["optimize delivery", "compress media"],
+  "convert-audio": ["convert formats", "audio converter"],
+  "convert-document": ["convert formats", "prepare documents"],
+  "convert-video": ["convert formats", "video converter"],
+  "create-zip": ["batch file operations", "archive files"],
+  "extract-zip": ["batch file operations", "extract archive"],
+  "image-to-pdf": ["prepare documents", "convert images to pdf"],
+  "merge-pdf": ["prepare pdf documents", "combine pdf"],
+  "optimize-for-web": ["optimize delivery", "web delivery"],
+  "pdfa-convert": ["prepare pdf documents", "archive pdf"],
+  "redact-pdf": ["prepare pdf documents", "hide sensitive text"],
+  "remove-background": ["enhance with ai", "transparent background"],
+  "remove-metadata": ["clean metadata", "strip exif"],
+  "split-pdf": ["prepare pdf documents", "extract pages"],
+  "transcribe-audio": ["enhance with ai", "speech to text"],
+  "watermark-pdf": ["prepare pdf documents", "add watermark"],
+  "word-to-pdf": ["prepare documents", "convert document to pdf"],
+};
+
+const defaultToolIds = [
+  "resize",
+  "compress",
+  "convert",
+  "remove-background",
+  "optimize-for-web",
+  "ocr",
+  "merge-pdf",
+  "split-pdf",
+  "compress-pdf",
+  "compress-video",
+  "convert-audio",
+  "extract-zip",
 ];
 
 function renderIcon(iconName: string): string {
@@ -32,164 +123,537 @@ function renderIcon(iconName: string): string {
     })
     .join("");
 }
+
+function toToolSearchItem(tool: (typeof TOOLS)[number]): ToolSearchItem {
+  const category = categoryMap.get(tool.category);
+  return {
+    id: tool.id,
+    name: tool.name,
+    description: tool.description,
+    modality: tool.modality as ToolModality,
+    category: tool.category,
+    url: `/tools/${toolSection(tool)}/${tool.id}/`,
+    icon: tool.icon,
+    iconSvg: renderIcon(tool.icon),
+    color: category?.color ?? "#E07832",
+    acceptedInputs: [...tool.acceptedInputs],
+    outputModality: tool.outputModality as ToolModality | undefined,
+    keywords: [...(tool.keywords ?? [])],
+    workflowAliases: workflowAliasesByToolId[tool.id] ?? [],
+  };
+}
+
+const searchIndex = TOOLS.map(toToolSearchItem);
+const defaultTools = defaultToolIds
+  .map((id) => searchIndex.find((tool) => tool.id === id))
+  .filter((tool): tool is ToolSearchItem => Boolean(tool));
+
+const safeSearchIndexJson = JSON.stringify(searchIndex).replace(/</g, "\\u003c");
+const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u003c");
 ---
 
 <section class="bg-background-alt px-6 py-20 md:py-28" id="features">
   <SectionHeading
-    title="One platform. Every file tool."
-    subtitle={`Browse ${toolCount} self-hosted tools across image, video, audio, documents, and data.`}
+    title="One platform. Every file workflow."
+    subtitle={`Search ${toolCount} self-hosted tools by task, format, modality, or workflow.`}
   />
 
   <div class="mx-auto max-w-6xl">
-    <!-- Modality pills -->
-    <div class="flex flex-wrap items-center justify-center gap-2" id="modality-pills">
-      {modalities.map((m) => (
-        <button
-          type="button"
-          data-modality={m.id}
-          class:list={[
-            "tool-pill shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-            m.id === "all"
-              ? "bg-primary text-white"
-              : "border border-border bg-surface hover:bg-background-emphasis",
-          ]}
-        >
-          {m.label} ({m.count})
-        </button>
-      ))}
-    </div>
-
-    <!-- Category pills -->
-    <div class="mt-3 flex flex-wrap items-center justify-center gap-2" id="category-pills">
-      {CATEGORIES.map((cat) => {
-        const count = TOOLS.filter((t) => t.category === cat.id).length;
-        return (
-          <button
-            type="button"
-            data-category={cat.id}
-            class="tool-pill shrink-0 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium transition-colors hover:bg-background-emphasis"
-          >
-            {cat.name} ({count})
-          </button>
-        );
-      })}
-    </div>
-
-    <!-- Result count -->
-    <p class="mt-6 text-center text-sm text-muted" id="tool-count">
-      Showing {toolCount} of {toolCount} tools
-    </p>
-
-    <!-- Tool grid -->
-    <div class="mt-8 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5" id="tool-grid">
-      {TOOLS.map((tool) => {
-        const cat = categoryMap.get(tool.category);
-        return (
-          <a
-            href={`/tools/${toolSection(tool)}/${tool.id}/`}
-            class="tool-card flex flex-col items-center rounded-xl border border-border bg-surface px-4 py-5 text-center no-underline transition-all"
-            data-name={tool.name.toLowerCase()}
-            data-desc={tool.description.toLowerCase()}
-            data-modality={tool.modality}
-            data-category={tool.category}
-            style={{ "--cat-color": cat?.color } as any}
-          >
+    <div class="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+      <div class="border-b border-border bg-background px-4 py-4 sm:px-5">
+        <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div class="relative">
+            <label class="sr-only" for="tool-command-search">Search landing tools</label>
             <svg
-              class="mb-2.5 h-7 w-7 shrink-0"
-              style={{ color: cat?.color }}
+              class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              set:html={renderIcon(tool.icon)}
+              aria-hidden="true"
+              set:html={renderIcon("Search")}
             />
-            <span class="text-sm font-semibold text-foreground">{tool.name}</span>
-            <p class="mt-1 text-xs leading-relaxed text-muted line-clamp-2">{tool.description}</p>
+            <input
+              id="tool-command-search"
+              type="text"
+              inputmode="search"
+              autocomplete="off"
+              aria-label="Search landing tools"
+              placeholder="Workflow or extension"
+              class="h-13 w-full rounded-lg border border-border bg-surface py-3 pl-12 pr-12 text-base text-foreground outline-none transition-colors placeholder:text-muted focus:border-primary"
+            />
+            <button
+              id="tool-command-clear"
+              type="button"
+              aria-label="Clear landing tool search"
+              class="absolute right-3 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted transition-colors hover:bg-background-alt hover:text-foreground"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                set:html={renderIcon("X")}
+              />
+            </button>
+          </div>
+
+          <div
+            class="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1"
+            aria-label="Filter tools by modality"
+          >
+            {modalities.map((modality) => (
+              <button
+                type="button"
+                data-modality={modality.id}
+                aria-pressed={modality.id === "all" ? "true" : "false"}
+                class:list={[
+                  "tool-command-modality rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+                  modality.id === "all"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted hover:bg-background-alt hover:text-foreground",
+                ]}
+              >
+                <span>{modality.label}</span>
+                <span class="ms-1 text-xs opacity-75">{modality.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid border-b border-border lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside class="order-2 border-t border-border bg-background-alt/50 p-4 lg:order-1 lg:border-e lg:border-t-0">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Workflows</p>
+            <button
+              id="tool-command-reset-workflow"
+              type="button"
+              class="hidden rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary-subtle"
+            >
+              Reset
+            </button>
+          </div>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            {workflows.map((workflow) => (
+              <button
+                type="button"
+                data-workflow={workflow.query}
+                data-workflow-id={workflow.id}
+                data-label={workflow.label}
+                aria-pressed="false"
+                class="tool-command-workflow group rounded-lg border border-border bg-surface p-3 text-start transition-all hover:border-primary hover:bg-primary-subtle/40"
+              >
+                <span class="flex items-center gap-3">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background-alt text-primary transition-colors group-hover:bg-surface">
+                    <svg
+                      class="h-4.5 w-4.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      set:html={renderIcon(workflow.icon)}
+                    />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-foreground">{workflow.label}</span>
+                    <span class="mt-0.5 block text-xs font-medium text-primary-dark">{workflow.metric}</span>
+                  </span>
+                </span>
+                <span class="mt-2 block text-xs leading-relaxed text-muted">{workflow.description}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div class="order-1 min-w-0 p-4 sm:p-5 lg:order-2">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Tool finder</p>
+              <h3 class="mt-1 text-xl font-bold tracking-tight text-foreground" id="tool-command-title">
+                Suggested starting points
+              </h3>
+            </div>
+            <p class="text-sm text-muted" id="tool-command-count" aria-live="polite">
+              {defaultTools.length} curated tools
+            </p>
+          </div>
+
+          <div
+            class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+            id="tool-command-results"
+          >
+            {defaultTools.map((tool) => (
+              <a
+                href={tool.url}
+                class="tool-card group flex min-h-[148px] flex-col rounded-xl border border-border bg-surface p-4 no-underline transition-all"
+                style={`--cat-color:${tool.color};`}
+              >
+                <span class="flex items-start justify-between gap-3">
+                  <span
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background-alt"
+                    style={`color:${tool.color};`}
+                  >
+                    <svg
+                      class="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      set:html={tool.iconSvg}
+                    />
+                  </span>
+                  <span class="rounded-full bg-background-alt px-2 py-1 text-[11px] font-semibold uppercase text-muted">
+                    {tool.modality === "document" ? "PDF" : tool.modality}
+                  </span>
+                </span>
+                <span class="mt-4 text-sm font-semibold text-foreground">{tool.name}</span>
+                <span class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">{tool.description}</span>
+              </a>
+            ))}
+          </div>
+
+          <div
+            class="mt-5 hidden rounded-xl border border-dashed border-border bg-background-alt p-5"
+            id="tool-command-empty"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 class="text-lg font-bold tracking-tight text-foreground">No matching tool yet</h3>
+                <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+                  Open a GitHub Discussion with this search prefilled, or browse the closest tools already in SnapOtter.
+                </p>
+              </div>
+              <a
+                href="https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas&title=Tool+request"
+                target="_blank"
+                rel="noopener noreferrer"
+                id="tool-command-request-empty"
+                class="btn-primary inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
+              >
+                Request this tool
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  set:html={renderIcon("ArrowUpRight")}
+                />
+              </a>
+            </div>
+            <div class="mt-5 hidden">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Closest existing tools</p>
+              <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" id="tool-command-related"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div class="text-sm text-muted">
+          Missing a workflow?
+          <a
+            href="https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas&title=Tool+request"
+            target="_blank"
+            rel="noopener noreferrer"
+            id="tool-command-request"
+            class="font-semibold text-primary hover:underline"
+          >
+            Request a tool
           </a>
-        );
-      })}
-    </div>
-
-    <!-- Empty state -->
-    <p class="mt-8 hidden text-center text-muted" id="tool-empty">
-      No tools match these filters.
-    </p>
-
-    <!-- Browse all link -->
-    <div class="mt-10 text-center">
-      <a href="/tools" class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-        Browse full tool catalog
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </a>
+          and include the input, output, and privacy requirements.
+        </div>
+        <a href="/tools" class="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+          Browse full tool catalog
+          <svg
+            class="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            set:html={renderIcon("ArrowRight")}
+          />
+        </a>
+      </div>
     </div>
   </div>
+
+  <script id="tool-command-index" type="application/json" is:inline set:html={safeSearchIndexJson}></script>
+  <script id="tool-command-default-ids" type="application/json" is:inline set:html={safeDefaultToolIdsJson}></script>
 </section>
 
-<script is:inline>
-  (function () {
-    var grid = document.getElementById("tool-grid");
-    var countEl = document.getElementById("tool-count");
-    var emptyEl = document.getElementById("tool-empty");
-    var cards = grid.querySelectorAll(".tool-card");
-    var total = cards.length;
-    var activeModality = "all";
-    var activeCategory = "";
+<script>
+  import {
+    buildToolRequestDiscussionUrl,
+    searchTools,
+    type ModalityFilter,
+    type ToolSearchItem,
+    type ToolSearchResult,
+  } from "../lib/tool-search";
 
-    function updatePillStyles() {
-      document.querySelectorAll("#modality-pills .tool-pill").forEach(function (btn) {
-        var m = btn.getAttribute("data-modality");
-        if (m === activeModality) {
-          btn.className = "tool-pill shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors bg-primary text-white";
-        } else {
-          btn.className = "tool-pill shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors border border-border bg-surface hover:bg-background-emphasis";
-        }
-      });
-      document.querySelectorAll("#category-pills .tool-pill").forEach(function (btn) {
-        var c = btn.getAttribute("data-category");
-        if (c === activeCategory) {
-          btn.className = "tool-pill shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors bg-primary text-white";
-        } else {
-          btn.className = "tool-pill shrink-0 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium transition-colors hover:bg-background-emphasis";
-        }
+  const indexEl = document.getElementById("tool-command-index");
+  const defaultIdsEl = document.getElementById("tool-command-default-ids");
+  const searchInput = document.getElementById("tool-command-search") as HTMLInputElement | null;
+  const clearButton = document.getElementById("tool-command-clear") as HTMLButtonElement | null;
+  const resetWorkflowButton = document.getElementById(
+    "tool-command-reset-workflow",
+  ) as HTMLButtonElement | null;
+  const resultsEl = document.getElementById("tool-command-results");
+  const emptyEl = document.getElementById("tool-command-empty");
+  const relatedEl = document.getElementById("tool-command-related");
+  const titleEl = document.getElementById("tool-command-title");
+  const countEl = document.getElementById("tool-command-count");
+  const requestLink = document.getElementById("tool-command-request") as HTMLAnchorElement | null;
+  const requestEmptyLink = document.getElementById(
+    "tool-command-request-empty",
+  ) as HTMLAnchorElement | null;
+  const modalityButtons = [...document.querySelectorAll<HTMLButtonElement>(".tool-command-modality")];
+  const workflowButtons = [...document.querySelectorAll<HTMLButtonElement>(".tool-command-workflow")];
+
+  if (
+    indexEl?.textContent &&
+    defaultIdsEl?.textContent &&
+    searchInput &&
+    clearButton &&
+    resetWorkflowButton &&
+    resultsEl &&
+    emptyEl &&
+    relatedEl &&
+    titleEl &&
+    countEl
+  ) {
+    const searchField = searchInput;
+    const clearSearchButton = clearButton;
+    const resetButton = resetWorkflowButton;
+    const resultContainer = resultsEl;
+    const emptyContainer = emptyEl;
+    const relatedContainer = relatedEl;
+    const titleNode = titleEl;
+    const countNode = countEl;
+    const tools = JSON.parse(indexEl.textContent) as ToolSearchItem[];
+    const defaultToolIds = JSON.parse(defaultIdsEl.textContent) as string[];
+    const defaultToolIdSet = new Set(defaultToolIds);
+    let activeModality: ModalityFilter = "all";
+    let activeWorkflowQuery = "";
+    let activeWorkflowLabel = "";
+
+    const modalityLabels = new Map(
+      modalityButtons.map((button) => [
+        button.dataset.modality as ModalityFilter,
+        button.querySelector("span")?.textContent?.trim() ?? "All",
+      ]),
+    );
+
+    function escapeHtml(value: string): string {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatReason(reason: string): string {
+      return reason
+        .replace("match", "")
+        .replace("token", "")
+        .replace("phrase", "")
+        .trim();
+    }
+
+    function matchesActiveModality(tool: ToolSearchItem): boolean {
+      if (activeModality === "all") return true;
+      if (activeModality === "document,file") {
+        return tool.modality === "document" || tool.modality === "file";
+      }
+      return tool.modality === activeModality;
+    }
+
+    function modalityLabel(tool: ToolSearchItem): string {
+      if (tool.modality === "document") return "PDF";
+      return tool.modality;
+    }
+
+    function renderCard(resultOrItem: ToolSearchItem | ToolSearchResult, showReason = false): string {
+      const result =
+        "item" in resultOrItem ? resultOrItem : ({ item: resultOrItem, reason: "" } as ToolSearchResult);
+      const { item } = result;
+      const reason = formatReason(result.reason);
+      const reasonHtml =
+        showReason && reason
+          ? `<span class="mt-3 inline-flex w-fit rounded-md bg-primary-subtle px-2 py-1 text-[11px] font-semibold text-primary-dark">${escapeHtml(reason)}</span>`
+          : "";
+
+      return `
+        <a href="${escapeHtml(item.url)}" class="tool-card group flex min-h-[148px] flex-col rounded-xl border border-border bg-surface p-4 no-underline transition-all" style="--cat-color:${escapeHtml(item.color)};">
+          <span class="flex items-start justify-between gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background-alt" style="color:${escapeHtml(item.color)};">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${item.iconSvg}</svg>
+            </span>
+            <span class="rounded-full bg-background-alt px-2 py-1 text-[11px] font-semibold uppercase text-muted">${escapeHtml(modalityLabel(item))}</span>
+          </span>
+          <span class="mt-4 text-sm font-semibold text-foreground">${escapeHtml(item.name)}</span>
+          <span class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">${escapeHtml(item.description)}</span>
+          ${reasonHtml}
+        </a>
+      `;
+    }
+
+    function setRequestLinks(query: string): void {
+      const href = buildToolRequestDiscussionUrl(query);
+      if (requestLink) requestLink.href = href;
+      if (requestEmptyLink) requestEmptyLink.href = href;
+    }
+
+    function updateClearButton(hasQuery: boolean): void {
+      clearSearchButton.classList.toggle("hidden", !hasQuery);
+      clearSearchButton.classList.toggle("inline-flex", hasQuery);
+    }
+
+    function setActiveModality(nextModality: ModalityFilter): void {
+      activeModality = nextModality;
+      for (const button of modalityButtons) {
+        const isActive = button.dataset.modality === activeModality;
+        button.setAttribute("aria-pressed", String(isActive));
+        button.classList.toggle("bg-primary", isActive);
+        button.classList.toggle("text-white", isActive);
+        button.classList.toggle("shadow-sm", isActive);
+        button.classList.toggle("text-muted", !isActive);
+        button.classList.toggle("hover:bg-background-alt", !isActive);
+        button.classList.toggle("hover:text-foreground", !isActive);
+      }
+    }
+
+    function setActiveWorkflow(query: string, label: string): void {
+      activeWorkflowQuery = query;
+      activeWorkflowLabel = label;
+      for (const button of workflowButtons) {
+        const isActive = button.dataset.workflow === activeWorkflowQuery;
+        button.setAttribute("aria-pressed", String(isActive));
+        button.classList.toggle("border-primary", isActive);
+        button.classList.toggle("bg-primary-subtle", isActive);
+        button.classList.toggle("border-border", !isActive);
+        button.classList.toggle("bg-surface", !isActive);
+      }
+      resetButton.classList.toggle("hidden", !activeWorkflowQuery);
+    }
+
+    function searchQuery(): string {
+      return searchField.value.trim() || activeWorkflowQuery;
+    }
+
+    function hideEmptyState(): void {
+      emptyContainer.classList.add("hidden");
+      relatedContainer.innerHTML = "";
+      relatedContainer.parentElement?.classList.add("hidden");
+    }
+
+    function renderDefault(): void {
+      const defaultTools = tools.filter(
+        (tool) => defaultToolIdSet.has(tool.id) && matchesActiveModality(tool),
+      );
+      const fallbackTools =
+        defaultTools.length > 0 ? defaultTools : tools.filter(matchesActiveModality).slice(0, 12);
+      const modalityName = modalityLabels.get(activeModality) ?? "All";
+
+      titleNode.textContent =
+        activeModality === "all" ? "Suggested starting points" : `${modalityName} starting points`;
+      countNode.textContent = `${fallbackTools.length} curated tools`;
+      resultContainer.innerHTML = fallbackTools.map((tool) => renderCard(tool)).join("");
+      resultContainer.classList.remove("hidden");
+      hideEmptyState();
+      setRequestLinks("");
+      updateClearButton(false);
+    }
+
+    function renderSearch(): void {
+      const query = searchQuery();
+      const hasQuery = query.length > 0;
+      updateClearButton(hasQuery);
+      setRequestLinks(query);
+
+      if (!hasQuery) {
+        renderDefault();
+        return;
+      }
+
+      const response = searchTools(tools, { query, modality: activeModality, limit: 12 });
+
+      if (response.hasConfidentMatch && response.results.length > 0) {
+        titleNode.textContent = activeWorkflowLabel || "Recommended tools";
+        countNode.textContent = `${response.results.length} of ${response.totalMatches} matches`;
+        resultContainer.innerHTML = response.results.map((result) => renderCard(result, true)).join("");
+        resultContainer.classList.remove("hidden");
+        hideEmptyState();
+        return;
+      }
+
+      titleNode.textContent = "Request or refine";
+      countNode.textContent =
+        response.related.length > 0
+          ? `${response.related.length} close ${response.related.length === 1 ? "tool" : "tools"}`
+          : "No confident match";
+      resultContainer.classList.add("hidden");
+      emptyContainer.classList.remove("hidden");
+      relatedContainer.innerHTML = response.related.map((result) => renderCard(result, true)).join("");
+      relatedContainer.parentElement?.classList.toggle("hidden", response.related.length === 0);
+    }
+
+    searchField.addEventListener("input", () => {
+      if (searchField.value.trim() !== activeWorkflowQuery) {
+        setActiveWorkflow("", "");
+      }
+      renderSearch();
+    });
+
+    clearSearchButton.addEventListener("click", () => {
+      searchField.value = "";
+      setActiveWorkflow("", "");
+      searchField.focus();
+      renderDefault();
+    });
+
+    resetButton.addEventListener("click", () => {
+      searchField.value = "";
+      setActiveWorkflow("", "");
+      renderDefault();
+    });
+
+    for (const button of modalityButtons) {
+      button.addEventListener("click", () => {
+        setActiveModality((button.dataset.modality as ModalityFilter) ?? "all");
+        renderSearch();
       });
     }
 
-    function filter() {
-      var visible = 0;
-      cards.forEach(function (card) {
-        var mod = card.getAttribute("data-modality") || "";
-        var cat = card.getAttribute("data-category") || "";
-        var matchMod = activeModality === "all" || activeModality.split(",").indexOf(mod) !== -1;
-        var matchCat = !activeCategory || cat === activeCategory;
-        if (matchMod && matchCat) {
-          card.style.display = "";
-          visible++;
-        } else {
-          card.style.display = "none";
-        }
+    for (const button of workflowButtons) {
+      button.addEventListener("click", () => {
+        const query = button.dataset.workflow ?? "";
+        const label = button.dataset.label ?? "";
+        searchField.value = "";
+        setActiveWorkflow(activeWorkflowQuery === query ? "" : query, activeWorkflowQuery === query ? "" : label);
+        renderSearch();
       });
-      countEl.textContent = "Showing " + visible + " of " + total + " tools";
-      emptyEl.style.display = visible === 0 ? "block" : "none";
-      grid.style.display = visible === 0 ? "none" : "";
     }
 
-    document.querySelectorAll("#modality-pills .tool-pill").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        activeModality = btn.getAttribute("data-modality");
-        updatePillStyles();
-        filter();
-      });
-    });
-
-    document.querySelectorAll("#category-pills .tool-pill").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var cat = btn.getAttribute("data-category");
-        activeCategory = activeCategory === cat ? "" : cat;
-        updatePillStyles();
-        filter();
-      });
-    });
-  })();
+    renderDefault();
+  }
 </script>

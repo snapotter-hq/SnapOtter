@@ -56,8 +56,28 @@ test.describe("Landing Homepage", () => {
   });
 
   test("tool catalog section renders heading and browse link", async ({ page }) => {
-    await expect(page.getByText("One platform. Every file tool.")).toBeVisible();
+    await expect(page.getByText("One platform. Every file workflow.")).toBeVisible();
+    await expect(page.getByLabel("Search landing tools")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Optimize delivery" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Request a tool/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Browse full tool catalog" })).toBeVisible();
+  });
+
+  test("tool command center searches, filters, and links missing requests", async ({ page }) => {
+    const search = page.getByLabel("Search landing tools");
+
+    await search.fill("mp4 to mp3");
+    await expect(
+      page.locator("#tool-command-results").getByRole("link", { name: /MP4 to MP3/ }),
+    ).toBeVisible();
+    await expect(page.getByText("Recommended tools")).toBeVisible();
+
+    await search.fill("convert figma file to layered psd");
+    await expect(page.getByText("No matching tool yet")).toBeVisible();
+
+    const requestHref = await page.locator("#tool-command-request-empty").getAttribute("href");
+    expect(requestHref).toContain("github.com/snapotter-hq/snapotter/discussions/new");
+    expect(requestHref).toContain("title=Tool+request%3A+convert+figma+file+to+layered+psd");
   });
 
   test("enterprise section renders eyebrow and feature cards", async ({ page }) => {
