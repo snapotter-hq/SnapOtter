@@ -1,18 +1,22 @@
 import type { Tool } from "@snapotter/shared";
 import { ANALYTICS_EVENTS, CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ToolCard } from "@/components/common/tool-card.js";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog.js";
 import { AppLayout } from "@/components/layout/app-layout.js";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
 import { useRecentTools } from "@/hooks/use-recent-tools.js";
+import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
 import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
+import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
 import { cn } from "@/lib/utils.js";
+import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface TabDef {
@@ -43,6 +47,17 @@ export function HomePage() {
   const [search, setSearch] = useState("");
   const { fetch: fetchSettings, disabledTools, experimentalEnabled, loaded } = useSettingsStore();
   const recentToolIds = useRecentTools();
+  const analyticsConfig = useAnalyticsStore((s) => s.config);
+  const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
+  const analyticsOn = analyticsConfigLoaded && analyticsConfig?.enabled === true;
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestVariant, setRequestVariant] = useState<FeedbackPromptVariant>("search-empty-v1");
+
+  const openRequest = useCallback((variant: FeedbackPromptVariant) => {
+    setRequestVariant(variant);
+    setRequestOpen(true);
+  }, []);
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -151,12 +166,26 @@ export function HomePage() {
           />
 
           {search ? (
-            <SearchResults results={searchResults} query={search} onClear={() => setSearch("")} />
+            <SearchResults
+              results={searchResults}
+              query={search}
+              onClear={() => setSearch("")}
+              analyticsOn={analyticsOn}
+              onRequest={openRequest}
+            />
           ) : activeTab === "all" ? (
             <AllTabContent recentTools={recentTools} visibleTools={visibleTools} />
           ) : (
             <CategoryGrid groupedTools={groupedTools} />
           )}
+
+          <FeedbackDialog
+            open={requestOpen}
+            source="search_miss"
+            searchQuery={search}
+            promptVariant={requestVariant}
+            onClose={() => setRequestOpen(false)}
+          />
         </div>
       </div>
     </AppLayout>
@@ -272,14 +301,66 @@ function ModalityTabs({
 
 // ── Search Results ───────────────────────────────────────────────
 
+function RequestToolAffordance({
+  query,
+  variant,
+  analyticsOn,
+  onRequest,
+}: {
+  query: string;
+  variant: "empty" | "below";
+  analyticsOn: boolean;
+  onRequest: (promptVariant: FeedbackPromptVariant) => void;
+}) {
+  const { t } = useTranslation();
+  const label =
+    variant === "empty"
+      ? format(t.homePage.requestToolCta, { query })
+      : t.homePage.requestToolBelowResults;
+  const promptVariant: FeedbackPromptVariant =
+    variant === "empty" ? "search-empty-v1" : "search-results-v1";
+  const className = "inline-flex items-center gap-1.5 text-sm text-primary hover:underline";
+
+  if (analyticsOn) {
+    return (
+      <button
+        type="button"
+        data-testid="request-tool"
+        onClick={() => onRequest(promptVariant)}
+        className={className}
+      >
+        <Plus className="h-4 w-4" />
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <a
+      href={buildToolRequestDiscussionUrl(query)}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid="request-tool"
+      className={className}
+    >
+      <Plus className="h-4 w-4" />
+      {label}
+    </a>
+  );
+}
+
 function SearchResults({
   results,
   query,
   onClear,
+  analyticsOn,
+  onRequest,
 }: {
   results: Tool[];
   query: string;
   onClear: () => void;
+  analyticsOn: boolean;
+  onRequest: (promptVariant: FeedbackPromptVariant) => void;
 }) {
   const { t } = useTranslation();
 
@@ -287,22 +368,36 @@ function SearchResults({
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground">{format(t.homePage.noToolsMatch, { query })}</p>
-        <button
-          type="button"
-          onClick={onClear}
-          className="mt-3 text-sm text-primary hover:underline"
-        >
-          {t.homePage.clearSearch}
-        </button>
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <RequestToolAffordance
+            query={query}
+            variant="empty"
+            analyticsOn={analyticsOn}
+            onRequest={onRequest}
+          />
+          <button type="button" onClick={onClear} className="text-sm text-primary hover:underline">
+            {t.homePage.clearSearch}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-      {results.map((tool) => (
-        <ToolCard key={tool.id} tool={tool} variant="descriptive" showModalityBadge />
-      ))}
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {results.map((tool) => (
+          <ToolCard key={tool.id} tool={tool} variant="descriptive" showModalityBadge />
+        ))}
+      </div>
+      <div className="pt-1 text-center">
+        <RequestToolAffordance
+          query={query}
+          variant="below"
+          analyticsOn={analyticsOn}
+          onRequest={onRequest}
+        />
+      </div>
     </div>
   );
 }
