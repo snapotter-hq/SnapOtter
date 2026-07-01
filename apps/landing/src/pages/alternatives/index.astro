@@ -30,11 +30,19 @@ const itemListJsonLd = {
 };
 
 const allJsonLd = [breadcrumbJsonLd, itemListJsonLd];
+
+const formatReviewDate = (date: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
 ---
 
 <Base
   title="Open-Source, Self-Hosted Alternatives to Cloud File Tools | SnapOtter"
-  description="Open-source, self-hosted alternatives to Smallpdf, iLovePDF, TinyPNG, CloudConvert, and Otter.ai. One stack for image, video, audio, PDF, and files, on infrastructure you own."
+  description="Open-source, self-hosted alternatives to TinyWow, Smallpdf, Adobe Acrobat online, FreeConvert, Convertio, CloudConvert, Otter.ai, and more. One stack for image, video, audio, PDF, and files."
   canonical={canonical}
 >
   <Fragment slot="head">
@@ -51,9 +59,9 @@ const allJsonLd = [breadcrumbJsonLd, itemListJsonLd];
           Open-source alternatives to cloud file tools
         </h1>
         <p class="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted md:text-xl">
-          Most file tools upload your work to someone else's server. SnapOtter runs the same kinds of
-          tools on yours: 241 of them across image, video, audio, PDF, and files, in one self-hosted
-          stack.
+          Most online file tools upload your work to someone else's server. SnapOtter runs the same
+          kinds of tools on yours: 241 of them across image, video, audio, PDF, and files, in one
+          self-hosted stack.
         </p>
       </div>
     </section>
@@ -73,6 +81,7 @@ const allJsonLd = [breadcrumbJsonLd, itemListJsonLd];
                 : `The alternative to ${alt.competitor}`}
             </span>
             <span class="mt-2 text-sm leading-relaxed text-muted">{alt.intro}</span>
+            <span class="mt-4 text-xs text-muted">Reviewed {formatReviewDate(alt.lastReviewed)}</span>
             <span class="mt-auto inline-flex items-center gap-1 pt-5 text-sm font-medium text-primary transition-all group-hover:gap-2">
               Compare
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -81,6 +90,39 @@ const allJsonLd = [breadcrumbJsonLd, itemListJsonLd];
             </span>
           </a>
         ))}
+      </div>
+    </section>
+
+    <!-- Methodology -->
+    <section class="border-t border-border py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
+            Comparisons that age gracefully
+          </h2>
+          <div class="mt-6 grid gap-6 sm:grid-cols-3">
+            <div>
+              <h3 class="text-sm font-semibold">Dated reviews</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted">
+                Every comparison page shows when the vendor pages were last checked, so stale
+                claims are easier to spot.
+              </p>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Public sources</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted">
+                Source links sit next to the comparison instead of being buried in a private note.
+              </p>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Stable criteria</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted">
+                The core comparison is deployment model, file location, auditability, and workflow
+                fit, not fragile point-in-time feature trivia.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -102,8 +144,8 @@ const allJsonLd = [breadcrumbJsonLd, itemListJsonLd];
             <div>
               <h3 class="text-sm font-semibold">No quotas or per-file fees</h3>
               <p class="mt-2 text-sm leading-relaxed text-muted">
-                The only limit is your machine. No monthly cap, no per-conversion billing, no
-                watermarks on the free output.
+                The only limit is your machine and your configuration. No third-party
+                per-conversion billing for internal jobs.
               </p>
             </div>
             <div>

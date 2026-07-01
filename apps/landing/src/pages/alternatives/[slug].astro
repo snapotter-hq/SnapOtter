@@ -17,6 +17,12 @@ export function getStaticPaths() {
 const { alt } = Astro.props;
 const canonical = `https://snapotter.com/alternatives/${alt.slug}`;
 const others = ALTERNATIVES.filter((a) => a.slug !== alt.slug);
+const reviewedOn = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+}).format(new Date(`${alt.lastReviewed}T00:00:00Z`));
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
@@ -143,9 +149,28 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             </table>
           </div>
           <p class="mt-4 text-xs text-muted">
-            Comparison reflects the open-source editions and publicly documented plans. Vendor
-            features change; check current docs before deciding.
+            Last reviewed {reviewedOn}. Comparison uses publicly available vendor pages and focuses
+            on deployment model, file location, auditability, and workflow fit. Vendor features and
+            plans change; check current docs before deciding. SnapOtter is not affiliated with
+            {alt.competitor}.
           </p>
+          <div class="mt-5">
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Sources reviewed</p>
+            <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+              {alt.sources.map((source) => (
+                <li>
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary transition-colors hover:text-primary-dark"
+                  >
+                    {source.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </section>
