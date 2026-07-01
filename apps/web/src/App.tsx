@@ -5,6 +5,7 @@ import { Toaster, toast } from "sonner";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { RouteAnnouncer } from "./components/common/route-announcer";
+import { UsageSurveyOverlay } from "./components/onboarding/usage-survey-overlay";
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
@@ -195,6 +196,7 @@ export function App() {
           <RouteAnnouncer />
           <KeyboardShortcutProvider>
             <AuthGuard>
+              <UsageSurveyOverlay />
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
