@@ -1,25 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { captureFeedback, type FeedbackEventProperties } from "../lib/analytics.js";
+import {
+  captureFeedback,
+  FEEDBACK_SOURCE_VALUES,
+  FEEDBACK_SURVEY_ID_VALUES,
+  type FeedbackEventProperties,
+} from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { requireAuth } from "../plugins/auth.js";
 
-const SOURCE_VALUES = [
-  "global",
-  "tool_result",
-  "failed_job",
-  "admin_installer",
-  "search_miss",
-  "onboarding",
-] as const;
-const SURVEY_ID_VALUES = [
-  "global-feedback-v1",
-  "tool-result-v1",
-  "failed-job-v1",
-  "admin-install-v1",
-  "search-miss-v1",
-  "onboarding-usage-v1",
-] as const;
 const SENTIMENT_VALUES = ["great", "okay", "issue", "missing", "bug", "idea", "other"] as const;
 const FEEDBACK_TYPE_VALUES = [
   "bug",
@@ -86,8 +75,8 @@ const optionalText = (max: number) =>
 
 const feedbackBodySchema = z
   .object({
-    source: z.enum(SOURCE_VALUES),
-    surveyId: z.enum(SURVEY_ID_VALUES).optional(),
+    source: z.enum(FEEDBACK_SOURCE_VALUES),
+    surveyId: z.enum(FEEDBACK_SURVEY_ID_VALUES).optional(),
     promptVariant: z
       .string()
       .trim()

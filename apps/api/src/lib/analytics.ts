@@ -7,21 +7,27 @@ import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
 
 let posthogClient: PostHog | null = null;
 
+export const FEEDBACK_SOURCE_VALUES = [
+  "global",
+  "tool_result",
+  "failed_job",
+  "admin_installer",
+  "search_miss",
+  "onboarding",
+] as const;
+
+export const FEEDBACK_SURVEY_ID_VALUES = [
+  "global-feedback-v1",
+  "tool-result-v1",
+  "failed-job-v1",
+  "admin-install-v1",
+  "search-miss-v1",
+  "onboarding-usage-v1",
+] as const;
+
 export interface FeedbackEventProperties {
-  source:
-    | "global"
-    | "tool_result"
-    | "failed_job"
-    | "admin_installer"
-    | "search_miss"
-    | "onboarding";
-  survey_id?:
-    | "global-feedback-v1"
-    | "tool-result-v1"
-    | "failed-job-v1"
-    | "admin-install-v1"
-    | "search-miss-v1"
-    | "onboarding-usage-v1";
+  source: (typeof FEEDBACK_SOURCE_VALUES)[number];
+  survey_id?: (typeof FEEDBACK_SURVEY_ID_VALUES)[number];
   prompt_variant?: string;
   sentiment?: "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
   feedback_type?: "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
