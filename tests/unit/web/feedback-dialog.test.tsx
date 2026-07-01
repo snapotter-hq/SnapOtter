@@ -26,9 +26,6 @@ describe("FeedbackDialog", () => {
     fireEvent.change(screen.getByLabelText("Install method"), {
       target: { value: "docker_compose" },
     });
-    fireEvent.change(screen.getByLabelText("Use case"), {
-      target: { value: "team_internal" },
-    });
     fireEvent.change(screen.getByLabelText("Hardest setup area"), {
       target: { value: "environment_variables" },
     });
@@ -52,7 +49,6 @@ describe("FeedbackDialog", () => {
         contactName: undefined,
         company: undefined,
         installMethod: "docker_compose",
-        usageType: "team_internal",
         frictionArea: "environment_variables",
         importantAreas: ["pdf_docs", "batch_workflows"],
       });

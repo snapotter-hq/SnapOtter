@@ -12,7 +12,6 @@ import {
   type FeedbackSentiment,
   type FeedbackSource,
   type FeedbackType,
-  type FeedbackUsageType,
   promptVariantForSource,
   submitFeedback,
   surveyIdForSource,
@@ -49,13 +48,6 @@ const INSTALL_METHODS: FeedbackInstallMethod[] = [
   "source",
   "cloud",
   "other",
-];
-const USAGE_TYPES: FeedbackUsageType[] = [
-  "personal",
-  "team_internal",
-  "business_workflow",
-  "education",
-  "evaluating",
 ];
 const FRICTION_AREAS: FeedbackFrictionArea[] = [
   "smooth",
@@ -99,7 +91,6 @@ export function FeedbackDialog({
   const [contactName, setContactName] = useState("");
   const [company, setCompany] = useState("");
   const [installMethod, setInstallMethod] = useState<FeedbackInstallMethod>("docker_compose");
-  const [usageType, setUsageType] = useState<FeedbackUsageType>("evaluating");
   const [frictionArea, setFrictionArea] = useState<FeedbackFrictionArea>("smooth");
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -121,7 +112,6 @@ export function FeedbackDialog({
     setContactName("");
     setCompany("");
     setInstallMethod("docker_compose");
-    setUsageType("evaluating");
     setFrictionArea("smooth");
     setImportantAreas([]);
     setSubmitting(false);
@@ -183,7 +173,6 @@ export function FeedbackDialog({
       ...(isAdminInstall
         ? {
             installMethod,
-            usageType,
             frictionArea,
             importantAreas,
           }
@@ -278,8 +267,6 @@ export function FeedbackDialog({
               <AdminInstallFields
                 installMethod={installMethod}
                 setInstallMethod={setInstallMethod}
-                usageType={usageType}
-                setUsageType={setUsageType}
                 frictionArea={frictionArea}
                 setFrictionArea={setFrictionArea}
                 importantAreas={importantAreas}
@@ -389,8 +376,6 @@ export function FeedbackDialog({
 interface AdminInstallFieldsProps {
   installMethod: FeedbackInstallMethod;
   setInstallMethod: (value: FeedbackInstallMethod) => void;
-  usageType: FeedbackUsageType;
-  setUsageType: (value: FeedbackUsageType) => void;
   frictionArea: FeedbackFrictionArea;
   setFrictionArea: (value: FeedbackFrictionArea) => void;
   importantAreas: FeedbackImportantArea[];
@@ -400,8 +385,6 @@ interface AdminInstallFieldsProps {
 function AdminInstallFields({
   installMethod,
   setInstallMethod,
-  usageType,
-  setUsageType,
   frictionArea,
   setFrictionArea,
   importantAreas,
@@ -410,41 +393,22 @@ function AdminInstallFields({
   const { t } = useTranslation();
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground" htmlFor="feedback-install-method">
-            {t.feedback.installMethodLabel}
-          </label>
-          <select
-            id="feedback-install-method"
-            value={installMethod}
-            onChange={(event) => setInstallMethod(event.target.value as FeedbackInstallMethod)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-          >
-            {INSTALL_METHODS.map((method) => (
-              <option key={method} value={method}>
-                {t.feedback.installMethods[method]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground" htmlFor="feedback-usage-type">
-            {t.feedback.usageTypeLabel}
-          </label>
-          <select
-            id="feedback-usage-type"
-            value={usageType}
-            onChange={(event) => setUsageType(event.target.value as FeedbackUsageType)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-          >
-            {USAGE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {t.feedback.usageTypes[type]}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground" htmlFor="feedback-install-method">
+          {t.feedback.installMethodLabel}
+        </label>
+        <select
+          id="feedback-install-method"
+          value={installMethod}
+          onChange={(event) => setInstallMethod(event.target.value as FeedbackInstallMethod)}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+        >
+          {INSTALL_METHODS.map((method) => (
+            <option key={method} value={method}>
+              {t.feedback.installMethods[method]}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">
