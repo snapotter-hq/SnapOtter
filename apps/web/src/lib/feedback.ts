@@ -1,16 +1,24 @@
 import { apiPost } from "@/lib/api";
 
-export type FeedbackSource = "global" | "tool_result" | "failed_job" | "admin_installer";
+export type FeedbackSource =
+  | "global"
+  | "tool_result"
+  | "failed_job"
+  | "admin_installer"
+  | "search_miss";
 export type FeedbackSurveyId =
   | "global-feedback-v1"
   | "tool-result-v1"
   | "failed-job-v1"
-  | "admin-install-v1";
+  | "admin-install-v1"
+  | "search-miss-v1";
 export type FeedbackPromptVariant =
   | "nav-v1"
   | "inline-v1"
   | "failed-button-v1"
-  | "settings-card-v1";
+  | "settings-card-v1"
+  | "search-empty-v1"
+  | "search-results-v1";
 export type FeedbackSentiment = "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
 export type FeedbackType = "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
 export type FeedbackInstallMethod = "docker" | "docker_compose" | "source" | "cloud" | "other";
@@ -58,6 +66,7 @@ export interface FeedbackPayload {
   contactName?: string;
   company?: string;
   toolId?: string;
+  searchQuery?: string;
   jobStatus?: "completed" | "failed";
   installMethod?: FeedbackInstallMethod;
   usageType?: FeedbackUsageType;
@@ -87,6 +96,8 @@ export function surveyIdForSource(source: FeedbackSource): FeedbackSurveyId {
       return "failed-job-v1";
     case "admin_installer":
       return "admin-install-v1";
+    case "search_miss":
+      return "search-miss-v1";
     case "global":
       return "global-feedback-v1";
   }
@@ -100,6 +111,8 @@ export function promptVariantForSource(source: FeedbackSource): FeedbackPromptVa
       return "failed-button-v1";
     case "admin_installer":
       return "settings-card-v1";
+    case "search_miss":
+      return "search-empty-v1";
     case "global":
       return "nav-v1";
   }
