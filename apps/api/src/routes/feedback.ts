@@ -10,6 +10,7 @@ const SOURCE_VALUES = [
   "failed_job",
   "admin_installer",
   "search_miss",
+  "onboarding",
 ] as const;
 const SURVEY_ID_VALUES = [
   "global-feedback-v1",
@@ -17,6 +18,7 @@ const SURVEY_ID_VALUES = [
   "failed-job-v1",
   "admin-install-v1",
   "search-miss-v1",
+  "onboarding-usage-v1",
 ] as const;
 const SENTIMENT_VALUES = ["great", "okay", "issue", "missing", "bug", "idea", "other"] as const;
 const FEEDBACK_TYPE_VALUES = [
