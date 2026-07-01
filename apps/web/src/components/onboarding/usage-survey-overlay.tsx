@@ -135,7 +135,7 @@ export function UsageSurveyOverlay() {
               type="button"
               onClick={() => setUsageType(value)}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors",
+                "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
                 usageType === value
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-foreground hover:bg-muted",
@@ -162,7 +162,7 @@ export function UsageSurveyOverlay() {
                 type="button"
                 onClick={() => toggleArea(value)}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors",
+                  "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
                   importantAreas.includes(value)
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-foreground hover:bg-muted",
