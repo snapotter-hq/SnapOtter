@@ -169,7 +169,7 @@ export function FeedbackDialog({
       source,
       surveyId: surveyIdForSource(source),
       promptVariant: promptVariantProp ?? promptVariantForSource(source),
-      searchQuery: isSearchMiss ? searchQuery : undefined,
+      searchQuery: isSearchMiss ? searchQuery?.slice(0, 200) : undefined,
       ...(sentiment ? { sentiment } : {}),
       feedbackType,
       message: message.trim() || undefined,

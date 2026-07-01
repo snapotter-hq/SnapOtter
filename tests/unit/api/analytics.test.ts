@@ -268,6 +268,36 @@ describe("captureFeedback", () => {
     });
   });
 
+  it("forwards search_query for a search_miss request", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.captureFeedback(
+      {
+        source: "search_miss",
+        survey_id: "search-miss-v1",
+        prompt_variant: "search-empty-v1",
+        feedback_type: "feature_request",
+        search_query: "convert to dicom",
+        contact_ok: false,
+      },
+      "distinct-search-miss",
+    );
+
+    expect(mockCapture).toHaveBeenCalledWith({
+      distinctId: "distinct-search-miss",
+      event: "feedback_submitted",
+      properties: expect.objectContaining({
+        source: "search_miss",
+        survey_id: "search-miss-v1",
+        prompt_variant: "search-empty-v1",
+        feedback_type: "feature_request",
+        search_query: "convert to dicom",
+      }),
+    });
+  });
+
   it("does nothing when analytics is disabled", async () => {
     bakedConfig.enabled = false;
 
