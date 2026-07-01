@@ -567,17 +567,20 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
     }
 
     function renderDefault(): void {
-      const defaultTools = tools.filter(
-        (tool) => defaultToolIdSet.has(tool.id) && matchesActiveModality(tool),
-      );
-      const fallbackTools =
-        defaultTools.length > 0 ? defaultTools : tools.filter(matchesActiveModality).slice(0, 12);
+      const matchingTools = tools.filter(matchesActiveModality);
+      const defaultTools =
+        activeModality === "all"
+          ? tools.filter((tool) => defaultToolIdSet.has(tool.id))
+          : matchingTools.slice(0, 12);
       const modalityName = modalityLabels.get(activeModality) ?? "All";
 
       titleNode.textContent =
         activeModality === "all" ? "Suggested starting points" : `${modalityName} starting points`;
-      countNode.textContent = `${fallbackTools.length} curated tools`;
-      resultContainer.innerHTML = fallbackTools.map((tool) => renderCard(tool)).join("");
+      countNode.textContent =
+        activeModality === "all"
+          ? `${defaultTools.length} curated tools`
+          : `${defaultTools.length} of ${matchingTools.length} tools`;
+      resultContainer.innerHTML = defaultTools.map((tool) => renderCard(tool)).join("");
       resultContainer.classList.remove("hidden");
       hideEmptyState();
       setRequestLinks("");

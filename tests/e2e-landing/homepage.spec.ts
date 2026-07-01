@@ -80,6 +80,19 @@ test.describe("Landing Homepage", () => {
     expect(requestHref).toContain("title=Tool+request%3A+convert+figma+file+to+layered+psd");
   });
 
+  test("tool command center shows multiple starting points for a selected modality", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: /Video 57/ }).click();
+
+    const results = page.locator("#tool-command-results");
+    await expect(page.getByText("Video starting points")).toBeVisible();
+    await expect(page.getByText(/12 of 57 tools/)).toBeVisible();
+    await expect(results.getByRole("link", { name: /Convert Video/ })).toBeVisible();
+    await expect(results.getByRole("link", { name: /Compress Video/ })).toBeVisible();
+    await expect(results.getByRole("link", { name: /Trim Video/ })).toBeVisible();
+  });
+
   test("enterprise section renders eyebrow and feature cards", async ({ page }) => {
     await expect(page.getByText("Built for enterprise deployment.")).toBeVisible();
     await expect(page.getByText("Enterprise-grade security")).toBeVisible();
