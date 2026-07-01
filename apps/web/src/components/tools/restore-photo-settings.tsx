@@ -15,7 +15,6 @@ export function RestorePhotoControls({
   settings: initialSettings,
   onChange,
 }: RestorePhotoControlsProps) {
-  const { t } = useTranslation();
   const [scratchRemoval, setScratchRemoval] = useState(true);
   const [faceEnhancement, setFaceEnhancement] = useState(true);
   const [fidelity, setFidelity] = useState(70);

@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
-import { createRedisConnection, sharedRedis } from "../jobs/connection.js";
+import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
 import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 
@@ -228,11 +228,11 @@ export function publishEphemeral(
 
 type FrameCallback = (json: string) => void;
 const sseListeners = new Map<string, Set<FrameCallback>>();
-let sseSubscriber: ReturnType<typeof createRedisConnection> | null = null;
+let sseSubscriber: ReturnType<typeof createRedisSubscriberConnection> | null = null;
 
 function ensureSubscriber(): void {
   if (sseSubscriber) return;
-  sseSubscriber = createRedisConnection();
+  sseSubscriber = createRedisSubscriberConnection();
   // ioredis auto-resubscribes after reconnects; the handler keeps connection
   // errors observable without crashing (ioredis silentEmits, but be explicit).
   sseSubscriber.on("error", (err) => {

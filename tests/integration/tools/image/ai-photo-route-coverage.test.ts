@@ -110,6 +110,17 @@ function expectEnqueued(toolId: string, settings: Record<string, unknown>) {
   );
 }
 
+function expectAsyncAccepted(body: string, clientJobId: string) {
+  const artifactJobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId;
+  expect(artifactJobId).toBeDefined();
+  expect(JSON.parse(body)).toEqual({
+    jobId: clientJobId,
+    progressJobId: clientJobId,
+    artifactJobId,
+    async: true,
+  });
+}
+
 describe("async AI photo routes", () => {
   it("colorize validates JSON settings and enqueues colorization jobs", async () => {
     const malformed = await postTool("colorize", [
@@ -122,8 +133,8 @@ describe("async AI photo routes", () => {
     const clientJobId = "55555555-5555-4555-8555-555555555555";
     const res = await postValid("colorize", { intensity: 0.45, model: "opencv" }, clientJobId);
     expect(res.statusCode).toBe(202);
-    expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
     expectEnqueued("colorize", { intensity: 0.45, model: "opencv" });
+    expectAsyncAccepted(res.body, clientJobId);
   });
 
   it("noise-removal rejects invalid tiers and coerces numeric settings", async () => {

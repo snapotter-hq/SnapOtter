@@ -1,6 +1,5 @@
 import { Check, ClipboardCopy, Download, FileJson, FileText, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { useTranslation } from "@/contexts/i18n-context";
 import type { Base64Result } from "@/stores/base64-store";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
@@ -169,7 +168,6 @@ function FileResult({ result }: { result: Base64Result }) {
 // -- Main ResultsPanel ------------------------------------------------------
 
 export function ImageToBase64Results() {
-  const { t } = useTranslation();
   const { results, errors, processing, progress } = useBase64Store();
   const { entries, selectedIndex, originalBlobUrl, selectedFileName } = useFileStore();
 

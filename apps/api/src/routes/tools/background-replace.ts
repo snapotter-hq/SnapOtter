@@ -15,6 +15,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -216,8 +217,6 @@ export function registerBackgroundReplace(app: FastifyInstance) {
         await putObject(inputKey, fileBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       await enqueueToolJob({
         jobId,
         toolId,
@@ -231,7 +230,7 @@ export function registerBackgroundReplace(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

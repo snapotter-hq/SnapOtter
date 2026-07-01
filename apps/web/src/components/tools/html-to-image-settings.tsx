@@ -45,8 +45,11 @@ export function HtmlToImageSettings() {
 
       {store.mode === "url" && (
         <div>
-          <label className="mb-1 block text-sm font-medium">{ts.url}</label>
+          <label htmlFor="html-to-image-url" className="mb-1 block text-sm font-medium">
+            {ts.url}
+          </label>
           <input
+            id="html-to-image-url"
             type="url"
             value={store.url}
             onChange={(e) => store.setUrl(e.target.value)}
@@ -58,8 +61,11 @@ export function HtmlToImageSettings() {
 
       {store.mode === "html" && (
         <div>
-          <label className="mb-1 block text-sm font-medium">{ts.htmlFile}</label>
+          <label htmlFor="html-to-image-file" className="mb-1 block text-sm font-medium">
+            {ts.htmlFile}
+          </label>
           <input
+            id="html-to-image-file"
             type="file"
             accept=".html,.htm"
             onChange={(e) => {
@@ -74,8 +80,11 @@ export function HtmlToImageSettings() {
       )}
 
       <div>
-        <label className="mb-1 block text-sm font-medium">{ts.format}</label>
+        <label htmlFor="html-to-image-format" className="mb-1 block text-sm font-medium">
+          {ts.format}
+        </label>
         <select
+          id="html-to-image-format"
           value={store.format}
           onChange={(e) => store.setFormat(e.target.value as "jpg" | "png" | "webp")}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -88,10 +97,11 @@ export function HtmlToImageSettings() {
 
       {store.format !== "png" && (
         <div>
-          <label className="mb-1 block text-sm font-medium">
+          <label htmlFor="html-to-image-quality" className="mb-1 block text-sm font-medium">
             {ts.quality}: {store.quality}%
           </label>
           <input
+            id="html-to-image-quality"
             type="range"
             min={1}
             max={100}
@@ -103,8 +113,11 @@ export function HtmlToImageSettings() {
       )}
 
       <div>
-        <label className="mb-1 block text-sm font-medium">{ts.devicePreset}</label>
+        <label htmlFor="html-to-image-device-preset" className="mb-1 block text-sm font-medium">
+          {ts.devicePreset}
+        </label>
         <select
+          id="html-to-image-device-preset"
           value={store.devicePreset}
           onChange={(e) =>
             store.setDevicePreset(e.target.value as "desktop" | "tablet" | "mobile" | "custom")
@@ -121,8 +134,14 @@ export function HtmlToImageSettings() {
       {store.devicePreset === "custom" && (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium">{ts.viewportWidth}</label>
+            <label
+              htmlFor="html-to-image-viewport-width"
+              className="mb-1 block text-sm font-medium"
+            >
+              {ts.viewportWidth}
+            </label>
             <input
+              id="html-to-image-viewport-width"
               type="number"
               min={320}
               max={3840}
@@ -132,8 +151,14 @@ export function HtmlToImageSettings() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">{ts.viewportHeight}</label>
+            <label
+              htmlFor="html-to-image-viewport-height"
+              className="mb-1 block text-sm font-medium"
+            >
+              {ts.viewportHeight}
+            </label>
             <input
+              id="html-to-image-viewport-height"
               type="number"
               min={320}
               max={2160}
@@ -146,8 +171,11 @@ export function HtmlToImageSettings() {
       )}
 
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">{ts.fullPage}</label>
+        <label htmlFor="html-to-image-full-page" className="text-sm font-medium">
+          {ts.fullPage}
+        </label>
         <button
+          id="html-to-image-full-page"
           type="button"
           role="switch"
           aria-checked={store.fullPage}

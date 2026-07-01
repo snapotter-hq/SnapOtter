@@ -19,6 +19,7 @@ import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -163,8 +164,6 @@ export function registerBlurFaces(app: FastifyInstance) {
         await putObject(inputKey, fileBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       await enqueueToolJob({
         jobId,
         toolId,
@@ -178,7 +177,7 @@ export function registerBlurFaces(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 

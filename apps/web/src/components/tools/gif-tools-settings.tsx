@@ -27,7 +27,6 @@ export interface GifToolsControlsProps {
 }
 
 export function GifToolsControls({ settings: initialSettings, onChange }: GifToolsControlsProps) {
-  const { t } = useTranslation();
   const { info, loading: infoLoading } = useGifInfo();
   const isAnimated = (info?.pages ?? 0) > 1;
 

@@ -13,7 +13,9 @@ const on = mode === "on";
 // a build from source stays silent. A Sentry DSN and a PostHog project key are
 // public (they ship in the browser bundle), so this is about not making forks /
 // source builds phone home by default, not about secrecy.
-const posthogApiKey = on ? (process.env.SNAPOTTER_POSTHOG_KEY ?? "") : "";
+const posthogApiKey = on
+  ? (process.env.SNAPOTTER_POSTHOG_PROJECT_ID ?? process.env.SNAPOTTER_POSTHOG_KEY ?? "")
+  : "";
 const sentryDsn = on ? (process.env.SNAPOTTER_SENTRY_DSN ?? "") : "";
 const posthogHost = posthogApiKey ? "https://us.i.posthog.com" : "";
 // Enabled only when turned on AND there is somewhere to report to, so a

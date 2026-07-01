@@ -20,6 +20,18 @@ export function createRedisConnection(): Redis {
   });
 }
 
+/**
+ * Create a Redis connection used only for pub/sub subscriptions.
+ * Subscriber sockets cannot run regular commands once subscribed, so disable
+ * ioredis ready checks that issue INFO during reconnects.
+ */
+export function createRedisSubscriberConnection(): Redis {
+  return new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+}
+
 // ioredis 5.11 vs BullMQ's bundled 5.10 type mismatch
 export function createBullMQConnection(): ConnectionOptions {
   return createRedisConnection() as unknown as ConnectionOptions;

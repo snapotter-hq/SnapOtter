@@ -15,6 +15,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 
 const settingsSchema = z.object({
   intensity: z.number().int().min(1).max(100).default(50),
@@ -186,8 +187,6 @@ export function registerBlurBackground(app: FastifyInstance) {
         await putObject(inputKey, fileBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       await enqueueToolJob({
         jobId,
         toolId,
@@ -201,7 +200,7 @@ export function registerBlurBackground(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

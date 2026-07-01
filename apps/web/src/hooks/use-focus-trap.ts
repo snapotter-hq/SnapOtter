@@ -67,7 +67,7 @@ export function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>, 
     return () => {
       container.removeEventListener("keydown", handleKeyDown);
       observer.disconnect();
-      if (returnFocusRef.current && returnFocusRef.current.isConnected) {
+      if (returnFocusRef.current?.isConnected) {
         returnFocusRef.current.focus();
       }
     };

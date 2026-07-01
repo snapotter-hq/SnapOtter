@@ -8,7 +8,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback } from "react";
-import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import {
   FONT_OPTIONS,
@@ -328,7 +327,6 @@ function ResultSettings() {
 // ── Main Settings Component ─────────────────────────────────────────
 
 export function MemeGeneratorSettings() {
-  const { t } = useTranslation();
   const phase = useMemeStore((s) => s.phase);
 
   if (phase === "gallery") return <GallerySettings />;

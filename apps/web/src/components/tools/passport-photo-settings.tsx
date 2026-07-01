@@ -20,7 +20,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { ProgressCard } from "@/components/common/progress-card";
-import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
@@ -337,7 +336,6 @@ function CountryOption({
 // ── Settings panel (left side) ─────────────────────────────────────
 
 export function PassportPhotoSettings() {
-  const { t } = useTranslation();
   const { files } = useFileStore();
   const { error } = useToolProcessor("passport-photo");
 
@@ -896,7 +894,6 @@ export function PassportPhotoSettings() {
 // ── Preview panel (right side) ────────────────────────────────────
 
 export function PassportPhotoPreview() {
-  const { t } = useTranslation();
   const {
     analyzeResult,
     countryCode,

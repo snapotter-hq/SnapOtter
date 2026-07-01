@@ -13,7 +13,6 @@ import {
 import QRCodeStyling from "qr-code-styling";
 import { useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
-import { useTranslation } from "@/contexts/i18n-context";
 import {
   type ContentType,
   type CornerDotType,
@@ -346,7 +345,6 @@ function PillButton({
 // ── Main settings component ──────────────────────────────────────────
 
 export function QrGenerateSettings() {
-  const { t } = useTranslation();
   const store = useQrStore();
   const logoInputRef = useRef<HTMLInputElement>(null);
 

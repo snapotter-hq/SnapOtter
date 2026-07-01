@@ -168,7 +168,7 @@ export function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const _data = await res.json().catch(() => ({}));
         setError(t.auth.invalidCredentials);
         return;
       }

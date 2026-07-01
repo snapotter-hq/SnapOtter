@@ -94,7 +94,7 @@ export function InfoSettings() {
     cacheRef.current.clear();
     autoFetchRef.current = false;
     setInfo(null);
-  }, [files.length]);
+  }, []);
 
   useEffect(() => {
     if (!autoFetchRef.current || files.length === 0) return;

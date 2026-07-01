@@ -1,5 +1,5 @@
 import { AlertCircle, FileImage, FileUp, Upload } from "lucide-react";
-import { type DragEvent, useCallback, useEffect, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { cn } from "@/lib/utils";
@@ -177,7 +177,7 @@ export function Dropzone({
     [onFiles, checkFile, acceptDescription, accept],
   );
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     setError(null);
     const input = document.createElement("input");
     input.type = "file";
@@ -193,7 +193,17 @@ export function Dropzone({
       }
     };
     input.click();
-  };
+  }, [multiple, resolvedAccept, checkFile, onFiles, acceptDescription, accept]);
+
+  const handleDropzoneKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLElement>) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      handleClick();
+    },
+    [handleClick],
+  );
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -234,6 +244,7 @@ export function Dropzone({
       onDragLeave={handleDrag}
       onDrop={handleDrop}
       onClick={handleClick}
+      onKeyDown={handleDropzoneKeyDown}
       className={cn(
         "group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-200 mx-auto max-w-2xl w-full cursor-pointer",
         compact ? "min-h-0 h-full" : "min-h-[400px]",

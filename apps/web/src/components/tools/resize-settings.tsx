@@ -104,6 +104,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     blurRadius,
     sobelThreshold,
     squareMode,
+    contentAware,
   ]);
 
   const handlePreset = (preset: (typeof SOCIAL_MEDIA_PRESETS)[number]) => {

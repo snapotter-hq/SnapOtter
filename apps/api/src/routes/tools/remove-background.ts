@@ -23,6 +23,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -206,8 +207,6 @@ export function registerRemoveBackground(app: FastifyInstance) {
         await putObject(inputKey, fileBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       // Enqueue on the AI pool
       await enqueueToolJob({
         jobId,
@@ -223,7 +222,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       });
 
       // AI tools always return 202 (no sync window)
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 

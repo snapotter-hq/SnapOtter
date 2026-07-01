@@ -1,5 +1,4 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Crown, Search } from "lucide-react";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatFileSize } from "@/lib/download";
 import type { DuplicateFileInfo } from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
@@ -251,7 +250,6 @@ function DetailComparison() {
 }
 
 export function FindDuplicatesResults() {
-  const { t } = useTranslation();
   const { results, scanning, viewMode } = useDuplicateStore();
 
   if (scanning) {

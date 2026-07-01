@@ -239,7 +239,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             SNAPOTTER_ANALYTICS=on
-            SNAPOTTER_POSTHOG_KEY=${{ secrets.SNAPOTTER_POSTHOG_KEY }}
+            SNAPOTTER_POSTHOG_PROJECT_ID=${{ secrets.SNAPOTTER_POSTHOG_KEY }}
             SNAPOTTER_SENTRY_DSN=${{ secrets.SNAPOTTER_SENTRY_DSN }}
             SENTRY_RELEASE=${{ needs.release.outputs.new_version }}
           secrets: |

@@ -1,7 +1,6 @@
 import { Download, Loader2, PackageOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
@@ -36,7 +35,6 @@ const OUTPUT_FORMATS = [
 const LOSSY_FORMATS = new Set(["jpg", "webp", "avif", "jxl"]);
 
 export function SplitSettings() {
-  const { t } = useTranslation();
   const { files, processing: fileStoreProcessing } = useFileStore();
   const {
     mode,

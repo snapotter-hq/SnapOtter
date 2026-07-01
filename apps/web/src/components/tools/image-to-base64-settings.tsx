@@ -1,8 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { format } from "@/lib/format";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
 
@@ -16,7 +14,6 @@ const OUTPUT_FORMATS = [
 ] as const;
 
 export function ImageToBase64Settings() {
-  const { t } = useTranslation();
   const { files } = useFileStore();
   const { processing, setProcessing, setProgress, addResult, addError, reset } = useBase64Store();
 

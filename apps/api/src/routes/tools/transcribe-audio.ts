@@ -12,6 +12,7 @@ import { isToolInstalled } from "../../lib/feature-status.js";
 import { type TranscriptSegment, toSrt, toVtt } from "../../lib/subtitle-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 
 const settingsSchema = z.object({
   language: z
@@ -145,8 +146,6 @@ export function registerTranscribeAudio(app: FastifyInstance) {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
-      const progressJobId = clientJobId || jobId;
-
       await enqueueToolJob({
         jobId,
         toolId,
@@ -160,7 +159,7 @@ export function registerTranscribeAudio(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

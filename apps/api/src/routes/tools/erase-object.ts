@@ -16,6 +16,7 @@ import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 
 const settingsSchema = z.object({
   format: z
@@ -157,8 +158,6 @@ export function registerEraseObject(app: FastifyInstance) {
         await putObject(imageKey, imageBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       // Enqueue with both image and mask as inputRefs; the worker handler
       // reads them via getObjectBuffer.
       await enqueueToolJob({
@@ -174,7 +173,7 @@ export function registerEraseObject(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

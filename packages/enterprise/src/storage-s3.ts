@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  type GetObjectCommandOutput,
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -62,6 +63,13 @@ function thumbKey(storedName: string): string {
   return `${prefix}thumbs/${storedName}.thumb.jpg`;
 }
 
+function requireObjectBody(response: GetObjectCommandOutput, key: string) {
+  if (!response.Body) {
+    throw new Error(`S3 object response for ${key} did not include a body`);
+  }
+  return response.Body;
+}
+
 export async function checkConnection(): Promise<void> {
   await getClient().send(new HeadBucketCommand({ Bucket: cfg().bucket }));
 }
@@ -77,23 +85,25 @@ export async function putObject(storedName: string, buffer: Buffer): Promise<voi
 }
 
 export async function getObject(storedName: string): Promise<Buffer> {
+  const key = fileKey(storedName);
   const response = await getClient().send(
     new GetObjectCommand({
       Bucket: cfg().bucket,
-      Key: fileKey(storedName),
+      Key: key,
     }),
   );
-  return Buffer.from(await response.Body!.transformToByteArray());
+  return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
 }
 
 export async function getObjectStream(storedName: string): Promise<Readable> {
+  const key = fileKey(storedName);
   const response = await getClient().send(
     new GetObjectCommand({
       Bucket: cfg().bucket,
-      Key: fileKey(storedName),
+      Key: key,
     }),
   );
-  return response.Body as Readable;
+  return requireObjectBody(response, key) as Readable;
 }
 
 export async function deleteObject(storedName: string): Promise<void> {
@@ -111,13 +121,14 @@ export async function deleteObject(storedName: string): Promise<void> {
 
 export async function getThumbnail(storedName: string): Promise<Buffer | null> {
   try {
+    const key = thumbKey(storedName);
     const response = await getClient().send(
       new GetObjectCommand({
         Bucket: cfg().bucket,
-        Key: thumbKey(storedName),
+        Key: key,
       }),
     );
-    return Buffer.from(await response.Body!.transformToByteArray());
+    return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
   } catch {
     return null;
   }

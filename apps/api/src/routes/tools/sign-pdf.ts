@@ -14,6 +14,7 @@ import { getObjectBuffer } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 
 const TOOL_ID = "sign-pdf";
 const MAX_PLACEMENTS = 100;
@@ -158,7 +159,7 @@ export function registerSignPdf(app: FastifyInstance) {
           savedFileId: result.savedFileId,
         });
       }
-      return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     } catch (err) {
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
       return reply.status(422).send({

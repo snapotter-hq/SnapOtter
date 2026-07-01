@@ -1,3 +1,3 @@
 #!/command/with-contenv sh
-cd /app
-exec s6-setuidgid snapotter pnpm --filter @snapotter/api run start
+cd /app/apps/api
+exec s6-setuidgid snapotter ./node_modules/.bin/tsx --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts

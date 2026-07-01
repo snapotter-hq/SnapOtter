@@ -42,14 +42,15 @@ export function DocumentView({ inputOnly = false }: { inputOnly?: boolean } = {}
     // F22: when processedUrl is available, use URL-based loading instead of
     // entry.file (which is the original non-PDF input and would fail pdf.js)
     const file = hasProcessedUrl ? undefined : entry?.file;
-    if (!file && !src) return;
+    const url = src;
+    if (!file && !url) return;
     let cancelled = false;
     let doc: pdfjs.PDFDocumentProxy | undefined;
     let renderTask: pdfjs.RenderTask | undefined;
 
     (async () => {
       try {
-        const source = file ? { data: new Uint8Array(await file.arrayBuffer()) } : { url: src! };
+        const source = file ? { data: new Uint8Array(await file.arrayBuffer()) } : { url };
         doc = await pdfjs.getDocument(source).promise;
         if (cancelled) return;
         setPageCount(doc.numPages);

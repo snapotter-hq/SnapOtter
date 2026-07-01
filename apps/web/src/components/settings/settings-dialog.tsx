@@ -420,7 +420,7 @@ function GeneralSection() {
       setSaving(false);
       setTimeout(() => setSaveMsg(null), 3000);
     }
-  }, [defaultToolView]);
+  }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed]);
 
   const username = user?.username || "admin";
   const role = user?.role || "unknown";
@@ -940,7 +940,16 @@ function SecuritySection() {
         setSubmitting(false);
       }
     },
-    [currentPassword, newPassword, confirmPassword],
+    [
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      t.settings.security.changeFailed,
+      t.settings.security.currentPasswordIncorrect,
+      t.settings.security.changeSuccess,
+      t.settings.security.passwordsMismatch,
+      t.settings.security.passwordTooShort,
+    ],
   );
 
   return (
@@ -1468,7 +1477,17 @@ function PeopleSection() {
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers],
+    [
+      newUsername,
+      newPassword,
+      newRole,
+      newTeam,
+      maxUsers,
+      loadUsers,
+      t.settings.people.createFailed,
+      t.settings.people.createSuccess,
+      t.settings.people.userLimitReached,
+    ],
   );
 
   const handleDeleteUser = useCallback(
@@ -1487,7 +1506,12 @@ function PeopleSection() {
       setOpenMenuId(null);
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadUsers],
+    [
+      loadUsers,
+      t.settings.people.deleteSuccess,
+      t.settings.people.deleteFailed,
+      t.settings.people.deleteConfirm,
+    ],
   );
 
   const handleUpdateUser = useCallback(
@@ -1511,7 +1535,14 @@ function PeopleSection() {
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [editingUser, editRole, editTeam, loadUsers],
+    [
+      editingUser,
+      editRole,
+      editTeam,
+      loadUsers,
+      t.settings.people.cannotRemoveOwnAdmin,
+      t.settings.people.updateSuccess,
+    ],
   );
 
   const handleResetPassword = useCallback(
@@ -1531,7 +1562,7 @@ function PeopleSection() {
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [resetPasswordUser, resetPassword],
+    [resetPasswordUser, resetPassword, t.settings.people.resetSuccess],
   );
 
   if (loading) {
@@ -2357,7 +2388,7 @@ function TeamsSection() {
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [newTeamName, loadTeams],
+    [newTeamName, loadTeams, t.settings.teams.duplicateName, t.settings.teams.createSuccess],
   );
 
   const handleRename = useCallback(
@@ -2375,7 +2406,7 @@ function TeamsSection() {
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [editingTeamName, loadTeams],
+    [editingTeamName, loadTeams, t.settings.teams.renameSuccess],
   );
 
   const handleDelete = useCallback(
@@ -2395,7 +2426,7 @@ function TeamsSection() {
       setOpenMenuId(null);
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadTeams],
+    [loadTeams, t.settings.teams.deleteConfirm, t.settings.teams.cannotDeleteDefault],
   );
 
   const handleExpandTeam = useCallback(
@@ -2432,7 +2463,7 @@ function TeamsSection() {
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [quotaMb, retention, loadTeams],
+    [quotaMb, retention, loadTeams, t.settings.teams.quotaSaved],
   );
 
   if (loading) {
@@ -2787,7 +2818,14 @@ function RolesSection() {
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [newName, newDescription, newPermissions, loadRoles],
+    [
+      newName,
+      newDescription,
+      newPermissions,
+      loadRoles,
+      t.settings.roles.duplicateRoleError,
+      t.settings.roles.createSuccess,
+    ],
   );
 
   const handleUpdate = useCallback(
@@ -2809,7 +2847,14 @@ function RolesSection() {
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [editingRole, editName, editDescription, editPermissions, loadRoles],
+    [
+      editingRole,
+      editName,
+      editDescription,
+      editPermissions,
+      loadRoles,
+      t.settings.roles.updateSuccess,
+    ],
   );
 
   const handleDelete = useCallback(
@@ -3213,8 +3258,11 @@ function AuditLogSection() {
             <div className="divide-y divide-border">
               {entries.map((entry) => (
                 <Fragment key={entry.id}>
-                  <div
-                    className="px-3 py-2.5 hover:bg-muted/20 cursor-pointer transition-colors"
+                  <button
+                    type="button"
+                    aria-expanded={expandedId === entry.id}
+                    aria-controls={`audit-details-${entry.id}`}
+                    className="w-full px-3 py-2.5 hover:bg-muted/20 cursor-pointer transition-colors text-start"
                     onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -3239,9 +3287,9 @@ function AuditLogSection() {
                         </span>
                       )}
                     </div>
-                  </div>
+                  </button>
                   {expandedId === entry.id && entry.details && (
-                    <div className="px-3 py-2 bg-muted/10">
+                    <div id={`audit-details-${entry.id}`} className="px-3 py-2 bg-muted/10">
                       <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-x-auto">
                         {JSON.stringify(entry.details, null, 2)}
                       </pre>

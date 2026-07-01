@@ -1,1 +1,1 @@
-/command/with-contenv sh -c "until pg_isready -h 127.0.0.1 -p 5432 -q; do sleep 1; done"
+/command/with-contenv sh -c "until pg_isready -h 127.0.0.1 -p 5432 -U snapotter -d snapotter -q; do sleep 1; done"

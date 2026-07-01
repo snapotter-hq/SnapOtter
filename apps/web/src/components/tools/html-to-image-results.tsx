@@ -24,9 +24,11 @@ export function HtmlToImageResults() {
     );
   }
 
+  const resultUrl = store.resultUrl;
+
   const handleDownload = () => {
     const a = document.createElement("a");
-    a.href = store.resultUrl!;
+    a.href = resultUrl;
     a.download = `screenshot.${store.format}`;
     a.click();
   };
@@ -35,7 +37,7 @@ export function HtmlToImageResults() {
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-auto p-4">
         <img
-          src={store.resultUrl}
+          src={resultUrl}
           alt="Captured screenshot"
           className="mx-auto max-w-full rounded-lg border border-border shadow-sm"
         />
@@ -49,6 +51,7 @@ export function HtmlToImageResults() {
             : ""}
         </span>
         <button
+          type="button"
           onClick={handleDownload}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >

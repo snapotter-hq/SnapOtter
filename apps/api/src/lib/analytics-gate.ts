@@ -95,8 +95,8 @@ const CHANNEL = async () => {
 
 /** Subscribe so a setting change on any replica refreshes this process's cache. */
 export async function startAnalyticsGateListener(): Promise<void> {
-  const { createRedisConnection } = await import("../jobs/connection.js");
-  gateSubscriber = createRedisConnection();
+  const { createRedisSubscriberConnection } = await import("../jobs/connection.js");
+  gateSubscriber = createRedisSubscriberConnection();
   gateSubscriber.on("error", (err) => console.error("Analytics gate subscriber error", err));
   await gateSubscriber.subscribe(await CHANNEL());
   gateSubscriber.on("message", () => {

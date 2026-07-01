@@ -173,7 +173,7 @@ function FileSelectionInfo({
           const entry = fileEntries[i];
           return (
             <button
-              key={`${file.name}-${i}`}
+              key={entry?.blobUrl ?? `${file.name}-${file.size}-${file.lastModified}`}
               type="button"
               onClick={() => onSelect(i)}
               className={`w-full flex items-center gap-1.5 text-xs rounded px-2 py-1.5 text-start transition-colors ${isSelected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"}`}

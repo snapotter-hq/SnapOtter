@@ -19,7 +19,6 @@ export function TransparencyFixerControls({
   settings: _settings,
   onChange,
 }: TransparencyFixerControlsProps) {
-  const { t } = useTranslation();
   const [defringe, setDefringe] = useState(30);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("png");
   const [removeWatermark, setRemoveWatermark] = useState(false);

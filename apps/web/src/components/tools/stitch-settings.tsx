@@ -1,6 +1,5 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { useFileStore } from "@/stores/file-store";
 
@@ -10,7 +9,6 @@ type Alignment = "start" | "center" | "end";
 type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "jxl";
 
 export function StitchSettings() {
-  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
     useFileStore();
 

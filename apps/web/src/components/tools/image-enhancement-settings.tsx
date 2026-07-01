@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type EnhancementMode = "auto" | "portrait" | "landscape" | "low-light" | "food" | "document";

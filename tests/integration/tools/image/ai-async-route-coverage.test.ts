@@ -79,6 +79,17 @@ function postMultipart(url: string, fields: Parameters<typeof createMultipartPay
   });
 }
 
+function expectAsyncAccepted(body: string, clientJobId: string) {
+  const artifactJobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId;
+  expect(artifactJobId).toBeDefined();
+  expect(JSON.parse(body)).toEqual({
+    jobId: clientJobId,
+    progressJobId: clientJobId,
+    artifactJobId,
+    async: true,
+  });
+}
+
 describe("custom async AI image routes", () => {
   it("upscale validates input, coerces settings, and enqueues an AI job", async () => {
     const clientJobId = "22222222-2222-4222-8222-222222222222";
@@ -93,7 +104,7 @@ describe("custom async AI image routes", () => {
     ]);
 
     expect(res.statusCode).toBe(202);
-    expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+    expectAsyncAccepted(res.body, clientJobId);
     expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
       expect.objectContaining({
         toolId: "upscale",
@@ -168,7 +179,7 @@ describe("custom async AI image routes", () => {
     ]);
 
     expect(res.statusCode).toBe(202);
-    expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+    expectAsyncAccepted(res.body, clientJobId);
     expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
       expect.objectContaining({
         toolId: "ai-canvas-expand",
@@ -262,7 +273,7 @@ describe("custom async AI image routes", () => {
     ]);
 
     expect(res.statusCode).toBe(202);
-    expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+    expectAsyncAccepted(res.body, clientJobId);
     expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
       expect.objectContaining({
         toolId: "erase-object",

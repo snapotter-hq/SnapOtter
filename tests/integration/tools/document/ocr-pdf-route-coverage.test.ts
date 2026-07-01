@@ -72,6 +72,17 @@ function postOcrPdf(parts: Parameters<typeof createMultipartPayload>[0]) {
   });
 }
 
+function expectAsyncAccepted(body: string, clientJobId: string) {
+  const artifactJobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId;
+  expect(artifactJobId).toBeDefined();
+  expect(JSON.parse(body)).toEqual({
+    jobId: clientJobId,
+    progressJobId: clientJobId,
+    artifactJobId,
+    async: true,
+  });
+}
+
 describe("ocr-pdf route coverage", () => {
   it("rejects requests without a PDF after the bundle gate passes", async () => {
     const res = await postOcrPdf([
@@ -136,7 +147,7 @@ describe("ocr-pdf route coverage", () => {
     ]);
 
     expect(res.statusCode).toBe(202);
-    expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+    expectAsyncAccepted(res.body, clientJobId);
     expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
     expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
       expect.objectContaining({

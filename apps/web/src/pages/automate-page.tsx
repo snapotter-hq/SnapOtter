@@ -363,7 +363,14 @@ export function AutomatePage() {
       }
     };
     input.click();
-  }, [setSavedPipelines]);
+  }, [
+    setSavedPipelines,
+    t.automate.invalidPipelineFile,
+    t.automate.noSteps,
+    t.automate.newerVersion,
+    t.automate.missingName,
+    t.automate.couldNotRead,
+  ]);
 
   useEffect(() => {
     if (!importError) return;
@@ -418,13 +425,16 @@ export function AutomatePage() {
    */
   function renderPipelinePreview(mode: "result" | "original") {
     const kind = currentEntry?.previewKind ?? "image";
+    const sourceUrl = originalBlobUrl;
+    if (!sourceUrl) return null;
 
     if (mode === "result") {
+      if (!processedUrl) return null;
       if (kind === "image") {
         return (
           <BeforeAfterSlider
-            beforeSrc={originalBlobUrl!}
-            afterSrc={processedUrl as string}
+            beforeSrc={sourceUrl}
+            afterSrc={processedUrl}
             beforeSize={originalSize ?? undefined}
             afterSize={processedSize ?? undefined}
           />
@@ -440,7 +450,7 @@ export function AutomatePage() {
       if (kind === "audio") {
         return (
           <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
-            <WaveformPlayer src={processedUrl as string} />
+            <WaveformPlayer src={processedUrl} />
           </Suspense>
         );
       }
@@ -467,7 +477,7 @@ export function AutomatePage() {
     if (kind === "image") {
       return (
         <ImageViewer
-          src={originalBlobUrl!}
+          src={sourceUrl}
           filename={selectedFileName ?? files[0].name}
           fileSize={selectedFileSize ?? files[0].size}
         />
@@ -483,7 +493,7 @@ export function AutomatePage() {
     if (kind === "audio") {
       return (
         <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
-          <WaveformPlayer src={originalBlobUrl!} />
+          <WaveformPlayer src={sourceUrl} />
         </Suspense>
       );
     }

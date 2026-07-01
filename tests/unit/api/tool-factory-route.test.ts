@@ -216,6 +216,7 @@ function createMockRequest(opts: {
   filename?: string;
   settings?: string;
   fileId?: string;
+  clientJobId?: string;
   fileCount?: number;
 }) {
   const parts: Array<{
@@ -255,6 +256,15 @@ function createMockRequest(opts: {
     });
   }
 
+  if (opts.clientJobId) {
+    parts.push({
+      type: "field",
+      fieldname: "clientJobId",
+      value: opts.clientJobId,
+      file: (async function* () {})(),
+    });
+  }
+
   return {
     parts: () => ({
       [Symbol.asyncIterator]: async function* () {
@@ -271,6 +281,8 @@ function createMockRequest(opts: {
 describe("createToolRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isToolInstalled).mockReset();
+    vi.mocked(isToolInstalled).mockReturnValue(true);
   });
 
   describe("route registration", () => {
@@ -503,6 +515,61 @@ describe("createToolRoute", () => {
 
       expect(reply.status).toHaveBeenCalledWith(202);
       expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ async: true }));
+    });
+
+    it("returns the artifact job ID when a client progress job ID is supplied", async () => {
+      vi.mocked(waitForJob).mockResolvedValueOnce(null);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const clientJobId = "client-progress-id";
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        clientJobId,
+      });
+
+      await handler(req, reply);
+
+      const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(artifactJobId).not.toBe(clientJobId);
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        progressJobId: clientJobId,
+        artifactJobId,
+        async: true,
+      });
+    });
+
+    it("returns the artifact job ID immediately for long tools with client progress IDs", async () => {
+      vi.mocked(isToolInstalled).mockReturnValue(true);
+      const app = createMockApp();
+      const id = "upscale";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const clientJobId = "client-long-progress-id";
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        clientJobId,
+      });
+
+      await handler(req, reply);
+
+      const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(waitForJob).not.toHaveBeenCalled();
+      expect(artifactJobId).not.toBe(clientJobId);
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        progressJobId: clientJobId,
+        artifactJobId,
+        async: true,
+      });
     });
 
     it("returns 422 when waitForJob rejects", async () => {

@@ -25,6 +25,7 @@ import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { MediaInputHandler, type MediaInputKind } from "../modality/media-input.js";
 import { requireToolAccess } from "../permissions.js";
+import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { updateSingleFileProgress } from "./progress.js";
 
 /** Context passed to tool process functions for cooperative cancellation, scratch storage, and progress. */
@@ -553,7 +554,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         // Long tools never block the HTTP request (spec 4.5): straight to SSE.
         if (shouldSkipSyncWindow(toolMeta?.executionHint)) {
-          return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
+          return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
         }
 
         try {
@@ -590,7 +591,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               ...result.resultPayload,
             });
           }
-          return reply.status(202).send({ jobId: clientJobId || jobId, async: true });
+          return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
         } catch (err) {
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.

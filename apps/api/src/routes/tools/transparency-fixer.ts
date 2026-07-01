@@ -18,6 +18,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const TOOL_ID = "transparency-fixer";
@@ -252,8 +253,6 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         await putObject(inputKey, fileBuffer);
       }
 
-      const progressJobId = clientJobId || jobId;
-
       await enqueueToolJob({
         jobId,
         toolId: TOOL_ID,
@@ -267,7 +266,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         kind: "ai-tool",
       });
 
-      return reply.status(202).send({ jobId: progressJobId, async: true });
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 

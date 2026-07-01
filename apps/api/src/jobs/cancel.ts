@@ -14,7 +14,7 @@
 import { eq } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
-import { createRedisConnection, sharedRedis } from "./connection.js";
+import { createRedisSubscriberConnection, sharedRedis } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { bullPrefix, POOLS } from "./types.js";
 
@@ -39,7 +39,7 @@ const CANCEL_CHANNEL = () => `${bullPrefix()}:cancel`;
 let subscriber: Redis | null = null;
 
 export async function startCancelListener(): Promise<void> {
-  subscriber = createRedisConnection();
+  subscriber = createRedisSubscriberConnection();
   subscriber.on("error", (err) => {
     console.error("Cancel listener subscriber error", err);
   });
