@@ -107,9 +107,9 @@ export const zhTW: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "僅我自己",
+      team_internal: "小型團隊",
+      business_workflow: "公司或組織",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -132,6 +132,12 @@ export const zhTW: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "您如何使用 SnapOtter?",
+    usageSurveyToolsLabel: "您最重視什麼?",
+    pickAnyHint: "(可複選)",
+    continueLabel: "繼續",
   },
   categories: {
     essentials: "基本工具",

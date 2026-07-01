@@ -107,9 +107,9 @@ export const th: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "แค่ฉันคนเดียว",
+      team_internal: "ทีมขนาดเล็ก",
+      business_workflow: "บริษัทหรือองค์กร",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -132,6 +132,12 @@ export const th: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "คุณใช้ SnapOtter อย่างไร?",
+    usageSurveyToolsLabel: "อะไรสำคัญที่สุดสำหรับคุณ?",
+    pickAnyHint: "(เลือกได้หลายข้อ)",
+    continueLabel: "ดำเนินการต่อ",
   },
   categories: {
     essentials: "พื้นฐาน",

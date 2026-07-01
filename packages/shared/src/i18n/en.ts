@@ -105,9 +105,9 @@ export const en = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "Just me",
+      team_internal: "Small team",
+      business_workflow: "Company or organization",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -130,6 +130,12 @@ export const en = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "How are you using SnapOtter?",
+    usageSurveyToolsLabel: "What matters most to you?",
+    pickAnyHint: "(pick any)",
+    continueLabel: "Continue",
   },
   categories: {
     // Image

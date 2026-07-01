@@ -108,9 +108,9 @@ export const fr: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "Juste moi",
+      team_internal: "Petite équipe",
+      business_workflow: "Entreprise ou organisation",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -133,6 +133,12 @@ export const fr: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "Comment utilisez-vous SnapOtter ?",
+    usageSurveyToolsLabel: "Qu'est-ce qui compte le plus pour vous ?",
+    pickAnyHint: "(plusieurs choix possibles)",
+    continueLabel: "Continuer",
   },
   categories: {
     essentials: "Essentiels",

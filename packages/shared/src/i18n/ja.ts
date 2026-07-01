@@ -108,9 +108,9 @@ export const ja: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "自分だけ",
+      team_internal: "小規模なチーム",
+      business_workflow: "会社・組織",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -133,6 +133,12 @@ export const ja: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "SnapOtterをどのように使っていますか?",
+    usageSurveyToolsLabel: "あなたにとって最も重要なものは?",
+    pickAnyHint: "(いくつでも選択可)",
+    continueLabel: "続ける",
   },
   categories: {
     essentials: "基本ツール",

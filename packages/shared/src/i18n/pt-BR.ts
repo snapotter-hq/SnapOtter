@@ -108,9 +108,9 @@ export const ptBR: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "Só eu",
+      team_internal: "Equipe pequena",
+      business_workflow: "Empresa ou organização",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -133,6 +133,12 @@ export const ptBR: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "Como você usa o SnapOtter?",
+    usageSurveyToolsLabel: "O que é mais importante para você?",
+    pickAnyHint: "(escolha quantas quiser)",
+    continueLabel: "Continuar",
   },
   categories: {
     essentials: "Essenciais",

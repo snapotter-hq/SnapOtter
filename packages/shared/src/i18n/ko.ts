@@ -107,9 +107,9 @@ export const ko: TranslationKeys = {
       other: "Other",
     },
     usageTypes: {
-      personal: "Personal",
-      team_internal: "Team/internal",
-      business_workflow: "Business workflow",
+      personal: "개인 사용",
+      team_internal: "소규모 팀",
+      business_workflow: "회사 또는 조직",
       education: "Education",
       evaluating: "Evaluating",
     },
@@ -132,6 +132,12 @@ export const ko: TranslationKeys = {
       batch_workflows: "Batch workflows",
       ai_tools: "AI tools",
     },
+  },
+  onboarding: {
+    usageSurveyTitle: "SnapOtter를 어떻게 사용하고 계신가요?",
+    usageSurveyToolsLabel: "가장 중요하게 생각하는 것은 무엇인가요?",
+    pickAnyHint: "(원하는 만큼 선택)",
+    continueLabel: "계속",
   },
   categories: {
     essentials: "기본 도구",
