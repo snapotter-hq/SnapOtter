@@ -45,6 +45,25 @@ function renderIcon(iconName: string): string {
 const title = seo ? `${seo.searchTitle} | SnapOtter` : `${tool.name} | SnapOtter`;
 const description = seo?.longDescription ?? tool.description;
 
+// The full longDescription drives the on-page copy and structured data, but as a
+// <meta name="description"> it overflows the ~160-char SERP snippet. Keep as many
+// whole sentences as fit so the snippet never ends mid-phrase; only fall back to a
+// word-boundary trim when even the first sentence is longer than the limit.
+function toMetaDescription(text: string): string {
+  if (text.length <= 160) return text;
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s|$)/g) ?? [];
+  let out = "";
+  for (const sentence of sentences) {
+    if ((out + sentence).trim().length > 160) break;
+    out += sentence;
+  }
+  out = out.trim();
+  if (out.length >= 50) return out;
+  const clipped = text.slice(0, 157);
+  return `${clipped.slice(0, clipped.lastIndexOf(" ")).trim()}…`;
+}
+const metaDescription = toMetaDescription(description);
+
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -81,82 +100,16 @@ const softwareJsonLd = {
   isPartOf: { "@type": "SoftwareApplication", name: "SnapOtter", url: "https://snapotter.com" },
 };
 
-const modalityLabel =
-  tool.modality === "image"
-    ? "image"
-    : tool.modality === "video"
-      ? "video"
-      : tool.modality === "audio"
-        ? "audio"
-        : "file";
-const uploadStep =
-  tool.modality === "image"
-    ? "Drag and drop your image file or click to browse. Supports JPEG, PNG, WebP, AVIF, TIFF, HEIC, and RAW formats."
-    : tool.modality === "video"
-      ? "Drag and drop your video file or click to browse. Supports MP4, MOV, AVI, MKV, WebM, and more."
-      : tool.modality === "audio"
-        ? "Drag and drop your audio file or click to browse. Supports MP3, WAV, FLAC, AAC, OGG, and more."
-        : "Drag and drop your file or click to browse. Supports a wide range of input formats.";
-
-const howToJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "HowTo",
-  name: `How to use ${tool.name} in SnapOtter`,
-  description,
-  totalTime: "PT1M",
-  tool: { "@type": "HowToTool", name: "SnapOtter" },
-  step: [
-    {
-      "@type": "HowToStep",
-      position: 1,
-      name: "Deploy SnapOtter",
-      text: "Run SnapOtter with a single Docker command: docker run -p 1349:1349 snapotter/snapotter",
-    },
-    {
-      "@type": "HowToStep",
-      position: 2,
-      name: `Open ${tool.name}`,
-      text: `Navigate to the ${tool.name} tool in SnapOtter's interface.`,
-    },
-    {
-      "@type": "HowToStep",
-      position: 3,
-      name: `Upload your ${modalityLabel}`,
-      text: uploadStep,
-    },
-    {
-      "@type": "HowToStep",
-      position: 4,
-      name: "Adjust settings and process",
-      text: `Configure ${tool.name} settings to your needs, then click process. Download your result or continue with another tool.`,
-    },
-  ],
-};
-
-const faqJsonLd =
-  seo?.faqs && seo.faqs.length > 0
-    ? {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: seo.faqs.map((faq) => ({
-          "@type": "Question",
-          name: faq.q,
-          acceptedAnswer: { "@type": "Answer", text: faq.a },
-        })),
-      }
-    : null;
-
-const allJsonLd = [
-  breadcrumbJsonLd,
-  softwareJsonLd,
-  howToJsonLd,
-  ...(faqJsonLd ? [faqJsonLd] : []),
-];
+// HowTo and FAQPage JSON-LD were dropped intentionally. Google removed HowTo
+// rich results in 2023 and fully retired FAQ rich results in May 2026, so both
+// produced no search appearance while adding weight to every tool page. The
+// human-readable how-to steps and FAQ content stay on the page below.
+const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
 ---
 
 <Base
   title={title}
-  description={description}
+  description={metaDescription}
   canonical={`https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`}
 >
   <Fragment slot="head">
@@ -218,7 +171,7 @@ const allJsonLd = [
         </div>
 
         <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">
-          {tool.name}
+          {seo?.h1 ?? tool.name}
         </h1>
         <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">
           {description}

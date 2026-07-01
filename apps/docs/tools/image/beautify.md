@@ -1,3 +1,7 @@
+---
+description: Turn plain screenshots into polished images with gradient backgrounds, device frames, shadows, and social media sizing.
+---
+
 # Beautify Screenshot
 
 Add gradient backgrounds, device frames, shadows, watermarks, and social media sizing to screenshots. Ideal for creating polished images for product marketing, social media, and documentation.

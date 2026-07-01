@@ -1,3 +1,7 @@
+---
+description: Resize, optimize, speed-change, reverse, rotate, and extract frames from animated GIFs in a single tool.
+---
+
 # GIF Tools
 
 Resize, optimize, change speed, reverse, extract frames, and rotate animated GIFs. Provides multiple operation modes in a single tool.

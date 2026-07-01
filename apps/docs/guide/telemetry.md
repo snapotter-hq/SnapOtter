@@ -1,3 +1,7 @@
+---
+description: What anonymous usage data SnapOtter collects, when it is sent, and how to turn instance-wide product analytics off.
+---
+
 # What SnapOtter collects
 
 Anonymous Product Analytics is on by default and set for the whole instance by an administrator. Turn it off under Settings > System > Privacy.

@@ -1,3 +1,7 @@
+---
+description: One-click auto-enhance that analyzes an image and corrects exposure, contrast, white balance, saturation, and sharpness.
+---
+
 # Image Enhancement
 
 One-click auto-improve with smart analysis. Analyzes the image and applies exposure, contrast, white balance, saturation, sharpness, and denoising corrections.

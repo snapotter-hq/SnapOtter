@@ -1,3 +1,7 @@
+---
+description: Add borders, padding, rounded corners, and drop shadows to images in a predictable, controllable order.
+---
+
 # Border & Frame
 
 Add borders, padding, rounded corners, and drop shadows to images. The tool applies effects in order: padding, border, corner radius, then shadow.

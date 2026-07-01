@@ -1,3 +1,7 @@
+---
+description: Expand an image canvas with AI outpainting, extending it in any direction and filling new areas to match the original.
+---
+
 # AI Canvas Expand
 
 Expand the canvas of an image with AI-powered fill (outpainting). Extends the image in any direction and fills the new areas with AI-generated content that matches the existing image.

@@ -1,3 +1,7 @@
+---
+description: Upscale images 2x to 4x with Real-ESRGAN AI super-resolution while preserving fine detail.
+---
+
 # Image Upscaling
 
 AI super-resolution enhancement using Real-ESRGAN. Upscales images 2x-4x while preserving detail.

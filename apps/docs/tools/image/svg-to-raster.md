@@ -1,3 +1,7 @@
+---
+description: Convert SVG files to PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF, or JXL at custom resolution and DPI, with batch support.
+---
+
 # SVG to Raster
 
 Convert SVG files to raster image formats (PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF, or JXL) at custom resolution and DPI. Also supports batch conversion of multiple SVGs.

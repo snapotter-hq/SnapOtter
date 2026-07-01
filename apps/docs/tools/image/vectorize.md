@@ -1,3 +1,7 @@
+---
+description: Convert raster images to SVG with black-and-white (potrace) and full-color multi-layer vectorization.
+---
+
 # Image to SVG
 
 Vectorize raster images into SVG using tracing algorithms. Supports black-and-white tracing (potrace) and full-color multi-layer vectorization.

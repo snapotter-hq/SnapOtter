@@ -41,8 +41,10 @@ blob-report/
 
 # IDE / tool scratch
 CLAUDE.md
+AGENTS.md
 CONTEXT.md
 .claude/
+.codex/
 .superpowers/
 docs/*
 !docs/COMMUNITY_GUIDE.md
@@ -82,3 +84,8 @@ run-ai-*.py
 
 # Local QA scratch artifacts
 .qa-maps/
+
+# Secrets: GSC OAuth client + any credential JSON (never commit)
+.secrets/
+*client_secret*.json
+*service_account*.json

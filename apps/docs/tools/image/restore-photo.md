@@ -1,3 +1,7 @@
+---
+description: Repair scratches, tears, and damage on old photos with an AI pipeline for restoration, face enhancement, and color.
+---
+
 # Photo Restoration
 
 Fix scratches, tears, and damage on old photos using a multi-step AI pipeline. Combines scratch repair, face enhancement, denoising, and optional colorization.

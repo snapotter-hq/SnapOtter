@@ -1,3 +1,7 @@
+---
+description: Combine multiple images into grid collages with 25+ templates, adjustable gaps and corners, and per-cell pan and zoom.
+---
+
 # Collage / Grid
 
 Combine multiple images into beautiful grid collages with 25+ templates. Supports 2-9 image layouts with customizable gap, corner radius, background color, and per-cell pan/zoom controls.

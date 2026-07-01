@@ -1,3 +1,7 @@
+---
+description: Split one image into grid tiles by rows and columns or by pixel size, returned as a ZIP archive.
+---
+
 # Image Splitting
 
 Split a single image into grid tiles by column/row count or by specific pixel dimensions. Returns a ZIP archive containing all tiles.

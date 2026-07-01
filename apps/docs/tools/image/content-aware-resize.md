@@ -1,3 +1,7 @@
+---
+description: Seam-carving resize that adds or removes pixels along low-importance paths to preserve key content and faces.
+---
+
 # Content-Aware Resize
 
 Seam carving resize that intelligently removes or adds pixels along paths of least visual importance, preserving important content and optionally protecting faces.

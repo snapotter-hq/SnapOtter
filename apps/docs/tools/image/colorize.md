@@ -1,3 +1,7 @@
+---
+description: Colorize black-and-white or grayscale photos automatically with the DDColor AI model.
+---
+
 # AI Colorization
 
 Convert black-and-white or grayscale photos to full color using AI (DDColor model with OpenCV DNN fallback).

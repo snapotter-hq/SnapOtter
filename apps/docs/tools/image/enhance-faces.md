@@ -1,3 +1,7 @@
+---
+description: Restore and sharpen blurry or low-quality faces in images with GFPGAN and CodeFormer AI models.
+---
+
 # Face Enhancement
 
 Restore and enhance faces in images using AI models (GFPGAN/CodeFormer).

@@ -68,7 +68,15 @@ const {
     <!-- LLM discovery -->
     <link rel="llms-txt" href="/llms.txt" />
 
-    <!-- Fonts: self-hosted in /fonts/ (loaded via @font-face in globals.css) -->
+    <!-- Fonts: self-hosted in /fonts/ (loaded via @font-face in globals.css).
+         Preload the display face used by the LCP heading to cut first paint. -->
+    <link
+      rel="preload"
+      href="/fonts/bricolage-grotesque-var.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
 
     <!-- Structured data slot -->
     <slot name="head" />

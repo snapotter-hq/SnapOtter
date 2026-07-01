@@ -5,6 +5,8 @@ interface Faq {
 
 export interface ToolSeo {
   searchTitle: string;
+  /** Optional visible <h1> override; falls back to the tool's app-wide name. */
+  h1?: string;
   longDescription: string;
   useCases: string[];
   features: string[];
@@ -2825,7 +2827,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   favicon: {
-    searchTitle: "Favicon Generator - Create All Sizes from One Image",
+    searchTitle: "Favicon Generator - All Sizes from One Image",
     longDescription:
       "Generate a complete favicon package from a single source image. Creates all standard sizes including ICO, Apple Touch icons, Android Chrome icons, and web manifest files. One upload produces everything you need for modern browsers.",
     useCases: [
@@ -2857,34 +2859,39 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "adjust-colors": {
-    searchTitle: "Adjust Image Colors - Brightness, Contrast, Saturation",
+    searchTitle: "Change Image Saturation & Colors Online",
+    h1: "Change Image Saturation & Colors",
     longDescription:
-      "Fine-tune image appearance with controls for brightness, contrast, exposure, saturation, temperature, tint, sharpness, and artistic effects. Apply adjustments to single images or batch process entire folders. Live preview shows changes in real time.",
+      "Change the saturation of an image online and fine-tune its colors. Increase the color intensity to make photos pop, or lower saturation for a muted, desaturated look, then adjust brightness, contrast, exposure, temperature, tint, and sharpness. Batch process whole folders with a live before/after preview.",
     useCases: [
-      "Correct white balance on product photography shot under mixed lighting",
-      "Batch apply consistent color grading across a set of images",
-      "Boost contrast and saturation on flat-looking phone photos",
-      "Create stylized looks with temperature and tint adjustments",
+      "Increase the color intensity of a dull photo to make it pop",
+      "Reduce or lower the saturation for a muted, desaturated look",
+      "Change the saturation across product photos for a consistent catalog",
+      "Correct white balance and color grade a batch of images at once",
     ],
     features: [
+      "Saturation slider to increase or decrease color intensity",
       "Brightness, contrast, exposure, and gamma controls",
-      "Saturation, vibrance, hue, and temperature adjustments",
+      "Temperature, tint, and hue adjustments",
       "Built-in effects: grayscale, sepia, vintage, and more",
-      "Live before/after preview",
-      "Batch process with saved presets",
+      "Live before/after preview and batch processing",
     ],
     faqs: [
       {
-        q: "How do I fix a photo that is too dark?",
-        a: "Increase the brightness and exposure sliders. If the highlights blow out, bring down the contrast slightly. The live preview shows your changes in real time so you can fine-tune.",
+        q: "How do I change the saturation of an image?",
+        a: "Upload your image and move the saturation slider. Increasing it intensifies every color; dragging it toward -100 fades the image to grayscale. The live preview updates as you drag, so you can dial in the exact look before downloading.",
+      },
+      {
+        q: "How do I increase the color intensity of an image?",
+        a: "Raise the saturation slider, and optionally contrast, to make colors more vivid. A vibrance-style boost is also available, which lifts muted colors more than already-saturated ones so skin tones stay natural.",
       },
       {
         q: "What is the difference between saturation and vibrance?",
-        a: "Saturation increases the intensity of all colors equally. Vibrance boosts muted colors more than already-saturated ones, making it better for photos with skin tones (it avoids making faces look orange).",
+        a: "Saturation increases the intensity of all colors equally. Vibrance boosts muted colors more than already-saturated ones, making it better for photos with skin tones because it avoids making faces look orange.",
       },
       {
-        q: "Can I apply the same color adjustments to multiple images?",
-        a: "Yes. Set your adjustments on one image, then batch process the rest of your files. All images will receive the same corrections, ensuring visual consistency across a set.",
+        q: "Can I saturate or desaturate photos in batch?",
+        a: "Yes. Set your saturation and color adjustments on one image, then batch process the rest. Every image receives the same settings, keeping a set visually consistent.",
       },
     ],
   },
@@ -2953,7 +2960,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "color-blindness": {
-    searchTitle: "Color Blindness Simulator - Accessibility Testing",
+    searchTitle: "Color Blindness Simulator for Accessibility",
     longDescription:
       "Simulate how images appear to people with different types of color vision deficiency, including protanopia, deuteranopia, tritanopia, and achromatopsia. Essential for accessibility testing of UI designs, infographics, and data visualizations.",
     useCases: [
@@ -2985,7 +2992,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "remove-background": {
-    searchTitle: "Remove Background from Image - AI Powered, Private",
+    searchTitle: "Remove Background from Image - Private AI",
     longDescription:
       "Remove image backgrounds automatically using AI-powered segmentation that runs entirely on your hardware. Handles complex edges like hair, fur, and transparent objects. No data is sent to external APIs. Supports batch processing for product catalogs.",
     useCases: [
@@ -3113,7 +3120,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "blur-faces": {
-    searchTitle: "Blur Faces in Photos - GDPR Compliant Anonymization",
+    searchTitle: "Blur Faces in Photos - GDPR Anonymization",
     longDescription:
       "Automatically detect and blur faces and personally identifiable information in images using AI face detection. Supports adjustable blur intensity and region expansion. Process entire batches to anonymize photo collections while keeping non-face content sharp.",
     useCases: [
@@ -3145,39 +3152,44 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "smart-crop": {
-    searchTitle: "Smart Crop - AI Subject-Aware Image Cropping",
+    searchTitle: "Smart Crop - AI Object-Aware Image Cropper",
+    h1: "Smart Crop: AI Object-Aware Image Cropper",
     longDescription:
-      "Crop images intelligently using subject detection, face detection, or trim-based cropping that removes uniform borders. The AI identifies the most important region and crops around it, keeping key content centered and properly composed.",
+      "Smart crop images automatically with AI object-aware and subject-aware cropping. The smart cropper detects the most important region, whether a face, product, or object, and crops around it so key content stays centered and well composed. Trim mode removes uniform borders, and batch mode applies consistent smart cropping across a whole set.",
     useCases: [
-      "Auto-crop product images to center on the product subject",
-      "Generate focused headshots from full-body photos",
-      "Trim whitespace and uniform borders from scanned images",
-      "Batch crop a photo set with consistent subject-centered framing",
+      "Smart crop product images to center on the product automatically",
+      "Use object-aware cropping to reframe photos without cutting off the subject",
+      "Generate focused headshots from full-body photos with face-aware crop",
+      "Batch smart crop a photo set with consistent subject-centered framing",
     ],
     features: [
-      "Subject-aware cropping using AI detection",
+      "AI object-aware and subject-aware smart cropping",
       "Face-centered crop with head room control",
+      "Smart photo cropper with custom aspect ratios",
       "Trim mode to remove uniform borders and whitespace",
-      "Custom aspect ratio with subject-aware positioning",
       "Batch smart crop with consistent framing",
     ],
     faqs: [
       {
-        q: "How does smart crop differ from regular cropping?",
-        a: "Regular cropping requires you to manually select the region. Smart crop uses AI to detect the main subject (person, product, or object) and automatically centers the crop around it, maintaining proper composition.",
+        q: "What is smart cropping?",
+        a: "Smart cropping uses AI to find the most important region of an image, whether a face, person, product, or object, and crops around it automatically, instead of cutting from the center. It keeps the subject in frame and properly composed.",
+      },
+      {
+        q: "How is a smart cropper different from regular cropping?",
+        a: "Regular cropping makes you manually pick the region. A smart cropper detects the subject with object-aware and face-aware AI and centers the crop on it, which is ideal for batch-processing many images to a consistent framing.",
       },
       {
         q: "Can I use smart crop to create headshots from full-body photos?",
-        a: "Yes. The face detection mode finds faces and crops to a configurable framing (close-up, head and shoulders, upper body, or half body). This is great for batch-generating profile pictures from group or full-body shots.",
+        a: "Yes. Face-detection mode finds faces and crops to a configurable framing (close-up, head and shoulders, upper body, or half body), great for batch-generating profile pictures from group or full-body shots.",
       },
       {
-        q: "What does trim mode do?",
-        a: "Trim mode detects and removes uniform borders or whitespace around the edges of an image. It is useful for cleaning up scanned documents, screenshots, and images with padding.",
+        q: "Does trim mode remove borders and whitespace?",
+        a: "Yes. Trim mode detects and removes uniform borders or whitespace around the edges of an image, useful for cleaning up scanned documents, screenshots, and padded images.",
       },
     ],
   },
   "image-enhancement": {
-    searchTitle: "Enhance Image Quality Online - One-Click Auto Fix",
+    searchTitle: "Enhance Image Quality - One-Click Auto Fix",
     longDescription:
       "Enhance images automatically with a single click. Smart analysis evaluates exposure, contrast, color balance, and sharpness, then applies targeted corrections. Handles under-exposed, washed-out, and flat-looking images without manual tweaking.",
     useCases: [
@@ -3209,7 +3221,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "enhance-faces": {
-    searchTitle: "AI Face Enhancement - Restore Blurry Faces in Photos",
+    searchTitle: "AI Face Enhancement - Fix Blurry Faces",
     longDescription:
       "Restore and enhance faces in photos using AI that sharpens facial features, smooths skin, and recovers detail lost to compression, low resolution, or motion blur. Works well on group photos where faces are small.",
     useCases: [
@@ -3337,7 +3349,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "restore-photo": {
-    searchTitle: "Restore Old Photos with AI - Fix Scratches and Damage",
+    searchTitle: "Restore Old Photos with AI - Fix Damage",
     longDescription:
       "Repair damaged photographs using AI that fixes scratches, tears, creases, stains, and color fading. Works on scanned prints and digitized film. The model reconstructs missing or damaged areas while preserving the original character of the image.",
     useCases: [
@@ -3369,7 +3381,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "passport-photo": {
-    searchTitle: "Passport Photo Maker - Compliant for 30+ Countries",
+    searchTitle: "Passport Photo Maker - 30+ Countries",
     longDescription:
       "Generate compliant passport and ID photos for 30+ countries using AI face detection and automatic cropping. Handles background replacement, head size validation, and print layout generation. Meets ICAO standards for official document photos.",
     useCases: [
@@ -3433,7 +3445,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "ai-canvas-expand": {
-    searchTitle: "AI Outpainting - Expand Image Canvas with AI Fill",
+    searchTitle: "AI Outpainting - Expand Image Canvas",
     longDescription:
       "Expand the canvas of an image and fill the new area with AI-generated content that matches the existing image seamlessly. Extend backgrounds, widen compositions, or add headroom above subjects. Powered by local inpainting models.",
     useCases: [
@@ -3465,7 +3477,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "transparency-fixer": {
-    searchTitle: "Fix PNG Transparency - Remove Fake Transparent Backgrounds",
+    searchTitle: "Fix PNG Transparency - Remove Fake Backgrounds",
     longDescription:
       "Detect and fix PNG images that appear transparent but actually contain a solid background baked into the image data. Uses AI matting to extract the true foreground and produce a genuine transparent PNG. Fixes a common issue with images from web scraping and design exports.",
     useCases: [
@@ -3529,7 +3541,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "watermark-image": {
-    searchTitle: "Add Logo Watermark to Photos - Batch Image Branding",
+    searchTitle: "Add Logo Watermark to Photos - Batch",
     longDescription:
       "Overlay a logo or image as a watermark on your photos. Control size, position, opacity, and tiling. Upload any PNG, SVG, or JPEG as the watermark source. Process entire folders to brand all images in a single operation.",
     useCases: [
@@ -3561,7 +3573,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "text-overlay": {
-    searchTitle: "Add Text to Image Online - Caption and Title Maker",
+    searchTitle: "Add Text to Image - Caption & Title Maker",
     longDescription:
       "Add styled text to images with control over font, size, color, shadows, outlines, backgrounds, and positioning. Create social media graphics, annotated screenshots, and labeled images directly from your self-hosted instance.",
     useCases: [
@@ -3657,7 +3669,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   info: {
-    searchTitle: "Image Info Viewer - Check EXIF Data and Dimensions",
+    searchTitle: "Image Info Viewer - EXIF Data & Dimensions",
     longDescription:
       "View comprehensive metadata and properties for any image including dimensions, file size, format, color space, bit depth, DPI, EXIF data, GPS coordinates, camera settings, and embedded ICC profiles. A complete image inspector.",
     useCases: [
@@ -3785,7 +3797,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "qr-generate": {
-    searchTitle: "QR Code Generator - Custom Colors, Logos, and Patterns",
+    searchTitle: "QR Code Generator - Custom Colors & Logos",
     longDescription:
       "Generate QR codes with custom colors, patterns, corner styles, and embedded logos. Control error correction levels for reliability. Output as PNG or SVG at any resolution. Style QR codes to match your brand while keeping them scannable.",
     useCases: [
@@ -3881,7 +3893,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "html-to-image": {
-    searchTitle: "HTML to Image Converter - Render HTML as PNG or JPEG",
+    searchTitle: "HTML to Image - Render HTML as PNG or JPEG",
     longDescription:
       "Convert HTML and CSS to high-quality images. Render any HTML snippet, webpage fragment, or styled markup as a PNG, JPEG, or WebP image at any resolution. Useful for generating social cards, email previews, and dynamic image content from templates.",
     useCases: [
@@ -3945,7 +3957,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   stitch: {
-    searchTitle: "Stitch Images Together - Combine Side by Side or Stacked",
+    searchTitle: "Stitch Images Together - Side by Side",
     longDescription:
       "Join multiple images side by side, stacked vertically, or in a custom grid arrangement. Match widths or heights automatically for seamless alignment. Add spacing and borders between images. Process any number of input files in a single operation.",
     useCases: [
@@ -3977,7 +3989,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   split: {
-    searchTitle: "Split Image into Tiles - Grid Cutter for Instagram",
+    searchTitle: "Split Image into Tiles - Grid Cutter",
     longDescription:
       "Split images into uniform grid tiles or by specific pixel dimensions with live preview. Choose rows and columns or set exact tile sizes. Exports individual tiles as separate files. Perfect for creating image puzzles, sprite sheets, and tiled content.",
     useCases: [
@@ -4009,7 +4021,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   border: {
-    searchTitle: "Add Border to Image Online - Frames, Corners, Shadows",
+    searchTitle: "Add Border to Image - Frames & Shadows",
     longDescription:
       "Add borders, rounded corners, and drop shadows to images. Choose solid colors, gradients, or transparent borders. Control corner radius individually for each corner. Combine with shadows for polished, presentation-ready results.",
     useCases: [
@@ -4041,7 +4053,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   beautify: {
-    searchTitle: "Screenshot Mockup Generator - Device Frames and Backgrounds",
+    searchTitle: "Screenshot Mockup Generator - Device Frames",
     longDescription:
       "Transform plain screenshots into polished visuals with gradient backgrounds, device frames (phone, laptop, browser), shadows, and social media sizing. Turn a raw screen capture into a presentation-ready graphic in seconds.",
     useCases: [
@@ -4137,7 +4149,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "gif-tools": {
-    searchTitle: "GIF Editor - Resize, Optimize, and Edit Animated GIFs",
+    searchTitle: "GIF Editor - Resize & Optimize Animated GIFs",
     longDescription:
       "A complete toolkit for animated GIFs: resize, optimize file size, change playback speed, reverse animation, extract individual frames, and rotate. Handles all operations while preserving animation timing and transparency.",
     useCases: [
@@ -4169,7 +4181,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "pdf-to-image": {
-    searchTitle: "PDF to Image Converter - Convert PDF Pages to PNG or JPEG",
+    searchTitle: "PDF to Image - Convert PDF Pages to PNG/JPEG",
     longDescription:
       "Convert PDF pages to images in any major format with control over resolution and quality. Extract individual pages or convert entire documents. Renders text, vectors, and embedded images faithfully at the DPI you specify.",
     useCases: [
@@ -5995,34 +6007,39 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "ringtone-maker": {
-    searchTitle: "Create Custom Ringtone From Audio",
+    searchTitle: "Ringtone Maker - Convert Audio to Ringtone",
+    h1: "Ringtone Maker: Convert Any Audio to a Ringtone",
     longDescription:
-      "Create a ringtone clip from any audio file by selecting a start and end time. Export in formats compatible with iOS and Android devices. SnapOtter runs on your own server so your music files stay private.",
+      "Convert any audio to a ringtone. Turn a song, MP3, or sound clip into a custom ringtone by selecting a start and end time, then export in formats that work on iPhone (M4R) and Android (MP3). SnapOtter runs on your own server, so your music files stay private.",
     useCases: [
-      "Clipping the chorus of a favorite song for a custom phone ringtone",
-      "Creating a short notification sound from a sound effect library file",
-      "Extracting an alarm tone from a long ambient audio recording",
-      "Making a personalized text message alert from a voice recording",
+      "Make a favorite song into a custom phone ringtone",
+      "Convert an MP3 to a ringtone for Android",
+      "Turn a downloaded song into an iPhone (M4R) ringtone",
+      "Create a short custom notification or text-alert sound",
     ],
     features: [
+      "Convert any audio (MP3, WAV, FLAC, M4A) to a ringtone",
       "Precise start and end time selection down to the millisecond",
-      "Fade-in and fade-out options for smooth ringtone transitions",
-      "Export to M4R for iPhone or MP3 for Android devices",
-      "Supports any input audio format including MP3, WAV, and FLAC",
-      "Preview the selected clip before saving the final ringtone",
+      "Fade-in and fade-out for smooth ringtone transitions",
+      "Export to M4R for iPhone or MP3 for Android",
+      "Preview the clip before saving the final ringtone",
     ],
     faqs: [
       {
-        q: "What format should I use for an iPhone ringtone?",
-        a: "Export as M4R, which is the format iOS requires for custom ringtones. SnapOtter handles the conversion automatically. Your audio is processed locally and never sent to external servers.",
+        q: "How do I make a song my ringtone?",
+        a: "Upload the song, drag to select the section you want (usually the chorus), optionally add a fade, and export. Use M4R for iPhone or MP3 for Android, then set it as your ringtone on your phone.",
+      },
+      {
+        q: "How do I convert an MP3 to a ringtone?",
+        a: "Upload the MP3, trim it to the part you want, and export. For iPhone choose M4R; for Android an MP3 works directly. Everything is processed on your own SnapOtter instance, so the file is never uploaded to a third party.",
       },
       {
         q: "How long can a ringtone be?",
-        a: "iOS limits ringtones to about 30 seconds while Android has no strict limit. SnapOtter lets you select any duration. All processing happens on your self-hosted instance.",
+        a: "iOS limits ringtones to about 30 seconds; Android has no strict limit. SnapOtter lets you select any duration and previews the clip before you export.",
       },
       {
-        q: "Can I add a fade effect to my ringtone?",
-        a: "Yes. You can apply fade-in and fade-out effects so the ringtone starts and ends smoothly instead of cutting abruptly. Processing runs entirely on your own hardware.",
+        q: "Can I make a video my ringtone?",
+        a: "Extract the audio from the video first with SnapOtter’s Extract Audio tool, then trim that audio clip into a ringtone here. The two tools chain together on your own server.",
       },
     ],
   },

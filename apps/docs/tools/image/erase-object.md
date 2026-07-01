@@ -1,3 +1,7 @@
+---
+description: Remove unwanted objects from images with AI inpainting (LaMa), guided by a mask of the region to erase.
+---
+
 # Object Eraser
 
 Remove unwanted objects from images using AI inpainting (LaMa model). Accepts an image and a mask indicating the region to erase.

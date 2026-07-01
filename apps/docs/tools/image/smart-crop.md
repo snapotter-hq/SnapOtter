@@ -1,3 +1,7 @@
+---
+description: Subject-, face-, and entropy-aware cropping that frames images intelligently using Sharp and AI face detection.
+---
+
 # Smart Crop
 
 Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/entropy strategies and AI face detection for intelligent framing.

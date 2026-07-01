@@ -1,3 +1,7 @@
+---
+description: Join images side by side, stacked, or in a grid with control over alignment, gaps, borders, and resize mode.
+---
+
 # Stitch / Combine
 
 Join multiple images side by side, stacked vertically, or arranged in a grid. Supports alignment, gap, border, corner radius, and multiple resize modes.

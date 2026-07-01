@@ -1,3 +1,7 @@
+---
+description: Fix fake transparent PNGs with AI matting (BiRefNet) to produce true alpha, plus defringe edge cleanup.
+---
+
 # PNG Transparency Fixer
 
 Fix fake transparent PNGs in one click. Uses AI matting (BiRefNet HR Matting model) to produce true alpha transparency, with defringe post-processing to clean up edges.
