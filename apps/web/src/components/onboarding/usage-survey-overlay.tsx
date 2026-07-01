@@ -53,10 +53,11 @@ export function UsageSurveyOverlay() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (role !== "admin") return;
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => setSettings(data.settings))
       .catch(() => setSettings({}));
-  }, []);
+  }, [role]);
 
   const visible =
     settings !== null &&

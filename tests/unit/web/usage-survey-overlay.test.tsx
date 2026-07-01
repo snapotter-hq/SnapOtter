@@ -38,13 +38,12 @@ afterEach(() => {
 });
 
 describe("UsageSurveyOverlay", () => {
-  it("renders nothing for a non-admin", async () => {
+  it("renders nothing for a non-admin", () => {
     useAuth.mockReturnValue({ role: "user" });
-    apiGet.mockResolvedValue({ settings: {} });
 
     render(<UsageSurveyOverlay />);
 
-    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    expect(apiGet).not.toHaveBeenCalled();
     expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
   });
 
