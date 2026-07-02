@@ -3534,7 +3534,7 @@ export const hi: TranslationKeys = {
     urlFetchFailed: "URL से इमेज नहीं ला सके",
     ariaLabel: "फाइल ड्रॉप ज़ोन",
     dropPrompt: "अपनी इमेज यहां खींचें",
-    browseOrPaste: "ब्राउज़ करने के लिए कहीं भी क्लिक करें, या क्लिपबोर्ड से पेस्ट करें",
+    browseOrPaste: "अपलोड बटन का उपयोग करें, या क्लिपबोर्ड से पेस्ट करें",
     uploadButton: "अपलोड",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD, और 65+ फॉर्मेट",
     orSeparator: "या",

@@ -3734,7 +3734,7 @@ export const ptBR: TranslationKeys = {
     urlFetchFailed: "Não foi possível obter a imagem da URL",
     ariaLabel: "Área de soltar arquivos",
     dropPrompt: "Arraste suas imagens aqui",
-    browseOrPaste: "clique em qualquer lugar para navegar, ou cole da área de transferência",
+    browseOrPaste: "use o botão de upload ou cole da área de transferência",
     uploadButton: "Enviar",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD e mais de 65 formatos",
     orSeparator: "ou",

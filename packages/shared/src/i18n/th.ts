@@ -3684,7 +3684,7 @@ export const th: TranslationKeys = {
     urlFetchFailed: "ไม่สามารถดึงภาพจาก URL",
     ariaLabel: "พื้นที่วางไฟล์",
     dropPrompt: "ลากภาพมาวางที่นี่",
-    browseOrPaste: "คลิกเพื่อเรียกดูหรือวางจากคลิปบอร์ด",
+    browseOrPaste: "ใช้ปุ่มอัปโหลดหรือวางจากคลิปบอร์ด",
     uploadButton: "อัปโหลด",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD และรูปแบบอื่นกว่า 65 รูปแบบ",
     orSeparator: "หรือ",

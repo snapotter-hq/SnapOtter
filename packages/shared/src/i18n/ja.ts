@@ -3677,7 +3677,7 @@ export const ja: TranslationKeys = {
     urlFetchFailed: "URLから画像を取得できませんでした",
     ariaLabel: "ファイルドロップゾーン",
     dropPrompt: "ここに画像をドロップ",
-    browseOrPaste: "クリックでファイルを参照、またはクリップボードから貼り付け",
+    browseOrPaste: "アップロードボタンを使用するか、クリップボードから貼り付け",
     uploadButton: "アップロード",
     defaultFormats: "PNG、JPG、WebP、HEIC、RAW、PSD、65以上のフォーマット",
     orSeparator: "または",

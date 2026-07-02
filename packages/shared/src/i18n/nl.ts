@@ -3736,7 +3736,7 @@ export const nl: TranslationKeys = {
     urlFetchFailed: "Afbeelding kon niet worden opgehaald van URL",
     ariaLabel: "Bestand-dropzone",
     dropPrompt: "Sleep je afbeeldingen hierheen",
-    browseOrPaste: "klik om te bladeren, of plak vanuit het klembord",
+    browseOrPaste: "gebruik de uploadknop of plak vanuit het klembord",
     uploadButton: "Uploaden",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD en 65+ formaten",
     orSeparator: "of",

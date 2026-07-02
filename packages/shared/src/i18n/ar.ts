@@ -3704,7 +3704,7 @@ export const ar: TranslationKeys = {
     urlFetchFailed: "تعذر جلب الصورة من الرابط",
     ariaLabel: "منطقة إسقاط الملفات",
     dropPrompt: "اسحب صورك هنا",
-    browseOrPaste: "اضغط في أي مكان للتصفح، أو الصق من الحافظة",
+    browseOrPaste: "استخدم زر التحميل، أو الصق من الحافظة",
     uploadButton: "رفع",
     defaultFormats: "PNG، JPG، WebP، HEIC، RAW، PSD، وأكثر من 65 صيغة",
     orSeparator: "أو",

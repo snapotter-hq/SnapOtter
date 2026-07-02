@@ -3730,7 +3730,7 @@ export const ru: TranslationKeys = {
     urlFetchFailed: "Не удалось загрузить изображение по URL",
     ariaLabel: "Зона перетаскивания файлов",
     dropPrompt: "Перетащите изображения сюда",
-    browseOrPaste: "нажмите в любом месте для выбора или вставьте из буфера обмена",
+    browseOrPaste: "используйте кнопку загрузки или вставьте из буфера обмена",
     uploadButton: "Загрузить",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD и 65+ форматов",
     orSeparator: "или",

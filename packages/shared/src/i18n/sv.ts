@@ -3724,7 +3724,7 @@ export const sv: TranslationKeys = {
     urlFetchFailed: "Kunde inte hämta bild från URL",
     ariaLabel: "Filsläppzon",
     dropPrompt: "Släpp dina bilder här",
-    browseOrPaste: "klicka för att bläddra, eller klistra in från urklipp",
+    browseOrPaste: "använd uppladdningsknappen eller klistra in från urklipp",
     uploadButton: "Ladda upp",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD och 65+ format",
     orSeparator: "eller",

@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "./en.js";
 import { en } from "./en.js";
 
 export type { TranslationKeys } from "./en.js";
@@ -34,11 +35,37 @@ export const SUPPORTED_LOCALES: SupportedLocale[] = [
   { code: "th", name: "Thai", nativeName: "ไทย", dir: "ltr" },
 ];
 
-export async function loadTranslations(locale: string): Promise<import("./en.js").TranslationKeys> {
+type TranslationLoader = () => Promise<TranslationKeys>;
+
+const TRANSLATION_LOADERS: Record<string, TranslationLoader> = {
+  ar: async () => (await import("./ar.js")).ar,
+  de: async () => (await import("./de.js")).de,
+  es: async () => (await import("./es.js")).es,
+  fr: async () => (await import("./fr.js")).fr,
+  hi: async () => (await import("./hi.js")).hi,
+  id: async () => (await import("./id.js")).id,
+  it: async () => (await import("./it.js")).it,
+  ja: async () => (await import("./ja.js")).ja,
+  ko: async () => (await import("./ko.js")).ko,
+  nl: async () => (await import("./nl.js")).nl,
+  pl: async () => (await import("./pl.js")).pl,
+  "pt-BR": async () => (await import("./pt-BR.js")).ptBR,
+  ru: async () => (await import("./ru.js")).ru,
+  sv: async () => (await import("./sv.js")).sv,
+  th: async () => (await import("./th.js")).th,
+  tr: async () => (await import("./tr.js")).tr,
+  uk: async () => (await import("./uk.js")).uk,
+  vi: async () => (await import("./vi.js")).vi,
+  "zh-CN": async () => (await import("./zh-CN.js")).zhCN,
+  "zh-TW": async () => (await import("./zh-TW.js")).zhTW,
+};
+
+export async function loadTranslations(locale: string): Promise<TranslationKeys> {
   if (locale === "en") return en;
+  const loadTranslation = TRANSLATION_LOADERS[locale];
+  if (!loadTranslation) return en;
   try {
-    const mod = await import(`./${locale}.js`);
-    return mod[locale] ?? mod.default ?? en;
+    return await loadTranslation();
   } catch {
     return en;
   }

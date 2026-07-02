@@ -3727,7 +3727,7 @@ export const id: TranslationKeys = {
     urlFetchFailed: "Tidak dapat mengambil gambar dari URL",
     ariaLabel: "Area seret file",
     dropPrompt: "Seret gambar Anda ke sini",
-    browseOrPaste: "klik untuk menjelajah, atau tempel dari clipboard",
+    browseOrPaste: "gunakan tombol unggah, atau tempel dari clipboard",
     uploadButton: "Unggah",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD, dan 65+ format",
     orSeparator: "atau",

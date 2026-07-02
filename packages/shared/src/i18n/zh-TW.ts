@@ -3468,7 +3468,7 @@ export const zhTW: TranslationKeys = {
     urlFetchFailed: "無法從URL取得影像",
     ariaLabel: "檔案拖放區域",
     dropPrompt: "將影像拖放到此處",
-    browseOrPaste: "點擊任意位置瀏覽檔案，或從剪貼簿貼上",
+    browseOrPaste: "使用上傳按鈕，或從剪貼簿貼上",
     uploadButton: "上傳",
     defaultFormats: "PNG、JPG、WebP、HEIC、RAW、PSD及65+種格式",
     orSeparator: "或",

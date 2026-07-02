@@ -3742,7 +3742,7 @@ export const pl: TranslationKeys = {
     urlFetchFailed: "Nie udało się pobrać obrazu z URL",
     ariaLabel: "Strefa upuszczania plików",
     dropPrompt: "Przeciągnij tutaj swoje obrazy",
-    browseOrPaste: "kliknij gdziekolwiek, aby przeglądać, lub wklej ze schowka",
+    browseOrPaste: "użyj przycisku przesyłania lub wklej ze schowka",
     uploadButton: "Prześlij",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD i ponad 65 formatów",
     orSeparator: "lub",

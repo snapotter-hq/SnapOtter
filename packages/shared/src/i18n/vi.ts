@@ -3724,7 +3724,7 @@ export const vi: TranslationKeys = {
     urlFetchFailed: "Không thể tải ảnh từ URL",
     ariaLabel: "Vùng thả tệp",
     dropPrompt: "Kéo thả hình ảnh vào đây",
-    browseOrPaste: "nhấp để duyệt hoặc dán từ bộ nhớ tạm",
+    browseOrPaste: "dùng nút tải lên hoặc dán từ bộ nhớ tạm",
     uploadButton: "Tải lên",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD và hơn 65 định dạng",
     orSeparator: "hoặc",

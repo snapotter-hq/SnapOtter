@@ -3740,7 +3740,7 @@ export const it: TranslationKeys = {
     urlFetchFailed: "Impossibile recuperare l'immagine dall'URL",
     ariaLabel: "Area di rilascio file",
     dropPrompt: "Trascina le tue immagini qui",
-    browseOrPaste: "fai clic ovunque per sfogliare, oppure incolla dagli appunti",
+    browseOrPaste: "usa il pulsante di caricamento oppure incolla dagli appunti",
     uploadButton: "Carica",
     defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD e oltre 65 formati",
     orSeparator: "o",
