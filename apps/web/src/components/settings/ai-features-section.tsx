@@ -283,7 +283,9 @@ function BundleCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">{bundle.name}</p>
           <p className="text-xs text-muted-foreground">
-            {bundle.description} (~{bundle.estimatedSize})
+            {bundle.description} (~
+            {bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize}
+            {bundle.installedBytes ? `, ${formatFileSize(bundle.installedBytes)} on disk` : ""})
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0 ms-4">

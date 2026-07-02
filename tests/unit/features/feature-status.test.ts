@@ -653,6 +653,43 @@ describe("Composite state - getFeatureStates", () => {
       expect(Array.isArray(state.enablesTools)).toBe(true);
     }
   });
+
+  it("surfaces real per-arch download/on-disk sizes from the manifest", () => {
+    // Write a manifest carrying archives for both arches; the API should
+    // surface the entry matching this host's arch.
+    const arch = process.arch === "arm64" ? "arm64-cpu" : "amd64-gpu";
+    const other = arch === "arm64-cpu" ? "amd64-gpu" : "arm64-cpu";
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            archives: {
+              [arch]: { compressedSize: 5_930_000_000, extractedSize: 9_370_000_000 },
+              [other]: { compressedSize: 1, extractedSize: 2 },
+            },
+          },
+          // extractedSize omitted / 0 must surface as null, not 0.
+          "background-removal": {
+            models: [],
+            archives: { [arch]: { compressedSize: 4_810_000_000, extractedSize: 0 } },
+          },
+        },
+      }),
+    );
+    const states = mod.getFeatureStates();
+    const ocr = states.find((s) => s.id === "ocr");
+    expect(ocr?.downloadBytes).toBe(5_930_000_000);
+    expect(ocr?.installedBytes).toBe(9_370_000_000);
+    const rembg = states.find((s) => s.id === "background-removal");
+    expect(rembg?.downloadBytes).toBe(4_810_000_000);
+    expect(rembg?.installedBytes).toBeNull();
+    // A bundle with no archives entry surfaces both as null (not undefined/0).
+    const transcription = states.find((s) => s.id === "transcription");
+    expect(transcription?.downloadBytes).toBeNull();
+    expect(transcription?.installedBytes).toBeNull();
+  });
 });
 
 describe("auto-repair state transition (install endpoint logic)", () => {

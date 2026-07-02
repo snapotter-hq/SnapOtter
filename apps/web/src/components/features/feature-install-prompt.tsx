@@ -2,7 +2,7 @@ import type { FeatureBundleState } from "@snapotter/shared";
 import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { format } from "@/lib/format";
+import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 const PROGRESS_MESSAGES = [
@@ -125,7 +125,11 @@ export function FeatureInstallPrompt({
         </p>
         {!isRepair && (
           <p className="text-sm text-muted-foreground">
-            {format(t.features.requiresDownload, { size: bundle.estimatedSize })}
+            {format(t.features.requiresDownload, {
+              size: bundle.downloadBytes
+                ? formatFileSize(bundle.downloadBytes)
+                : bundle.estimatedSize,
+            })}
           </p>
         )}
       </div>

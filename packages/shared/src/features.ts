@@ -15,6 +15,13 @@ export interface FeatureBundleState {
   status: FeatureStatus;
   installedVersion: string | null;
   estimatedSize: string;
+  // Real download / on-disk sizes for THIS host's architecture, read from the
+  // bundle manifest. amd64 hosts pull the CUDA-inclusive archive whether or not
+  // a GPU is present, so these can be much larger than the coarse estimatedSize
+  // label suggests. Optional/nullable: absent in native (non-Docker) mode and
+  // when the manifest lacks the value (extractedSize is 0 for some archives).
+  downloadBytes?: number | null;
+  installedBytes?: number | null;
   enablesTools: string[];
   progress: { percent: number; stage: string } | null;
   error: string | null;
@@ -52,7 +59,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "upscale-enhance",
     name: "Upscale & Enhance",
     description: "AI upscaling, face enhancement, and noise removal",
-    estimatedSize: "4-5 GB",
+    estimatedSize: "5-6 GB",
     enablesTools: ["upscale", "enhance-faces", "noise-removal"],
   },
   "photo-restoration": {

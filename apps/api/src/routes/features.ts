@@ -122,6 +122,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           status: "installed" as const,
           installedVersion: null,
           estimatedSize: bundle.estimatedSize,
+          // Native (non-Docker) mode runs the models in-process with no bundle
+          // archive to download, so there are no per-arch download/on-disk sizes.
+          downloadBytes: null,
+          installedBytes: null,
           enablesTools: bundle.enablesTools,
           progress: null,
           error: null,
