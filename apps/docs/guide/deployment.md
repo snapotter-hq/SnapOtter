@@ -487,7 +487,7 @@ labels:
 
 ### Caddy
 
-```caddyfile
+```txt
 images.example.com {
     reverse_proxy localhost:1349 {
         flush_interval -1

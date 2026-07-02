@@ -48,6 +48,19 @@ export default defineConfig({
   },
 
   vite: {
+    build: {
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          if (
+            warning.code === "INVALID_ANNOTATION" &&
+            warning.id?.includes("@vueuse/core/dist/index.js")
+          ) {
+            return;
+          }
+          defaultHandler(warning);
+        },
+      },
+    },
     plugins: [
       pagefindPlugin({
         btnPlaceholder: "Search",
