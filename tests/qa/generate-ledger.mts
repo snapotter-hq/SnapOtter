@@ -1,7 +1,7 @@
 // Generates the master coverage ledger (157 rows, complete by construction) from
 // tools-meta.json. Discovery shards update cells; any "pending" cell at the end is
 // an explicit, surfaced gap. Run: npx tsx tests/qa/generate-ledger.mts
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,6 +41,7 @@ const tools = meta.map((t) => ({
 }));
 
 const out = path.join(dir, "..", "..", "docs", "qa", "coverage-ledger.json");
+mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(
   out,
   `${JSON.stringify(

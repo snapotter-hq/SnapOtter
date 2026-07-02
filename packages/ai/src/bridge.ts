@@ -137,6 +137,7 @@ export class PythonDispatcher {
   private crashes = 0;
   private lastCrashTs = 0;
   private backoffEnd = 0;
+  private shuttingDown = false;
 
   constructor(opts: { profile: "ai" | "docs" }) {
     this.profile = opts.profile;
@@ -174,6 +175,7 @@ export class PythonDispatcher {
 
   private startChild(): ChildProcess | null {
     if (this.childFailed) return null;
+    this.shuttingDown = false;
 
     try {
       const proc = spawn(getPythonPath(), [resolve(PYTHON_DIR, "dispatcher.py")], {
@@ -190,7 +192,13 @@ export class PythonDispatcher {
             req.reject(new Error("Python dispatcher stdin closed unexpectedly"));
             this.pending.delete(id);
           }
-          this.recordCrash();
+          // An intentional shutdown() ends stdin then SIGTERMs the child, which
+          // can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is not a
+          // crash -- counting it would let repeated legitimate restarts (e.g.
+          // shutdownDispatcher() on every AI bundle install) trip the crash
+          // limit and permanently disable the dispatcher. Guard mirrors the
+          // "close" handler below.
+          if (!this.shuttingDown) this.recordCrash();
           this.child = null;
           this.childReady = false;
         }
@@ -284,7 +292,9 @@ export class PythonDispatcher {
         console.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`);
         if (err.code === "ENOENT") {
           this.childFailed = true;
-        } else {
+        } else if (!this.shuttingDown) {
+          // Skip crash accounting when we initiated the teardown (shutdown()
+          // sets shuttingDown before killing the child); mirrors "close".
           this.recordCrash();
         }
         for (const [id, req] of this.pending.entries()) {
@@ -300,7 +310,7 @@ export class PythonDispatcher {
           req.reject(new Error("Python dispatcher exited unexpectedly"));
           this.pending.delete(id);
         }
-        if (code !== 0) {
+        if (code !== 0 && !this.shuttingDown) {
           this.recordCrash();
         }
         this.child = null;
@@ -531,6 +541,7 @@ export class PythonDispatcher {
    */
   shutdown(): void {
     if (this.child && !this.child.killed) {
+      this.shuttingDown = true;
       this.child.stdin?.end();
       this.child.kill("SIGTERM");
       this.child = null;

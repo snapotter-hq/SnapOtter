@@ -198,7 +198,7 @@ test.describe("Image browser-native input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "resize");
-      await uploadFiles(page, fixture("formats", filename));
+      await uploadFiles(page, fixture("image", "formats", filename));
       await assertImageRendered(page, filename, `input preview ${ext}`);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -249,7 +249,7 @@ test.describe("Image server-decode input preview", () => {
       test.setTimeout(90_000);
       const issues = instrument(page);
       await gotoTool(page, "resize");
-      await uploadFiles(page, fixture("formats", filename));
+      await uploadFiles(page, fixture("image", "formats", filename));
       const status = await assertServerDecodePreview(page, filename);
       expect(
         ["rendered", "fallback"],
@@ -278,7 +278,7 @@ test.describe("Video native input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "convert-video");
-      await uploadFiles(page, fixture("media", filename));
+      await uploadFiles(page, fixture("video", "formats", filename));
       await assertVideoPreview(page);
       assertClean(issues, ext);
     });
@@ -314,7 +314,7 @@ test.describe("Video non-native input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "convert-video");
-      await uploadFiles(page, fixture("media", filename));
+      await uploadFiles(page, fixture("video", "formats", filename));
       await assertVideoNonNativePreview(page);
       assertClean(issues, ext);
     });
@@ -342,7 +342,7 @@ test.describe("Audio decodable input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "convert-audio");
-      await uploadFiles(page, fixture("media", filename));
+      await uploadFiles(page, fixture("audio", "formats", filename));
       await assertAudioPreview(page);
       assertClean(issues, ext);
     });
@@ -368,7 +368,7 @@ test.describe("Audio undecodable input preview (graceful fallback)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "convert-audio");
-      await uploadFiles(page, fixture("media", filename));
+      await uploadFiles(page, fixture("audio", "formats", filename));
       // F8: WaveSurfer error/timeout surfaces a graceful "cannot be previewed"
       // message instead of a dead disabled play button.
       const fallback = page.getByText(/cannot be previewed in the browser/i).first();
@@ -390,7 +390,7 @@ test.describe("Document PDF input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "rotate-pdf");
-    await uploadFiles(page, fixture("documents", "tiny.pdf"));
+    await uploadFiles(page, fixture("document", "formats", "tiny.pdf"));
     await assertDocumentPreview(page);
     assertClean(issues, "pdf");
   });
@@ -416,7 +416,7 @@ test.describe("Document non-PDF input preview (word-to-pdf)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "word-to-pdf");
-      await uploadFiles(page, fixture("documents", filename));
+      await uploadFiles(page, fixture("document", "formats", filename));
       await assertNonPdfDocumentPreview(page);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -437,7 +437,7 @@ test.describe("Document non-PDF input preview (excel-to-pdf)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "excel-to-pdf");
-      await uploadFiles(page, fixture("documents", filename));
+      await uploadFiles(page, fixture("document", "formats", filename));
       await assertNonPdfDocumentPreview(page);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -458,7 +458,7 @@ test.describe("Document non-PDF input preview (powerpoint-to-pdf)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "powerpoint-to-pdf");
-      await uploadFiles(page, fixture("documents", filename));
+      await uploadFiles(page, fixture("document", "formats", filename));
       await assertNonPdfDocumentPreview(page);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -478,7 +478,7 @@ test.describe("Document non-PDF input preview (html-to-pdf)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "html-to-pdf");
-      await uploadFiles(page, fixture("documents", filename));
+      await uploadFiles(page, fixture("document", "formats", filename));
       await assertNonPdfDocumentPreview(page);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -498,7 +498,7 @@ test.describe("Document non-PDF input preview (markdown-to-pdf)", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "markdown-to-pdf");
-      await uploadFiles(page, fixture("documents", filename));
+      await uploadFiles(page, fixture("document", "formats", filename));
       await assertNonPdfDocumentPreview(page);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -512,7 +512,7 @@ test.describe("Document non-PDF input preview (epub-convert)", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "epub-convert");
-    await uploadFiles(page, fixture("documents", "tiny.epub"));
+    await uploadFiles(page, fixture("document", "formats", "tiny.epub"));
     // epub-convert uses no-comparison mode, not document viewer.
     // Just verify file accepted and no crash.
     await page.waitForTimeout(3_000);
@@ -538,7 +538,7 @@ test.describe("File/data input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "csv-json");
-      await uploadFiles(page, fixture("data", filename));
+      await uploadFiles(page, fixture("data", "valid", filename));
       await page.waitForTimeout(2_000);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -550,7 +550,7 @@ test.describe("File/data input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "json-xml");
-    await uploadFiles(page, fixture("data", "tiny.xml"));
+    await uploadFiles(page, fixture("data", "valid", "tiny.xml"));
     await page.waitForTimeout(2_000);
     await assertNoBrokenImages(page);
     assertClean(issues, "xml");
@@ -567,7 +567,7 @@ test.describe("File/data input preview", () => {
       test.setTimeout(60_000);
       const issues = instrument(page);
       await gotoTool(page, "yaml-json");
-      await uploadFiles(page, fixture("data", filename));
+      await uploadFiles(page, fixture("data", "valid", filename));
       await page.waitForTimeout(2_000);
       await assertNoBrokenImages(page);
       assertClean(issues, ext);
@@ -579,7 +579,7 @@ test.describe("File/data input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "extract-zip");
-    await uploadFiles(page, fixture("data", "tiny.zip"));
+    await uploadFiles(page, fixture("data", "valid", "tiny.zip"));
     await page.waitForTimeout(2_000);
     await assertNoBrokenImages(page);
     assertClean(issues, "zip");
@@ -624,7 +624,7 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "image-to-base64");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertImageRendered(page, "sample.png", "image-to-base64 input");
     await assertNoBrokenImages(page);
     assertClean(issues, "image-to-base64");
@@ -636,7 +636,7 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "find-duplicates");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertCustomResultsPreview(page, "find-duplicates");
     await assertNoBrokenImages(page);
     assertClean(issues, "find-duplicates");
@@ -648,7 +648,7 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "pdf-to-image");
-    await uploadFiles(page, fixture("documents", "tiny.pdf"));
+    await uploadFiles(page, fixture("document", "formats", "tiny.pdf"));
     // Try document preview first; fall back to custom-results oracle
     try {
       await assertDocumentPreview(page);
@@ -665,7 +665,7 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "passport-photo");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertCustomResultsPreview(page, "passport-photo");
     await assertNoBrokenImages(page);
     assertClean(issues, "passport-photo");
@@ -682,7 +682,7 @@ test.describe("Custom interactive tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "crop");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertInteractivePreview(page, "crop");
     await assertNoBrokenImages(page);
     assertClean(issues, "crop");
@@ -692,7 +692,7 @@ test.describe("Custom interactive tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "erase-object");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertInteractivePreview(page, "erase-object");
     await assertNoBrokenImages(page);
     assertClean(issues, "erase-object");
@@ -702,7 +702,7 @@ test.describe("Custom interactive tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "split");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertInteractivePreview(page, "split");
     await assertNoBrokenImages(page);
     assertClean(issues, "split");

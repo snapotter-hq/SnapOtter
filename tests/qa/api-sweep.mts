@@ -12,7 +12,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath } from "../../packages/shared/src/constants.js";
 
 // ── Config ────────────────────────────────────────────────────────
 const BASE = "http://localhost:13499";
@@ -48,7 +48,13 @@ interface SweepResult {
   note: string;
 }
 
-type Classification = "pass" | "expected-reject" | "suspicious-reject" | "bug" | "skipped" | "needs-review";
+type Classification =
+  | "pass"
+  | "expected-reject"
+  | "suspicious-reject"
+  | "bug"
+  | "skipped"
+  | "needs-review";
 
 // ── Load tools + settings ─────────────────────────────────────────
 
@@ -137,7 +143,13 @@ function resolveFixture(ext: string, modality: string): string | null {
   }
 
   // Fallback: try all dirs
-  for (const dir of [FIXTURES_FORMATS, FIXTURES_MEDIA_VIDEO, FIXTURES_MEDIA_AUDIO, FIXTURES_DOCS, FIXTURES_DATA]) {
+  for (const dir of [
+    FIXTURES_FORMATS,
+    FIXTURES_MEDIA_VIDEO,
+    FIXTURES_MEDIA_AUDIO,
+    FIXTURES_DOCS,
+    FIXTURES_DATA,
+  ]) {
     for (const prefix of ["sample", "tiny"]) {
       const p = join(dir, `${prefix}.${bare}`);
       if (existsSync(p)) return p;
@@ -194,7 +206,10 @@ function detectSignature(data: Buffer): string | null {
     if (data.length < off + sig.bytes.length) continue;
     let match = true;
     for (let i = 0; i < sig.bytes.length; i++) {
-      if (data[off + i] !== sig.bytes[i]) { match = false; break; }
+      if (data[off + i] !== sig.bytes[i]) {
+        match = false;
+        break;
+      }
     }
     if (match) return sig.name;
   }
@@ -266,7 +281,10 @@ function verifyOutput(data: Buffer, contentType: string): { ok: boolean; detail:
 
 // ── SSE polling for async jobs ────────────────────────────────────
 
-async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
+async function pollJobSSE(
+  jobId: string,
+  timeoutMs: number,
+): Promise<{
   status: "completed" | "failed" | "timeout";
   error?: string;
   result?: Record<string, unknown>;
@@ -277,7 +295,10 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
   while (Date.now() < deadline) {
     try {
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), Math.min(30_000, deadline - Date.now()));
+      const fetchTimeout = setTimeout(
+        () => controller.abort(),
+        Math.min(30_000, deadline - Date.now()),
+      );
 
       const res = await fetch(url, {
         signal: controller.signal,
@@ -299,7 +320,9 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
         while (Date.now() < deadline) {
           const readTimeout = Math.min(30_000, deadline - Date.now());
           const readPromise = reader.read();
-          const timeoutPromise = sleep(readTimeout).then(() => ({ done: true, value: undefined } as const));
+          const timeoutPromise = sleep(readTimeout).then(
+            () => ({ done: true, value: undefined }) as const,
+          );
           const chunk = await Promise.race([readPromise, timeoutPromise]);
 
           if (chunk.done) break;
@@ -336,7 +359,9 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
                   reader.cancel().catch(() => {});
                   return {
                     status: "failed",
-                    error: data.errors?.map((e: { error: string }) => e.error).join("; ") || "batch failed",
+                    error:
+                      data.errors?.map((e: { error: string }) => e.error).join("; ") ||
+                      "batch failed",
                   };
                 }
               }
@@ -400,10 +425,19 @@ async function fetchAsyncOutput(jobId: string): Promise<{
 
   // Fallback: try common output filenames
   const commonNames = [
-    "output.mp4", "output.webm", "output.mkv", "output.avi",
-    "output.mp3", "output.wav", "output.ogg",
-    "output.png", "output.jpg", "output.webp",
-    "output.pdf", "output.txt", "output.json",
+    "output.mp4",
+    "output.webm",
+    "output.mkv",
+    "output.avi",
+    "output.mp3",
+    "output.wav",
+    "output.ogg",
+    "output.png",
+    "output.jpg",
+    "output.webp",
+    "output.pdf",
+    "output.txt",
+    "output.json",
     "output.zip",
   ];
 
@@ -421,9 +455,7 @@ async function fetchAsyncOutput(jobId: string): Promise<{
           };
         }
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return { found: false };
@@ -474,9 +506,7 @@ async function main() {
   const startTime = Date.now();
 
   for (const tool of tools) {
-    const formats = tool.isAI
-      ? [aiRepresentativeFormat(tool)]
-      : [...tool.acceptedInputs]; // clone to avoid mutation
+    const formats = tool.isAI ? [aiRepresentativeFormat(tool)] : [...tool.acceptedInputs]; // clone to avoid mutation
 
     // Deduplicate aliases (e.g. .jpg and .jpeg resolve to same fixture)
     const seenFixtures = new Set<string>();
@@ -514,7 +544,11 @@ async function main() {
       }
       seenFixtures.add(fixture);
 
-      const timeoutMs = tool.isAI ? AI_TIMEOUT_MS : (tool.executionHint === "long" ? LONG_TIMEOUT_MS : FAST_TIMEOUT_MS);
+      const timeoutMs = tool.isAI
+        ? AI_TIMEOUT_MS
+        : tool.executionHint === "long"
+          ? LONG_TIMEOUT_MS
+          : FAST_TIMEOUT_MS;
       const settings = defaultSettingsFor(tool.id);
       const filename = fixture.split("/").pop()!;
 
@@ -561,9 +595,13 @@ async function main() {
         // ── 4xx: legitimate rejection ────────────────────────
         if (statusCode >= 400 && statusCode < 500) {
           let body = "";
-          try { body = await res.text(); } catch {}
+          try {
+            body = await res.text();
+          } catch {}
           let parsed: { error?: string; details?: string } = {};
-          try { parsed = JSON.parse(body); } catch {}
+          try {
+            parsed = JSON.parse(body);
+          } catch {}
           const msg = parsed.error || parsed.details || body.slice(0, 200);
 
           // Check if this format is in the tool's own acceptedInputs
@@ -593,7 +631,9 @@ async function main() {
         // ── 5xx: server error = BUG ──────────────────────────
         if (statusCode >= 500) {
           let body = "";
-          try { body = await res.text(); } catch {}
+          try {
+            body = await res.text();
+          } catch {}
           const r: SweepResult = {
             tool: tool.id,
             format: ext,
@@ -617,7 +657,9 @@ async function main() {
             format: ext,
             status: 200,
             outputOk: isZip && buf.length > 2,
-            note: isZip ? `pass: ZIP stream (${buf.length} bytes)` : "BUG: ZIP content-type but invalid header",
+            note: isZip
+              ? `pass: ZIP stream (${buf.length} bytes)`
+              : "BUG: ZIP content-type but invalid header",
           };
           results.push(r);
           if (isZip && buf.length > 2) {
@@ -635,7 +677,7 @@ async function main() {
         if (statusCode === 200 && resContentType === "application/json") {
           let json: Record<string, unknown>;
           try {
-            json = await res.json() as Record<string, unknown>;
+            json = (await res.json()) as Record<string, unknown>;
           } catch (e) {
             const r: SweepResult = {
               tool: tool.id,
@@ -769,7 +811,9 @@ async function main() {
         // ── 202: async job ───────────────────────────────────
         if (statusCode === 202) {
           let json: { jobId?: string; async?: boolean } = {};
-          try { json = await res.json() as typeof json; } catch {}
+          try {
+            json = (await res.json()) as typeof json;
+          } catch {}
 
           const jobId = json.jobId;
           if (!jobId) {
@@ -895,7 +939,9 @@ async function main() {
 
         // ── Unexpected status code ───────────────────────────
         let body = "";
-        try { body = await res.text(); } catch {}
+        try {
+          body = await res.text();
+        } catch {}
         const r: SweepResult = {
           tool: tool.id,
           format: ext,
@@ -907,7 +953,6 @@ async function main() {
         bugs.push(r);
         bugCount++;
         console.log(`    [BUG] unexpected status ${statusCode}`);
-
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const isTimeout = msg.includes("abort") || msg.includes("timeout");
@@ -932,10 +977,7 @@ async function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
 
-  writeFileSync(
-    join(OUT_DIR, "api-sweep-results.json"),
-    JSON.stringify(results, null, 2),
-  );
+  writeFileSync(join(OUT_DIR, "api-sweep-results.json"), JSON.stringify(results, null, 2));
 
   // ── Write findings markdown ───────────────────────────────────
 

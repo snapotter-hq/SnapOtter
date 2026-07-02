@@ -811,7 +811,7 @@
   },
   {
     "id": "ocr",
-    "name": "OCR / Text Extraction",
+    "name": "Extract Text from Image (OCR)",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -4080,6 +4080,14 @@
     "isAI": false
   },
   {
+    "id": "sign-pdf",
+    "name": "Sign PDF",
+    "modality": "document",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "pdf-to-text",
     "name": "PDF to Text",
     "modality": "document",
@@ -4237,6 +4245,670 @@
     "modality": "file",
     "acceptedInputs": [".zip"],
     "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-png",
+    "name": "JPG to PNG",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-jpg",
+    "name": "PNG to JPG",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-webp",
+    "name": "JPG to WebP",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-webp",
+    "name": "PNG to WebP",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webp-to-jpg",
+    "name": "WebP to JPG",
+    "modality": "image",
+    "acceptedInputs": [".webp"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webp-to-png",
+    "name": "WebP to PNG",
+    "modality": "image",
+    "acceptedInputs": [".webp"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-avif",
+    "name": "JPG to AVIF",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-avif",
+    "name": "PNG to AVIF",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webp-to-avif",
+    "name": "WebP to AVIF",
+    "modality": "image",
+    "acceptedInputs": [".webp"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "heic-to-jpg",
+    "name": "HEIC to JPG",
+    "modality": "image",
+    "acceptedInputs": [".heic", ".heif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "heic-to-png",
+    "name": "HEIC to PNG",
+    "modality": "image",
+    "acceptedInputs": [".heic", ".heif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "heic-to-avif",
+    "name": "HEIC to AVIF",
+    "modality": "image",
+    "acceptedInputs": [".heic", ".heif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-gif",
+    "name": "JPG to GIF",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-gif",
+    "name": "PNG to GIF",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-jpg",
+    "name": "GIF to JPG",
+    "modality": "image",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-png",
+    "name": "GIF to PNG",
+    "modality": "image",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webp-to-gif",
+    "name": "WebP to GIF",
+    "modality": "image",
+    "acceptedInputs": [".webp"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-tiff",
+    "name": "JPG to TIFF",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-tiff",
+    "name": "PNG to TIFF",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "tiff-to-jpg",
+    "name": "TIFF to JPG",
+    "modality": "image",
+    "acceptedInputs": [".tiff", ".tif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "tiff-to-png",
+    "name": "TIFF to PNG",
+    "modality": "image",
+    "acceptedInputs": [".tiff", ".tif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "psd-to-jpg",
+    "name": "PSD to JPG",
+    "modality": "image",
+    "acceptedInputs": [".psd"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "psd-to-png",
+    "name": "PSD to PNG",
+    "modality": "image",
+    "acceptedInputs": [".psd"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-eps",
+    "name": "PNG to EPS",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-eps",
+    "name": "JPG to EPS",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "eps-to-png",
+    "name": "EPS to PNG",
+    "modality": "image",
+    "acceptedInputs": [".eps"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "eps-to-jpg",
+    "name": "EPS to JPG",
+    "modality": "image",
+    "acceptedInputs": [".eps"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-svg",
+    "name": "PNG to SVG",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-svg",
+    "name": "JPG to SVG",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "tiff-to-svg",
+    "name": "TIFF to SVG",
+    "modality": "image",
+    "acceptedInputs": [".tiff", ".tif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "psd-to-svg",
+    "name": "PSD to SVG",
+    "modality": "image",
+    "acceptedInputs": [".psd"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "eps-to-svg",
+    "name": "EPS to SVG",
+    "modality": "image",
+    "acceptedInputs": [".eps"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "svg-to-png",
+    "name": "SVG to PNG",
+    "modality": "image",
+    "acceptedInputs": [".svg", ".svgz"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "svg-to-jpg",
+    "name": "SVG to JPG",
+    "modality": "image",
+    "acceptedInputs": [".svg", ".svgz"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "jpg-to-pdf",
+    "name": "JPG to PDF",
+    "modality": "image",
+    "acceptedInputs": [".jpg", ".jpeg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "png-to-pdf",
+    "name": "PNG to PDF",
+    "modality": "image",
+    "acceptedInputs": [".png"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "heic-to-pdf",
+    "name": "HEIC to PDF",
+    "modality": "image",
+    "acceptedInputs": [".heic", ".heif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "tiff-to-pdf",
+    "name": "TIFF to PDF",
+    "modality": "image",
+    "acceptedInputs": [".tiff", ".tif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webp-to-pdf",
+    "name": "WebP to PDF",
+    "modality": "image",
+    "acceptedInputs": [".webp"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-pdf",
+    "name": "GIF to PDF",
+    "modality": "image",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "eps-to-pdf",
+    "name": "EPS to PDF",
+    "modality": "image",
+    "acceptedInputs": [".eps"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "pdf-to-jpg",
+    "name": "PDF to JPG",
+    "modality": "document",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "pdf-to-png",
+    "name": "PDF to PNG",
+    "modality": "document",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "pdf-to-tiff",
+    "name": "PDF to TIFF",
+    "modality": "document",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mov-to-mp4",
+    "name": "MOV to MP4",
+    "modality": "video",
+    "acceptedInputs": [".mov"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "webm-to-mp4",
+    "name": "WEBM to MP4",
+    "modality": "video",
+    "acceptedInputs": [".webm"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mkv-to-mp4",
+    "name": "MKV to MP4",
+    "modality": "video",
+    "acceptedInputs": [".mkv"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "avi-to-mp4",
+    "name": "AVI to MP4",
+    "modality": "video",
+    "acceptedInputs": [".avi"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-mov",
+    "name": "MP4 to MOV",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-webm",
+    "name": "MP4 to WEBM",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "webm-to-mov",
+    "name": "WEBM to MOV",
+    "modality": "video",
+    "acceptedInputs": [".webm"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mkv-to-mov",
+    "name": "MKV to MOV",
+    "modality": "video",
+    "acceptedInputs": [".mkv"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "avi-to-mov",
+    "name": "AVI to MOV",
+    "modality": "video",
+    "acceptedInputs": [".avi"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-avi",
+    "name": "MP4 to AVI",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mov-to-avi",
+    "name": "MOV to AVI",
+    "modality": "video",
+    "acceptedInputs": [".mov"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mkv-to-avi",
+    "name": "MKV to AVI",
+    "modality": "video",
+    "acceptedInputs": [".mkv"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "avi-to-mkv",
+    "name": "AVI to MKV",
+    "modality": "video",
+    "acceptedInputs": [".avi"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-gif",
+    "name": "MP4 to GIF",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mov-to-gif",
+    "name": "MOV to GIF",
+    "modality": "video",
+    "acceptedInputs": [".mov"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "mkv-to-gif",
+    "name": "MKV to GIF",
+    "modality": "video",
+    "acceptedInputs": [".mkv"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "avi-to-gif",
+    "name": "AVI to GIF",
+    "modality": "video",
+    "acceptedInputs": [".avi"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-mp4",
+    "name": "GIF to MP4",
+    "modality": "video",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-webm",
+    "name": "GIF to WEBM",
+    "modality": "video",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "gif-to-mov",
+    "name": "GIF to MOV",
+    "modality": "video",
+    "acceptedInputs": [".gif"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-mp3",
+    "name": "MP4 to MP3",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mov-to-mp3",
+    "name": "MOV to MP3",
+    "modality": "video",
+    "acceptedInputs": [".mov"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mkv-to-mp3",
+    "name": "MKV to MP3",
+    "modality": "video",
+    "acceptedInputs": [".mkv"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "webm-to-mp3",
+    "name": "WEBM to MP3",
+    "modality": "video",
+    "acceptedInputs": [".webm"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "avi-to-mp3",
+    "name": "AVI to MP3",
+    "modality": "video",
+    "acceptedInputs": [".avi"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-wav",
+    "name": "MP4 to WAV",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mov-to-wav",
+    "name": "MOV to WAV",
+    "modality": "video",
+    "acceptedInputs": [".mov"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp4-to-ogg",
+    "name": "MP4 to OGG",
+    "modality": "video",
+    "acceptedInputs": [".mp4"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "m4a-to-mp3",
+    "name": "M4A to MP3",
+    "modality": "audio",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "m4a-to-wav",
+    "name": "M4A to WAV",
+    "modality": "audio",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aac-to-mp3",
+    "name": "AAC to MP3",
+    "modality": "audio",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aac-to-wav",
+    "name": "AAC to WAV",
+    "modality": "audio",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aac-to-flac",
+    "name": "AAC to FLAC",
+    "modality": "audio",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ogg-to-mp3",
+    "name": "OGG to MP3",
+    "modality": "audio",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ogg-to-wav",
+    "name": "OGG to WAV",
+    "modality": "audio",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wav-to-mp3",
+    "name": "WAV to MP3",
+    "modality": "audio",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp3-to-wav",
+    "name": "MP3 to WAV",
+    "modality": "audio",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "flac-to-mp3",
+    "name": "FLAC to MP3",
+    "modality": "audio",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "excel-to-csv",
+    "name": "Excel to CSV",
+    "modality": "document",
+    "acceptedInputs": [".xlsx", ".xls"],
+    "executionHint": "long",
     "isAI": false
   }
 ]
