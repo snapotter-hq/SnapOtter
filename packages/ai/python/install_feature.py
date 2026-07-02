@@ -12,6 +12,7 @@ Progress is reported via JSON lines on stderr (parsed by the Node bridge).
 Final result is a JSON object on stdout.
 """
 
+import errno
 import glob
 import hashlib
 import json
@@ -66,9 +67,21 @@ def detect_arch() -> str:
 
 # -- Disk space --
 
+def _existing_ancestor(path: str) -> str:
+    """Nearest existing ancestor of path (so disk_usage never raises on a
+    not-yet-created dir like the venv)."""
+    p = os.path.abspath(path)
+    while p and not os.path.exists(p):
+        parent = os.path.dirname(p)
+        if parent == p:
+            break
+        p = parent
+    return p or "/"
+
+
 def check_disk_space(path: str, needed_bytes: int) -> None:
-    """Fail if insufficient disk space."""
-    usage = shutil.disk_usage(path)
+    """Fail if insufficient disk space on the filesystem holding path."""
+    usage = shutil.disk_usage(_existing_ancestor(path))
     if usage.free < needed_bytes:
         free_gb = usage.free / (1024 ** 3)
         need_gb = needed_bytes / (1024 ** 3)
@@ -77,6 +90,37 @@ def check_disk_space(path: str, needed_bytes: int) -> None:
             f"have {free_gb:.1f} GB free. "
             f"Free up space and retry."
         )
+
+
+def estimate_extracted(compressed: int, extracted: int) -> int:
+    """Extracted-size estimate for the disk preflight. When the manifest omits
+    extractedSize (0), the budget would otherwise collapse to just the
+    compressed size and under-reserve for the extracted payload; fall back to a
+    conservative 3x of compressed (measured extracted/compressed ratios reach
+    ~3x). This is only the early sanity bail -- the accurate guard is the
+    real-on-disk re-check just before the destructive venv write."""
+    return extracted if extracted > 0 else compressed * 3
+
+
+def dir_size(path: str) -> int:
+    """Total size in bytes of all files under path (best-effort)."""
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+def same_filesystem(a: str, b: str) -> bool:
+    """True if paths a and b live on the same filesystem (so a rename between
+    them is a cheap metadata op rather than a full copy)."""
+    try:
+        return os.stat(_existing_ancestor(a)).st_dev == os.stat(_existing_ancestor(b)).st_dev
+    except OSError:
+        return False
 
 
 # -- Venv site-packages discovery --
@@ -226,10 +270,39 @@ def safe_extract(tar_path: str, staging_dir: str) -> None:
 # -- File move --
 
 def move_tree(src: str, dst: str) -> None:
-    """Recursively merge src into dst, overwriting existing files."""
-    if os.path.isdir(src):
-        shutil.copytree(src, dst, dirs_exist_ok=True)
-        shutil.rmtree(src)
+    """Merge src into dst, overwriting existing files. Renames entries where
+    possible so that on the same filesystem no copy (and thus no transient
+    doubling of the payload on disk) occurs; falls back to a copy only across
+    filesystems. The old copytree+rmtree approach duplicated the whole tree on
+    disk during the move, which could exhaust the host on a tight-disk node."""
+    if not os.path.isdir(src):
+        return
+    os.makedirs(dst, exist_ok=True)
+    for name in os.listdir(src):
+        s = os.path.join(src, name)
+        d = os.path.join(dst, name)
+        if os.path.isdir(s) and os.path.isdir(d):
+            # Both dirs exist: merge recursively rather than replace.
+            move_tree(s, d)
+            continue
+        if os.path.exists(d):
+            if os.path.isdir(d):
+                shutil.rmtree(d)
+            else:
+                os.remove(d)
+        try:
+            os.rename(s, d)
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.EXDEV:
+                # Cross-filesystem: rename isn't allowed, fall back to a copy.
+                if os.path.isdir(s):
+                    shutil.copytree(s, d)
+                else:
+                    shutil.copy2(s, d)
+            else:
+                raise
+    # Remove whatever remains of src (emptied by renames, or copied originals).
+    shutil.rmtree(src, ignore_errors=True)
 
 
 # -- Fixups (NCCL wheel) --
@@ -350,8 +423,12 @@ def main() -> None:
         bundle_repo = manifest.get("bundleRepo", "deepsafe/feature-bundles")
         url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
 
-        # Disk space check
-        needed = compressed_size + extracted_size + 500 * 1024 * 1024  # 500 MB buffer
+        # Disk space check (early sanity bail before a multi-GB download).
+        # estimate_extracted covers the extractedSize:0 case so the budget can't
+        # collapse to just the compressed size; the accurate guard is the
+        # real-on-disk re-check just before the destructive venv write below.
+        needed = compressed_size + estimate_extracted(compressed_size, extracted_size)
+        needed += 500 * 1024 * 1024  # 500 MB buffer
         if needed > 0:
             check_disk_space(ai_dir, needed)
 
@@ -419,20 +496,41 @@ def main() -> None:
     version = bundle_meta.get("version", manifest.get("imageVersion", "unknown"))
     model_ids = bundle_meta.get("models", [])
 
+    # -- Disk re-check before the first destructive venv write --
+    # The upfront check ran before the download and used an estimate; now the
+    # payload is really on disk, so measure it and verify there's room to place
+    # it before we start writing into the venv. On the same filesystem the move
+    # is a rename (no extra space needed, just a safety floor); across
+    # filesystems it is a copy that transiently needs the payload's size again.
+    # Running here (after the local/remote branches merge) also covers the
+    # offline-import path, which skipped the upfront check entirely.
+    staging_real = dir_size(staging_dir)
+    if same_filesystem(staging_dir, venv_path):
+        recheck_needed = 1024 ** 3  # 1 GB floor for fixups / installed.json / slack
+    else:
+        recheck_needed = staging_real + 1024 ** 3
+    check_disk_space(ai_dir, recheck_needed)
+
     # -- Move site-packages --
     emit_progress(92, "Installing packages...")
     site_packages_dir = get_site_packages_dir(venv_path)
     staging_sp = os.path.join(staging_dir, "site-packages")
 
-    if os.path.isdir(staging_sp) and site_packages_dir:
-        move_tree(staging_sp, site_packages_dir)
+    try:
+        if os.path.isdir(staging_sp) and site_packages_dir:
+            move_tree(staging_sp, site_packages_dir)
 
-    # -- Move models --
-    emit_progress(95, "Installing models...")
-    staging_models = os.path.join(staging_dir, "models")
-    if os.path.isdir(staging_models):
-        os.makedirs(models_dir, exist_ok=True)
-        move_tree(staging_models, models_dir)
+        # -- Move models --
+        emit_progress(95, "Installing models...")
+        staging_models = os.path.join(staging_dir, "models")
+        if os.path.isdir(staging_models):
+            os.makedirs(models_dir, exist_ok=True)
+            move_tree(staging_models, models_dir)
+    except OSError as e:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        if getattr(e, "errno", None) == errno.ENOSPC:
+            fail("Ran out of disk space while installing the bundle. Free up space and retry.")
+        fail(f"Failed to install bundle files: {e}")
 
     # -- Apply fixups --
     emit_progress(97, "Finalizing...")
