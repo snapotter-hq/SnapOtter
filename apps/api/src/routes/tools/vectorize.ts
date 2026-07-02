@@ -1,17 +1,15 @@
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { vectorize as vtrace } from "@neplex/vectorizer";
 import type { FastifyInstance } from "fastify";
 import potrace from "potrace";
 import sharp from "sharp";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -112,7 +110,7 @@ export function registerVectorize(app: FastifyInstance) {
             chunks.push(chunk);
           }
           fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "output").replace(/\.[^.]+$/, "");
+          filename = sanitizeFilename(part.filename ?? "output");
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         }
@@ -143,46 +141,11 @@ export function registerVectorize(app: FastifyInstance) {
     }
 
     try {
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-      if (needsCliDecode(validation.format)) {
-        try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch {
-          try {
-            await sharp(fileBuffer).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (validation.format === "svg") {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
-        }
-      }
-      fileBuffer = await autoOrient(fileBuffer);
+      const prepared = await inputHandlerFor("image").prepare(fileBuffer, filename, {
+        scratchDir: tmpdir(),
+      });
+      fileBuffer = prepared.buffer;
+      filename = prepared.filename;
 
       const result = await vectorizeBuffer(fileBuffer, settings, filename);
 
@@ -196,6 +159,9 @@ export function registerVectorize(app: FastifyInstance) {
         processedSize: result.buffer.length,
       });
     } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+      }
       return reply.status(422).send({
         error: "Vectorization failed",
         details: err instanceof Error ? err.message : "Unknown error",

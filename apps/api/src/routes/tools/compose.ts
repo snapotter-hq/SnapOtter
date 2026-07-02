@@ -1,35 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Blend } from "sharp";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
-
-async function decodeBuffer(inputBuffer: Buffer, filename: string): Promise<Buffer> {
-  const validation = await validateImageBuffer(inputBuffer, filename);
-  if (!validation.valid) {
-    throw new Error(`Invalid image: ${validation.reason}`);
-  }
-
-  let decoded = inputBuffer;
-  if (validation.format === "heif") {
-    decoded = await decodeHeic(decoded);
-  } else if (needsCliDecode(validation.format)) {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    decoded = await decodeToSharpCompat(decoded, validation.format, ext);
-  } else if (validation.format === "svg") {
-    decoded = decompressSvgz(decoded);
-    decoded = sanitizeSvg(decoded);
-  }
-
-  return autoOrient(decoded);
-}
+import { resolveOutputFormat } from "../../lib/output-format.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
 
 const settingsSchema = z.object({
   x: z.number().min(0).default(0),
@@ -108,8 +87,27 @@ export function registerCompose(app: FastifyInstance) {
     }
 
     try {
-      baseBuffer = await decodeBuffer(baseBuffer, filename);
-      overlayBuffer = await decodeBuffer(overlayBuffer, overlayFilename);
+      const imageHandler = inputHandlerFor("image");
+      const base = await imageHandler.prepare(baseBuffer, filename, {
+        scratchDir: tmpdir(),
+      });
+      const overlay = await imageHandler.prepare(overlayBuffer, overlayFilename, {
+        scratchDir: tmpdir(),
+      });
+      baseBuffer = base.buffer;
+      overlayBuffer = overlay.buffer;
+      filename = base.filename;
+
+      const left = Math.floor(settings.x);
+      const top = Math.floor(settings.y);
+      const baseMeta = await sharp(baseBuffer).metadata();
+      const baseWidth = baseMeta.width ?? 0;
+      const baseHeight = baseMeta.height ?? 0;
+      const availableWidth = baseWidth - left;
+      const availableHeight = baseHeight - top;
+      if (availableWidth <= 0 || availableHeight <= 0) {
+        throw new InputValidationError("Overlay position is outside the base image");
+      }
 
       // Apply opacity to overlay if needed
       let processedOverlay = overlayBuffer;
@@ -136,27 +134,47 @@ export function registerCompose(app: FastifyInstance) {
           .toBuffer();
       }
 
+      const overlayMeta = await sharp(processedOverlay).metadata();
+      const overlayWidth = overlayMeta.width ?? 0;
+      const overlayHeight = overlayMeta.height ?? 0;
+      if (overlayWidth > availableWidth || overlayHeight > availableHeight) {
+        processedOverlay = await sharp(processedOverlay)
+          .extract({
+            left: 0,
+            top: 0,
+            width: Math.min(overlayWidth, availableWidth),
+            height: Math.min(overlayHeight, availableHeight),
+          })
+          .toBuffer();
+      }
+
+      const outputFormat = await resolveOutputFormat(baseBuffer, filename);
       const result = await sharp(baseBuffer)
         .composite([
           {
             input: processedOverlay,
-            top: settings.y,
-            left: settings.x,
+            top,
+            left,
             blend: settings.blendMode as Blend,
           },
         ])
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
         .toBuffer();
 
       const jobId = randomUUID();
-      await putObject(`outputs/${jobId}/${filename}`, result);
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_composed.${outputFormat.extension}`;
+      await putObject(`outputs/${jobId}/${outputFilename}`, result);
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
         originalSize: baseBuffer.length,
         processedSize: result.length,
       });
     } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+      }
       return reply.status(422).send({
         error: "Processing failed",
         details: err instanceof Error ? err.message : "Image processing failed",

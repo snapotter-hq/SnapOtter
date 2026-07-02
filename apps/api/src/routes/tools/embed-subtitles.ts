@@ -2,7 +2,13 @@ import { basename, extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
+import {
+  audioEncodeArgsForContainer,
+  runFfmpegWithProgress,
+  stageMediaInputs,
+  videoContentType,
+  videoEncodeArgsForContainer,
+} from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -34,6 +40,7 @@ export function registerEmbedSubtitles(app: FastifyInstance) {
       const toMp4 = [".mp4", ".mov", ".m4v"].includes(srcExt);
       const outExt = toMp4 ? ".mp4" : ".mkv";
       const scodec = toMp4 ? "mov_text" : "srt";
+      const reencodeInputStreams = outExt === ".mkv" && [".mpg", ".mpeg"].includes(srcExt);
 
       const outName = `${base}_subs${outExt}`;
       const contentType = videoContentType(outExt);
@@ -47,16 +54,21 @@ export function registerEmbedSubtitles(app: FastifyInstance) {
       await runFfmpegWithProgress(
         ctx,
         [
+          "-fflags",
+          "+genpts",
           "-i",
           videoPath,
           "-i",
           subPath,
           "-map",
-          "0",
+          "0:v:0",
+          "-map",
+          "0:a?",
           "-map",
           "1:0",
-          "-c",
-          "copy",
+          ...(reencodeInputStreams
+            ? [...videoEncodeArgsForContainer(outExt), ...audioEncodeArgsForContainer(outExt)]
+            : ["-c:v", "copy", "-c:a", "copy"]),
           "-c:s",
           scodec,
           "-metadata:s:s:0",

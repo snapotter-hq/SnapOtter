@@ -5,9 +5,20 @@ import type { ToolProcessCtxV2 } from "../routes/tool-factory.js";
 
 const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
   ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
   ".mov": "video/quicktime",
   ".webm": "video/webm",
   ".mkv": "video/x-matroska",
+  ".avi": "video/x-msvideo",
+  ".3gp": "video/3gpp",
+  ".flv": "video/x-flv",
+  ".wmv": "video/x-ms-wmv",
+  ".mpg": "video/mpeg",
+  ".mpeg": "video/mpeg",
+  ".ts": "video/mp2t",
+  ".mts": "video/mp2t",
+  ".m2ts": "video/mp2t",
+  ".ogv": "video/ogg",
 };
 
 /** Content type for a preserved-container video output; mp4 fallback. */
@@ -25,6 +36,9 @@ export function videoContentType(ext: string): string {
  */
 export function videoEncodeArgsForContainer(ext: string): string[] {
   const lower = ext.toLowerCase();
+  if (lower === ".mpg" || lower === ".mpeg") {
+    return ["-c:v", "mpeg2video", "-q:v", "4", "-pix_fmt", "yuv420p"];
+  }
   if (lower === ".webm") {
     return ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"];
   }
@@ -44,6 +58,7 @@ export function videoEncodeArgsForContainer(ext: string): string[] {
  */
 export function audioEncodeArgsForContainer(ext: string): string[] {
   const lower = ext.toLowerCase();
+  if (lower === ".mpg" || lower === ".mpeg") return ["-c:a", "mp2", "-b:a", "192k"];
   if (lower === ".webm") return ["-c:a", resolveEncoder("opus")];
   if (lower === ".ogv" || lower === ".ogg") return ["-c:a", "libvorbis"];
   return ["-c:a", resolveEncoder("aac")];

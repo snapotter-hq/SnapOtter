@@ -41,9 +41,8 @@ export function registerReplaceAudio(app: FastifyInstance) {
         throw new InputValidationError("Second file must be an audio file");
       }
 
-      // vp8/vp9 in webm cannot be muxed into mp4; keep the source container
       const vcodec = videoProbe.streams.find((s) => s.type === "video")?.codec ?? "";
-      const ext = ["vp8", "vp9"].includes(vcodec) ? ".webm" : ".mp4";
+      const ext = outputExtForCopiedVideo(vcodec);
       const videoBase = basename(ctx.inputs[0].filename, extname(ctx.inputs[0].filename));
       const outName = `${videoBase}_newaudio${ext}`;
       const outPath = join(ctx.scratchDir, "media", outName);
@@ -74,4 +73,20 @@ export function registerReplaceAudio(app: FastifyInstance) {
       };
     },
   });
+}
+
+function outputExtForCopiedVideo(codec: string): ".mp4" | ".webm" | ".mkv" | ".mpg" {
+  if (["mpeg1video", "mpeg2video"].includes(codec)) {
+    return ".mpg";
+  }
+
+  if (["vp8", "vp9"].includes(codec)) {
+    return ".webm";
+  }
+
+  if (["h264", "hevc", "mpeg4", "av1"].includes(codec)) {
+    return ".mp4";
+  }
+
+  return ".mkv";
 }

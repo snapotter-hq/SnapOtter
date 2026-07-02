@@ -9,6 +9,7 @@ import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -224,16 +225,19 @@ export function registerWatermarkImage(app: FastifyInstance) {
           break;
       }
 
+      const outputFormat = await resolveOutputFormat(mainBuffer, filename);
       const result = await sharp(mainBuffer)
         .composite([{ input: wmBuffer, top, left }])
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
         .toBuffer();
 
       const jobId = randomUUID();
-      await putObject(`outputs/${jobId}/${filename}`, result);
+      const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_watermarked.${outputFormat.extension}`;
+      await putObject(`outputs/${jobId}/${outputFilename}`, result);
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
         originalSize: mainBuffer.length,
         processedSize: result.length,
       });

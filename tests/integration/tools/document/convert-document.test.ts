@@ -86,14 +86,20 @@ describe.skipIf(!sofficeAvailable())("convert-document (requires soffice)", () =
     expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
   }, 90_000);
 
-  it("rejects same-format conversion (docx to docx)", async () => {
+  it("passes through same-format conversion (docx to docx)", async () => {
     const res = await runTool("tiny.docx", DOCX, { format: "docx" });
     expect(res.statusCode).toBe(202);
     const { jobId } = JSON.parse(res.body);
     const row = await pollJob(jobId);
-    expect(row?.status).toBe("failed");
-    const error = row?.error as { message: string } | null;
-    expect(error?.message).toMatch(/already in that format/i);
+    expect(row?.status).toBe("completed");
+    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+    });
+    expect(dl.statusCode).toBe(200);
+    // Same-format is a passthrough: the original validated DOCX (PK magic) comes back.
+    expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
   }, 90_000);
 });
 

@@ -21,7 +21,7 @@ import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
-import { InputValidationError } from "../modality/contract.js";
+import { type InputHandler, InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { MediaInputHandler, type MediaInputKind } from "../modality/media-input.js";
 import { requireToolAccess } from "../permissions.js";
@@ -384,16 +384,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
 
-        // Build per-position input handlers: when inputKinds is present,
-        // each position gets a MediaInputHandler for its kind; otherwise
-        // the tool's modality drives a single shared handler as before.
-        const kindHandlers: Map<MediaInputKind, MediaInputHandler> = new Map();
-        function handlerForPosition(idx: number) {
+        // Build per-position input handlers. Mixed-input image slots still need
+        // the image pipeline so RAW/HEIC/SVG inputs are normalized before jobs.
+        const kindHandlers: Map<MediaInputKind, InputHandler> = new Map();
+        function handlerForPosition(idx: number): InputHandler {
           if (config.inputKinds) {
             const kind = config.inputKinds[Math.min(idx, config.inputKinds.length - 1)];
             let h = kindHandlers.get(kind);
             if (!h) {
-              h = new MediaInputHandler(kind);
+              h = kind === "image" ? inputHandlerFor("image") : new MediaInputHandler(kind);
               kindHandlers.set(kind, h);
             }
             return h;

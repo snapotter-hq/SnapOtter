@@ -1,10 +1,12 @@
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
+import { runFfmpegWithProgress } from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
-import { createToolRoute } from "../tool-factory.js";
+import { createToolRoute, type ToolProcessCtxV2 } from "../tool-factory.js";
 
 const DIMS: Record<string, { w: number; h: number }> = {
   "1080p": { w: 1920, h: 1080 },
@@ -35,7 +37,7 @@ export function registerImagesToVideo(app: FastifyInstance) {
       const settings = settingsSchema.parse(ctx.settings);
       const { w: W, h: H } = DIMS[settings.resolution];
 
-      const paths = await stageMediaInputs(ctx);
+      const paths = await stageImageFrames(ctx);
 
       const parts: string[] = [];
       const refs: string[] = [];
@@ -76,4 +78,17 @@ export function registerImagesToVideo(app: FastifyInstance) {
       };
     },
   });
+}
+
+async function stageImageFrames(ctx: ToolProcessCtxV2): Promise<string[]> {
+  const dir = join(ctx.scratchDir, "media", "frames");
+  await mkdir(dir, { recursive: true });
+
+  return Promise.all(
+    ctx.inputs.map(async (input, index) => {
+      const framePath = join(dir, `frame-${String(index).padStart(4, "0")}.png`);
+      await sharp(input.buffer, { animated: false }).png().toFile(framePath);
+      return framePath;
+    }),
+  );
 }

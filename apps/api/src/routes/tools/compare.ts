@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { autoOrient } from "../../lib/auto-orient.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
 
 /**
  * Compare two images: compute a pixel-level diff and similarity score.
@@ -15,6 +14,8 @@ export function registerCompare(app: FastifyInstance) {
   app.post("/api/v1/tools/image/compare", async (request, reply) => {
     let bufferA: Buffer | null = null;
     let bufferB: Buffer | null = null;
+    let filenameA = "first.png";
+    let filenameB = "second.png";
 
     try {
       const parts = request.parts();
@@ -27,8 +28,10 @@ export function registerCompare(app: FastifyInstance) {
           const buf = Buffer.concat(chunks);
           if (!bufferA) {
             bufferA = buf;
+            filenameA = sanitizeFilename(part.filename ?? filenameA);
           } else {
             bufferB = buf;
+            filenameB = sanitizeFilename(part.filename ?? filenameB);
           }
         }
       }
@@ -44,85 +47,17 @@ export function registerCompare(app: FastifyInstance) {
     }
 
     try {
-      const valA = await validateImageBuffer(bufferA, "image");
-      if (!valA.valid) {
-        return reply.status(400).send({ error: `Invalid first image: ${valA.reason}` });
-      }
-      if (valA.format === "heif") {
-        try {
-          bufferA = await decodeHeic(bufferA);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode first image (HEIC). Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-      if (needsCliDecode(valA.format)) {
-        try {
-          bufferA = await decodeToSharpCompat(bufferA, valA.format);
-        } catch {
-          try {
-            await sharp(bufferA).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode first image (${valA.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (valA.format === "svg") {
-        try {
-          bufferA = decompressSvgz(bufferA);
-          bufferA = sanitizeSvg(bufferA);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG (first image)",
-          });
-        }
-      }
-      bufferA = await autoOrient(bufferA);
-
-      const valB = await validateImageBuffer(bufferB, "image");
-      if (!valB.valid) {
-        return reply.status(400).send({ error: `Invalid second image: ${valB.reason}` });
-      }
-      if (valB.format === "heif") {
-        try {
-          bufferB = await decodeHeic(bufferB);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode second image (HEIC). Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-      if (needsCliDecode(valB.format)) {
-        try {
-          bufferB = await decodeToSharpCompat(bufferB, valB.format);
-        } catch {
-          try {
-            await sharp(bufferB).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode second image (${valB.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (valB.format === "svg") {
-        try {
-          bufferB = decompressSvgz(bufferB);
-          bufferB = sanitizeSvg(bufferB);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG (second image)",
-          });
-        }
-      }
-      bufferB = await autoOrient(bufferB);
+      const imageHandler = inputHandlerFor("image");
+      bufferA = (
+        await imageHandler.prepare(bufferA, filenameA, {
+          scratchDir: tmpdir(),
+        })
+      ).buffer;
+      bufferB = (
+        await imageHandler.prepare(bufferB, filenameB, {
+          scratchDir: tmpdir(),
+        })
+      ).buffer;
 
       // Normalize both to same size for comparison
       const metaA = await sharp(bufferA).metadata();
@@ -189,6 +124,9 @@ export function registerCompare(app: FastifyInstance) {
         processedSize: diffBuffer.length,
       });
     } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+      }
       return reply.status(422).send({
         error: "Comparison failed",
         details: err instanceof Error ? err.message : "Unknown error",

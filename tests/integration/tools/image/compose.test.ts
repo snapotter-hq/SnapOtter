@@ -601,7 +601,7 @@ describe("Compose", () => {
 
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
-    expect(result.downloadUrl).toContain("my-photo.png");
+    expect(result.downloadUrl).toContain("my-photo_composed.png");
   });
 
   it("rejects negative x position", async () => {
@@ -648,8 +648,8 @@ describe("Compose", () => {
 
   // ── Branch coverage: multipart parse error (lines 60-64) ────────────
 
-  it("returns 400 for corrupt base image that fails processing", async () => {
-    // Send a corrupt buffer that passes initial multipart parse but fails Sharp processing
+  it("returns 400 for corrupt base image rejected by input validation", async () => {
+    // Send a corrupt buffer that passes multipart parsing but fails image validation.
     const corruptBuffer = Buffer.from("not a real image content at all!!!");
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.png", contentType: "image/png", content: corruptBuffer },
@@ -667,16 +667,16 @@ describe("Compose", () => {
       body,
     });
 
-    // Should get 422 because the corrupt buffer fails Sharp processing
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/processing failed/i);
+    expect(result.error).toMatch(/invalid image/i);
   });
 
-  // ── Branch coverage: overlay larger than base causes 422 (line 140-144) ──
+  // ── Branch coverage: overlay larger than base is cropped to fit ─────
 
-  it("returns 422 when overlay is larger than base image", async () => {
-    // Overlay (200x150) is larger than base (100x100) — Sharp composite fails
+  it("crops overlay when it is larger than the base image", async () => {
+    // Overlay (200x150) is larger than base (100x100), so compose crops
+    // the overlay to the visible base area.
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.jpg", contentType: "image/jpeg", content: JPG },
       { name: "overlay", filename: "overlay.png", contentType: "image/png", content: PNG },
@@ -693,14 +693,21 @@ describe("Compose", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/processing failed/i);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(100);
+    expect(meta.height).toBe(100);
   });
 
   // ── Branch coverage: 1x1 tiny image handling ────────────────────────
 
-  it("returns 422 when 1x1 base is smaller than overlay", async () => {
+  it("crops overlay when 1x1 base is smaller than overlay", async () => {
     const TINY = readFixture(fixtures.image.edge.px1);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.png", contentType: "image/png", content: TINY },
@@ -718,10 +725,17 @@ describe("Compose", () => {
       body,
     });
 
-    // Overlay (100x100) extends beyond 1x1 base — Sharp fails
-    expect(res.statusCode).toBe(422);
+    // Overlay (100x100) extends beyond 1x1 base and should be cropped.
+    expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/processing failed/i);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(1);
+    expect(meta.height).toBe(1);
   });
 
   it("handles 1x1 pixel overlay image", async () => {
@@ -985,7 +999,7 @@ describe("Compose", () => {
 
   // ── Branch coverage: corrupt overlay ───────────────────────────────
 
-  it("returns 422 for corrupt overlay image", async () => {
+  it("returns 400 for corrupt overlay image rejected by input validation", async () => {
     const corruptBuffer = Buffer.from("not a valid image at all");
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
@@ -1008,9 +1022,9 @@ describe("Compose", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/processing failed/i);
+    expect(result.error).toMatch(/invalid image/i);
   });
 
   // ── HEIF format input ─────────────────────────────────────────────
@@ -1177,7 +1191,7 @@ describe("Compose", () => {
 
   // ── X exceeding max rejects ───────────────────────────────────────
 
-  it("rejects x position exceeding 65535", async () => {
+  it("rejects x position outside the base image", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "base.png", contentType: "image/png", content: PNG },
       { name: "overlay", filename: "overlay.jpg", contentType: "image/jpeg", content: JPG },
@@ -1194,8 +1208,9 @@ describe("Compose", () => {
       body,
     });
 
-    // Sharp composite will fail if overlay extends beyond canvas
-    expect([200, 422]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/outside the base image/i);
   });
 
   // ── AVIF format input ─────────────────────────────────────────────
