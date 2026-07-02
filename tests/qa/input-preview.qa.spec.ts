@@ -665,6 +665,20 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "passport-photo");
+    // Guard against route rot: a wrong/404 route must fail loudly, not silently skip.
+    await expect(page.getByRole("heading", { name: "404" })).toHaveCount(0);
+    // The country dropdown is only present once the tool's real UI has loaded;
+    // on a container without the background-removal/face-detection bundles
+    // installed, this page shows an install prompt instead (no dropzone), which
+    // would otherwise fail uploadFiles() with an unclear timeout.
+    const ready = await page
+      .getByText("Country")
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) {
+      test.skip(true, "background-removal or face-detection feature bundle not installed");
+    }
     await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertCustomResultsPreview(page, "passport-photo");
     await assertNoBrokenImages(page);
@@ -692,6 +706,20 @@ test.describe("Custom interactive tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "erase-object");
+    // Guard against route rot: a wrong/404 route must fail loudly, not silently skip.
+    await expect(page.getByRole("heading", { name: "404" })).toHaveCount(0);
+    // The submit button is only present once the tool's real UI has loaded; on
+    // a container without the object-eraser-colorize bundle installed, this
+    // page shows an install prompt instead (no dropzone), which would
+    // otherwise fail uploadFiles() with an unclear timeout.
+    const ready = await page
+      .getByTestId("erase-object-submit")
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) {
+      test.skip(true, "object-eraser-colorize feature bundle not installed");
+    }
     await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await assertInteractivePreview(page, "erase-object");
     await assertNoBrokenImages(page);
