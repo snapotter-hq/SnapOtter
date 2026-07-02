@@ -1,3 +1,9 @@
+import {
+  FEEDBACK_FRICTION_AREA_VALUES,
+  FEEDBACK_IMPORTANT_AREA_VALUES,
+  FEEDBACK_INSTALL_METHOD_VALUES,
+  FEEDBACK_TYPE_VALUES,
+} from "@snapotter/shared";
 import { CheckCircle2, MessageSquare, Send, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -33,41 +39,11 @@ interface FeedbackDialogProps {
   onSubmitted?: () => void;
 }
 
-const FEEDBACK_TYPES: FeedbackType[] = [
-  "bug",
-  "feature_request",
-  "confusing_ux",
-  "performance",
-  "other",
-];
-
+// The dialog's option lists derive from the shared enum arrays so a value added
+// in @snapotter/shared propagates here automatically. SENTIMENTS is the
+// deliberate exception: it offers only the 4 conversational ratings, a curated
+// subset of the 7-value FEEDBACK_SENTIMENT_VALUES, so it stays a local list.
 const SENTIMENTS: FeedbackSentiment[] = ["great", "okay", "issue", "missing"];
-const INSTALL_METHODS: FeedbackInstallMethod[] = [
-  "docker",
-  "docker_compose",
-  "source",
-  "cloud",
-  "other",
-];
-const FRICTION_AREAS: FeedbackFrictionArea[] = [
-  "smooth",
-  "docker",
-  "environment_variables",
-  "auth",
-  "storage",
-  "workers",
-  "ai_tools",
-  "docs",
-  "performance",
-  "other",
-];
-const IMPORTANT_AREAS: FeedbackImportantArea[] = [
-  "images",
-  "pdf_docs",
-  "video_audio",
-  "batch_workflows",
-  "ai_tools",
-];
 
 export function FeedbackDialog({
   open,
@@ -284,7 +260,7 @@ export function FeedbackDialog({
                     onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
                   >
-                    {FEEDBACK_TYPES.map((type) => (
+                    {FEEDBACK_TYPE_VALUES.map((type) => (
                       <option key={type} value={type}>
                         {t.feedback.types[type]}
                       </option>
@@ -403,7 +379,7 @@ function AdminInstallFields({
           onChange={(event) => setInstallMethod(event.target.value as FeedbackInstallMethod)}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
         >
-          {INSTALL_METHODS.map((method) => (
+          {FEEDBACK_INSTALL_METHOD_VALUES.map((method) => (
             <option key={method} value={method}>
               {t.feedback.installMethods[method]}
             </option>
@@ -421,7 +397,7 @@ function AdminInstallFields({
           onChange={(event) => setFrictionArea(event.target.value as FeedbackFrictionArea)}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
         >
-          {FRICTION_AREAS.map((area) => (
+          {FEEDBACK_FRICTION_AREA_VALUES.map((area) => (
             <option key={area} value={area}>
               {t.feedback.frictionAreas[area]}
             </option>
@@ -434,7 +410,7 @@ function AdminInstallFields({
           {t.feedback.importantAreasLabel}
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
-          {IMPORTANT_AREAS.map((area) => (
+          {FEEDBACK_IMPORTANT_AREA_VALUES.map((area) => (
             <label key={area} className="flex items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
