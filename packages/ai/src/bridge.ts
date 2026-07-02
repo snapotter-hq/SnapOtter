@@ -137,6 +137,11 @@ export class PythonDispatcher {
   private crashes = 0;
   private lastCrashTs = 0;
   private backoffEnd = 0;
+  // Set by shutdown() before it SIGTERMs the child, so the close handler can
+  // tell an intentional stop (app shutdown, or a reload after a bundle install
+  // rewrote the venv) apart from a real crash. SIGTERM makes the exit code
+  // null, which would otherwise be miscounted as a crash + trigger backoff.
+  private stopping = false;
 
   constructor(opts: { profile: "ai" | "docs" }) {
     this.profile = opts.profile;
@@ -300,7 +305,12 @@ export class PythonDispatcher {
           req.reject(new Error("Python dispatcher exited unexpectedly"));
           this.pending.delete(id);
         }
-        if (code !== 0) {
+        if (this.stopping) {
+          // Expected stop: shutdown() SIGTERMed the child (app exit, or a
+          // reload after a bundle install rewrote the venv). Not a crash.
+          this.stopping = false;
+          console.log("[bridge] Python dispatcher stopped for reload");
+        } else if (code !== 0) {
           this.recordCrash();
         }
         this.child = null;
@@ -531,6 +541,7 @@ export class PythonDispatcher {
    */
   shutdown(): void {
     if (this.child && !this.child.killed) {
+      this.stopping = true;
       this.child.stdin?.end();
       this.child.kill("SIGTERM");
       this.child = null;
