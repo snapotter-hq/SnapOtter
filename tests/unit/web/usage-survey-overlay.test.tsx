@@ -106,6 +106,49 @@ describe("UsageSurveyOverlay", () => {
     });
   });
 
+  it("does not resubmit feedback if only the settings write failed on the first attempt", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+    apiPut.mockRejectedValueOnce(new Error("network error")).mockResolvedValueOnce({});
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("button", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
+    expect(submitFeedback).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(2));
+    expect(submitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("resubmits feedback if the answer changes after a failed settings write", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+    apiPut.mockRejectedValueOnce(new Error("network error")).mockResolvedValueOnce({});
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("button", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /Small team/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(2));
+    expect(submitFeedback).toHaveBeenCalledTimes(2);
+    expect(submitFeedback).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ usageType: "team_internal" }),
+    );
+  });
+
   it("dismissing writes the dismiss key without submitting feedback", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });

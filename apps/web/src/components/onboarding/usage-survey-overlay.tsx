@@ -55,6 +55,7 @@ export function UsageSurveyOverlay() {
   const [usageType, setUsageType] = useState<FeedbackUsageType | null>(null);
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submittedAnswerKeyRef = useRef<string | null>(null);
 
   const eligibleAuthState = role === "admin" && !mustChangePassword;
   const eligibleRoute = !AUTH_GUARD_BYPASS_PATHS.has(location.pathname);
@@ -94,18 +95,26 @@ export function UsageSurveyOverlay() {
   async function handleContinue() {
     if (!usageType || submitting) return;
     setSubmitting(true);
+    const answerKey = JSON.stringify({ usageType, importantAreas: [...importantAreas].sort() });
     try {
-      await submitFeedback({
-        source: "onboarding",
-        surveyId: "onboarding-usage-v1",
-        promptVariant: "onboarding-overlay-v1",
-        usageType,
-        importantAreas,
-      });
+      if (submittedAnswerKeyRef.current !== answerKey) {
+        await submitFeedback({
+          source: "onboarding",
+          surveyId: "onboarding-usage-v1",
+          promptVariant: "onboarding-overlay-v1",
+          usageType,
+          importantAreas,
+        });
+        submittedAnswerKeyRef.current = answerKey;
+      }
       await recordSettingsKey("onboarding.usageSurvey.answeredAt");
     } catch {
       // Submission failed (network/auth). Leave the overlay visible so the
-      // admin can retry instead of silently losing their answer.
+      // admin can retry instead of silently losing their answer. If this
+      // exact answer already submitted successfully (submittedAnswerKeyRef
+      // matches), a retry only retries the settings write, so the same
+      // answer never gets submitted twice -- but a genuinely different
+      // answer always submits fresh.
     } finally {
       setSubmitting(false);
     }
