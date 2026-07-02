@@ -13,7 +13,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
-import { useAuth } from "@/hooks/use-auth";
 import { useMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
@@ -62,7 +61,6 @@ export function TopNav({
 }: TopNavProps) {
   const location = useLocation();
   const isMobile = useMobile();
-  const { authEnabled } = useAuth();
   const { t } = useTranslation();
   const navLinks = useNavLinks();
 
@@ -282,9 +280,7 @@ export function TopNav({
           <HelpCircle className="h-4 w-4" />
         </button>
 
-        {!isMobile && authEnabled && (
-          <AvatarDropdown onSettingsClick={onSettingsClick} variant={variant} />
-        )}
+        {!isMobile && <AvatarDropdown onSettingsClick={onSettingsClick} variant={variant} />}
       </div>
     </header>
   );

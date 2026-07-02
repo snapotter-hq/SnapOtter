@@ -45,7 +45,19 @@ def fail(message: str) -> None:
 # -- Architecture detection --
 
 def detect_arch() -> str:
-    """Return 'amd64-gpu' or 'arm64-cpu' based on host + GPU."""
+    """Return the bundle archive key for this host.
+
+    Only two archive variants are currently published to the bundle repo:
+    'amd64-gpu' and 'arm64-cpu' (see deepsafe/feature-bundles). There is no
+    CPU-only amd64 variant yet, so amd64 hosts always resolve to 'amd64-gpu'
+    even when no GPU is present -- this downloads working CUDA-capable
+    packages, just larger than a CPU-only host strictly needs. Do not change
+    this to branch on GPU presence without first publishing an 'amd64-cpu'
+    archive for every bundle; requesting a key that doesn't exist in the
+    manifest fails the install outright (see the archives.get(arch) lookup
+    below), which would be worse than the current oversized-but-working
+    download.
+    """
     machine = platform.machine().lower()
     if machine in ("aarch64", "arm64"):
         return "arm64-cpu"
