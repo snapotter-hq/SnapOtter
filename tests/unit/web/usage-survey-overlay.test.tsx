@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const submitFeedback = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, accepted: true }));
@@ -37,33 +38,41 @@ afterEach(() => {
   useAuth.mockReset();
 });
 
+function renderOverlay(initialPath = "/") {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <UsageSurveyOverlay />
+    </MemoryRouter>,
+  );
+}
+
 describe("UsageSurveyOverlay", () => {
   it("renders nothing for a non-admin", () => {
-    useAuth.mockReturnValue({ role: "user" });
+    useAuth.mockReturnValue({ role: "user", mustChangePassword: false });
 
-    render(<UsageSurveyOverlay />);
+    renderOverlay();
 
     expect(apiGet).not.toHaveBeenCalled();
     expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
   });
 
   it("renders nothing once already answered or dismissed", async () => {
-    useAuth.mockReturnValue({ role: "admin" });
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({
       settings: { "onboarding.usageSurvey.dismissedAt": "2026-01-01T00:00:00Z" },
     });
 
-    render(<UsageSurveyOverlay />);
+    renderOverlay();
 
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
     expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
   });
 
   it("shows both questions for an admin instance that hasn't answered", async () => {
-    useAuth.mockReturnValue({ role: "admin" });
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });
 
-    render(<UsageSurveyOverlay />);
+    renderOverlay();
 
     expect(await screen.findByText("How are you using SnapOtter?")).toBeDefined();
     expect(screen.getByText("What matters most to you?")).toBeDefined();
@@ -72,10 +81,10 @@ describe("UsageSurveyOverlay", () => {
   });
 
   it("submits the selected answers and records the settings key", async () => {
-    useAuth.mockReturnValue({ role: "admin" });
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });
 
-    render(<UsageSurveyOverlay />);
+    renderOverlay();
     await screen.findByText("How are you using SnapOtter?");
 
     fireEvent.click(screen.getByRole("button", { name: /Small team/ }));
@@ -98,10 +107,10 @@ describe("UsageSurveyOverlay", () => {
   });
 
   it("dismissing writes the dismiss key without submitting feedback", async () => {
-    useAuth.mockReturnValue({ role: "admin" });
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });
 
-    render(<UsageSurveyOverlay />);
+    renderOverlay();
     await screen.findByText("How are you using SnapOtter?");
 
     fireEvent.click(screen.getByRole("button", { name: "Don't ask again" }));
@@ -112,5 +121,38 @@ describe("UsageSurveyOverlay", () => {
       });
     });
     expect(submitFeedback).not.toHaveBeenCalled();
+  });
+
+  it("renders nothing when the admin must still change their password", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: true });
+    apiGet.mockResolvedValue({ settings: {} });
+
+    renderOverlay();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
+  });
+
+  it("renders nothing on the change-password route even if mustChangePassword is stale-false", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+
+    renderOverlay("/change-password");
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
+  });
+
+  it("renders nothing on the privacy policy route", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+
+    renderOverlay("/privacy");
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
   });
 });

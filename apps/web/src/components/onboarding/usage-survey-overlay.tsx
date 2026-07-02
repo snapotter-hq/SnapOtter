@@ -11,6 +11,7 @@ import {
   Video,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
@@ -23,6 +24,8 @@ import {
 } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
+
+const AUTH_GUARD_BYPASS_PATHS = new Set(["/login", "/change-password", "/privacy"]);
 
 const USAGE_TYPES: { value: FeedbackUsageType; Icon: typeof User; wide?: boolean }[] = [
   { value: "personal", Icon: User },
@@ -42,7 +45,8 @@ const IMPORTANT_AREAS: { value: FeedbackImportantArea; Icon: typeof Image; wide?
 
 export function UsageSurveyOverlay() {
   const { t } = useTranslation();
-  const { role } = useAuth();
+  const { role, mustChangePassword } = useAuth();
+  const location = useLocation();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,14 +56,19 @@ export function UsageSurveyOverlay() {
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
+  const eligibleAuthState = role === "admin" && !mustChangePassword;
+  const eligibleRoute = !AUTH_GUARD_BYPASS_PATHS.has(location.pathname);
+
   useEffect(() => {
-    if (role !== "admin") return;
+    if (!eligibleAuthState || !eligibleRoute) return;
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => setSettings(data.settings))
       .catch(() => setSettings({}));
-  }, [role]);
+  }, [eligibleAuthState, eligibleRoute]);
 
   const visible =
+    eligibleAuthState &&
+    eligibleRoute &&
     settings !== null &&
     shouldShowUsageSurvey({
       settings,
