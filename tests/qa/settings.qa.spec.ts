@@ -1268,6 +1268,9 @@ test.describe("IMAGE: replace-color", () => {
     await setupTool(page, "replace-color", IMG_200x150);
     // Check the "make transparent" checkbox
     await page.getByRole("checkbox").first().check();
+    // The current fixture has no pixels near pure red at the default tolerance.
+    // Use the full tolerance range so this assertion exercises transparent output.
+    await setSlider(page, "replace-tolerance", 255);
     const dl = await processAndDownload(page, "replace-color");
     if (!dl.ok) {
       bug({
@@ -1288,6 +1291,7 @@ test.describe("IMAGE: replace-color", () => {
         expected: "hasAlpha=true",
         actual: `hasAlpha=${info.hasAlpha}`,
       });
+    expect(info.hasAlpha).toBe(true);
   });
 
   test("tolerance=0 (exact match) -> runs", async ({ page }) => {

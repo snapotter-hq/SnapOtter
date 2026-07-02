@@ -6,7 +6,7 @@
  * downloadable result, and no console errors.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { fixture, instrument, isClean, issuesSummary } from "./qa-helpers";
+import { fixture, instrument, isClean, issuesSummary, uploadFiles } from "./qa-helpers";
 
 const FIXTURE_PNG = fixture("formats", "sample.png");
 
@@ -44,11 +44,8 @@ test.describe("Pipeline Builder UI", () => {
     await page.goto("/automate", { waitUntil: "domcontentloaded" });
     await expect(page.locator("text=Pipeline Builder")).toBeVisible({ timeout: 15_000 });
 
-    // ---- Upload a file via the dropzone ----
-    const chooserPromise = page.waitForEvent("filechooser");
-    await page.locator("[class*='border-dashed']").first().click();
-    const chooser = await chooserPromise;
-    await chooser.setFiles(FIXTURE_PNG);
+    // ---- Upload a file via the semantic upload control ----
+    await uploadFiles(page, FIXTURE_PNG);
 
     // Wait for file badge
     await expect(page.locator("text=sample.png").first()).toBeVisible({ timeout: 10_000 });

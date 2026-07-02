@@ -120,8 +120,6 @@ async function assertNonPdfDocumentPreview(page: Page): Promise<void> {
  * img OR any visible canvas in the main content area.
  */
 async function assertInteractivePreview(page: Page, label: string): Promise<void> {
-  // Any img with decoded pixels (naturalWidth > 0)
-  const anyDecodedImg = page.locator("img").first();
   // Any canvas element (Konva, react-konva, native canvas)
   const anyCanvas = page.locator("canvas").first();
 
@@ -168,6 +166,34 @@ async function assertCustomResultsPreview(page: Page, label: string): Promise<vo
     throw new Error(`${label}: file not accepted (dropzone still visible)`);
   }
   // File accepted but no preview image -- acceptable for custom-results tools
+}
+
+async function waitForUploadOrFeatureGate(page: Page): Promise<"upload" | "feature-gate"> {
+  const uploadButton = page.getByRole("button", { name: /upload from computer/i }).first();
+  const dropzone = page.locator("[class*='border-dashed']").first();
+  const enableButton = page.getByRole("button", { name: /^Enable /i }).first();
+  const gate = page
+    .getByText(/requires an additional download|not enabled|enable it in settings/i)
+    .first();
+  const deadline = Date.now() + 30_000;
+
+  while (Date.now() < deadline) {
+    if (
+      (await enableButton.isVisible().catch(() => false)) ||
+      (await gate.isVisible().catch(() => false))
+    ) {
+      return "feature-gate";
+    }
+    if (
+      (await uploadButton.isVisible().catch(() => false)) ||
+      (await dropzone.isVisible().catch(() => false))
+    ) {
+      return "upload";
+    }
+    await page.waitForTimeout(400);
+  }
+
+  throw new Error("No upload UI or AI feature install gate appeared after 30s");
 }
 
 /** Shorthand for console-clean assertion with context. */
@@ -665,6 +691,10 @@ test.describe("Custom custom-results tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "passport-photo");
+    if ((await waitForUploadOrFeatureGate(page)) === "feature-gate") {
+      assertClean(issues, "passport-photo feature gate");
+      test.skip(true, "passport-photo requires an uninstalled AI feature bundle in this QA stack");
+    }
     await uploadFiles(page, fixture("formats", "sample.png"));
     await assertCustomResultsPreview(page, "passport-photo");
     await assertNoBrokenImages(page);
@@ -692,6 +722,10 @@ test.describe("Custom interactive tools input preview", () => {
     test.setTimeout(60_000);
     const issues = instrument(page);
     await gotoTool(page, "erase-object");
+    if ((await waitForUploadOrFeatureGate(page)) === "feature-gate") {
+      assertClean(issues, "erase-object feature gate");
+      test.skip(true, "erase-object requires an uninstalled AI feature bundle in this QA stack");
+    }
     await uploadFiles(page, fixture("formats", "sample.png"));
     await assertInteractivePreview(page, "erase-object");
     await assertNoBrokenImages(page);

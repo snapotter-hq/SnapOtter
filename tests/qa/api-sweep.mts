@@ -7,15 +7,20 @@
  * Usage:
  *   ./apps/api/node_modules/.bin/tsx tests/qa/api-sweep.mts
  *
- * Expects: snapotter-qa container at http://localhost:13499, AUTH_ENABLED=false.
+ * Expects: snapotter-qa container at QA_BASE_URL or http://localhost:13499, AUTH_ENABLED=false.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath } from "../../packages/shared/src/constants.js";
 
 // ── Config ────────────────────────────────────────────────────────
-const BASE = "http://localhost:13499";
+// biome-ignore lint/suspicious/noUndeclaredEnvVars: QA scripts are run directly, outside Turbo.
+const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
+// biome-ignore lint/suspicious/noUndeclaredEnvVars: QA scripts are run directly, outside Turbo.
+const TOOL_FILTER = new Set((process.env.QA_TOOL_FILTER || "").split(",").filter(Boolean));
+// biome-ignore lint/suspicious/noUndeclaredEnvVars: QA scripts are run directly, outside Turbo.
+const FORMAT_FILTER = new Set((process.env.QA_FORMAT_FILTER || "").split(",").filter(Boolean));
 const REPO = join(import.meta.dirname, "..", "..");
 const FIXTURES_FORMATS = join(REPO, "tests", "fixtures", "image", "formats");
 const FIXTURES_MEDIA_VIDEO = join(REPO, "tests", "fixtures", "video", "formats");
@@ -48,8 +53,6 @@ interface SweepResult {
   note: string;
 }
 
-type Classification = "pass" | "expected-reject" | "suspicious-reject" | "bug" | "skipped" | "needs-review";
-
 // ── Load tools + settings ─────────────────────────────────────────
 
 const tools: ToolMeta[] = JSON.parse(
@@ -58,11 +61,13 @@ const tools: ToolMeta[] = JSON.parse(
 
 const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   resize: { width: 64 },
-  crop: { left: 0, top: 0, width: 50, height: 50 },
+  crop: { left: 0, top: 0, width: 4, height: 4 },
   convert: { format: "png" },
   "watermark-text": { text: "Test" },
   "text-overlay": { text: "Test" },
   "passport-photo": { countryCode: "us" },
+  "content-aware-resize": { width: 64 },
+  collage: { templateId: "2-h-equal" },
   "trim-video": { startS: 0, endS: 5 },
   "trim-audio": { startS: 0, endS: 5 },
   "split-pdf": { mode: "range", range: "1" },
@@ -78,6 +83,7 @@ const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "resize-video": { preset: "720p" },
   "watermark-video": { text: "CONFIDENTIAL" },
   "audio-channels": { mode: "mono-to-stereo" },
+  "split-audio": { mode: "parts", parts: 2 },
   "convert-document": { format: "odt" },
   "epub-convert": { format: "html" },
   "convert-presentation": { format: "odp" },
@@ -86,6 +92,107 @@ const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
 
 function defaultSettingsFor(toolId: string): unknown {
   return TOOL_SETTINGS_OVERRIDES[toolId] ?? {};
+}
+
+const CUSTOM_BODY_SETTINGS: Record<string, unknown> = {
+  "qr-generate": { text: "SnapOtter QA" },
+  "barcode-generate": { text: "SnapOtter QA", type: "code128" },
+  "html-to-image": { html: "<html><body><h1>SnapOtter QA</h1></body></html>", format: "png" },
+};
+
+interface SecondaryInput {
+  fieldName: string;
+  ext?: string;
+  modality?: string;
+  sameAsPrimary?: boolean;
+}
+
+const AUDIO_FORMATS = new Set([
+  ".mp3",
+  ".wav",
+  ".flac",
+  ".aac",
+  ".m4a",
+  ".ogg",
+  ".opus",
+  ".wma",
+  ".aiff",
+  ".amr",
+  ".ac3",
+]);
+const SUBTITLE_FORMATS = new Set([".srt", ".vtt", ".ass"]);
+
+const SECONDARY_INPUTS: Record<string, SecondaryInput[]> = {
+  "watermark-image": [{ fieldName: "watermark", ext: ".png", modality: "image" }],
+  compose: [{ fieldName: "overlay", ext: ".png", modality: "image" }],
+  compare: [{ fieldName: "file", sameAsPrimary: true }],
+  "find-duplicates": [{ fieldName: "file", sameAsPrimary: true }],
+  collage: [{ fieldName: "file", sameAsPrimary: true }],
+  stitch: [{ fieldName: "file", sameAsPrimary: true }],
+  "sprite-sheet": [{ fieldName: "file", sameAsPrimary: true }],
+  "images-to-video": [{ fieldName: "file", sameAsPrimary: true }],
+  "merge-videos": [{ fieldName: "file", sameAsPrimary: true }],
+  "merge-audio": [{ fieldName: "file", sameAsPrimary: true }],
+  "merge-pdf": [{ fieldName: "file", sameAsPrimary: true }],
+  "merge-csvs": [{ fieldName: "file", sameAsPrimary: true }],
+  "replace-audio": [{ fieldName: "file", ext: ".mp3", modality: "audio" }],
+  "burn-subtitles": [{ fieldName: "file", ext: ".srt", modality: "video" }],
+  "embed-subtitles": [{ fieldName: "file", ext: ".srt", modality: "video" }],
+  "sign-pdf": [{ fieldName: "sig0", ext: ".png", modality: "image" }],
+};
+
+const TOOL_SPECIFIC_FIXTURES: Record<string, Record<string, string>> = {
+  "chart-maker": {
+    ".json": join(FIXTURES_DATA, "chart.json"),
+  },
+};
+
+const EXPECTED_SELF_REJECTS: Record<string, RegExp[]> = {
+  "extract-subtitles": [/no subtitle track/i],
+};
+
+function resolveFixtureForTool(tool: ToolMeta, ext: string): string | null {
+  const toolFixture = TOOL_SPECIFIC_FIXTURES[tool.id]?.[ext];
+  if (toolFixture && existsSync(toolFixture)) {
+    return toolFixture;
+  }
+
+  return resolveFixture(ext, tool.modality);
+}
+
+function isExpectedSelfReject(toolId: string, message: string): boolean {
+  return EXPECTED_SELF_REJECTS[toolId]?.some((pattern) => pattern.test(message)) ?? false;
+}
+
+function isSecondaryOnlyFormat(toolId: string, ext: string): boolean {
+  if (toolId === "replace-audio") return AUDIO_FORMATS.has(ext);
+  if (toolId === "burn-subtitles" || toolId === "embed-subtitles") {
+    return SUBTITLE_FORMATS.has(ext);
+  }
+  return false;
+}
+
+function secondaryInputsFor(
+  tool: ToolMeta,
+  ext: string,
+): Array<{ fieldName: string; fixture: string }> {
+  const inputs = SECONDARY_INPUTS[tool.id] ?? [];
+  const resolved: Array<{ fieldName: string; fixture: string }> = [];
+
+  for (const input of inputs) {
+    const secondaryExt = input.sameAsPrimary ? ext : input.ext;
+    const secondaryModality = input.sameAsPrimary
+      ? tool.modality
+      : (input.modality ?? tool.modality);
+    if (!secondaryExt) continue;
+
+    const fixture = resolveFixture(secondaryExt, secondaryModality);
+    if (fixture) {
+      resolved.push({ fieldName: input.fieldName, fixture });
+    }
+  }
+
+  return resolved;
 }
 
 // ── Extension aliases ─────────────────────────────────────────────
@@ -137,7 +244,13 @@ function resolveFixture(ext: string, modality: string): string | null {
   }
 
   // Fallback: try all dirs
-  for (const dir of [FIXTURES_FORMATS, FIXTURES_MEDIA_VIDEO, FIXTURES_MEDIA_AUDIO, FIXTURES_DOCS, FIXTURES_DATA]) {
+  for (const dir of [
+    FIXTURES_FORMATS,
+    FIXTURES_MEDIA_VIDEO,
+    FIXTURES_MEDIA_AUDIO,
+    FIXTURES_DOCS,
+    FIXTURES_DATA,
+  ]) {
     for (const prefix of ["sample", "tiny"]) {
       const p = join(dir, `${prefix}.${bare}`);
       if (existsSync(p)) return p;
@@ -145,21 +258,6 @@ function resolveFixture(ext: string, modality: string): string | null {
   }
 
   return null;
-}
-
-// ── Multipart builder (native, no deps) ───────────────────────────
-
-function buildMultipart(
-  filePath: string,
-  filename: string,
-  settings: unknown,
-): { body: Blob; contentType: string } {
-  const fileBytes = readFileSync(filePath);
-  const form = new FormData();
-  form.append("file", new Blob([fileBytes]), filename);
-  form.append("settings", JSON.stringify(settings));
-  // Return the FormData directly -- fetch handles it
-  return { body: form as unknown as Blob, contentType: "multipart/form-data" };
 }
 
 // ── Output verification ───────────────────────────────────────────
@@ -194,7 +292,10 @@ function detectSignature(data: Buffer): string | null {
     if (data.length < off + sig.bytes.length) continue;
     let match = true;
     for (let i = 0; i < sig.bytes.length; i++) {
-      if (data[off + i] !== sig.bytes[i]) { match = false; break; }
+      if (data[off + i] !== sig.bytes[i]) {
+        match = false;
+        break;
+      }
     }
     if (match) return sig.name;
   }
@@ -264,9 +365,23 @@ function verifyOutput(data: Buffer, contentType: string): { ok: boolean; detail:
   return { ok: false, detail: `suspiciously small binary output (${data.length} bytes)` };
 }
 
+async function fetchAndVerifyDownload(
+  downloadUrl: string,
+): Promise<{ ok: boolean; detail: string }> {
+  const dlRes = await fetch(`${BASE}${downloadUrl}`);
+  if (!dlRes.ok) return { ok: false, detail: `downloadUrl returned ${dlRes.status}` };
+
+  const outBuf = Buffer.from(await dlRes.arrayBuffer());
+  const outCT = dlRes.headers.get("content-type") || "";
+  return verifyOutput(outBuf, outCT);
+}
+
 // ── SSE polling for async jobs ────────────────────────────────────
 
-async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
+async function pollJobSSE(
+  jobId: string,
+  timeoutMs: number,
+): Promise<{
   status: "completed" | "failed" | "timeout";
   error?: string;
   result?: Record<string, unknown>;
@@ -277,7 +392,10 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
   while (Date.now() < deadline) {
     try {
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), Math.min(30_000, deadline - Date.now()));
+      const fetchTimeout = setTimeout(
+        () => controller.abort(),
+        Math.min(30_000, deadline - Date.now()),
+      );
 
       const res = await fetch(url, {
         signal: controller.signal,
@@ -299,7 +417,9 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
         while (Date.now() < deadline) {
           const readTimeout = Math.min(30_000, deadline - Date.now());
           const readPromise = reader.read();
-          const timeoutPromise = sleep(readTimeout).then(() => ({ done: true, value: undefined } as const));
+          const timeoutPromise = sleep(readTimeout).then(
+            () => ({ done: true, value: undefined }) as const,
+          );
           const chunk = await Promise.race([readPromise, timeoutPromise]);
 
           if (chunk.done) break;
@@ -336,7 +456,9 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
                   reader.cancel().catch(() => {});
                   return {
                     status: "failed",
-                    error: data.errors?.map((e: { error: string }) => e.error).join("; ") || "batch failed",
+                    error:
+                      data.errors?.map((e: { error: string }) => e.error).join("; ") ||
+                      "batch failed",
                   };
                 }
               }
@@ -348,7 +470,7 @@ async function pollJobSSE(jobId: string, timeoutMs: number): Promise<{
       } finally {
         reader.cancel().catch(() => {});
       }
-    } catch (err) {
+    } catch (_err) {
       if (Date.now() >= deadline) break;
       // Connection error -- retry after a short wait
       await sleep(SSE_POLL_INTERVAL_MS);
@@ -400,10 +522,19 @@ async function fetchAsyncOutput(jobId: string): Promise<{
 
   // Fallback: try common output filenames
   const commonNames = [
-    "output.mp4", "output.webm", "output.mkv", "output.avi",
-    "output.mp3", "output.wav", "output.ogg",
-    "output.png", "output.jpg", "output.webp",
-    "output.pdf", "output.txt", "output.json",
+    "output.mp4",
+    "output.webm",
+    "output.mkv",
+    "output.avi",
+    "output.mp3",
+    "output.wav",
+    "output.ogg",
+    "output.png",
+    "output.jpg",
+    "output.webp",
+    "output.pdf",
+    "output.txt",
+    "output.json",
     "output.zip",
   ];
 
@@ -421,9 +552,7 @@ async function fetchAsyncOutput(jobId: string): Promise<{
           };
         }
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return { found: false };
@@ -455,7 +584,7 @@ async function main() {
     const health = await fetch(`${BASE}/api/v1/health`);
     if (!health.ok) throw new Error(`health check returned ${health.status}`);
     console.log("Container health: OK\n");
-  } catch (err) {
+  } catch (_err) {
     console.error("ERROR: Cannot reach container at", BASE);
     process.exit(1);
   }
@@ -473,17 +602,120 @@ async function main() {
 
   const startTime = Date.now();
 
-  for (const tool of tools) {
-    const formats = tool.isAI
-      ? [aiRepresentativeFormat(tool)]
-      : [...tool.acceptedInputs]; // clone to avoid mutation
+  const selectedTools =
+    TOOL_FILTER.size > 0 ? tools.filter((tool) => TOOL_FILTER.has(tool.id)) : tools;
+
+  for (const tool of selectedTools) {
+    const formats = CUSTOM_BODY_SETTINGS[tool.id]
+      ? [".custom-body"]
+      : tool.isAI
+        ? [aiRepresentativeFormat(tool)]
+        : [...tool.acceptedInputs]; // clone to avoid mutation
 
     // Deduplicate aliases (e.g. .jpg and .jpeg resolve to same fixture)
     const seenFixtures = new Set<string>();
 
     for (const ext of formats) {
+      if (FORMAT_FILTER.size > 0 && !FORMAT_FILTER.has(ext)) continue;
       totalCombos++;
-      const fixture = resolveFixture(ext, tool.modality);
+      const customBodySettings = CUSTOM_BODY_SETTINGS[tool.id];
+
+      if (customBodySettings) {
+        console.log(`  [TEST] ${tool.id} x custom-body...`);
+        try {
+          const res = await fetch(`${BASE}${apiToolPath(tool.id)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(customBodySettings),
+          });
+
+          const statusCode = res.status;
+          if (statusCode >= 400) {
+            let body = "";
+            try {
+              body = await res.text();
+            } catch {}
+            const r: SweepResult = {
+              tool: tool.id,
+              format: ext,
+              status: statusCode,
+              outputOk: false,
+              note: `BUG: custom body route returned ${statusCode} -- ${body.slice(0, 300)}`,
+            };
+            results.push(r);
+            bugs.push(r);
+            bugCount++;
+            console.log(`    [BUG] ${statusCode}: ${body.slice(0, 100)}`);
+            continue;
+          }
+
+          const json = (await res.json()) as Record<string, unknown>;
+          const downloadUrl = json.downloadUrl as string | undefined;
+          if (!downloadUrl) {
+            const r: SweepResult = {
+              tool: tool.id,
+              format: ext,
+              status: statusCode,
+              outputOk: Object.keys(json).length > 0,
+              note: `pass: JSON result (keys: ${Object.keys(json).join(",")})`,
+            };
+            results.push(r);
+            passes++;
+            console.log(`    [PASS] JSON result (${Object.keys(json).join(",")})`);
+            continue;
+          }
+
+          const verification = await fetchAndVerifyDownload(downloadUrl);
+          const r: SweepResult = {
+            tool: tool.id,
+            format: ext,
+            status: statusCode,
+            outputOk: verification.ok,
+            note: verification.ok
+              ? `pass: ${verification.detail}`
+              : `BUG: corrupt success -- ${verification.detail}`,
+          };
+          results.push(r);
+          if (verification.ok) {
+            passes++;
+            console.log(`    [PASS] ${verification.detail}`);
+          } else {
+            bugs.push(r);
+            bugCount++;
+            console.log(`    [BUG] corrupt output: ${verification.detail}`);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const r: SweepResult = {
+            tool: tool.id,
+            format: ext,
+            status: "network-error",
+            outputOk: false,
+            note: `BUG: custom body request failed -- ${msg.slice(0, 200)}`,
+          };
+          results.push(r);
+          bugs.push(r);
+          bugCount++;
+          console.log(`    [BUG] custom body request failed: ${msg.slice(0, 80)}`);
+        }
+        continue;
+      }
+
+      if (isSecondaryOnlyFormat(tool.id, ext)) {
+        const r: SweepResult = {
+          tool: tool.id,
+          format: ext,
+          status: "secondary-only",
+          outputOk: null,
+          note: "skipped: secondary-only format for multi-input route",
+        };
+        results.push(r);
+        skipped++;
+        console.log(`  [SKIP] ${tool.id} x ${ext}: secondary-only format`);
+        continue;
+      }
+
+      const fixture = resolveFixtureForTool(tool, ext);
 
       if (!fixture) {
         const r: SweepResult = {
@@ -514,9 +746,13 @@ async function main() {
       }
       seenFixtures.add(fixture);
 
-      const timeoutMs = tool.isAI ? AI_TIMEOUT_MS : (tool.executionHint === "long" ? LONG_TIMEOUT_MS : FAST_TIMEOUT_MS);
+      const timeoutMs = tool.isAI
+        ? AI_TIMEOUT_MS
+        : tool.executionHint === "long"
+          ? LONG_TIMEOUT_MS
+          : FAST_TIMEOUT_MS;
       const settings = defaultSettingsFor(tool.id);
-      const filename = fixture.split("/").pop()!;
+      const filename = fixture.split("/").pop() ?? "input";
 
       console.log(`  [TEST] ${tool.id} x ${ext} (${filename})...`);
 
@@ -524,7 +760,18 @@ async function main() {
         const form = new FormData();
         const fileBytes = readFileSync(fixture);
         form.append("file", new Blob([fileBytes]), filename);
-        form.append("settings", JSON.stringify(settings));
+        for (const input of secondaryInputsFor(tool, ext)) {
+          const secondaryFilename = input.fixture.split("/").pop() ?? "secondary";
+          form.append(input.fieldName, new Blob([readFileSync(input.fixture)]), secondaryFilename);
+        }
+        if (tool.id === "sign-pdf") {
+          form.append(
+            "placements",
+            JSON.stringify([{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.25, h: 0.12 }]),
+          );
+        } else {
+          form.append("settings", JSON.stringify(settings));
+        }
 
         const controller = new AbortController();
         const fetchTimer = setTimeout(() => controller.abort(), timeoutMs);
@@ -561,14 +808,21 @@ async function main() {
         // ── 4xx: legitimate rejection ────────────────────────
         if (statusCode >= 400 && statusCode < 500) {
           let body = "";
-          try { body = await res.text(); } catch {}
+          try {
+            body = await res.text();
+          } catch {}
           let parsed: { error?: string; details?: string } = {};
-          try { parsed = JSON.parse(body); } catch {}
+          try {
+            parsed = JSON.parse(body);
+          } catch {}
           const msg = parsed.error || parsed.details || body.slice(0, 200);
+          const fullMsg =
+            [parsed.error, parsed.details].filter(Boolean).join(" -- ") || body.slice(0, 300);
 
           // Check if this format is in the tool's own acceptedInputs
           const isSelfFormat = tool.acceptedInputs.includes(ext);
-          const classification = isSelfFormat ? "suspicious-reject" : "expected-reject";
+          const isExpected = !isSelfFormat || isExpectedSelfReject(tool.id, fullMsg);
+          const classification = isExpected ? "expected-reject" : "suspicious-reject";
 
           const r: SweepResult = {
             tool: tool.id,
@@ -579,7 +833,7 @@ async function main() {
           };
           results.push(r);
 
-          if (isSelfFormat) {
+          if (!isExpected) {
             suspicious.push(r);
             suspiciousCount++;
             console.log(`    [SUSPICIOUS] ${statusCode}: ${msg}`);
@@ -593,7 +847,31 @@ async function main() {
         // ── 5xx: server error = BUG ──────────────────────────
         if (statusCode >= 500) {
           let body = "";
-          try { body = await res.text(); } catch {}
+          try {
+            body = await res.text();
+          } catch {}
+
+          let parsed: { code?: string; feature?: string; featureName?: string; error?: string } =
+            {};
+          try {
+            parsed = JSON.parse(body);
+          } catch {}
+
+          if (statusCode === 501 && parsed.code === "FEATURE_NOT_INSTALLED") {
+            const feature = parsed.featureName || parsed.feature || "AI feature";
+            const r: SweepResult = {
+              tool: tool.id,
+              format: ext,
+              status: statusCode,
+              outputOk: null,
+              note: `skipped-feature-not-installed: ${feature}`,
+            };
+            results.push(r);
+            skipped++;
+            console.log(`    [SKIP] feature not installed: ${feature}`);
+            continue;
+          }
+
           const r: SweepResult = {
             tool: tool.id,
             format: ext,
@@ -617,7 +895,9 @@ async function main() {
             format: ext,
             status: 200,
             outputOk: isZip && buf.length > 2,
-            note: isZip ? `pass: ZIP stream (${buf.length} bytes)` : "BUG: ZIP content-type but invalid header",
+            note: isZip
+              ? `pass: ZIP stream (${buf.length} bytes)`
+              : "BUG: ZIP content-type but invalid header",
           };
           results.push(r);
           if (isZip && buf.length > 2) {
@@ -635,8 +915,8 @@ async function main() {
         if (statusCode === 200 && resContentType === "application/json") {
           let json: Record<string, unknown>;
           try {
-            json = await res.json() as Record<string, unknown>;
-          } catch (e) {
+            json = (await res.json()) as Record<string, unknown>;
+          } catch (_e) {
             const r: SweepResult = {
               tool: tool.id,
               format: ext,
@@ -656,7 +936,7 @@ async function main() {
           // Some tools return JSON results directly (info, color-palette, barcode-read, image-to-base64, etc.)
           if (!downloadUrl) {
             // Check if it's a result-only response (no downloadUrl but has data)
-            if (Object.keys(json).length > 0 && json.jobId) {
+            if (Object.keys(json).length > 0) {
               const r: SweepResult = {
                 tool: tool.id,
                 format: ext,
@@ -769,7 +1049,9 @@ async function main() {
         // ── 202: async job ───────────────────────────────────
         if (statusCode === 202) {
           let json: { jobId?: string; async?: boolean } = {};
-          try { json = await res.json() as typeof json; } catch {}
+          try {
+            json = (await res.json()) as typeof json;
+          } catch {}
 
           const jobId = json.jobId;
           if (!jobId) {
@@ -787,8 +1069,9 @@ async function main() {
             continue;
           }
 
+          const asyncTimeoutMs = Math.max(timeoutMs, LONG_TIMEOUT_MS);
           console.log(`    [ASYNC] jobId=${jobId}, polling SSE...`);
-          const jobResult = await pollJobSSE(jobId, timeoutMs);
+          const jobResult = await pollJobSSE(jobId, asyncTimeoutMs);
 
           if (jobResult.status === "timeout") {
             const r: SweepResult = {
@@ -796,7 +1079,7 @@ async function main() {
               format: ext,
               status: "202-timeout",
               outputOk: false,
-              note: `BUG: async job timed out after ${timeoutMs}ms`,
+              note: `BUG: async job timed out after ${asyncTimeoutMs}ms`,
             };
             results.push(r);
             bugs.push(r);
@@ -895,7 +1178,9 @@ async function main() {
 
         // ── Unexpected status code ───────────────────────────
         let body = "";
-        try { body = await res.text(); } catch {}
+        try {
+          body = await res.text();
+        } catch {}
         const r: SweepResult = {
           tool: tool.id,
           format: ext,
@@ -907,7 +1192,6 @@ async function main() {
         bugs.push(r);
         bugCount++;
         console.log(`    [BUG] unexpected status ${statusCode}`);
-
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const isTimeout = msg.includes("abort") || msg.includes("timeout");
@@ -932,10 +1216,7 @@ async function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
 
-  writeFileSync(
-    join(OUT_DIR, "api-sweep-results.json"),
-    JSON.stringify(results, null, 2),
-  );
+  writeFileSync(join(OUT_DIR, "api-sweep-results.json"), JSON.stringify(results, null, 2));
 
   // ── Write findings markdown ───────────────────────────────────
 
@@ -961,7 +1242,7 @@ async function main() {
     const byTool = new Map<string, SweepResult[]>();
     for (const b of bugs) {
       if (!byTool.has(b.tool)) byTool.set(b.tool, []);
-      byTool.get(b.tool)!.push(b);
+      byTool.get(b.tool)?.push(b);
     }
 
     for (const [toolId, toolBugs] of byTool) {
@@ -980,7 +1261,7 @@ async function main() {
     const byTool = new Map<string, SweepResult[]>();
     for (const s of suspicious) {
       if (!byTool.has(s.tool)) byTool.set(s.tool, []);
-      byTool.get(s.tool)!.push(s);
+      byTool.get(s.tool)?.push(s);
     }
 
     for (const [toolId, toolSuspicious] of byTool) {
@@ -996,7 +1277,7 @@ async function main() {
 
   // ── Console summary ───────────────────────────────────────────
 
-  console.log("\n" + "=".repeat(60));
+  console.log(`\n${"=".repeat(60)}`);
   console.log("SWEEP COMPLETE");
   console.log("=".repeat(60));
   console.log(`Total combos: ${totalCombos}`);

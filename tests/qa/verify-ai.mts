@@ -3,9 +3,10 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath } from "../../packages/shared/src/constants.js";
 
-const BASE = "http://localhost:13499";
+// biome-ignore lint/suspicious/noUndeclaredEnvVars: QA scripts are run directly, outside Turbo.
+const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
 
 async function pollSSE(jobId: string, timeoutMs = 240_000): Promise<Record<string, unknown>> {
   const res = await fetch(`${BASE}/api/v1/jobs/${jobId}/progress`);
@@ -113,7 +114,15 @@ if (r.out) {
   try {
     probe = execFileSync(
       "ffprobe",
-      ["-v", "quiet", "-show_entries", "stream=width,height,pix_fmt", "-of", "json", "/tmp/rembg-out.png"],
+      [
+        "-v",
+        "quiet",
+        "-show_entries",
+        "stream=width,height,pix_fmt",
+        "-of",
+        "json",
+        "/tmp/rembg-out.png",
+      ],
       { encoding: "utf8" },
     ).replace(/\s+/g, " ");
   } catch (e) {

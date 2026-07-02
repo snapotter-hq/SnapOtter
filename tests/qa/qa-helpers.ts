@@ -12,9 +12,56 @@ import { expect, type Page } from "@playwright/test";
 export const REPO_ROOT = path.join(__dirname, "..", "..");
 export const FIXTURES = path.join(REPO_ROOT, "tests", "fixtures");
 
-/** Absolute path to a fixture, e.g. fixture("formats", "sample.png"). */
+/** Absolute path to a fixture. Accepts current paths and legacy QA aliases. */
 export function fixture(...parts: string[]): string {
-  return path.join(FIXTURES, ...parts);
+  const direct = path.join(FIXTURES, ...parts);
+  if (fs.existsSync(direct)) return direct;
+
+  const [scope, ...rest] = parts;
+  const legacyScopes: Record<string, string[]> = {
+    content: [path.join("image", "valid"), path.join("document", "valid")],
+    formats: [path.join("image", "formats"), path.join("image", "valid")],
+    media: [
+      path.join("video", "formats"),
+      path.join("video", "valid"),
+      path.join("audio", "formats"),
+      path.join("audio", "valid"),
+    ],
+    documents: [
+      path.join("document", "formats"),
+      path.join("document", "valid"),
+      path.join("document", "edge"),
+      path.join("document", "hostile"),
+    ],
+    data: [path.join("data", "valid")],
+  };
+
+  for (const candidateScope of legacyScopes[scope] ?? []) {
+    const candidate = path.join(FIXTURES, candidateScope, ...rest);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  if (parts.length === 1) {
+    const legacyBareScopes = [
+      path.join("image", "valid"),
+      path.join("image", "edge"),
+      path.join("image", "formats"),
+      path.join("document", "valid"),
+      path.join("document", "formats"),
+      path.join("document", "edge"),
+      path.join("video", "valid"),
+      path.join("video", "formats"),
+      path.join("audio", "valid"),
+      path.join("audio", "formats"),
+      path.join("data", "valid"),
+    ];
+    for (const candidateScope of legacyBareScopes) {
+      const candidate = path.join(FIXTURES, candidateScope, parts[0]);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
+
+  return direct;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +385,24 @@ export interface ImageInfo {
   hasAlpha: boolean;
 }
 
+function sharpHasAlpha(file: string): boolean {
+  try {
+    const script = `
+      import sharp from "sharp";
+      const meta = await sharp(process.argv[1]).metadata();
+      console.log(JSON.stringify({ hasAlpha: meta.hasAlpha === true }));
+    `;
+    const out = execFileSync(process.execPath, ["--input-type=module", "-e", script, file], {
+      cwd: path.join(REPO_ROOT, "apps", "api"),
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    return JSON.parse(out).hasAlpha === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Image dimensions/format/alpha via ffprobe (png/jpg/webp/gif/tiff/bmp/avif/heic/...). */
 export function imageInfo(file: string): ImageInfo {
   const out = execFileSync(
@@ -357,12 +422,15 @@ export function imageInfo(file: string): ImageInfo {
   );
   const s = (JSON.parse(out).streams ?? [])[0] ?? {};
   const pixFmt: string = s.pix_fmt ?? "";
+  const hasAlpha =
+    /(rgba|bgra|argb|abgr|ya\d|yuva|gbrap)/i.test(pixFmt) ||
+    (s.codec_name === "png" && sharpHasAlpha(file));
   return {
     width: s.width ?? 0,
     height: s.height ?? 0,
     codec: s.codec_name ?? "",
     pixFmt,
-    hasAlpha: /(rgba|bgra|argb|abgr|ya\d|yuva|gbrap)/i.test(pixFmt),
+    hasAlpha,
   };
 }
 
