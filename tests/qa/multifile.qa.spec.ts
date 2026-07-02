@@ -177,8 +177,8 @@ test.describe("A) Multi-input tools", () => {
     const issues = instrument(page);
     await gotoTool(page, "merge-pdf");
     await uploadFiles(page, [
-      fixture("documents", "tiny.pdf"),
-      fixture("content", "alt-2page.pdf"),
+      fixture("document", "formats", "tiny.pdf"),
+      fixture("document", "valid", "alt-2page.pdf"),
     ]);
     await page.waitForTimeout(1_000);
     const res = await processTool(page, "merge-pdf", "fast");
@@ -202,7 +202,10 @@ test.describe("A) Multi-input tools", () => {
     // endpoint.
     const issues = instrument(page);
     await gotoTool(page, "merge-audio");
-    await uploadFiles(page, [fixture("media", "tiny.mp3"), fixture("media", "tiny.wav")]);
+    await uploadFiles(page, [
+      fixture("audio", "formats", "tiny.mp3"),
+      fixture("audio", "formats", "tiny.wav"),
+    ]);
     await page.waitForTimeout(1_000);
 
     // Click submit and watch what happens
@@ -255,7 +258,10 @@ test.describe("A) Multi-input tools", () => {
   test("merge-videos: mp4 + mov -> duration ~= sum", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "merge-videos");
-    await uploadFiles(page, [fixture("media", "tiny.mp4"), fixture("media", "tiny.mov")]);
+    await uploadFiles(page, [
+      fixture("video", "formats", "tiny.mp4"),
+      fixture("video", "formats", "tiny.mov"),
+    ]);
     await page.waitForTimeout(1_000);
 
     // merge-videos has executionHint "long" => SSE/async
@@ -278,7 +284,10 @@ test.describe("A) Multi-input tools", () => {
     // files are present.
     const issues = instrument(page);
     await gotoTool(page, "merge-csvs");
-    await uploadFiles(page, [fixture("data", "tiny-a.csv"), fixture("data", "tiny-b.csv")]);
+    await uploadFiles(page, [
+      fixture("data", "valid", "tiny-a.csv"),
+      fixture("data", "valid", "tiny-b.csv"),
+    ]);
     await page.waitForTimeout(1_000);
 
     await clickSubmit(page, "merge-csvs");
@@ -329,7 +338,10 @@ test.describe("A) Multi-input tools", () => {
   test("stitch: 2 images -> stitched output with combined dimensions", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "stitch");
-    await uploadFiles(page, [fixture("formats", "sample.png"), fixture("formats", "sample.jpg")]);
+    await uploadFiles(page, [
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+    ]);
     await page.waitForTimeout(1_000);
 
     await clickSubmit(page, "stitch");
@@ -340,8 +352,8 @@ test.describe("A) Multi-input tools", () => {
     expect(dl.size).toBeGreaterThan(0);
 
     const info = imageInfo(dl.path);
-    const src1 = imageInfo(fixture("formats", "sample.png"));
-    const src2 = imageInfo(fixture("formats", "sample.jpg"));
+    const src1 = imageInfo(fixture("image", "formats", "sample.png"));
+    const src2 = imageInfo(fixture("image", "formats", "sample.jpg"));
     // Default direction is horizontal => width should be roughly sum of inputs
     expect(
       info.width,
@@ -355,7 +367,10 @@ test.describe("A) Multi-input tools", () => {
     const issues = instrument(page);
     await gotoTool(page, "collage");
 
-    await uploadFiles(page, [fixture("formats", "sample.png"), fixture("formats", "sample.jpg")]);
+    await uploadFiles(page, [
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+    ]);
     await page.waitForTimeout(1_500);
 
     await clickSubmit(page, "collage");
@@ -373,10 +388,14 @@ test.describe("A) Multi-input tools", () => {
   test("compose: base + overlay -> composited image", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "compose");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await page.waitForTimeout(500);
 
-    await setSecondaryInput(page, "#compose-overlay-image", fixture("formats", "sample.jpg"));
+    await setSecondaryInput(
+      page,
+      "#compose-overlay-image",
+      fixture("image", "formats", "sample.jpg"),
+    );
     await page.waitForTimeout(500);
 
     await clickSubmit(page, "compose");
@@ -394,13 +413,13 @@ test.describe("A) Multi-input tools", () => {
   test("compare: two distinct images -> similarity score + diff image", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "compare");
-    await uploadFiles(page, fixture("formats", "sample.png"));
+    await uploadFiles(page, fixture("image", "formats", "sample.png"));
     await page.waitForTimeout(500);
 
     await setSecondaryInput(
       page,
       "#compare-second-image",
-      fixture("content", "portrait-color.jpg"),
+      fixture("image", "valid", "portrait-color.jpg"),
     );
     await page.waitForTimeout(500);
 
@@ -423,9 +442,9 @@ test.describe("A) Multi-input tools", () => {
     const issues = instrument(page);
     await gotoTool(page, "find-duplicates");
     await uploadFiles(page, [
-      fixture("content", "portrait-color.jpg"),
-      fixture("content", "portrait-color-dup.jpg"),
-      fixture("formats", "sample.png"),
+      fixture("image", "valid", "portrait-color.jpg"),
+      fixture("image", "valid", "portrait-color-dup.jpg"),
+      fixture("image", "formats", "sample.png"),
     ]);
     await page.waitForTimeout(1_500);
 
@@ -451,9 +470,9 @@ test.describe("A) Multi-input tools", () => {
     const issues = instrument(page);
     await gotoTool(page, "images-to-video");
     await uploadFiles(page, [
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.jpg"),
-      fixture("formats", "sample.webp"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+      fixture("image", "formats", "sample.webp"),
     ]);
     await page.waitForTimeout(1_000);
 
@@ -487,9 +506,9 @@ test.describe("A) Multi-input tools", () => {
     await gotoTool(page, "create-zip");
     // Use a mix of file types since create-zip should accept all types
     const inputFiles = [
-      fixture("documents", "tiny.pdf"),
-      fixture("data", "tiny-a.csv"),
-      fixture("documents", "tiny.txt"),
+      fixture("document", "formats", "tiny.pdf"),
+      fixture("data", "valid", "tiny-a.csv"),
+      fixture("document", "formats", "tiny.txt"),
     ];
     await uploadFiles(page, inputFiles);
     await page.waitForTimeout(2_000);
@@ -561,7 +580,10 @@ test.describe("A) Multi-input tools", () => {
   test("replace-audio: video + audio -> output video has audio track", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "replace-audio");
-    await uploadFiles(page, [fixture("media", "tiny.mp4"), fixture("media", "tiny.mp3")]);
+    await uploadFiles(page, [
+      fixture("video", "formats", "tiny.mp4"),
+      fixture("audio", "formats", "tiny.mp3"),
+    ]);
     await page.waitForTimeout(1_000);
 
     const res = await processTool(page, "replace-audio", "fast");
@@ -581,7 +603,10 @@ test.describe("A) Multi-input tools", () => {
   test("burn-subtitles: video + srt -> output produced", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "burn-subtitles");
-    await uploadFiles(page, [fixture("media", "tiny.mp4"), fixture("media", "tiny.srt")]);
+    await uploadFiles(page, [
+      fixture("video", "formats", "tiny.mp4"),
+      fixture("video", "formats", "tiny.srt"),
+    ]);
     await page.waitForTimeout(1_000);
 
     const res = await processTool(page, "burn-subtitles", "long");
@@ -599,7 +624,10 @@ test.describe("A) Multi-input tools", () => {
   test("embed-subtitles: video + srt -> output has subtitle stream", async ({ page }) => {
     const issues = instrument(page);
     await gotoTool(page, "embed-subtitles");
-    await uploadFiles(page, [fixture("media", "tiny.mp4"), fixture("media", "tiny.srt")]);
+    await uploadFiles(page, [
+      fixture("video", "formats", "tiny.mp4"),
+      fixture("video", "formats", "tiny.srt"),
+    ]);
     await page.waitForTimeout(1_000);
 
     const res = await processTool(page, "embed-subtitles", "fast");
@@ -626,11 +654,11 @@ test.describe("B) Batch processing", () => {
     const issues = instrument(page);
     await gotoTool(page, "resize");
     const batchFiles = [
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.jpg"),
-      fixture("formats", "sample.webp"),
-      fixture("formats", "sample.bmp"),
-      fixture("formats", "sample.gif"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+      fixture("image", "formats", "sample.webp"),
+      fixture("image", "formats", "sample.bmp"),
+      fixture("image", "formats", "sample.gif"),
     ];
     await uploadFiles(page, batchFiles);
     await page.waitForTimeout(1_500);
@@ -657,11 +685,11 @@ test.describe("B) Batch processing", () => {
     const issues = instrument(page);
     await gotoTool(page, "convert");
     const batchFiles = [
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.jpg"),
-      fixture("formats", "sample.bmp"),
-      fixture("formats", "sample.gif"),
-      fixture("formats", "sample.tiff"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+      fixture("image", "formats", "sample.bmp"),
+      fixture("image", "formats", "sample.gif"),
+      fixture("image", "formats", "sample.tiff"),
     ];
     await uploadFiles(page, batchFiles);
     await page.waitForTimeout(1_500);
@@ -685,11 +713,11 @@ test.describe("B) Batch processing", () => {
     const issues = instrument(page);
     await gotoTool(page, "compress");
     const batchFiles = [
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.jpg"),
-      fixture("formats", "sample.webp"),
-      fixture("formats", "sample.gif"),
-      fixture("formats", "sample.tiff"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
+      fixture("image", "formats", "sample.webp"),
+      fixture("image", "formats", "sample.gif"),
+      fixture("image", "formats", "sample.tiff"),
     ];
     await uploadFiles(page, batchFiles);
     await page.waitForTimeout(1_500);
@@ -727,7 +755,7 @@ test.describe("C) Edge cases", () => {
     // Upload 11 copies of the same video to exceed the 10-file limit.
     const manyFiles: string[] = [];
     for (let i = 0; i < 11; i++) {
-      manyFiles.push(fixture("media", "tiny.mp4"));
+      manyFiles.push(fixture("video", "formats", "tiny.mp4"));
     }
     await uploadFiles(page, manyFiles);
     await page.waitForTimeout(2_000);
@@ -790,7 +818,7 @@ test.describe("C) Edge cases", () => {
     await gotoTool(page, "collage");
 
     // Upload a text file into collage (expects images)
-    await uploadFiles(page, fixture("documents", "tiny.txt"));
+    await uploadFiles(page, fixture("document", "formats", "tiny.txt"));
     await page.waitForTimeout(1_500);
 
     // Try to submit -- the button may be disabled (no valid images) or server rejects
@@ -825,9 +853,9 @@ test.describe("C) Edge cases", () => {
 
     // Upload the same file twice (same filename) plus a different one.
     const dupeFiles = [
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.png"),
-      fixture("formats", "sample.jpg"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.png"),
+      fixture("image", "formats", "sample.jpg"),
     ];
     await uploadFiles(page, dupeFiles);
     await page.waitForTimeout(1_500);

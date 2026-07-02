@@ -33,16 +33,16 @@ import {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const PNG = fixture("formats", "sample.png");
-const JPG = fixture("formats", "sample.jpg");
-const SVG = fixture("formats", "sample.svg");
-const GIF = fixture("formats", "sample.gif");
-const PDF = fixture("documents", "tiny.pdf");
-const HTML = fixture("documents", "tiny.html");
-const CSV = fixture("data", "tiny.csv");
-const MP4 = fixture("media", "tiny.mp4");
-const MP3 = fixture("media", "tiny.mp3");
-const WAV = fixture("media", "tiny.wav");
+const PNG = fixture("image", "formats", "sample.png");
+const JPG = fixture("image", "formats", "sample.jpg");
+const SVG = fixture("image", "formats", "sample.svg");
+const GIF = fixture("image", "formats", "sample.gif");
+const PDF = fixture("document", "formats", "tiny.pdf");
+const HTML = fixture("document", "formats", "tiny.html");
+const CSV = fixture("data", "valid", "tiny.csv");
+const MP4 = fixture("video", "formats", "tiny.mp4");
+const MP3 = fixture("audio", "formats", "tiny.mp3");
+const WAV = fixture("audio", "formats", "tiny.wav");
 
 // ---------------------------------------------------------------------------
 // Helpers for tools with non-standard submit/download flows
@@ -745,7 +745,7 @@ test.describe("4: State-lifecycle flows", () => {
       await newFileBtn.click();
       await page.waitForTimeout(1_000);
     }
-    const WEBM = fixture("media", "tiny.webm");
+    const WEBM = fixture("video", "formats", "tiny.webm");
     await uploadFiles(page, WEBM);
     await assertVideoPreview(page);
     await page.locator("#cv-format").selectOption("mp4");

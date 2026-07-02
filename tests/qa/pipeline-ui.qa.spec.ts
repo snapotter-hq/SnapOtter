@@ -8,7 +8,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { fixture, instrument, isClean, issuesSummary } from "./qa-helpers";
 
-const FIXTURE_PNG = fixture("formats", "sample.png");
+const FIXTURE_PNG = fixture("image", "formats", "sample.png");
 
 /**
  * Helper: click a tool in the left palette by searching for it and clicking

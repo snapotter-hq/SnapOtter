@@ -55,12 +55,12 @@ function warn(f: Omit<Finding, "severity">) {
 }
 
 // ── Fixtures ─────────────────────────────────────────────────────────
-const IMG_200x150 = fixture("test-200x150.png"); // 200x150 PNG
-const IMG_JPG = fixture("sample-photo.jpg");
-const VID_MP4 = fixture("media", "tiny.mp4"); // 64x64, 1s, 8fps
-const AUD_MP3 = fixture("media", "tiny.mp3"); // mono, ~1s
-const AUD_STEREO = fixture("media", "tone-stereo.wav"); // stereo, 1s
-const PDF_3PAGE = fixture("test-3page.pdf"); // 3 pages
+const IMG_200x150 = fixture("image", "valid", "test-200x150.png"); // 200x150 PNG
+const IMG_JPG = fixture("image", "valid", "sample-photo.jpg");
+const VID_MP4 = fixture("video", "formats", "tiny.mp4"); // 64x64, 1s, 8fps
+const AUD_MP3 = fixture("audio", "formats", "tiny.mp3"); // mono, ~1s
+const AUD_STEREO = fixture("audio", "formats", "tone-stereo.wav"); // stereo, 1s
+const PDF_3PAGE = fixture("document", "valid", "test-3page.pdf"); // 3 pages
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const TOOL_TIMEOUT = 120_000;
