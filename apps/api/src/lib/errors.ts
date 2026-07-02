@@ -14,6 +14,25 @@ export function stripInternalPaths(message: string): string {
   return message.replace(/\/(tmp|data|app|opt|home|workspace)\b[^\s'")}]*/g, "[internal]");
 }
 
+// Matching control characters is the entire point of these patterns (we strip
+// them), so noControlCharactersInRegex's premise doesn't apply. ANSI_CSI =
+// ESC [ ... final-byte (color/cursor/spinner); C0_CONTROLS = the C0 range + DEL,
+// excluding tab (\x09) and newline (\x0A), which we keep.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matches control chars to strip them
+const ANSI_CSI = /\x1B\[[0-9;?]*[ -/]*[@-~]/g;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matches control chars to strip them
+const C0_CONTROLS = /[\x00-\x08\x0B-\x1F\x7F]/g;
+
+/**
+ * Strip ANSI escape sequences and other terminal control characters that
+ * subprocess CLIs (e.g. caire's progress spinner) emit into their stderr, so a
+ * surfaced tool-failure message is plain text rather than raw terminal garbage.
+ * Preserves tab and newline.
+ */
+export function stripControlChars(message: string): string {
+  return message.replace(ANSI_CSI, "").replace(C0_CONTROLS, "");
+}
+
 /**
  * Unambiguous markers of a raw external-tool failure dump: the
  * `ffmpeg/ffprobe exited N:` prefix that media-engine throws, a Python
@@ -33,7 +52,7 @@ const RAW_TOOL_FAILURE =
  * sanitized. Idempotent, so it is safe to apply at every error surface.
  */
 export function friendlyError(message: string): string {
-  const cleaned = stripInternalPaths(message);
+  const cleaned = stripInternalPaths(stripControlChars(message));
   if (RAW_TOOL_FAILURE.test(cleaned) || cleaned.length > 280 || cleaned.split("\n").length > 3) {
     return "Processing failed. The file may be in an unsupported or corrupted format.";
   }

@@ -6,7 +6,7 @@ import { seamCarve } from "@snapotter/ai";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
@@ -73,7 +73,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         } catch (err) {
           return reply.status(422).send({
             error: "Failed to decode HEIC/HEIF file",
-            details: err instanceof Error ? err.message : String(err),
+            details: friendlyError(err instanceof Error ? err.message : String(err)),
           });
         }
       }
@@ -87,7 +87,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         } catch (err) {
           return reply.status(422).send({
             error: `Failed to decode ${validation.format} file`,
-            details: err instanceof Error ? err.message : String(err),
+            details: friendlyError(err instanceof Error ? err.message : String(err)),
           });
         }
       }
@@ -164,7 +164,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         request.log.error({ err, toolId: "content-aware-resize" }, "Content-aware resize failed");
         return reply.status(422).send({
           error: "Content-aware resize failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: friendlyError(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

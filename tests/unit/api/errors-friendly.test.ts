@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendlyError } from "../../../apps/api/src/lib/errors.js";
+import { friendlyError, stripControlChars } from "../../../apps/api/src/lib/errors.js";
 
 const GENERIC = "Processing failed. The file may be in an unsupported or corrupted format.";
 
@@ -61,5 +61,25 @@ describe("friendlyError", () => {
     expect(friendlyError(friendlyError(dump))).toBe(friendlyError(dump));
     const ok = "Region exceeds image bounds";
     expect(friendlyError(friendlyError(ok))).toBe(ok);
+  });
+
+  it("strips ANSI/terminal control chars from surfaced subprocess errors", () => {
+    // caire's progress spinner emits ANSI cursor/color sequences into stderr.
+    const raw = "\x1B[2K\x1B[1G\x1B[36mcarving\x1B[0m 42%\x08\x08done";
+    expect(friendlyError(raw)).toBe("carving 42%done");
+  });
+});
+
+describe("stripControlChars", () => {
+  it("removes ANSI CSI sequences but keeps visible text", () => {
+    expect(stripControlChars("\x1B[31mred\x1B[0m text")).toBe("red text");
+  });
+
+  it("removes residual C0 control chars but preserves tab and newline", () => {
+    expect(stripControlChars("a\x00b\x07c\td\ne")).toBe("abc\td\ne");
+  });
+
+  it("leaves plain text and accented locale strings untouched", () => {
+    expect(stripControlChars("Café déjà vu")).toBe("Café déjà vu");
   });
 });

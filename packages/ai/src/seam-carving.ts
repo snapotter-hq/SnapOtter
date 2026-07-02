@@ -130,7 +130,20 @@ export async function seamCarve(
 
     const currentMp = (currentW * currentH) / 1_000_000;
     const timeoutMs = Math.ceil(Math.max(120_000, currentMp * 10_000));
-    await execFileAsync(cairePath, args, { timeout: timeoutMs });
+    try {
+      await execFileAsync(cairePath, args, { timeout: timeoutMs });
+    } catch (err) {
+      // execFile sets killed=true when it terminates the child on timeout.
+      // Replace the raw caire terminal output (ANSI/spinner control chars) with
+      // an actionable message; keep the original as `cause` for server logs.
+      if ((err as { killed?: boolean }).killed) {
+        throw new Error(
+          "Content-aware resize timed out on this image. Try a smaller image or a larger target size.",
+          { cause: err },
+        );
+      }
+      throw err;
+    }
 
     const buffer = await readFile(outputPath);
     const outMeta = await sharp(buffer).metadata();
