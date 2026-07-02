@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
 import { FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import * as tar from "tar";
+import { getQueuedBundleIds } from "./feature-install-queue.js";
 
 // ── Paths ───────────────────────────────────────────────────────────────
 
@@ -510,6 +511,7 @@ export function getFeatureStates(): FeatureBundleState[] {
   const lock = getInstallingBundle();
   const manifest = readManifest();
   const arch = bundleArchKey();
+  const queuedIds = new Set(getQueuedBundleIds());
 
   return Object.values(FEATURE_BUNDLES).map((bundle) => {
     const installedBundle = installed.bundles[bundle.id];
@@ -535,6 +537,9 @@ export function getFeatureStates(): FeatureBundleState[] {
       } else {
         status = "installed";
       }
+    } else if (queuedIds.has(bundle.id)) {
+      // Waiting behind the active install in the server-side queue.
+      status = "queued";
     } else if (currentProgress?.bundleId === bundle.id && currentProgress.error) {
       status = "error";
       error = currentProgress.error;

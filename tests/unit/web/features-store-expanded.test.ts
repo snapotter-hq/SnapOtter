@@ -153,70 +153,62 @@ describe("useFeaturesStore (expanded)", () => {
     });
   });
 
-  describe("installBundle queuing edge cases", () => {
-    it("does not duplicate already-queued bundles", async () => {
-      // Set up a bundle that is already installing
+  describe("installBundle queuing (server-owned queue)", () => {
+    it("adds a server-queued bundle to the queued pill exactly once across duplicate POSTs", async () => {
       useFeaturesStore.setState({
-        installing: { "active-bundle": { percent: 50, stage: "Processing..." } },
-        bundles: [
-          makeBundleState({ id: "active-bundle", status: "installing" }),
-          makeBundleState({ id: "waiting-bundle", status: "not_installed" }),
-        ],
+        bundles: [makeBundleState({ id: "waiting-bundle", status: "not_installed" })],
       });
+      // Server reports it queued behind an active install both times.
+      apiPostMock.mockResolvedValue({ jobId: "job-wait", queued: true });
 
-      // Start install for waiting-bundle; it should queue
-      const p1 = useFeaturesStore.getState().installBundle("waiting-bundle");
-      const p2 = useFeaturesStore.getState().installBundle("waiting-bundle");
+      await Promise.all([
+        useFeaturesStore.getState().installBundle("waiting-bundle"),
+        useFeaturesStore.getState().installBundle("waiting-bundle"),
+      ]);
+
+      const q = useFeaturesStore.getState().queued;
+      expect(q.filter((id) => id === "waiting-bundle").length).toBe(1);
+      // A queued bundle is not shown as installing.
+      expect(useFeaturesStore.getState().installing["waiting-bundle"]).toBeUndefined();
+    });
+
+    it("shows a not-queued install as installing (not in the queued pill)", async () => {
+      useFeaturesStore.setState({
+        bundles: [makeBundleState({ id: "go-bundle", status: "not_installed" })],
+      });
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-go", queued: false });
+
+      const promise = useFeaturesStore.getState().installBundle("go-bundle");
 
       await vi.waitFor(() => {
-        // Should only be queued once
-        const q = useFeaturesStore.getState().queued;
-        expect(q.filter((id) => id === "waiting-bundle").length).toBeLessThanOrEqual(1);
+        expect(useFeaturesStore.getState().installing["go-bundle"]).toBeDefined();
       });
+      expect(useFeaturesStore.getState().queued).not.toContain("go-bundle");
 
-      // Clean up: finish the active install so queued ones proceed
-      useFeaturesStore.setState({ installing: {} });
-      apiPostMock.mockResolvedValue({ jobId: "job-wait" });
-
-      await vi
-        .waitFor(() => {
-          if (FakeEventSource.instances.length > 0) return;
-          throw new Error("waiting");
-        })
-        .catch(() => {});
-
-      for (const es of FakeEventSource.instances) {
-        es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
-      }
-
-      await Promise.allSettled([p1, p2]);
+      FakeEventSource.instances[0]?.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await promise;
     });
   });
 
-  describe("installBundle skips already-installed bundles from queue", () => {
-    it("skips bundle that got installed while queued", async () => {
+  describe("installBundle when the server reports the bundle already installed", () => {
+    it("still POSTs, then clears state and refreshes on a 409 already-installed", async () => {
       useFeaturesStore.setState({
-        installing: { "first-bundle": { percent: 80, stage: "Finishing" } },
-        bundles: [
-          makeBundleState({ id: "first-bundle", status: "installing" }),
-          makeBundleState({ id: "second-bundle", status: "installed" }),
-        ],
+        bundles: [makeBundleState({ id: "done-bundle", status: "not_installed" })],
+      });
+      apiPostMock.mockRejectedValueOnce(new Error('Bundle "done-bundle" is already installed'));
+      apiGetMock.mockResolvedValueOnce({
+        bundles: [makeBundleState({ id: "done-bundle", status: "installed" })],
       });
 
-      // second-bundle is already installed, so should skip
-      const promise = useFeaturesStore.getState().installBundle("second-bundle");
+      await useFeaturesStore.getState().installBundle("done-bundle");
 
-      // Clear the active install to unblock
-      useFeaturesStore.setState({ installing: {} });
-
-      await promise;
-
-      // apiPost should not have been called for second-bundle since it is installed
-      const installCalls = apiPostMock.mock.calls.filter(
-        (call: unknown[]) =>
-          typeof call[0] === "string" && (call[0] as string).includes("second-bundle"),
-      );
-      expect(installCalls.length).toBe(0);
+      // The client always POSTs now -- the server owns the queue/dedup decision.
+      expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/done-bundle/install", {});
+      // A 409 already-installed clears installing + error and refreshes silently.
+      const state = useFeaturesStore.getState();
+      expect(state.installing["done-bundle"]).toBeUndefined();
+      expect(state.errors["done-bundle"]).toBeUndefined();
+      expect(apiGetMock).toHaveBeenCalledWith("/v1/features");
     });
   });
 

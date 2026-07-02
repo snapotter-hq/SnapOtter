@@ -25,6 +25,14 @@ import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { trackEvent } from "../lib/analytics.js";
 import {
+  clearActive,
+  dequeue,
+  enqueue,
+  getActiveBundleId,
+  peekQueue,
+  setActive,
+} from "../lib/feature-install-queue.js";
+import {
   acquireInstallLock,
   getAiDir,
   getFeatureStates,
@@ -48,6 +56,173 @@ import { updateSingleFileProgress } from "./progress.js";
 
 const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
 const pythonPath = `${venvPath}/bin/python3`;
+
+/**
+ * Spawn the installer child for a bundle and wire up progress / analytics /
+ * error reporting. The child is detached from any HTTP request, so it finalizes
+ * via its own close/error handlers regardless of the connection. On exit it
+ * releases the venv + file locks, clears the active slot, and pumps the queue
+ * so the next waiting bundle starts automatically.
+ *
+ * Precondition: the file install lock is already held for `bundleId` and the
+ * queue's active slot is already set to it (pump() does both before calling).
+ */
+function startInstall(bundleId: string, jobId: string): void {
+  const scriptPath = getInstallScriptPath();
+  const manifestPath = getManifestPath();
+  const modelsDir = getModelsDir();
+  const installStartTime = Date.now();
+
+  void (async () => {
+    // Hold the venv lock across the whole install so no AI tool job loads
+    // native libs from the venv while pip is rewriting them (that segfaults
+    // the sidecar). This awaits any in-flight AI job before the installer
+    // starts; the lock is released when the installer process exits.
+    const releaseVenv = await acquireVenvLock();
+    let venvReleased = false;
+    const releaseVenvOnce = () => {
+      if (!venvReleased) {
+        venvReleased = true;
+        releaseVenv();
+      }
+    };
+
+    const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        BUNDLE_ID: bundleId,
+        PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
+      },
+    });
+
+    let stderrBuffer = "";
+    let stdoutBuffer = "";
+    const lastStderrLines: string[] = [];
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBuffer += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrBuffer += chunk.toString();
+
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        lastStderrLines.push(trimmed);
+        if (lastStderrLines.length > 20) lastStderrLines.shift();
+
+        try {
+          const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
+          if (typeof parsed.progress === "number") {
+            setInstallProgress(
+              bundleId,
+              { percent: parsed.progress, stage: parsed.stage ?? "" },
+              null,
+            );
+            updateSingleFileProgress({
+              jobId,
+              phase: "processing",
+              percent: parsed.progress,
+              stage: parsed.stage,
+            });
+          }
+        } catch {
+          // Not JSON progress - rembg/pip output noise, keep in lastStderrLines for error reporting
+        }
+      }
+    });
+
+    child.on("close", (code) => {
+      releaseVenvOnce();
+      releaseInstallLock();
+      clearActive();
+      pump();
+
+      if (code === 0) {
+        invalidateCache();
+        shutdownDispatcher();
+        setInstallProgress(null, null, null);
+        updateSingleFileProgress({ jobId, phase: "complete", percent: 100, stage: "Complete" });
+        trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+          bundle_id: bundleId,
+          action: "installed",
+          duration_ms: Date.now() - installStartTime,
+        });
+      } else {
+        // Extract the structured error from Python's fail() function first.
+        // fail() writes {"error": "..."} to stderr - prefer this over raw lines.
+        let errorMsg: string | undefined;
+        for (let i = lastStderrLines.length - 1; i >= 0; i--) {
+          const line = lastStderrLines[i];
+          if (line.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(line) as Record<string, unknown>;
+              if (typeof parsed.error === "string") {
+                errorMsg = parsed.error;
+                break;
+              }
+            } catch {
+              // Not valid JSON
+            }
+          }
+        }
+        if (!errorMsg) {
+          if (code === 137) {
+            errorMsg =
+              "Installation was killed due to insufficient memory. " +
+              "Try increasing the container's memory limit (e.g. mem_limit: 6g in docker-compose.yml) and retry.";
+          } else {
+            const meaningful = lastStderrLines.filter(
+              (l) =>
+                !l.startsWith("{") &&
+                !l.includes("pthread_setaffinity_np") &&
+                !l.includes("\x1b[") &&
+                !l.includes("━") &&
+                !/^\s*\d+%\|/.test(l),
+            );
+            errorMsg =
+              meaningful.join("\n") ||
+              stdoutBuffer.trim() ||
+              `Install failed with exit code ${code}`;
+          }
+        }
+        setInstallProgress(bundleId, null, errorMsg);
+        updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
+      }
+    });
+
+    child.on("error", (err) => {
+      releaseVenvOnce();
+      releaseInstallLock();
+      clearActive();
+      pump();
+      const errorMsg = `Failed to spawn install process: ${err.message}`;
+      setInstallProgress(bundleId, null, errorMsg);
+      updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
+    });
+  })();
+}
+
+/**
+ * Start the next queued install if nothing is running and the file lock is
+ * free. If the lock is held (an offline import is in progress) the head stays
+ * queued and gets pumped again when the import releases the lock.
+ */
+function pump(): void {
+  if (getActiveBundleId()) return;
+  const head = peekQueue();
+  if (!head) return;
+  if (!acquireInstallLock(head.bundleId)) return;
+  dequeue();
+  setActive(head);
+  startInstall(head.bundleId, head.jobId);
+}
 
 interface BundleIdParams {
   bundleId: string;
@@ -159,147 +334,22 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         markUninstalled(bundleId);
       }
 
-      if (!acquireInstallLock(bundleId)) {
-        return reply.status(409).send({ error: "Another install is already in progress" });
-      }
-
+      // Queue the install on the server so the POST is durable: enqueue()
+      // dedups an already-active/queued bundle and returns the effective jobId,
+      // then pump() starts it immediately if nothing else is installing. A
+      // bundle that lands behind another install stays queued server-side and
+      // starts automatically when the running install finishes.
       const jobId = crypto.randomUUID();
-      const scriptPath = getInstallScriptPath();
-      const manifestPath = getManifestPath();
-      const modelsDir = getModelsDir();
+      const effectiveJobId = enqueue({ bundleId, jobId });
+      pump();
 
-      const installStartTime = Date.now();
+      // queued === true means it did NOT start right now (another install is
+      // active, or an offline import holds the lock). The client still opens
+      // the SSE stream for the returned jobId; the progress route tolerates a
+      // not-yet-started jobId and streams once the installer begins.
+      const queued = getActiveBundleId() !== bundleId;
 
-      // Hold the venv lock across the whole install so no AI tool job loads
-      // native libs from the venv while pip is rewriting them (that segfaults
-      // the sidecar). This awaits any in-flight AI job before the installer
-      // starts; the lock is released when the installer process exits.
-      const releaseVenv = await acquireVenvLock();
-      let venvReleased = false;
-      const releaseVenvOnce = () => {
-        if (!venvReleased) {
-          venvReleased = true;
-          releaseVenv();
-        }
-      };
-
-      const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          BUNDLE_ID: bundleId,
-          PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
-        },
-      });
-
-      let stderrBuffer = "";
-      let stdoutBuffer = "";
-      const lastStderrLines: string[] = [];
-
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdoutBuffer += chunk.toString();
-      });
-
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderrBuffer += chunk.toString();
-
-        const lines = stderrBuffer.split("\n");
-        stderrBuffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          lastStderrLines.push(trimmed);
-          if (lastStderrLines.length > 20) lastStderrLines.shift();
-
-          try {
-            const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
-            if (typeof parsed.progress === "number") {
-              setInstallProgress(
-                bundleId,
-                { percent: parsed.progress, stage: parsed.stage ?? "" },
-                null,
-              );
-              updateSingleFileProgress({
-                jobId,
-                phase: "processing",
-                percent: parsed.progress,
-                stage: parsed.stage,
-              });
-            }
-          } catch {
-            // Not JSON progress - rembg/pip output noise, keep in lastStderrLines for error reporting
-          }
-        }
-      });
-
-      child.on("close", (code) => {
-        releaseVenvOnce();
-        releaseInstallLock();
-
-        if (code === 0) {
-          invalidateCache();
-          shutdownDispatcher();
-          setInstallProgress(null, null, null);
-          updateSingleFileProgress({ jobId, phase: "complete", percent: 100, stage: "Complete" });
-          trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
-            bundle_id: bundleId,
-            action: "installed",
-            duration_ms: Date.now() - installStartTime,
-          });
-        } else {
-          // Extract the structured error from Python's fail() function first.
-          // fail() writes {"error": "..."} to stderr - prefer this over raw lines.
-          let errorMsg: string | undefined;
-          for (let i = lastStderrLines.length - 1; i >= 0; i--) {
-            const line = lastStderrLines[i];
-            if (line.startsWith("{")) {
-              try {
-                const parsed = JSON.parse(line) as Record<string, unknown>;
-                if (typeof parsed.error === "string") {
-                  errorMsg = parsed.error;
-                  break;
-                }
-              } catch {
-                // Not valid JSON
-              }
-            }
-          }
-          if (!errorMsg) {
-            if (code === 137) {
-              errorMsg =
-                "Installation was killed due to insufficient memory. " +
-                "Try increasing the container's memory limit (e.g. mem_limit: 6g in docker-compose.yml) and retry.";
-            } else {
-              const meaningful = lastStderrLines.filter(
-                (l) =>
-                  !l.startsWith("{") &&
-                  !l.includes("pthread_setaffinity_np") &&
-                  !l.includes("\x1b[") &&
-                  !l.includes("━") &&
-                  !/^\s*\d+%\|/.test(l),
-              );
-              errorMsg =
-                meaningful.join("\n") ||
-                stdoutBuffer.trim() ||
-                `Install failed with exit code ${code}`;
-            }
-          }
-          setInstallProgress(bundleId, null, errorMsg);
-          updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
-        }
-      });
-
-      child.on("error", (err) => {
-        releaseVenvOnce();
-        releaseInstallLock();
-        const errorMsg = `Failed to spawn install process: ${err.message}`;
-        setInstallProgress(bundleId, null, errorMsg);
-        updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
-      });
-
-      return reply.status(202).send({ jobId });
+      return reply.status(202).send({ jobId: effectiveJobId, queued });
     },
   );
 
@@ -430,6 +480,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           return reply.status(400).send({ error: err.message });
         }
         throw err;
+      } finally {
+        // The import releases the file lock in its own finally; pump here so a
+        // bundle that was queued while the import held the lock starts now.
+        pump();
       }
     },
   );

@@ -6484,6 +6484,12 @@ paths:
         Start async installation of an AI feature bundle. Downloads models and
         configures the Python sidecar. Returns a jobId for progress tracking
         via the SSE endpoint. Requires features:manage permission.
+
+        Installs are serialized server-side: a request made while another
+        install is running is queued (queued=true) rather than rejected, and
+        starts automatically when the running install finishes. A repeat
+        request for the same in-flight bundle is deduped and returns the same
+        jobId.
       security:
         - bearerAuth: []
       parameters:
@@ -6495,7 +6501,7 @@ paths:
             type: string
       responses:
         "202":
-          description: Installation started
+          description: Installation started or queued
           content:
             application/json:
               schema:
@@ -6504,6 +6510,11 @@ paths:
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
+                  queued:
+                    type: boolean
+                    description: >-
+                      True when the install was queued behind another running
+                      install instead of starting immediately.
         "401":
           description: Authentication required
           content:
@@ -6523,7 +6534,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: Bundle already installed or another install in progress
+          description: Bundle already installed
           content:
             application/json:
               schema:

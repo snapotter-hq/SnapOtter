@@ -60,7 +60,9 @@ test.describe("Feature API", () => {
       expect(bundle.estimatedSize).toBeTruthy();
       expect(bundle.enablesTools).toBeInstanceOf(Array);
       expect(bundle.enablesTools.length).toBeGreaterThan(0);
-      expect(["not_installed", "installed", "installing", "error"]).toContain(bundle.status);
+      expect(["not_installed", "queued", "installed", "installing", "error"]).toContain(
+        bundle.status,
+      );
     }
   });
 

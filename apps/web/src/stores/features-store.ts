@@ -44,14 +44,11 @@ interface FeaturesState {
 export const useFeaturesStore = create<FeaturesState>((set, get) => {
   const esRefs: Record<string, EventSource> = {};
   const pollRefs: Record<string, ReturnType<typeof setInterval>> = {};
-  const completionRefs: Record<string, () => void> = {};
 
-  const resolveCompletion = (bundleId: string) => {
-    if (completionRefs[bundleId]) {
-      completionRefs[bundleId]();
-      delete completionRefs[bundleId];
-    }
-  };
+  // Bundles that already got one retry during the current Install All run.
+  // Preserves the old one-shot retry-on-failure behavior now that the server
+  // serializes installs and we no longer drive the queue from the client.
+  const installAllRetried = new Set<string>();
 
   const refreshBundles = async () => {
     try {
@@ -60,36 +57,82 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     } catch {}
   };
 
+  /** Drop a bundle from both the installing map and the queued pill. */
+  const stopTracking = (bundleId: string) => {
+    const installing = { ...get().installing };
+    delete installing[bundleId];
+    set({ installing, queued: get().queued.filter((id) => id !== bundleId) });
+  };
+
+  /** Clear Install All once every bundle it kicked off has drained. */
+  const maybeFinishInstallAll = () => {
+    if (
+      get().installAllActive &&
+      Object.keys(get().installing).length === 0 &&
+      get().queued.length === 0
+    ) {
+      installAllRetried.clear();
+      set({ installAllActive: false });
+    }
+  };
+
+  /**
+   * A bundle install reached a terminal state. During Install All a failure is
+   * retried once (re-POSTed); otherwise the error is recorded. Either way we
+   * check whether the Install All run is done.
+   */
+  const onInstallSettled = (bundleId: string, errorMsg: string | null) => {
+    if (errorMsg) {
+      if (get().installAllActive && !installAllRetried.has(bundleId)) {
+        installAllRetried.add(bundleId);
+        const errors = { ...get().errors };
+        delete errors[bundleId];
+        set({ errors });
+        get().installBundle(bundleId);
+        return;
+      }
+      set({ errors: { ...get().errors, [bundleId]: errorMsg } });
+    }
+    maybeFinishInstallAll();
+  };
+
   const startPolling = (bundleId: string) => {
     if (pollRefs[bundleId]) return;
     pollRefs[bundleId] = setInterval(async () => {
       try {
         await refreshBundles();
         const updated = get().bundles.find((b) => b.id === bundleId);
-        if (updated?.status !== "installing") {
-          clearInterval(pollRefs[bundleId]);
-          delete pollRefs[bundleId];
 
-          const installing = { ...get().installing };
-          delete installing[bundleId];
-          set({ installing });
-
-          if (updated?.status === "error") {
-            set({
-              errors: { ...get().errors, [bundleId]: updated.error ?? "Installation failed" },
-            });
+        if (updated?.status === "queued") {
+          // Still waiting behind another install on the server; keep the pill.
+          if (!get().queued.includes(bundleId)) {
+            set({ queued: [...get().queued, bundleId] });
           }
-          resolveCompletion(bundleId);
-        } else if (updated.progress) {
+          return;
+        }
+
+        if (updated?.status === "installing") {
+          // Now the active install: move queued -> installing and track progress.
           const current = get().installing[bundleId];
-          const percent = Math.max(updated.progress.percent, current?.percent ?? 0);
+          const percent = Math.max(updated.progress?.percent ?? 0, current?.percent ?? 0);
           set({
             installing: {
               ...get().installing,
-              [bundleId]: { percent, stage: updated.progress.stage },
+              [bundleId]: { percent, stage: updated.progress?.stage ?? current?.stage ?? "" },
             },
+            queued: get().queued.filter((id) => id !== bundleId),
           });
+          return;
         }
+
+        // Terminal: installed / error / not_installed.
+        clearInterval(pollRefs[bundleId]);
+        delete pollRefs[bundleId];
+        stopTracking(bundleId);
+        onInstallSettled(
+          bundleId,
+          updated?.status === "error" ? (updated.error ?? "Installation failed") : null,
+        );
       } catch {}
     }, 3000);
   };
@@ -109,23 +152,20 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         if (data.phase === "complete") {
           es.close();
           delete esRefs[bundleId];
-          const installing = { ...get().installing };
-          delete installing[bundleId];
-          set({ installing });
+          stopTracking(bundleId);
           refreshBundles();
-          resolveCompletion(bundleId);
+          onInstallSettled(bundleId, null);
           return;
         }
         if (data.phase === "failed") {
           es.close();
           delete esRefs[bundleId];
-          const installing = { ...get().installing };
-          delete installing[bundleId];
-          set({ installing });
-          set({ errors: { ...get().errors, [bundleId]: data.error ?? "Installation failed" } });
-          resolveCompletion(bundleId);
+          stopTracking(bundleId);
+          onInstallSettled(bundleId, data.error ?? "Installation failed");
           return;
         }
+        // First progress frame means the server has started this install for
+        // real: move it out of the queued pill and into the installing map.
         const current = get().installing[bundleId];
         const percent = Math.max(data.percent, current?.percent ?? 0);
         set({
@@ -133,6 +173,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
             ...get().installing,
             [bundleId]: { percent, stage: data.stage },
           },
+          queued: get().queued.filter((id) => id !== bundleId),
         });
       } catch {}
     };
@@ -155,6 +196,12 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           startTimes: { ...get().startTimes, [bundle.id]: Date.now() },
         });
         startPolling(bundle.id);
+      } else if (bundle.status === "queued" && !get().queued.includes(bundle.id)) {
+        set({
+          queued: [...get().queued, bundle.id],
+          startTimes: { ...get().startTimes, [bundle.id]: Date.now() },
+        });
+        startPolling(bundle.id);
       }
     }
   };
@@ -162,7 +209,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState !== "visible") return;
-      const activeIds = Object.keys(get().installing);
+      const activeIds = [...Object.keys(get().installing), ...get().queued];
       if (activeIds.length === 0) return;
 
       for (const bundleId of activeIds) {
@@ -230,36 +277,9 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     },
 
     installBundle: async (bundleId: string) => {
-      const activeIds = Object.keys(get().installing);
-      if (activeIds.length > 0 && !activeIds.includes(bundleId)) {
-        const alreadyQueued = get().queued.includes(bundleId);
-        if (!alreadyQueued) {
-          set({ queued: [...get().queued, bundleId] });
-        }
-        const errors = { ...get().errors };
-        delete errors[bundleId];
-        set({ errors });
-
-        await new Promise<void>((resolve) => {
-          const check = () => {
-            const current = get().installing;
-            if (Object.keys(current).length === 0 || Object.keys(current).includes(bundleId)) {
-              resolve();
-            } else {
-              setTimeout(check, 500);
-            }
-          };
-          check();
-        });
-
-        set({ queued: get().queued.filter((id) => id !== bundleId) });
-        const currentBundle = get().bundles.find((b) => b.id === bundleId);
-        if (currentBundle?.status === "installed") {
-          resolveCompletion(bundleId);
-          return;
-        }
-      }
-
+      // Always POST immediately -- the server owns the queue now, so a POST is
+      // durable even if this tab closes. Optimistically show "installing"; the
+      // response tells us whether it actually started or got queued.
       const errors = { ...get().errors };
       delete errors[bundleId];
       set({
@@ -269,32 +289,38 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       });
 
       try {
-        const result = await apiPost<{ jobId: string }>(
+        const result = await apiPost<{ jobId: string; queued?: boolean }>(
           `/v1/admin/features/${bundleId}/install`,
           {},
         );
+        if (result.queued) {
+          // Server queued it behind an active install; show the pill instead of
+          // a progress bar until the first progress frame arrives.
+          const installing = { ...get().installing };
+          delete installing[bundleId];
+          set({
+            installing,
+            queued: get().queued.includes(bundleId) ? get().queued : [...get().queued, bundleId],
+          });
+        }
         listenToProgress(bundleId, result.jobId);
       } catch (err) {
-        const installing = { ...get().installing };
-        delete installing[bundleId];
+        stopTracking(bundleId);
 
         const message = err instanceof Error ? err.message : "Failed to start installation";
         const isAlreadyInstalled = /already installed/i.test(message);
 
         if (isAlreadyInstalled) {
-          // 409 "already installed": clear the error and refresh status
-          // so the UI transitions to the installed state silently.
+          // 409 "already installed": clear the error and refresh status so the
+          // UI transitions to the installed state silently.
           const errors = { ...get().errors };
           delete errors[bundleId];
-          set({ installing, errors });
+          set({ errors });
           await refreshBundles();
+          onInstallSettled(bundleId, null);
         } else {
-          set({
-            installing,
-            errors: { ...get().errors, [bundleId]: message },
-          });
+          onInstallSettled(bundleId, message);
         }
-        resolveCompletion(bundleId);
       }
     },
 
@@ -318,59 +344,28 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     },
 
     installAll: async () => {
-      set({ installAllActive: true });
+      const pending = get().bundles.filter((b) => b.status !== "installed");
+      if (pending.length === 0) return;
 
-      // Immediately mark every not-yet-installed bundle as queued so the UI
-      // updates right away.  Exclude bundles that are already installing.
-      const activeIds = new Set(Object.keys(get().installing));
-      const pending = get().bundles.filter((b) => b.status !== "installed" && !activeIds.has(b.id));
-      // Clear stale errors for these bundles
+      // Mark every pending bundle up front so the run never looks "drained"
+      // between POST dispatches (which would clear installAllActive early).
       const errors = { ...get().errors };
-      for (const b of pending) delete errors[b.id];
-      set({ queued: pending.map((b) => b.id), errors });
-
-      // If an install is already in progress (user clicked an individual
-      // install before Install All), wait for it to finish first.
-      if (activeIds.size > 0) {
-        const activeId = [...activeIds][0];
-        await new Promise<void>((resolve) => {
-          completionRefs[activeId] = resolve;
-        });
-        await refreshBundles();
+      const installing = { ...get().installing };
+      const startTimes = { ...get().startTimes };
+      for (const b of pending) {
+        delete errors[b.id];
+        installing[b.id] = installing[b.id] ?? { percent: 5, stage: "Starting..." };
+        startTimes[b.id] = startTimes[b.id] ?? Date.now();
       }
+      set({ installAllActive: true, errors, installing, startTimes });
 
-      // Process the queue sequentially. After each install, wait briefly
-      // so the backend lock file is fully released before the next attempt.
-      // If a bundle fails, re-enqueue it for one retry.
-      const retried = new Set<string>();
-      while (true) {
-        const q = get().queued;
-        if (q.length === 0) break;
-        const nextId = q[0];
-        set({ queued: q.slice(1) });
-
-        const current = get().bundles.find((b) => b.id === nextId);
-        if (current?.status === "installed") continue;
-
-        await new Promise<void>((resolve) => {
-          completionRefs[nextId] = resolve;
-          get().installBundle(nextId);
-        });
-        await refreshBundles();
-
-        const after = get().bundles.find((b) => b.id === nextId);
-        if (after?.status !== "installed" && !retried.has(nextId)) {
-          retried.add(nextId);
-          const errors = { ...get().errors };
-          delete errors[nextId];
-          set({ queued: [...get().queued, nextId], errors });
-        }
-
-        // Brief pause to let the backend fully release the install lock
-        await new Promise((r) => setTimeout(r, 2000));
+      // Fire one POST per pending bundle. The server serializes them behind its
+      // queue; installBundle() reconciles installing vs queued from each
+      // response and installAllActive clears once installing[] and queued[]
+      // both drain (see maybeFinishInstallAll).
+      for (const b of pending) {
+        get().installBundle(b.id);
       }
-
-      set({ queued: [], installAllActive: false });
     },
 
     clearError: (bundleId: string) => {

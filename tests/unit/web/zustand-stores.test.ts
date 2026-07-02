@@ -2552,7 +2552,7 @@ describe("useFeaturesStore", () => {
 
   // -- installAll -----------------------------------------------------------
 
-  it("installAll processes all not-installed bundles sequentially", async () => {
+  it("installAll POSTs an install for each not-installed bundle", async () => {
     const bundles = [
       {
         id: "ai-rembg",
@@ -2610,10 +2610,15 @@ describe("useFeaturesStore", () => {
 
     await useFeaturesStore.getState().installAll();
 
-    expect(useFeaturesStore.getState().installAllActive).toBe(false);
-    expect(useFeaturesStore.getState().queued).toEqual([]);
-    // Only not-installed bundle should have been installed
+    // The install POST fires immediately (the server serializes installs now);
+    // only the not-installed bundle is POSTed.
     expect(mockApiPost).toHaveBeenCalledWith("/v1/admin/features/ai-rembg/install", {});
+    expect(mockApiPost).not.toHaveBeenCalledWith("/v1/admin/features/ai-esrgan/install", {});
+    // installAllActive clears once the (mock) EventSource reports completion.
+    await vi.waitFor(() => {
+      expect(useFeaturesStore.getState().installAllActive).toBe(false);
+    });
+    expect(useFeaturesStore.getState().queued).toEqual([]);
   });
 
   it("installAll skips bundles that are already installed", async () => {

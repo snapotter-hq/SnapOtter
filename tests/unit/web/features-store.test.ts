@@ -396,7 +396,9 @@ describe("useFeaturesStore", () => {
   });
 
   describe("installAll()", () => {
-    it("sets installAllActive = true and processes all uninstalled bundles", async () => {
+    // The server serializes installs now, so installAll just fires one POST per
+    // not-installed bundle and lets the backend queue them.
+    it("POSTs an install for every not-installed bundle and sets installAllActive", async () => {
       const bundles = [
         makeBundleState({ id: "bundle-1", status: "not_installed" }),
         makeBundleState({ id: "bundle-2", status: "installed" }),
@@ -404,52 +406,105 @@ describe("useFeaturesStore", () => {
       ];
       useFeaturesStore.setState({ bundles, loaded: true });
 
-      apiPostMock.mockImplementation((path: string) => {
-        if (path.includes("install")) {
-          return Promise.resolve({ jobId: `job-${path}` });
-        }
-        return Promise.resolve({});
-      });
-      apiGetMock.mockResolvedValue({
-        bundles: bundles.map((b) => ({ ...b, status: "installed" })),
-      });
+      apiPostMock.mockImplementation((path: string) => Promise.resolve({ jobId: `job-${path}` }));
 
-      const promise = useFeaturesStore.getState().installAll();
+      await useFeaturesStore.getState().installAll();
+
+      expect(useFeaturesStore.getState().installAllActive).toBe(true);
 
       await vi.waitFor(() => {
-        expect(useFeaturesStore.getState().installAllActive).toBe(true);
+        expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/bundle-1/install", {});
+        expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/bundle-3/install", {});
       });
+      // The already-installed bundle is not POSTed.
+      expect(apiPostMock).not.toHaveBeenCalledWith("/v1/admin/features/bundle-2/install", {});
 
-      const completeAllOpen = () => {
-        for (const es of FakeEventSource.instances) {
-          if (!es.closed) {
-            es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
-          }
-        }
-      };
+      // Complete both installs; installAllActive clears once installing + queued drain.
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances.length).toBe(2);
+      });
+      for (const es of FakeEventSource.instances) {
+        es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      }
 
       await vi.waitFor(() => {
-        expect(FakeEventSource.instances.length).toBeGreaterThan(0);
+        expect(useFeaturesStore.getState().installAllActive).toBe(false);
       });
-      completeAllOpen();
+      expect(useFeaturesStore.getState().queued).toEqual([]);
+    }, 15000);
 
-      await vi
-        .waitFor(
-          () => {
-            if (FakeEventSource.instances.length < 2) {
-              throw new Error("waiting for second EventSource");
-            }
-          },
-          { timeout: 5000 },
-        )
-        .catch(() => {});
-      completeAllOpen();
+    it("reflects server-queued bundles in the queued pill during Install All", async () => {
+      const bundles = [
+        makeBundleState({ id: "bundle-a", status: "not_installed" }),
+        makeBundleState({ id: "bundle-b", status: "not_installed" }),
+      ];
+      useFeaturesStore.setState({ bundles, loaded: true });
 
-      await promise;
+      // Server starts bundle-a immediately and queues bundle-b.
+      apiPostMock.mockImplementation((path: string) =>
+        Promise.resolve({
+          jobId: `job-${path}`,
+          queued: path.includes("bundle-b"),
+        }),
+      );
 
-      const state = useFeaturesStore.getState();
-      expect(state.installAllActive).toBe(false);
-      expect(state.queued).toEqual([]);
+      await useFeaturesStore.getState().installAll();
+
+      await vi.waitFor(() => {
+        expect(useFeaturesStore.getState().queued).toContain("bundle-b");
+        expect(useFeaturesStore.getState().installing["bundle-a"]).toBeDefined();
+      });
+      expect(useFeaturesStore.getState().installing["bundle-b"]).toBeUndefined();
+
+      // Finish both; the second transitions queued -> installing on its first
+      // progress frame, then completes.
+      const esB = FakeEventSource.instances.find((es) => es.url.includes("bundle-b"));
+      esB?.onmessage?.({ data: JSON.stringify({ phase: "installing", percent: 10, stage: "Go" }) });
+      await vi.waitFor(() => {
+        expect(useFeaturesStore.getState().queued).not.toContain("bundle-b");
+      });
+
+      for (const es of FakeEventSource.instances) {
+        es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      }
+      await vi.waitFor(() => {
+        expect(useFeaturesStore.getState().installAllActive).toBe(false);
+      });
+    }, 15000);
+
+    it("retries a bundle once if it fails during Install All, then stops", async () => {
+      const bundles = [makeBundleState({ id: "flaky", status: "not_installed" })];
+      useFeaturesStore.setState({ bundles, loaded: true });
+
+      apiPostMock.mockImplementation((path: string) => Promise.resolve({ jobId: `job-${path}` }));
+
+      await useFeaturesStore.getState().installAll();
+
+      // First attempt fails -> one retry (a second install POST + EventSource).
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances.length).toBe(1);
+      });
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ phase: "failed", error: "boom" }),
+      });
+
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances.length).toBe(2);
+      });
+      // Still active (retrying), no error surfaced yet.
+      expect(useFeaturesStore.getState().installAllActive).toBe(true);
+      expect(useFeaturesStore.getState().errors.flaky).toBeUndefined();
+
+      // Second attempt fails too -> no further retry; error recorded, run ends.
+      FakeEventSource.instances[1].onmessage?.({
+        data: JSON.stringify({ phase: "failed", error: "boom again" }),
+      });
+
+      await vi.waitFor(() => {
+        expect(useFeaturesStore.getState().installAllActive).toBe(false);
+      });
+      expect(FakeEventSource.instances.length).toBe(2);
+      expect(useFeaturesStore.getState().errors.flaky).toBe("boom again");
     }, 15000);
 
     it("clears stale errors for pending bundles", async () => {
@@ -465,7 +520,7 @@ describe("useFeaturesStore", () => {
         bundles: bundles.map((b) => ({ ...b, status: "installed" })),
       });
 
-      const promise = useFeaturesStore.getState().installAll();
+      await useFeaturesStore.getState().installAll();
 
       await vi.waitFor(() => {
         expect(useFeaturesStore.getState().errors["err-bundle"]).toBeUndefined();
@@ -479,7 +534,9 @@ describe("useFeaturesStore", () => {
         es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
       }
 
-      await promise;
+      await vi.waitFor(() => {
+        expect(useFeaturesStore.getState().installAllActive).toBe(false);
+      });
     }, 15000);
   });
 

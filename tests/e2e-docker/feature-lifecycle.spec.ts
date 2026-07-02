@@ -12,7 +12,7 @@ const pngBuffer = Buffer.from(
   "base64",
 );
 
-const VALID_STATUSES = ["not_installed", "installed", "installing", "error"];
+const VALID_STATUSES = ["not_installed", "queued", "installed", "installing", "error"];
 
 let _token: string | undefined;
 
@@ -296,26 +296,44 @@ test.describe("Install lifecycle - face-detection", () => {
     expect(["installing", "installed"]).toContain(bundle.status);
   });
 
-  test("second install of same bundle returns 409 during install", async ({ request }) => {
+  // New contract: the server owns the install queue, so a concurrent install is
+  // no longer rejected with 409. A repeat POST of the *same* installing bundle
+  // is deduped (202, not newly queued, same job); a *different* bundle is
+  // queued (202 { queued: true }) and reported as "queued" via GET /features.
+  test("second install of same bundle is deduped (202, not a new job)", async ({ request }) => {
     const status = await getBundleStatus(request, "face-detection");
     if (status === "installing") {
       const headers = await authHeaders(request);
       const res = await request.post(`${API}/api/v1/admin/features/face-detection/install`, {
         headers,
       });
-      expect(res.status()).toBe(409);
+      expect(res.status()).toBe(202);
+      const body = await res.json();
+      expect(body.queued).toBe(false);
+      expect(typeof body.jobId).toBe("string");
     }
     // If already installed (fast download), this test is a no-op
   });
 
-  test("install of different bundle returns 409 during install", async ({ request }) => {
+  test("install of different bundle while one is active is queued (202)", async ({ request }) => {
+    test.setTimeout(900_000);
     const status = await getBundleStatus(request, "face-detection");
-    if (status === "installing") {
-      const headers = await authHeaders(request);
-      const res = await request.post(`${API}/api/v1/admin/features/ocr/install`, { headers });
-      expect(res.status()).toBe(409);
-    }
-    // If already installed (fast download), this test is a no-op
+    if (status !== "installing") return; // fast install already finished; nothing to assert
+
+    const headers = await authHeaders(request);
+    const res = await request.post(`${API}/api/v1/admin/features/ocr/install`, { headers });
+    expect(res.status()).toBe(202);
+    expect((await res.json()).queued).toBe(true);
+
+    const ocr = await getBundle(request, "ocr");
+    expect(["queued", "installing"]).toContain(ocr.status);
+
+    // ocr auto-starts once face-detection finishes. Drain and uninstall it so
+    // the rest of the serial suite runs against a clean lock/state.
+    await waitForInstallComplete(request, "face-detection");
+    await waitForInstallComplete(request, "ocr", 900_000);
+    await request.post(`${API}/api/v1/admin/features/ocr/uninstall`, { headers });
+    expect(await getBundleStatus(request, "ocr")).toBe("not_installed");
   });
 
   test("after install completes, status is installed with version", async ({ request }) => {

@@ -6,7 +6,7 @@ export interface FeatureBundleInfo {
   enablesTools: string[];
 }
 
-export type FeatureStatus = "not_installed" | "installing" | "installed" | "error";
+export type FeatureStatus = "not_installed" | "queued" | "installing" | "installed" | "error";
 
 export interface FeatureBundleState {
   id: string;

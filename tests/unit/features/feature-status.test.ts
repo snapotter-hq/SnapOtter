@@ -637,6 +637,38 @@ describe("Composite state - getFeatureStates", () => {
     expect(ocr?.error).toBe("Install failed: disk full");
   });
 
+  it("reports a queued bundle as status 'queued'", async () => {
+    // The queue is a leaf module feature-status imports FROM; enqueue via the
+    // same (freshly reset) instance so getFeatureStates sees it.
+    const queue = await import("../../../apps/api/src/lib/feature-install-queue.js");
+    queue.enqueue({ bundleId: "ocr", jobId: "job-queued" });
+    try {
+      const states = mod.getFeatureStates();
+      const ocr = states.find((s) => s.id === "ocr");
+      expect(ocr?.status).toBe("queued");
+      // Bundles not in the queue stay not_installed.
+      const face = states.find((s) => s.id === "face-detection");
+      expect(face?.status).toBe("not_installed");
+    } finally {
+      queue.resetQueueState();
+    }
+  });
+
+  it("the currently-installing (lock) bundle takes precedence over queued", async () => {
+    const queue = await import("../../../apps/api/src/lib/feature-install-queue.js");
+    // ocr holds the lock (active install); face-detection is queued behind it.
+    mod.acquireInstallLock("ocr");
+    queue.enqueue({ bundleId: "face-detection", jobId: "job-2" });
+    try {
+      const states = mod.getFeatureStates();
+      expect(states.find((s) => s.id === "ocr")?.status).toBe("installing");
+      expect(states.find((s) => s.id === "face-detection")?.status).toBe("queued");
+    } finally {
+      queue.resetQueueState();
+      mod.releaseInstallLock();
+    }
+  });
+
   it("each result has correct shape", () => {
     mod.markInstalled("ocr", "1.0.0", []);
     const states = mod.getFeatureStates();
