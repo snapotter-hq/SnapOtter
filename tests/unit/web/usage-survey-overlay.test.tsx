@@ -76,7 +76,7 @@ describe("UsageSurveyOverlay", () => {
 
     expect(await screen.findByText("How are you using SnapOtter?")).toBeDefined();
     expect(screen.getByText("What matters most to you?")).toBeDefined();
-    expect(screen.getByRole("button", { name: /Just me/ })).toBeDefined();
+    expect(screen.getByRole("radio", { name: /Just me/ })).toBeDefined();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
@@ -87,7 +87,7 @@ describe("UsageSurveyOverlay", () => {
     renderOverlay();
     await screen.findByText("How are you using SnapOtter?");
 
-    fireEvent.click(screen.getByRole("button", { name: /Small team/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Small team/ }));
     fireEvent.click(screen.getByRole("button", { name: /Images/ }));
     fireEvent.click(screen.getByRole("button", { name: /PDF\/docs/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -114,7 +114,7 @@ describe("UsageSurveyOverlay", () => {
     renderOverlay();
     await screen.findByText("How are you using SnapOtter?");
 
-    fireEvent.click(screen.getByRole("button", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
@@ -134,11 +134,11 @@ describe("UsageSurveyOverlay", () => {
     renderOverlay();
     await screen.findByText("How are you using SnapOtter?");
 
-    fireEvent.click(screen.getByRole("button", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole("button", { name: /Small team/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Small team/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(2));
@@ -164,6 +164,35 @@ describe("UsageSurveyOverlay", () => {
       });
     });
     expect(submitFeedback).not.toHaveBeenCalled();
+  });
+
+  it("ignores a second dismiss click while the first write is in flight", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+    let resolveApiPut: (() => void) | undefined;
+    apiPut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveApiPut = () => resolve({});
+        }),
+    );
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    const dismissButton = screen.getByRole("button", { name: "Don't ask again" });
+    fireEvent.click(dismissButton);
+    fireEvent.click(dismissButton);
+    fireEvent.click(dismissButton);
+
+    resolveApiPut?.();
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/settings", {
+        "onboarding.usageSurvey.dismissedAt": expect.any(String),
+      });
+    });
+    expect(apiPut).toHaveBeenCalledTimes(1);
   });
 
   it("renders nothing when the admin must still change their password", async () => {
