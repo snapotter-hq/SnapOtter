@@ -2,7 +2,7 @@
 // Consumed by: the API's Zod validation (apps/api/src/routes/feedback.ts),
 // the API's PostHog event shape (apps/api/src/lib/analytics.ts), and the
 // web app's feedback types (apps/web/src/lib/feedback.ts). Add new values
-// here, not in any of those three -- they all derive from this file.
+// here, not in any of those three. They all derive from this file.
 
 export const FEEDBACK_SOURCE_VALUES = [
   "global",

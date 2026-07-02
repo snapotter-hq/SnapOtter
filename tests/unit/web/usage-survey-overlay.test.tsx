@@ -149,6 +149,26 @@ describe("UsageSurveyOverlay", () => {
     );
   });
 
+  it("stays visible and re-enables Continue if the feedback submission itself fails", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+    submitFeedback.mockRejectedValueOnce(new Error("network error"));
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
+
+    expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
+    expect(apiPut).not.toHaveBeenCalled();
+  });
+
   it("dismissing writes the dismiss key without submitting feedback", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });

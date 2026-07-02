@@ -116,8 +116,8 @@ export function UsageSurveyOverlay() {
       // admin can retry instead of silently losing their answer. If this
       // exact answer already submitted successfully (submittedAnswerKeyRef
       // matches), a retry only retries the settings write, so the same
-      // answer never gets submitted twice -- but a genuinely different
-      // answer always submits fresh.
+      // answer never gets submitted twice, but a genuinely different answer
+      // always submits fresh.
     } finally {
       setSubmitting(false);
     }
