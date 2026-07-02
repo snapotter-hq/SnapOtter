@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "@playwright/test";
+import { apiToolPath } from "../../packages/shared/src/constants.js";
 
 const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
 const USERNAME = process.env.QA_USERNAME || "admin";
@@ -121,7 +122,6 @@ async function runOneTool(token: string, bundleId: string) {
   const fd = new FormData();
   fd.append("file", new Blob([buf]), path.basename(spec.file));
   fd.append("settings", JSON.stringify(spec.settings));
-  const { apiToolPath } = await import("@snapotter/shared");
   const res = await fetch(`${BASE}${apiToolPath(spec.toolId)}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
