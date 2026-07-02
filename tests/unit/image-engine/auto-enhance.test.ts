@@ -329,6 +329,89 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
 
     expect(Buffer.compare(lowBuf, highBuf)).not.toBe(0);
   });
+
+  it("skips CLAHE above MAX_CLAHE_PIXELS (regression: 20MP RAW photo hung 40+s on this step alone)", async () => {
+    const corrections = {
+      brightness: 20,
+      contrast: 20,
+      temperature: 0,
+      saturation: 0,
+      sharpness: 0,
+      denoise: 0,
+    };
+    // A real 5504x3672 (20.2MP) photo triggered this; reuse those dimensions
+    // as the reported imageSize so the pixel-count gate is exercised without
+    // needing to decode an actual 20MP buffer in a unit test.
+    const overCap = applyCorrections(
+      sharp(PNG_200x150),
+      corrections,
+      "auto",
+      50,
+      {},
+      {
+        width: 5504,
+        height: 3672,
+      },
+    );
+    const overCapBuf = await overCap.toBuffer();
+
+    const claheDisabled = applyCorrections(
+      sharp(PNG_200x150),
+      corrections,
+      "auto",
+      50,
+      { contrast: false },
+      { width: 5504, height: 3672 },
+    );
+    const claheDisabledBuf = await claheDisabled.toBuffer();
+
+    // Skipping CLAHE via the size cap must produce byte-identical output to
+    // skipping it via the explicit toggle -- proof the cap actually took effect.
+    expect(Buffer.compare(overCapBuf, claheDisabledBuf)).toBe(0);
+  });
+
+  it("still applies CLAHE at or below MAX_CLAHE_PIXELS", async () => {
+    const corrections = {
+      brightness: 20,
+      contrast: 20,
+      temperature: 0,
+      saturation: 0,
+      sharpness: 0,
+      denoise: 0,
+    };
+    // Use the real buffer's actual 200x150 dimensions (30,000 px, well under
+    // the 16M cap) -- CLAHE's tile size is derived from imageSize, and Sharp
+    // rejects a tile window larger than the real underlying image, so a fake
+    // imageSize far bigger than the actual small test buffer isn't valid here
+    // (that's exactly what the "above the cap" test above uses instead,
+    // where CLAHE never actually runs so the mismatch never surfaces).
+    const underCap = applyCorrections(
+      sharp(PNG_200x150),
+      corrections,
+      "auto",
+      50,
+      {},
+      {
+        width: 200,
+        height: 150,
+      },
+    );
+    const underCapBuf = await underCap.toBuffer();
+
+    const claheDisabled = applyCorrections(
+      sharp(PNG_200x150),
+      corrections,
+      "auto",
+      50,
+      { contrast: false },
+      { width: 200, height: 150 },
+    );
+    const claheDisabledBuf = await claheDisabled.toBuffer();
+
+    // Under the cap, CLAHE should still run -- output must differ from the
+    // contrast-disabled baseline.
+    expect(Buffer.compare(underCapBuf, claheDisabledBuf)).not.toBe(0);
+  });
 });
 
 describe("auto-enhance edge cases", () => {
