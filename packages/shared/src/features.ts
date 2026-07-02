@@ -59,14 +59,14 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "photo-restoration",
     name: "Photo Restoration",
     description: "Restore old or damaged photos",
-    estimatedSize: "800 MB - 1 GB",
+    estimatedSize: "4-5 GB",
     enablesTools: ["restore-photo"],
   },
   ocr: {
     id: "ocr",
     name: "OCR",
     description: "Extract text from images",
-    estimatedSize: "3-4 GB",
+    estimatedSize: "5-6 GB",
     enablesTools: ["ocr", "ocr-pdf"],
   },
   transcription: {
