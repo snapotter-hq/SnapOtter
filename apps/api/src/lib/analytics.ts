@@ -1,4 +1,17 @@
-import { ANALYTICS_BAKED, ANALYTICS_EVENTS, APP_VERSION } from "@snapotter/shared";
+import {
+  ANALYTICS_BAKED,
+  ANALYTICS_EVENTS,
+  APP_VERSION,
+  type FeedbackErrorCategory,
+  type FeedbackFrictionArea,
+  type FeedbackImportantArea,
+  type FeedbackInstallMethod,
+  type FeedbackSentiment,
+  type FeedbackSource,
+  type FeedbackSurveyId,
+  type FeedbackType,
+  type FeedbackUsageType,
+} from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { PostHog } from "posthog-node";
 import { db, schema } from "../db/index.js";
@@ -7,30 +20,12 @@ import { analyticsEnabled, bakedEnabled } from "./analytics-gate.js";
 
 let posthogClient: PostHog | null = null;
 
-export const FEEDBACK_SOURCE_VALUES = [
-  "global",
-  "tool_result",
-  "failed_job",
-  "admin_installer",
-  "search_miss",
-  "onboarding",
-] as const;
-
-export const FEEDBACK_SURVEY_ID_VALUES = [
-  "global-feedback-v1",
-  "tool-result-v1",
-  "failed-job-v1",
-  "admin-install-v1",
-  "search-miss-v1",
-  "onboarding-usage-v1",
-] as const;
-
 export interface FeedbackEventProperties {
-  source: (typeof FEEDBACK_SOURCE_VALUES)[number];
-  survey_id?: (typeof FEEDBACK_SURVEY_ID_VALUES)[number];
+  source: FeedbackSource;
+  survey_id?: FeedbackSurveyId;
   prompt_variant?: string;
-  sentiment?: "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
-  feedback_type?: "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
+  sentiment?: FeedbackSentiment;
+  feedback_type?: FeedbackType;
   message?: string;
   contact_ok: boolean;
   contact_email?: string;
@@ -39,28 +34,11 @@ export interface FeedbackEventProperties {
   tool_id?: string;
   search_query?: string;
   job_status?: "completed" | "failed";
-  install_method?: "docker" | "docker_compose" | "source" | "cloud" | "other";
-  usage_type?: "personal" | "team_internal" | "business_workflow" | "education" | "evaluating";
-  important_areas?: string[];
-  friction_area?:
-    | "smooth"
-    | "docker"
-    | "environment_variables"
-    | "auth"
-    | "storage"
-    | "workers"
-    | "ai_tools"
-    | "docs"
-    | "performance"
-    | "other";
-  error_category?:
-    | "validation_error"
-    | "upload_error"
-    | "processing_error"
-    | "timeout"
-    | "unsupported_format"
-    | "worker_unavailable"
-    | "unknown";
+  install_method?: FeedbackInstallMethod;
+  usage_type?: FeedbackUsageType;
+  important_areas?: FeedbackImportantArea[];
+  friction_area?: FeedbackFrictionArea;
+  error_category?: FeedbackErrorCategory;
 }
 
 export async function initAnalytics(): Promise<void> {

@@ -19,8 +19,10 @@ import { apiGet, apiPut } from "@/lib/api";
 import {
   type FeedbackImportantArea,
   type FeedbackUsageType,
+  promptVariantForSource,
   shouldShowUsageSurvey,
   submitFeedback,
+  surveyIdForSource,
 } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -100,8 +102,8 @@ export function UsageSurveyOverlay() {
       if (submittedAnswerKeyRef.current !== answerKey) {
         await submitFeedback({
           source: "onboarding",
-          surveyId: "onboarding-usage-v1",
-          promptVariant: "onboarding-overlay-v1",
+          surveyId: surveyIdForSource("onboarding"),
+          promptVariant: promptVariantForSource("onboarding"),
           usageType,
           importantAreas,
         });
