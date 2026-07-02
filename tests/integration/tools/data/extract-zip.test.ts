@@ -131,6 +131,78 @@ describe("extract-zip (pure JS, no skipIf)", () => {
     expect(parsed.error).toMatch(/unsafe entry path|invalid relative path/i);
   }, 30_000);
 
+  it("rejects a zip with a deeply nested traversal entry (../../../etc/passphrase-lol) with 400", async () => {
+    // Same binary-patch technique as the "../evil.txt" case above, but with a
+    // multi-segment ".." path to make sure the segment-splitting check
+    // (name.split(/[/\\]/).some(s => s === "..")) isn't fooled by extra
+    // "../" hops -- only the first ".." segment mattering would be a bug.
+    const zip = new AdmZip();
+    const traversalName = "../../../etc/passphrase-lol";
+    const placeholder = "X".repeat(traversalName.length);
+    zip.addFile(placeholder, Buffer.from("evil"));
+    const zipBuf = Buffer.from(zip.toBuffer());
+
+    const placeholderBuf = Buffer.from(placeholder);
+    const replacementBuf = Buffer.from(traversalName);
+    let offset = zipBuf.indexOf(placeholderBuf);
+    while (offset !== -1) {
+      replacementBuf.copy(zipBuf, offset);
+      offset = zipBuf.indexOf(placeholderBuf, offset + 1);
+    }
+
+    const res = await runExtract("deep-traversal.zip", zipBuf);
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toMatch(/unsafe entry path|invalid relative path/i);
+  }, 30_000);
+
+  it("rejects a zip with an absolute Unix path entry (/etc/passwd) with 400", async () => {
+    // Absolute paths bypass ".." detection entirely -- extract-zip must reject
+    // entry names starting with "/" on their own (preValidate's
+    // name.startsWith("/") branch), independent of the ".." segment check.
+    const zip = new AdmZip();
+    const absoluteName = "/etc/passwd";
+    const placeholder = "X".repeat(absoluteName.length);
+    zip.addFile(placeholder, Buffer.from("evil"));
+    const zipBuf = Buffer.from(zip.toBuffer());
+
+    const placeholderBuf = Buffer.from(placeholder);
+    const replacementBuf = Buffer.from(absoluteName);
+    let offset = zipBuf.indexOf(placeholderBuf);
+    while (offset !== -1) {
+      replacementBuf.copy(zipBuf, offset);
+      offset = zipBuf.indexOf(placeholderBuf, offset + 1);
+    }
+
+    const res = await runExtract("absolute-path.zip", zipBuf);
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toMatch(/unsafe entry path|invalid relative path|absolute path/i);
+  }, 30_000);
+
+  it("rejects a zip with a Windows-style absolute path entry (\\evil.txt) with 400", async () => {
+    // Covers preValidate's name.startsWith("\\") branch, distinct from both
+    // the Unix absolute-path and ".." segment checks.
+    const zip = new AdmZip();
+    const absoluteName = "\\evil.txt";
+    const placeholder = "X".repeat(absoluteName.length);
+    zip.addFile(placeholder, Buffer.from("evil"));
+    const zipBuf = Buffer.from(zip.toBuffer());
+
+    const placeholderBuf = Buffer.from(placeholder);
+    const replacementBuf = Buffer.from(absoluteName);
+    let offset = zipBuf.indexOf(placeholderBuf);
+    while (offset !== -1) {
+      replacementBuf.copy(zipBuf, offset);
+      offset = zipBuf.indexOf(placeholderBuf, offset + 1);
+    }
+
+    const res = await runExtract("windows-absolute-path.zip", zipBuf);
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toMatch(/unsafe entry path|invalid relative path|absolute path/i);
+  }, 30_000);
+
   it("rejects a high-ratio zip bomb with 422", async () => {
     // Create a 60 MiB zero buffer - compresses to a very small zip
     const bomb = Buffer.alloc(60 * 1024 * 1024, 0);

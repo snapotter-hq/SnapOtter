@@ -50,6 +50,24 @@ export async function verifyPassword(password: string, stored: string): Promise<
 }
 
 /**
+ * Fixed-cost hash used to equalize login timing for usernames that don't
+ * exist (or have no local password). Computed once per process and cached --
+ * without this, a login attempt for an unknown username returns as soon as
+ * the user lookup misses, while a wrong password for a real user waits on a
+ * full scrypt run. That gap is a timing side-channel an attacker can use to
+ * enumerate valid usernames even though both cases return an identical 401
+ * body. Running verifyPassword against this dummy hash pays the same scrypt
+ * cost on the "unknown user" path so the two cases are timing-indistinguishable.
+ */
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hashPassword(randomBytes(SALT_LENGTH).toString("hex"));
+  }
+  return dummyHashPromise;
+}
+
+/**
  * Compute a fast lookup prefix for an API key.
  * Uses SHA-256 (not scrypt) so lookups are O(1) instead of O(n).
  */
@@ -358,6 +376,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (!user?.passwordHash) {
+        // Pay the same scrypt cost a real password check would take, so
+        // response timing doesn't reveal whether the username exists.
+        await verifyPassword(body.password, await getDummyHash());
         authAttempts.inc({ method: "password", result: "failure" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),

@@ -106,6 +106,54 @@ describe("Login failures", () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it("unknown username and wrong password take comparable time (no enumeration timing oracle)", async () => {
+    // Both cases must return the identical 401 body, but a naive implementation
+    // short-circuits on "user not found" before ever running the password
+    // hash (scrypt), while "wrong password for a real user" always pays the
+    // scrypt cost. That gap lets an attacker enumerate valid usernames purely
+    // from response timing even though the status code and body are identical.
+    // See getDummyHash() in apps/api/src/plugins/auth.ts -- it equalizes cost
+    // by running verifyPassword against a dummy hash on the unknown-user path.
+    const SAMPLES = 10;
+    const median = (values: number[]) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
+    };
+
+    const unknownUserTimes: number[] = [];
+    for (let i = 0; i < SAMPLES; i++) {
+      const start = performance.now();
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `nonexistent_${uid()}_${i}`, password: "Whatever1" },
+      });
+      unknownUserTimes.push(performance.now() - start);
+    }
+
+    const wrongPasswordTimes: number[] = [];
+    for (let i = 0; i < SAMPLES; i++) {
+      const start = performance.now();
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: "admin", password: `WrongPass1_${i}` },
+      });
+      wrongPasswordTimes.push(performance.now() - start);
+    }
+
+    const unknownMedian = median(unknownUserTimes);
+    const wrongPasswordMedian = median(wrongPasswordTimes);
+    const ratio =
+      Math.max(unknownMedian, wrongPasswordMedian) /
+      Math.max(1, Math.min(unknownMedian, wrongPasswordMedian));
+
+    // A real (unfixed) timing oracle shows up as 5-10x+ here (unknown-user
+    // returns near-instantly; wrong-password waits on scrypt). Bound at 3x to
+    // absorb normal event-loop/GC jitter while still catching a regression.
+    expect(ratio).toBeLessThan(3);
+  }, 30_000);
+
   it("failed logins generate LOGIN_FAILED audit events", async () => {
     const marker = uid();
     // Trigger a failed login with a unique username
