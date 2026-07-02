@@ -292,7 +292,10 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   test.describe("Compose", () => {
     async function uploadBaseImage(page: Page) {
       const fileChooserPromise = page.waitForEvent("filechooser");
-      await page.locator("section[aria-label='File drop zone']").click();
+      await page
+        .locator("section[aria-label='File drop zone']")
+        .getByRole("button", { name: /upload from computer/i })
+        .click();
       const fileChooser = await fileChooserPromise;
       await fileChooser.setFiles(getTestImagePath());
       await page.waitForTimeout(500);
@@ -662,7 +665,10 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       // Use compose-specific upload helpers
       const fileChooserPromise = page.waitForEvent("filechooser");
-      await page.locator("section[aria-label='File drop zone']").click();
+      await page
+        .locator("section[aria-label='File drop zone']")
+        .getByRole("button", { name: /upload from computer/i })
+        .click();
       const fileChooser = await fileChooserPromise;
       await fileChooser.setFiles(getTestImagePath());
       await page.waitForTimeout(500);

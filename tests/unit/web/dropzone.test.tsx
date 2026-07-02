@@ -146,7 +146,7 @@ describe("Dropzone", () => {
       render(<Dropzone />);
       expect(screen.getByText("Upload from computer")).toBeDefined();
       expect(screen.getByText("Drop your files here")).toBeDefined();
-      expect(screen.getByText("click anywhere to browse, or paste from clipboard")).toBeDefined();
+      expect(screen.getByText("use the upload button, or paste from clipboard")).toBeDefined();
     });
 
     it("shows supported formats hint", () => {
@@ -186,19 +186,19 @@ describe("Dropzone", () => {
   // Click to upload
   // ---------------------------------------------------------------------------
   describe("click to upload", () => {
-    it("opens file picker when the section is clicked", () => {
+    it("keeps the drop zone drag-only when the section is clicked", () => {
       const getInput = spyFileInput();
       render(<Dropzone />);
 
       fireEvent.click(screen.getByLabelText("File drop zone"));
-      expect(getInput()).not.toBeNull();
+      expect(getInput()).toBeNull();
     });
 
     it("opens file picker when the Upload button is clicked", () => {
       const getInput = spyFileInput();
       render(<Dropzone />);
 
-      fireEvent.click(screen.getByText("Upload from computer"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       expect(getInput()).not.toBeNull();
     });
 
@@ -206,7 +206,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       expect(getInput()?.multiple).toBe(true);
     });
 
@@ -214,7 +214,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone multiple={false} />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       expect(getInput()?.multiple).toBe(false);
     });
 
@@ -222,7 +222,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone accept="image/*" />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       const input = getInput()!;
       expect(input.accept).toContain("image/*");
       expect(input.accept).toContain(".heic");
@@ -234,7 +234,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone onFiles={onFiles} />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       const input = getInput()!;
 
       const file = makeFile("photo.png");
@@ -249,7 +249,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone onFiles={onFiles} />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       const input = getInput()!;
 
       const files = [makeFile("a.png"), makeFile("b.jpg", "image/jpeg")];
@@ -264,7 +264,7 @@ describe("Dropzone", () => {
       const getInput = spyFileInput();
       render(<Dropzone onFiles={onFiles} />);
 
-      fireEvent.click(screen.getByLabelText("File drop zone"));
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
       const input = getInput()!;
 
       Object.defineProperty(input, "files", { value: [], configurable: true });

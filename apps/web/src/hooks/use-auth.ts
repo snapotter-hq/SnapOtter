@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatHeaders } from "@/lib/api";
+import { clearToken, formatHeaders } from "@/lib/api";
 import { useConnectionStore } from "@/stores/connection-store";
 
 interface AuthState {
@@ -110,7 +110,7 @@ export function useAuth() {
               hasLocalPassword: session.user?.hasLocalPassword ?? false,
             });
         } else {
-          localStorage.removeItem("snapotter-token");
+          clearToken();
           if (!cancelled)
             setState({
               loading: false,

@@ -1,5 +1,5 @@
 import { AlertCircle, FileImage, FileUp, Upload } from "lucide-react";
-import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { cn } from "@/lib/utils";
@@ -195,16 +195,6 @@ export function Dropzone({
     input.click();
   }, [multiple, resolvedAccept, checkFile, onFiles, acceptDescription, accept]);
 
-  const handleDropzoneKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLElement>) => {
-      if (e.target !== e.currentTarget) return;
-      if (e.key !== "Enter" && e.key !== " ") return;
-      e.preventDefault();
-      handleClick();
-    },
-    [handleClick],
-  );
-
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const clip = e.clipboardData;
@@ -243,10 +233,8 @@ export function Dropzone({
       onDragOver={handleDrag}
       onDragLeave={handleDrag}
       onDrop={handleDrop}
-      onClick={handleClick}
-      onKeyDown={handleDropzoneKeyDown}
       className={cn(
-        "group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-200 mx-auto max-w-2xl w-full cursor-pointer",
+        "group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-200 mx-auto max-w-2xl w-full",
         compact ? "min-h-0 h-full" : "min-h-[400px]",
         isDragging
           ? "border-primary bg-primary/10 scale-[1.01]"

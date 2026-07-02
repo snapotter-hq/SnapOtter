@@ -530,24 +530,28 @@ describe("getToolRegistryEntry", () => {
 // Wrapper components (lines 305-324)
 // ==========================================================================
 
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import React from "react";
 
-function renderSettings(Settings: React.ComponentType<Record<string, unknown>>, props = {}) {
-  return render(
+async function renderSettings(Settings: React.ComponentType<Record<string, unknown>>, props = {}) {
+  const result = render(
     React.createElement(React.Suspense, { fallback: null }, React.createElement(Settings, props)),
   );
+  await act(async () => {
+    await vi.dynamicImportSettled();
+  });
+  return result;
 }
 
 describe("CropSettingsWrapper", () => {
-  it("renders null when cropProps is undefined", () => {
+  it("renders null when cropProps is undefined", async () => {
     const entry = getToolRegistryEntry("crop");
     expect(entry).toBeDefined();
-    const { container } = renderSettings(entry?.Settings as never);
+    const { container } = await renderSettings(entry?.Settings as never);
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders CropSettings when cropProps is provided", () => {
+  it("renders CropSettings when cropProps is provided", async () => {
     const entry = getToolRegistryEntry("crop");
     expect(entry).toBeDefined();
     const cropProps = {
@@ -561,20 +565,20 @@ describe("CropSettingsWrapper", () => {
       onAspectChange: vi.fn(),
       onGridToggle: vi.fn(),
     };
-    const { container } = renderSettings(entry?.Settings as never, { cropProps });
+    const { container } = await renderSettings(entry?.Settings as never, { cropProps });
     expect(container).toBeDefined();
   });
 });
 
 describe("EraseObjectSettingsWrapper", () => {
-  it("renders null when eraserProps is undefined", () => {
+  it("renders null when eraserProps is undefined", async () => {
     const entry = getToolRegistryEntry("erase-object");
     expect(entry).toBeDefined();
-    const { container } = renderSettings(entry?.Settings as never);
+    const { container } = await renderSettings(entry?.Settings as never);
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders EraseObjectSettings when eraserProps is provided", () => {
+  it("renders EraseObjectSettings when eraserProps is provided", async () => {
     const entry = getToolRegistryEntry("erase-object");
     expect(entry).toBeDefined();
     const eraserProps = {
@@ -583,16 +587,16 @@ describe("EraseObjectSettingsWrapper", () => {
       brushSize: 20,
       onBrushSizeChange: vi.fn(),
     };
-    const { container } = renderSettings(entry?.Settings as never, { eraserProps });
+    const { container } = await renderSettings(entry?.Settings as never, { eraserProps });
     expect(container).toBeDefined();
   });
 });
 
 describe("makeColorSettingsComponent", () => {
-  it("adjust-colors Settings renders without throwing", () => {
+  it("adjust-colors Settings renders without throwing", async () => {
     const entry = getToolRegistryEntry("adjust-colors");
     expect(entry).toBeDefined();
-    const { container } = renderSettings(entry?.Settings as never, {
+    const { container } = await renderSettings(entry?.Settings as never, {
       onPreviewFilter: vi.fn(),
     });
     expect(container).toBeDefined();

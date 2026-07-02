@@ -215,25 +215,6 @@ export function FindDuplicatesSettings() {
     URL.revokeObjectURL(url);
   }, [files, results]);
 
-  const _handleDownloadAll = useCallback(async () => {
-    const { zipSync } = await import("fflate");
-
-    const zipData: Record<string, Uint8Array> = {};
-    for (const file of files) {
-      const buf = await file.arrayBuffer();
-      zipData[file.name] = new Uint8Array(buf);
-    }
-
-    const zipped = zipSync(zipData);
-    const blob = new Blob([zipped as Uint8Array<ArrayBuffer>], { type: "application/zip" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "all-images.zip";
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [files]);
-
   const hasFiles = files.length >= 2;
   const activeDesc = preset ? PRESET_DESCRIPTIONS[preset] : null;
 

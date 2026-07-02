@@ -90,11 +90,12 @@ export function InfoSettings() {
     [setProcessing, setError, t],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: files.length is the reset trigger
   useEffect(() => {
     cacheRef.current.clear();
     autoFetchRef.current = false;
     setInfo(null);
-  }, []);
+  }, [files.length]);
 
   useEffect(() => {
     if (!autoFetchRef.current || files.length === 0) return;

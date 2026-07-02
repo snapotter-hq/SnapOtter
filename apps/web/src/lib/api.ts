@@ -45,9 +45,13 @@ export function parseApiError(
 
 // ── Auth Headers ───────────────────────────────────────────────
 
+function getBrowserStorage(): Storage | null {
+  return typeof window !== "undefined" ? window.localStorage : null;
+}
+
 function getToken(): string {
   try {
-    return localStorage.getItem("snapotter-token") || "";
+    return getBrowserStorage()?.getItem("snapotter-token") || "";
   } catch {
     return "";
   }
@@ -152,11 +156,11 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 export function setToken(token: string) {
-  localStorage.setItem("snapotter-token", token);
+  getBrowserStorage()?.setItem("snapotter-token", token);
 }
 
 export function clearToken() {
-  localStorage.removeItem("snapotter-token");
+  getBrowserStorage()?.removeItem("snapotter-token");
 }
 
 // ── File Upload / Download ──────────────────────────────────────
