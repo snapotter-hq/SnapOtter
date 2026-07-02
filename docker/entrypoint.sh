@@ -121,6 +121,7 @@ if [ -d "/opt/venv" ]; then
     rm -rf "$AI_VENV"
     cp -r /opt/venv "$AI_VENV_TMP"
     mv "$AI_VENV_TMP" "$AI_VENV"
+    rewrite_venv_paths "$AI_VENV" "/opt/venv" "$AI_VENV"
     # Reset installed-bundle state: their packages lived in the old venv.
     # Models in /data/ai/models survive, so reinstalling a bundle only
     # reruns pip (model downloads are idempotent and skip existing files).
@@ -129,6 +130,8 @@ if [ -d "/opt/venv" ]; then
       echo "WARNING: Installed AI feature bundles were reset after base venv upgrade. Reinstall them from the Settings page."
     fi
     echo "AI venv ready at $AI_VENV"
+  elif [ -d "$AI_VENV" ]; then
+    rewrite_venv_paths "$AI_VENV" "/opt/venv" "$AI_VENV"
   fi
 fi
 

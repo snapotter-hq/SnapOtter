@@ -59,19 +59,19 @@ function warn(f: Omit<Finding, "severity">) {
 }
 
 // ── Fixtures ─────────────────────────────────────────────────────────
-const IMG = fixture("test-200x150.png");
-const IMG_JPG = fixture("sample-photo.jpg");
-const VID = fixture("media", "tiny.mp4");
-const AUD = fixture("media", "tiny.mp3");
-const AUD_WAV = fixture("media", "tone-stereo.wav");
-const AUD_GAP = fixture("media", "tone-gap.wav");
-const PDF3 = fixture("test-3page.pdf");
-const GIF = fixture("animated.gif");
-const CSV = fixture("data", "tiny.csv");
-const JSON_F = fixture("data", "tiny.json");
-const YAML_F = fixture("data", "tiny.yaml");
-const XML_F = fixture("data", "tiny.xml");
-const ENCRYPTED_PDF = fixture("documents", "encrypted.pdf");
+const IMG = fixture("image", "valid", "test-200x150.png");
+const IMG_JPG = fixture("image", "valid", "sample-photo.jpg");
+const VID = fixture("video", "formats", "tiny.mp4");
+const AUD = fixture("audio", "formats", "tiny.mp3");
+const AUD_WAV = fixture("audio", "formats", "tone-stereo.wav");
+const AUD_GAP = fixture("audio", "formats", "tone-gap.wav");
+const PDF3 = fixture("document", "valid", "test-3page.pdf");
+const GIF = fixture("image", "valid", "animated.gif");
+const CSV = fixture("data", "valid", "tiny.csv");
+const JSON_F = fixture("data", "valid", "tiny.json");
+const YAML_F = fixture("data", "valid", "tiny.yaml");
+const XML_F = fixture("data", "valid", "tiny.xml");
+const ENCRYPTED_PDF = fixture("document", "valid", "encrypted.pdf");
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const TOOL_TIMEOUT = 180_000;

@@ -10,6 +10,7 @@ import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
 import { initAnalytics, isAnalyticsActive, optOut, track } from "./lib/analytics";
+import { AUTH_GUARD_UNGATED_PATHS } from "./lib/auth-routes";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -100,11 +101,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // Don't guard the login or change-password pages
-  if (
-    location.pathname === "/login" ||
-    location.pathname === "/change-password" ||
-    location.pathname === "/privacy"
-  ) {
+  if (AUTH_GUARD_UNGATED_PATHS.has(location.pathname)) {
     return <>{children}</>;
   }
 

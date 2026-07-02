@@ -10,6 +10,12 @@ import type {
 } from "../types.js";
 
 /**
+ * Above this pixel count, CLAHE is skipped in applyCorrections() -- see the
+ * comment at its call site for why.
+ */
+const MAX_CLAHE_PIXELS = 16_000_000;
+
+/**
  * Preset multipliers applied to auto-computed corrections.
  * Each value scales the corresponding correction (1.0 = unchanged).
  */
@@ -223,17 +229,28 @@ export function applyCorrections(
   const scale = intensity / 50;
 
   let result = image;
+  // Tracks whether .clahe() actually ran (not just whether the toggle allowed
+  // it) -- Step 5 below applies a compensation boost keyed off this, and it
+  // needs to stay correct now that CLAHE can also be skipped by image size.
+  let claheApplied = false;
 
   // Step 1: CLAHE - adaptive local contrast enhancement
-  // maxSlope must be an integer (Sharp requirement); skip for tiny images
+  // maxSlope must be an integer (Sharp requirement); skip for tiny images.
+  // CLAHE's cost scales with total pixel count regardless of tile size (tile
+  // size only bounds granularity, not the per-pixel histogram/interpolation
+  // work), so it's also skipped above MAX_CLAHE_PIXELS -- a 5504x3672 (20MP)
+  // real-world RAW photo measured 40+ seconds in this step alone versus ~1s
+  // for every other correction combined. The other six corrections below
+  // still apply at full resolution regardless of size.
   if (toggles.contrast !== false) {
     const maxSlope = clamp(Math.round(1.0 + (intensity / 100) * 4.0 * presets.clahe), 1, 10);
     const w = imageSize?.width ?? 64;
     const h = imageSize?.height ?? 64;
     const tileW = clamp(Math.round(w / 8), 8, 256);
     const tileH = clamp(Math.round(h / 8), 8, 256);
-    if (maxSlope >= 2 && w >= tileW && h >= tileH) {
+    if (maxSlope >= 2 && w >= tileW && h >= tileH && w * h <= MAX_CLAHE_PIXELS) {
       result = result.clahe({ width: tileW, height: tileH, maxSlope });
+      claheApplied = true;
     }
   }
 
@@ -272,7 +289,7 @@ export function applyCorrections(
   // Step 5: Saturation (with small CLAHE compensation boost)
   if (toggles.saturation !== false) {
     const adj = corrections.saturation * presets.saturation * scale;
-    const claheCompensation = toggles.contrast !== false && intensity > 10 ? 0.05 : 0;
+    const claheCompensation = claheApplied && intensity > 10 ? 0.05 : 0;
     const satMul = 1 + adj / 100 + claheCompensation;
     if (Math.abs(satMul - 1) > 0.02) {
       result = result.modulate({ saturation: clamp(satMul, 0.2, 3.0) });

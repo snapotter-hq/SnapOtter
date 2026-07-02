@@ -1224,6 +1224,69 @@ describe("bridge - initDispatcher", () => {
     // spawn should only have been called once
     expect(spawn).toHaveBeenCalledTimes(1);
   });
+
+  it("does not count an intentional shutdown() as a crash", async () => {
+    // Regression test: shutdown() kills the child with SIGTERM, which Node
+    // reports via the "close" event as code=null (not 0). The close handler
+    // must not mistake that for a crash, or repeated legitimate restarts
+    // (e.g. shutdownDispatcher() called on every AI bundle install in
+    // routes/features.ts) would eventually trip MAX_CONSECUTIVE_CRASHES and
+    // permanently disable the dispatcher with nothing having actually crashed.
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    shutdownDispatcher();
+    // Node reports a signal-killed process as code=null, signal="SIGTERM".
+    mock.emitEvent("close", null, "SIGTERM");
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+  });
+
+  it("does not count a shutdown()-induced stdin EPIPE as a crash", async () => {
+    // Regression: shutdown() ends stdin then SIGTERMs the child. On a real
+    // pipe that teardown can surface as an EPIPE/ERR_STREAM_DESTROYED on the
+    // stdin stream (observed in the container shutdown log as a spurious
+    // "[bridge] Dispatcher crash #1"). The "close" handler alone is guarded,
+    // but the stdin error handler must be too -- otherwise shutdownDispatcher()
+    // on every AI bundle install accrues false crashes toward the disable cap.
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    shutdownDispatcher();
+    const epipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    epipe.code = "EPIPE";
+    mock.stdin.emit("error", epipe);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+    expect(getDispatcherStatus().failed).toBe(false);
+  });
+
+  it("does not count a shutdown()-induced process error as a crash", async () => {
+    // The proc "error" handler (non-ENOENT) also records crashes; a kill during
+    // shutdown can emit one (e.g. ESRCH), which must not be counted.
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    shutdownDispatcher();
+    const err = new Error("kill ESRCH") as NodeJS.ErrnoException;
+    err.code = "ESRCH";
+    mock.emitEvent("error", err);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+    expect(getDispatcherStatus().failed).toBe(false);
+  });
 });
 
 // ── Dispatcher stdin JSON-RPC protocol ──────────────────────────────

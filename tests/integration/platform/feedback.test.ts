@@ -166,6 +166,43 @@ describe("POST /api/v1/feedback", () => {
     );
   });
 
+  it("accepts a persona-only onboarding submission with no important areas selected", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+    const token = await loginAsAdmin(testApp.app);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        source: "onboarding",
+        surveyId: "onboarding-usage-v1",
+        promptVariant: "onboarding-overlay-v1",
+        usageType: "personal",
+        importantAreas: [],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, accepted: true });
+    expect(captureFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "onboarding",
+        survey_id: "onboarding-usage-v1",
+        prompt_variant: "onboarding-overlay-v1",
+        usage_type: "personal",
+      }),
+      undefined,
+    );
+    // captureFeedback is mocked, so it receives the route's raw properties: the
+    // empty importantAreas array is forwarded as-is. Dropping an empty
+    // important_areas before it reaches PostHog happens inside the real,
+    // unmocked cleanFeedbackProperties (analytics.ts), which this test bypasses.
+    const lastCall = captureFeedback.mock.calls.at(-1);
+    expect(lastCall?.[0].important_areas).toEqual([]);
+  });
+
   it("drops identifying contact fields when contact consent is not checked", async () => {
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     await refreshAnalyticsGate();

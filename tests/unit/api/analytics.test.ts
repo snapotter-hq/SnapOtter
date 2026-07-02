@@ -268,6 +268,27 @@ describe("captureFeedback", () => {
     });
   });
 
+  it("drops an empty important_areas array instead of forwarding it", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.captureFeedback(
+      {
+        source: "onboarding",
+        survey_id: "onboarding-usage-v1",
+        prompt_variant: "onboarding-overlay-v1",
+        contact_ok: false,
+        usage_type: "personal",
+        important_areas: [],
+      },
+      "distinct-empty-areas",
+    );
+
+    const properties = mockCapture.mock.calls.at(-1)?.[0].properties;
+    expect(properties).not.toHaveProperty("important_areas");
+  });
+
   it("forwards search_query for a search_miss request", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";

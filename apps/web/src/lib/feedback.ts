@@ -1,19 +1,28 @@
+import type {
+  FeedbackErrorCategory,
+  FeedbackFrictionArea,
+  FeedbackImportantArea,
+  FeedbackInstallMethod,
+  FeedbackSentiment,
+  FeedbackSource,
+  FeedbackSurveyId,
+  FeedbackType,
+  FeedbackUsageType,
+} from "@snapotter/shared";
 import { apiPost } from "@/lib/api";
 
-export type FeedbackSource =
-  | "global"
-  | "tool_result"
-  | "failed_job"
-  | "admin_installer"
-  | "search_miss"
-  | "onboarding";
-export type FeedbackSurveyId =
-  | "global-feedback-v1"
-  | "tool-result-v1"
-  | "failed-job-v1"
-  | "admin-install-v1"
-  | "search-miss-v1"
-  | "onboarding-usage-v1";
+export type {
+  FeedbackErrorCategory,
+  FeedbackFrictionArea,
+  FeedbackImportantArea,
+  FeedbackInstallMethod,
+  FeedbackSentiment,
+  FeedbackSource,
+  FeedbackSurveyId,
+  FeedbackType,
+  FeedbackUsageType,
+};
+
 export type FeedbackPromptVariant =
   | "nav-v1"
   | "inline-v1"
@@ -22,40 +31,6 @@ export type FeedbackPromptVariant =
   | "search-empty-v1"
   | "search-results-v1"
   | "onboarding-overlay-v1";
-export type FeedbackSentiment = "great" | "okay" | "issue" | "missing" | "bug" | "idea" | "other";
-export type FeedbackType = "bug" | "feature_request" | "confusing_ux" | "performance" | "other";
-export type FeedbackInstallMethod = "docker" | "docker_compose" | "source" | "cloud" | "other";
-export type FeedbackUsageType =
-  | "personal"
-  | "team_internal"
-  | "business_workflow"
-  | "education"
-  | "evaluating";
-export type FeedbackImportantArea =
-  | "images"
-  | "pdf_docs"
-  | "video_audio"
-  | "batch_workflows"
-  | "ai_tools";
-export type FeedbackFrictionArea =
-  | "smooth"
-  | "docker"
-  | "environment_variables"
-  | "auth"
-  | "storage"
-  | "workers"
-  | "ai_tools"
-  | "docs"
-  | "performance"
-  | "other";
-export type FeedbackErrorCategory =
-  | "validation_error"
-  | "upload_error"
-  | "processing_error"
-  | "timeout"
-  | "unsupported_format"
-  | "worker_unavailable"
-  | "unknown";
 
 export interface FeedbackPayload {
   source: FeedbackSource;

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,5 +70,34 @@ describe("entrypoint-lib.sh ensure_writable", () => {
     expect(stderr).toContain(readonly);
     expect(stderr.toLowerCase()).toContain("not writable");
     expect(stderr).toContain("chown");
+  });
+});
+
+describe("entrypoint-lib.sh rewrite_venv_paths", () => {
+  it("rewrites copied venv text entrypoints literally without touching binary files", () => {
+    const optVenv = join(root, "opt&venv");
+    const aiVenv = join(root, "data|ai", "venv&runtime");
+    const binDir = join(aiVenv, "bin");
+    mkdirSync(binDir, { recursive: true });
+
+    const pip = join(binDir, "pip");
+    const activate = join(binDir, "activate");
+    const pyvenv = join(aiVenv, "pyvenv.cfg");
+    const binary = join(binDir, "python3");
+
+    writeFileSync(pip, `#!${optVenv}/bin/python3\nprint('pip')\n`);
+    writeFileSync(activate, `VIRTUAL_ENV=${optVenv}\nexport VIRTUAL_ENV\n`);
+    writeFileSync(pyvenv, `command = python3 -m venv ${optVenv}\n`);
+    writeFileSync(binary, Buffer.from([0x00, ...Buffer.from(optVenv), 0x00]));
+
+    const result = runLib(`rewrite_venv_paths '${aiVenv}' '${optVenv}' '${aiVenv}'`);
+    expect(result.status, result.stderr).toBe(0);
+
+    for (const file of [pip, activate, pyvenv]) {
+      const content = readFileSync(file, "utf-8");
+      expect(content).toContain(aiVenv);
+      expect(content).not.toContain(optVenv);
+    }
+    expect(readFileSync(binary)).toEqual(Buffer.from([0x00, ...Buffer.from(optVenv), 0x00]));
   });
 });

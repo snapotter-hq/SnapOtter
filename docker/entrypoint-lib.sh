@@ -55,3 +55,55 @@ ensure_writable() {
   done
   return "$_ew_failed"
 }
+
+# rewrite_venv_paths <venv> <from> <to>
+# A Python venv is not fully relocatable after a raw copy: console scripts and
+# activation files keep the source venv path. Patch only text files that still
+# contain that path so feature installs do not fall back to the baked /opt/venv.
+rewrite_venv_paths() {
+  _rv_venv="$1"
+  _rv_from="$2"
+  _rv_to="$3"
+
+  if [ ! -d "$_rv_venv" ] || [ -z "$_rv_from" ] || [ -z "$_rv_to" ]; then
+    return 0
+  fi
+
+  grep -Il -- "$_rv_from" "$_rv_venv"/bin/* "$_rv_venv/pyvenv.cfg" 2>/dev/null |
+    while IFS= read -r _rv_file; do
+      [ -f "$_rv_file" ] || continue
+      [ -L "$_rv_file" ] && continue
+      python3 - "$_rv_file" "$_rv_from" "$_rv_to" <<'PY'
+import os
+import sys
+import tempfile
+
+path, old, new = sys.argv[1:]
+old_bytes = old.encode()
+new_bytes = new.encode()
+
+with open(path, "rb") as source:
+    data = source.read()
+
+if old_bytes not in data:
+    raise SystemExit(0)
+
+stat = os.stat(path)
+directory = os.path.dirname(path) or "."
+prefix = f".{os.path.basename(path)}.snapotter-rewrite."
+fd, tmp_path = tempfile.mkstemp(prefix=prefix, dir=directory)
+
+try:
+    with os.fdopen(fd, "wb") as target:
+        target.write(data.replace(old_bytes, new_bytes))
+    os.chmod(tmp_path, stat.st_mode & 0o7777)
+    os.replace(tmp_path, path)
+except Exception:
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
+    raise
+PY
+    done
+}

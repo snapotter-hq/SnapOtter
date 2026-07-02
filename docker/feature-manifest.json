@@ -1,7 +1,7 @@
 {
   "manifestVersion": 2,
   "imageVersion": "2.0.0",
-  "pythonVersion": "3.11",
+  "pythonVersion": { "amd64": "3.12", "arm64": "3.11" },
   "basePackages": ["numpy==1.26.4", "Pillow==12.2.0", "opencv-python-headless==4.10.0.84"],
   "bundleRepo": "deepsafe/feature-bundles",
   "bundles": {

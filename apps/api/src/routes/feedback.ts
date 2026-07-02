@@ -1,58 +1,19 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { z } from "zod";
 import {
-  captureFeedback,
+  FEEDBACK_ERROR_CATEGORY_VALUES,
+  FEEDBACK_FRICTION_AREA_VALUES,
+  FEEDBACK_IMPORTANT_AREA_VALUES,
+  FEEDBACK_INSTALL_METHOD_VALUES,
+  FEEDBACK_SENTIMENT_VALUES,
   FEEDBACK_SOURCE_VALUES,
   FEEDBACK_SURVEY_ID_VALUES,
-  type FeedbackEventProperties,
-} from "../lib/analytics.js";
+  FEEDBACK_TYPE_VALUES,
+  FEEDBACK_USAGE_TYPE_VALUES,
+} from "@snapotter/shared";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { captureFeedback, type FeedbackEventProperties } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { requireAuth } from "../plugins/auth.js";
-
-const SENTIMENT_VALUES = ["great", "okay", "issue", "missing", "bug", "idea", "other"] as const;
-const FEEDBACK_TYPE_VALUES = [
-  "bug",
-  "feature_request",
-  "confusing_ux",
-  "performance",
-  "other",
-] as const;
-const INSTALL_METHOD_VALUES = ["docker", "docker_compose", "source", "cloud", "other"] as const;
-const USAGE_TYPE_VALUES = [
-  "personal",
-  "team_internal",
-  "business_workflow",
-  "education",
-  "evaluating",
-] as const;
-const IMPORTANT_AREA_VALUES = [
-  "images",
-  "pdf_docs",
-  "video_audio",
-  "batch_workflows",
-  "ai_tools",
-] as const;
-const FRICTION_AREA_VALUES = [
-  "smooth",
-  "docker",
-  "environment_variables",
-  "auth",
-  "storage",
-  "workers",
-  "ai_tools",
-  "docs",
-  "performance",
-  "other",
-] as const;
-const ERROR_CATEGORY_VALUES = [
-  "validation_error",
-  "upload_error",
-  "processing_error",
-  "timeout",
-  "unsupported_format",
-  "worker_unavailable",
-  "unknown",
-] as const;
 
 const toolIdSchema = z
   .string()
@@ -83,7 +44,7 @@ const feedbackBodySchema = z
       .max(80)
       .regex(/^[a-z0-9_-]+$/)
       .optional(),
-    sentiment: z.enum(SENTIMENT_VALUES).optional(),
+    sentiment: z.enum(FEEDBACK_SENTIMENT_VALUES).optional(),
     feedbackType: z.enum(FEEDBACK_TYPE_VALUES).optional(),
     message: optionalText(2000),
     contactOk: z.boolean().default(false),
@@ -93,11 +54,11 @@ const feedbackBodySchema = z
     toolId: toolIdSchema.optional(),
     searchQuery: optionalText(200),
     jobStatus: z.enum(["completed", "failed"]).optional(),
-    installMethod: z.enum(INSTALL_METHOD_VALUES).optional(),
-    usageType: z.enum(USAGE_TYPE_VALUES).optional(),
-    importantAreas: z.array(z.enum(IMPORTANT_AREA_VALUES)).max(5).optional(),
-    frictionArea: z.enum(FRICTION_AREA_VALUES).optional(),
-    errorCategory: z.enum(ERROR_CATEGORY_VALUES).optional(),
+    installMethod: z.enum(FEEDBACK_INSTALL_METHOD_VALUES).optional(),
+    usageType: z.enum(FEEDBACK_USAGE_TYPE_VALUES).optional(),
+    importantAreas: z.array(z.enum(FEEDBACK_IMPORTANT_AREA_VALUES)).max(5).optional(),
+    frictionArea: z.enum(FEEDBACK_FRICTION_AREA_VALUES).optional(),
+    errorCategory: z.enum(FEEDBACK_ERROR_CATEGORY_VALUES).optional(),
   })
   .superRefine((value, ctx) => {
     const hasText = Boolean(value.message?.trim());

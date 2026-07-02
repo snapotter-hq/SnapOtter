@@ -24,7 +24,7 @@ import {
 test("image: resize round-trip, previews, dimension oracle", async ({ page }) => {
   const issues = instrument(page);
   await gotoTool(page, "resize");
-  await uploadFiles(page, fixture("formats", "sample.png"));
+  await uploadFiles(page, fixture("image", "formats", "sample.png"));
   await assertNoBrokenImages(page);
   await page.locator("#resize-width").fill("64");
   const res = await processTool(page, "resize", "fast");
@@ -39,7 +39,7 @@ test("image: resize round-trip, previews, dimension oracle", async ({ page }) =>
 
 test("image: convert png -> webp, magic-byte oracle", async ({ page }) => {
   await gotoTool(page, "convert");
-  await uploadFiles(page, fixture("formats", "sample.png"));
+  await uploadFiles(page, fixture("image", "formats", "sample.png"));
   await assertNoBrokenImages(page);
   await page.locator("#convert-target-format").selectOption("webp");
   const res = await processTool(page, "convert", "fast");
@@ -50,18 +50,18 @@ test("image: convert png -> webp, magic-byte oracle", async ({ page }) => {
 
 test("video: input preview decodes (tiny.mp4)", async ({ page }) => {
   await gotoTool(page, "convert-video");
-  await uploadFiles(page, fixture("media", "tiny.mp4"));
+  await uploadFiles(page, fixture("video", "formats", "tiny.mp4"));
   await assertVideoPreview(page);
 });
 
 test("audio: input waveform ready (tiny.mp3)", async ({ page }) => {
   await gotoTool(page, "convert-audio");
-  await uploadFiles(page, fixture("media", "tiny.mp3"));
+  await uploadFiles(page, fixture("audio", "formats", "tiny.mp3"));
   await assertAudioPreview(page);
 });
 
 test("document: pdf input preview renders (tiny.pdf)", async ({ page }) => {
   await gotoTool(page, "rotate-pdf");
-  await uploadFiles(page, fixture("documents", "tiny.pdf"));
+  await uploadFiles(page, fixture("document", "formats", "tiny.pdf"));
   await assertDocumentPreview(page);
 });

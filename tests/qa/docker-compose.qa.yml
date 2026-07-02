@@ -4,12 +4,18 @@
 # clashing with a native dev server on 1349.
 #   docker compose -f tests/qa/docker-compose.qa.yml up -d
 #   open http://localhost:13499
-name: snapotter-qa
+#
+# Project/container names default to snapotter-qa. Two sessions on the same host
+# running this file verbatim at the same time will silently steal each other's
+# container (last `up` wins, no error) since container_name is fixed rather than
+# derived from the project name. If you need a second concurrent stack, override:
+#   QA_PROJECT_NAME=snapotter-qa-2 docker compose -f tests/qa/docker-compose.qa.yml up -d
+name: ${QA_PROJECT_NAME:-snapotter-qa}
 
 services:
   app:
     image: snapotter/snapotter:latest
-    container_name: snapotter-qa
+    container_name: ${QA_PROJECT_NAME:-snapotter-qa}
     ports:
       - "13499:1349"
     volumes:
@@ -45,7 +51,7 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    container_name: snapotter-qa-postgres
+    container_name: ${QA_PROJECT_NAME:-snapotter-qa}-postgres
     environment:
       POSTGRES_USER: snapotter
       POSTGRES_PASSWORD: snapotter
@@ -61,7 +67,7 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: snapotter-qa-redis
+    container_name: ${QA_PROJECT_NAME:-snapotter-qa}-redis
     command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
     volumes:
       - qa-redisdata:/data
