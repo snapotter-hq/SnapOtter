@@ -365,7 +365,7 @@ export function ToolPage() {
   const [eraserHasStrokes, setEraserHasStrokes] = useState(false);
   const [eraserBrushSize, setEraserBrushSize] = useState(30);
   const [eraserMaskedCount, setEraserMaskedCount] = useState(0);
-  // Center of the painted mask as a 0-100 percentage — used to init the slider at the right spot
+  // Center of the painted mask as a 0-100 percentage, used to init the slider at the erased spot
   const [eraserSliderInitPos, setEraserSliderInitPos] = useState<number | null>(null);
 
   // Sign state
@@ -596,15 +596,16 @@ export function ToolPage() {
   if (isAiTool && !toolInstalled && featureBundle) {
     return (
       <AppLayout breadcrumb={breadcrumb}>
-        <div className="flex-1 overflow-y-auto bg-muted/20">
-          <div className="flex items-center justify-center min-h-full">
-            <FeatureInstallPrompt
-              bundle={featureBundle}
-              isAdmin={isAdmin}
-              toolName={tool?.name}
-              toolDescription={tool?.description}
-            />
-          </div>
+        {/* min-h-full (not flex-1): AppLayout's <main> is a block scroll
+            container, so flex-1 collapses to content height and the prompt
+            hugs the top instead of centering. */}
+        <div className="min-h-full bg-muted/20 flex items-center justify-center py-8">
+          <FeatureInstallPrompt
+            bundle={featureBundle}
+            isAdmin={isAdmin}
+            toolName={tool?.name}
+            toolDescription={tool?.description}
+          />
         </div>
       </AppLayout>
     );

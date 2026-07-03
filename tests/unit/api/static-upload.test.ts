@@ -118,7 +118,7 @@ describe("registerUpload", () => {
   it("registers multipart with correct file size limit", async () => {
     uploadConfig.MAX_UPLOAD_SIZE_MB = 10;
     uploadConfig.MAX_BATCH_SIZE = 5;
-    const app = { register: vi.fn().mockResolvedValue(undefined) };
+    const app = { register: vi.fn().mockResolvedValue(undefined), addHook: vi.fn() };
 
     await registerUpload(app as never);
     expect(app.register).toHaveBeenCalledWith(mockMultipartPlugin, {
@@ -132,7 +132,7 @@ describe("registerUpload", () => {
   it("passes undefined for fileSize when MAX_UPLOAD_SIZE_MB is 0", async () => {
     uploadConfig.MAX_UPLOAD_SIZE_MB = 0;
     uploadConfig.MAX_BATCH_SIZE = 5;
-    const app = { register: vi.fn().mockResolvedValue(undefined) };
+    const app = { register: vi.fn().mockResolvedValue(undefined), addHook: vi.fn() };
 
     await registerUpload(app as never);
     expect(app.register).toHaveBeenCalledWith(mockMultipartPlugin, {
@@ -146,7 +146,7 @@ describe("registerUpload", () => {
   it("passes undefined for files when MAX_BATCH_SIZE is 0", async () => {
     uploadConfig.MAX_UPLOAD_SIZE_MB = 10;
     uploadConfig.MAX_BATCH_SIZE = 0;
-    const app = { register: vi.fn().mockResolvedValue(undefined) };
+    const app = { register: vi.fn().mockResolvedValue(undefined), addHook: vi.fn() };
 
     await registerUpload(app as never);
     expect(app.register).toHaveBeenCalledWith(mockMultipartPlugin, {
@@ -160,7 +160,7 @@ describe("registerUpload", () => {
   it("passes undefined for both limits when both are 0", async () => {
     uploadConfig.MAX_UPLOAD_SIZE_MB = 0;
     uploadConfig.MAX_BATCH_SIZE = 0;
-    const app = { register: vi.fn().mockResolvedValue(undefined) };
+    const app = { register: vi.fn().mockResolvedValue(undefined), addHook: vi.fn() };
 
     await registerUpload(app as never);
     expect(app.register).toHaveBeenCalledWith(mockMultipartPlugin, {

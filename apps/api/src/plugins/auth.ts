@@ -1243,21 +1243,17 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
       role: user.role,
     };
 
-    // Enforce mustChangePassword — block non-auth API calls
-    // (skipped when SKIP_MUST_CHANGE_PASSWORD=true for CI/dev environments)
-    if (user.mustChangePassword && !env.SKIP_MUST_CHANGE_PASSWORD) {
-      const allowed = [
-        "/api/auth/change-password",
-        "/api/auth/logout",
-        "/api/auth/session",
-        "/api/v1/config/",
-      ];
-      if (!allowed.some((p) => request.url.startsWith(p)) && request.url.startsWith("/api/")) {
-        return reply.status(403).send({
-          error: "Password change required",
-          code: "MUST_CHANGE_PASSWORD",
-        });
-      }
+    // Enforce mustChangePassword by blocking the authenticated API surface
+    // until the password is rotated. Public routes stay reachable: they need
+    // no session at all, so a 403 on the cookied variant adds no security and
+    // breaks the SPA (the /api/v1/health poll used to trip a false
+    // "Reconnecting to server" banner on the forced change-password screen).
+    // Skipped when SKIP_MUST_CHANGE_PASSWORD=true for CI/dev environments.
+    if (user.mustChangePassword && !env.SKIP_MUST_CHANGE_PASSWORD && !isPublic) {
+      return reply.status(403).send({
+        error: "Password change required",
+        code: "MUST_CHANGE_PASSWORD",
+      });
     }
   });
 }

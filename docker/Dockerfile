@@ -283,18 +283,26 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && pandoc --version \
     && rm -rf /var/lib/apt/lists/*
 
-# Embedded-mode databases: PostgreSQL 17 (PGDG, to match the Compose postgres:17
-# major for a clean data handoff) + Redis. Shipped in every image (single tag);
-# unused in external/Compose mode, ~tens of MB against the multi-GB base. They
-# enter the Trivy CVE surface and ride the existing apt-get upgrade patching.
+# Embedded-mode databases: PostgreSQL 17 (PGDG) + Redis 8 (packages.redis.io),
+# each pinned to the same major the Compose stack runs (postgres:17 / redis:8)
+# so embedded and external deployments behave identically and data hands off
+# cleanly. Distro repos would silently downgrade Redis to 7.x. Shipped in every
+# image (single tag); unused in external/Compose mode, ~tens of MB against the
+# multi-GB base. They enter the Trivy CVE surface and ride the existing
+# apt-get upgrade patching.
 RUN install -d /usr/share/postgresql-common/pgdg \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
          -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && curl -fsSL https://packages.redis.io/gpg \
+         -o /usr/share/keyrings/redis-archive-keyring.asc \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
          > /etc/apt/sources.list.d/pgdg.list \
+    && echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.asc] https://packages.redis.io/deb ${VERSION_CODENAME} main" \
+         > /etc/apt/sources.list.d/redis.list \
     && for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done \
     && apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17 redis-server \
+    && redis-server --version | grep -q 'v=8\.' \
     && rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem \
     && rm -rf /var/lib/apt/lists/*
 

@@ -41,13 +41,13 @@ Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all fi
 - **21 languages:** English, Arabic, Chinese (Simplified & Traditional), Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
 - **Pipelines:** Chain tools into reusable workflows with unlimited steps. Import/export as JSON. Batch process unlimited files at once
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
-- **Self-hosted:** one `docker run` for a single-container quick start (embedded Postgres + Redis), or a Postgres 17 + Redis 8 Compose stack for production. No external SaaS dependencies
+- **Self-hosted:** one `docker run` for a single-container quick start (embedded Postgres 17 + Redis 8), or the same Postgres 17 + Redis 8 as a Compose stack for production. No external SaaS dependencies
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
 - **Privacy first:** Your files never leave your network. Basic analytics help us catch bugs and improve tools -- disable anytime by rebuilding with `SNAPOTTER_ANALYTICS=off` ([Here's how to do it](https://docs.snapotter.com/guide/deployment.html#analytics))
 
 ## Quick Start
 
-One container, no setup. It starts an embedded Postgres + Redis on loopback and stores data in the `SnapOtter-data` volume:
+One container, no setup. It starts an embedded Postgres 17 + Redis 8 on loopback and stores data in the `SnapOtter-data` volume:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest

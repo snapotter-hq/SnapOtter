@@ -450,3 +450,64 @@ describe("Register validation", () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORCED PASSWORD CHANGE GATE
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Forced password change gate", () => {
+  // The register route leaves mustChangePassword=true; log straight in
+  // without clearing it so the gate is active for the session.
+  async function loginWithMustChange(): Promise<{ password: string; token: string }> {
+    const username = uid();
+    const password = "ValidPass1";
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username, password, role: "admin" },
+    });
+    if (res.statusCode !== 201) {
+      throw new Error(`register failed: ${res.statusCode} ${res.body}`);
+    }
+    return { password, token: await loginAs(username, password) };
+  }
+
+  it("keeps public endpoints reachable while the flag is set", async () => {
+    const { token } = await loginWithMustChange();
+    // Regression: /api/v1/health returned 403 here, tripping the SPA's
+    // "Reconnecting to server" banner on the forced change-password screen.
+    const health = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/health",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(health.statusCode).toBe(200);
+  });
+
+  it("blocks protected endpoints until the password is changed", async () => {
+    const { password, token } = await loginWithMustChange();
+
+    const blocked = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(blocked.statusCode).toBe(403);
+    expect(JSON.parse(blocked.body).code).toBe("MUST_CHANGE_PASSWORD");
+
+    const change = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { currentPassword: password, newPassword: "RotatedPass1" },
+    });
+    expect(change.statusCode).toBe(200);
+
+    const after = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(after.statusCode).toBe(200);
+  });
+});

@@ -249,15 +249,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let clientJobId: string | null = null;
       let fileCount = 0;
       const received: ReceivedUpload[] = [];
-      // Track last part for post-loop field recovery
-      let lastPart: { fields?: Record<string, unknown> } | undefined;
 
-      // Parse multipart parts (file parts stream to object storage)
+      // Parse multipart parts (file parts stream to object storage).
+      // request.parts() is the keep-alive-safe iterator from
+      // lib/multipart-parts.ts (installed in plugins/upload.ts), which never
+      // drops trailing parts, so no post-loop field recovery is needed.
       try {
         const parts = request.parts();
 
         for await (const part of parts) {
-          lastPart = part as { fields?: Record<string, unknown> };
           if (part.type === "file") {
             fileCount++;
             if (fileCount > maxInputs) {
@@ -288,31 +288,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
                 clientJobId = raw;
               }
-            }
-          }
-        }
-
-        // The upstream parts iterator can terminate before yielding trailing
-        // fields, but busboy has already populated part.fields on every part.
-        if (lastPart?.fields) {
-          const recover = (name: string): string | null => {
-            const f = lastPart?.fields?.[name];
-            const entry = Array.isArray(f) ? f[0] : f;
-            if (entry != null && typeof (entry as { value?: unknown }).value === "string") {
-              return (entry as { value: string }).value;
-            }
-            return null;
-          };
-          if (settingsRaw === null) {
-            settingsRaw = recover("settings");
-          }
-          if (fileId === null) {
-            fileId = recover("fileId");
-          }
-          if (clientJobId === null) {
-            const raw = recover("clientJobId");
-            if (raw !== null && raw.length > 0 && raw.length <= 128) {
-              clientJobId = raw;
             }
           }
         }

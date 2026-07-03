@@ -13,7 +13,7 @@ interface BeforeAfterSliderProps {
   beforeSize?: number;
   /** Processed file size in bytes. */
   afterSize?: number;
-  /** Initial divider position as a percentage (0–100). Defaults to 50. */
+  /** Initial divider position as a percentage (0-100). Defaults to 50. */
   initialPosition?: number;
   /** Optional CSS preview layers for the "after" panel (remove-bg effects). */
   bgPreview?: BgPreviewState | null;
@@ -213,11 +213,11 @@ export function BeforeAfterSlider({
         {/* Divider line */}
         {isMobile ? (
           <div
-            className="absolute inset-x-0 h-0.5 bg-white/80 pointer-events-none"
+            className="absolute inset-x-0 h-0.5 bg-white pointer-events-none shadow-[0_0_0_1px_rgba(0,0,0,0.4),0_0_6px_rgba(0,0,0,0.35)]"
             style={{ top: `${position}%`, transform: "translateY(-50%)" }}
           >
             {/* Handle grip */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border-2 border-primary shadow-lg flex items-center justify-center pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border-2 border-primary shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.35)] flex items-center justify-center pointer-events-none">
               <svg
                 width="14"
                 height="14"
@@ -245,11 +245,11 @@ export function BeforeAfterSlider({
           </div>
         ) : (
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-white/80 pointer-events-none"
+            className="absolute top-0 bottom-0 w-0.5 bg-white pointer-events-none shadow-[0_0_0_1px_rgba(0,0,0,0.4),0_0_6px_rgba(0,0,0,0.35)]"
             style={{ left: `${position}%`, transform: "translateX(-50%)" }}
           >
             {/* Handle grip */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border-2 border-primary shadow-lg flex items-center justify-center pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border-2 border-primary shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.35)] flex items-center justify-center pointer-events-none">
               <svg
                 width="14"
                 height="14"

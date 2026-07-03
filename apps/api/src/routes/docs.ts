@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import scalarPlugin from "@scalar/fastify-api-reference";
+import scalarPlugin, { type FastifyApiReferenceOptions } from "@scalar/fastify-api-reference";
 import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
@@ -173,12 +173,23 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     reply.type("text/yaml").send(specContent);
   });
 
-  await app.register(scalarPlugin, {
-    routePrefix: "/api/docs",
-    configuration: {
-      content: specContent,
-      theme: "default",
-      customCss: `
+  // Scalar's "Ask AI" (Agent Scalar), "Generate MCP", "Open API Client", and
+  // the Configure/Share/Deploy toolbar are all Scalar cloud features: they
+  // upload or link the OpenAPI document to scalar.com, which the docs CSP
+  // blocks by design (self-hosted docs make no external calls). Hide them
+  // instead of shipping dead UI. `agent` is a source-level key the plugin's
+  // configuration type doesn't list yet, hence the widened type.
+  const configuration: NonNullable<FastifyApiReferenceOptions["configuration"]> & {
+    agent?: { disabled?: boolean };
+  } = {
+    content: specContent,
+    pageTitle: "SnapOtter API Reference",
+    agent: { disabled: true },
+    mcp: { disabled: true },
+    hideClientButton: true,
+    showDeveloperTools: "never",
+    theme: "default",
+    customCss: `
         :root {
           --scalar-color-1: #09090b;
           --scalar-color-2: #3f3f46;
@@ -190,10 +201,20 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
           --scalar-border-color: #e4e4e7;
           --scalar-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+        /* Hide the "Powered by Scalar" sidebar footer link. Scalar exposes no
+           config flag for it (unlike the cloud buttons disabled above). */
+        a[href^="https://www.scalar.com"],
+        a[href^="https://scalar.com"] {
+          display: none !important;
+        }
       `,
-      hideDownloadButton: false,
-      hideTestRequestButton: true,
-      hiddenClients: true,
-    },
+    hideDownloadButton: false,
+    hideTestRequestButton: true,
+    hiddenClients: true,
+  };
+
+  await app.register(scalarPlugin, {
+    routePrefix: "/api/docs",
+    configuration,
   });
 }

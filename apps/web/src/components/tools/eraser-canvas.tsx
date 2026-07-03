@@ -451,12 +451,20 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
               style={{ width: canvasSize.w, height: canvasSize.h }}
               draggable={false}
             />
+            {/* Explicit CSS size is load-bearing: the backing store (width/height
+                attributes) is natural resolution, and `inset-0` alone does not
+                stretch a replaced element, so without it the canvas renders at
+                intrinsic size and every rect-based coordinate is misscaled. */}
             <canvas
               ref={canvasRef}
               width={renderDims.w}
               height={renderDims.h}
               className="absolute inset-0 touch-none"
-              style={{ cursor: isPanMode ? "grab" : "none" }}
+              style={{
+                width: canvasSize.w,
+                height: canvasSize.h,
+                cursor: isPanMode ? "grab" : "none",
+              }}
               onMouseDown={handleDown}
               onMouseMove={handleMove}
               onMouseUp={handleUp}

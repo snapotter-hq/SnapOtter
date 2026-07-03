@@ -13,6 +13,7 @@
     "migrate:sqlite": "tsx src/db/migrate-from-sqlite.ts"
   },
   "dependencies": {
+    "@fastify/busboy": "^3.2.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.0.0",

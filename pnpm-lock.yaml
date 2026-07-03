@@ -136,6 +136,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fastify/busboy':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@fastify/cookie':
         specifier: ^11.0.2
         version: 11.0.2

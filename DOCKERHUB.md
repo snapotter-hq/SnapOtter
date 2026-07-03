@@ -15,13 +15,32 @@ Open-source, self-hostable file manipulation suite. 200+ tools across image, vid
 
 ## What is SnapOtter?
 
-SnapOtter is a privacy-first alternative to cloud file-processing services. Convert, compress, edit, and transform files in your browser while the work happens on a server you control. No uploads to third parties, no per-file pricing, no SaaS lock-in. It runs as a small Docker Compose stack (the app plus PostgreSQL 17 and Redis 8) and works on AMD64 and ARM64.
+SnapOtter is a privacy-first alternative to cloud file-processing services. Convert, compress, edit, and transform files in your browser while the work happens on a server you control. No uploads to third parties, no per-file pricing, no SaaS lock-in. It runs as a single container (embedded PostgreSQL 17 and Redis 8) or as a small Docker Compose stack for production, and works on AMD64 and ARM64.
 
 ![SnapOtter dashboard](https://raw.githubusercontent.com/snapotter-hq/SnapOtter/main/branding/dashboard.gif)
 
 ## Quick start
 
-SnapOtter runs alongside PostgreSQL 17 and Redis 8. Save this as `compose.yaml`:
+One command, no setup. The container starts an embedded PostgreSQL 17 and Redis 8 on the loopback interface and keeps all data in the `SnapOtter-data` volume:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
+```
+
+The same image is also published to GHCR as `ghcr.io/snapotter-hq/snapotter:latest`. Embedded mode turns off automatically as soon as you set `DATABASE_URL`, so moving to the Compose stack later is just a config change.
+
+Open `http://localhost:1349` and log in.
+
+| Field    | Value   |
+|----------|---------|
+| Username | `admin` |
+| Password | `admin` |
+
+You will be asked to change your password on first login.
+
+### Production: Docker Compose
+
+For production, run PostgreSQL and Redis in their own containers. Save this as `compose.yaml`:
 
 ```yaml
 services:
@@ -59,14 +78,7 @@ Then start the stack:
 docker compose up -d
 ```
 
-Open `http://localhost:1349` and log in.
-
-| Field    | Value   |
-|----------|---------|
-| Username | `admin` |
-| Password | `admin` |
-
-You will be asked to change your password on first login. Change `DEFAULT_PASSWORD` for any non-local deployment.
+Change `DEFAULT_PASSWORD` for any non-local deployment.
 
 ## Supported tags and platforms
 
@@ -128,10 +140,10 @@ OIDC, SSO, S3 storage, and the full variable reference are documented in [Config
 
 | Path | Purpose |
 |------|---------|
-| `/data` | AI models and persistent user files. Back this up. |
+| `/data` | AI models and persistent user files; in single-container mode also the embedded PostgreSQL and Redis data. Back this up. |
 | `/tmp/workspace` | Temporary processing files (auto-cleaned). |
 
-PostgreSQL and Redis keep their own volumes (`snapotter-pgdata`, `snapotter-redisdata`) in the Compose stack above.
+In the Compose stack, PostgreSQL and Redis keep their own volumes (`snapotter-pgdata`, `snapotter-redisdata`).
 
 ## Ports
 
