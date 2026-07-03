@@ -316,24 +316,33 @@ test.describe("Install lifecycle - face-detection", () => {
   });
 
   test("install of different bundle while one is active is queued (202)", async ({ request }) => {
-    test.setTimeout(900_000);
+    // The drain below waits out two full installs, each with the helper's
+    // 600s default budget, so the test timeout must cover both plus slack.
+    test.setTimeout(1_500_000);
     const status = await getBundleStatus(request, "face-detection");
     if (status !== "installing") return; // fast install already finished; nothing to assert
 
     const headers = await authHeaders(request);
-    const res = await request.post(`${API}/api/v1/admin/features/ocr/install`, { headers });
+    // Queue transcription: the smallest bundle (~0.5 GB archive) that no
+    // other test here depends on. There is no cancel API for a queued
+    // install, so the drain below really downloads it; queueing ocr here
+    // used to pull a ~6 GB archive just to assert queued=true.
+    const res = await request.post(`${API}/api/v1/admin/features/transcription/install`, {
+      headers,
+    });
     expect(res.status()).toBe(202);
     expect((await res.json()).queued).toBe(true);
 
-    const ocr = await getBundle(request, "ocr");
-    expect(["queued", "installing"]).toContain(ocr.status);
+    const queuedBundle = await getBundle(request, "transcription");
+    expect(["queued", "installing"]).toContain(queuedBundle.status);
 
-    // ocr auto-starts once face-detection finishes. Drain and uninstall it so
-    // the rest of the serial suite runs against a clean lock/state.
+    // transcription auto-starts once face-detection finishes. Drain and
+    // uninstall it so the rest of the serial suite runs against a clean
+    // lock/state.
     await waitForInstallComplete(request, "face-detection");
-    await waitForInstallComplete(request, "ocr", 900_000);
-    await request.post(`${API}/api/v1/admin/features/ocr/uninstall`, { headers });
-    expect(await getBundleStatus(request, "ocr")).toBe("not_installed");
+    await waitForInstallComplete(request, "transcription");
+    await request.post(`${API}/api/v1/admin/features/transcription/uninstall`, { headers });
+    expect(await getBundleStatus(request, "transcription")).toBe("not_installed");
   });
 
   test("after install completes, status is installed with version", async ({ request }) => {

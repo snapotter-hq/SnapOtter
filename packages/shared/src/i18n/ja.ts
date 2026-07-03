@@ -3445,6 +3445,7 @@ export const ja: TranslationKeys = {
       description: "高度なファイル処理のためのAIモデルバンドルを管理します。",
       installAll: "すべてインストール",
       diskUsage: "ディスク使用量: {size}",
+      sizeOnDisk: "ディスク上 {size}",
       installed: "インストール済み",
       notInstalled: "未インストール",
       queued: "待機中",

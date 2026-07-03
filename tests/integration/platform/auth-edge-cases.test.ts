@@ -112,7 +112,7 @@ describe("Login failures", () => {
     // hash (scrypt), while "wrong password for a real user" always pays the
     // scrypt cost. That gap lets an attacker enumerate valid usernames purely
     // from response timing even though the status code and body are identical.
-    // See getDummyHash() in apps/api/src/plugins/auth.ts -- it equalizes cost
+    // See getDummyHash() in apps/api/src/plugins/auth.ts; it equalizes cost
     // by running verifyPassword against a dummy hash on the unknown-user path.
     const SAMPLES = 10;
     const median = (values: number[]) => {

@@ -135,7 +135,7 @@ describe("extract-zip (pure JS, no skipIf)", () => {
     // Same binary-patch technique as the "../evil.txt" case above, but with a
     // multi-segment ".." path to make sure the segment-splitting check
     // (name.split(/[/\\]/).some(s => s === "..")) isn't fooled by extra
-    // "../" hops -- only the first ".." segment mattering would be a bug.
+    // "../" hops; only the first ".." segment mattering would be a bug.
     const zip = new AdmZip();
     const traversalName = "../../../etc/passphrase-lol";
     const placeholder = "X".repeat(traversalName.length);
@@ -157,7 +157,7 @@ describe("extract-zip (pure JS, no skipIf)", () => {
   }, 30_000);
 
   it("rejects a zip with an absolute Unix path entry (/etc/passwd) with 400", async () => {
-    // Absolute paths bypass ".." detection entirely -- extract-zip must reject
+    // Absolute paths bypass ".." detection entirely; extract-zip must reject
     // entry names starting with "/" on their own (preValidate's
     // name.startsWith("/") branch), independent of the ".." segment check.
     const zip = new AdmZip();

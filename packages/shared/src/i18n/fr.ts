@@ -3516,6 +3516,7 @@ export const fr: TranslationKeys = {
       description: "Gérez les paquets de modèles AI pour le traitement avancé de fichiers.",
       installAll: "Tout installer",
       diskUsage: "Utilisation du disque : {size}",
+      sizeOnDisk: "{size} sur le disque",
       installed: "Installé",
       notInstalled: "Non installé",
       queued: "En file d'attente",

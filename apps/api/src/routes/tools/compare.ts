@@ -48,16 +48,25 @@ export function registerCompare(app: FastifyInstance) {
 
     try {
       const imageHandler = inputHandlerFor("image");
-      bufferA = (
-        await imageHandler.prepare(bufferA, filenameA, {
-          scratchDir: tmpdir(),
-        })
-      ).buffer;
-      bufferB = (
-        await imageHandler.prepare(bufferB, filenameB, {
-          scratchDir: tmpdir(),
-        })
-      ).buffer;
+      // Attribute validation failures to the specific upload: with two
+      // inputs, a bare "Invalid image: ..." does not tell the user which of
+      // their files was rejected. Restores the route's pre-migration
+      // "Invalid first/second image: ..." message contract.
+      const prepareInput = async (buffer: Buffer, filename: string, which: string) => {
+        try {
+          return (await imageHandler.prepare(buffer, filename, { scratchDir: tmpdir() })).buffer;
+        } catch (err) {
+          if (err instanceof InputValidationError) {
+            const message = err.message.startsWith("Invalid image")
+              ? err.message.replace("Invalid image", `Invalid ${which} image`)
+              : `${err.message} (${which} image)`;
+            throw new InputValidationError(message, err.statusCode, err.details);
+          }
+          throw err;
+        }
+      };
+      bufferA = await prepareInput(bufferA, filenameA, "first");
+      bufferB = await prepareInput(bufferB, filenameB, "second");
 
       // Normalize both to same size for comparison
       const metaA = await sharp(bufferA).metadata();

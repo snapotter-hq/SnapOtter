@@ -3512,6 +3512,7 @@ export const de: TranslationKeys = {
       description: "AI-Modellpakete für erweiterte Dateiverarbeitung verwalten.",
       installAll: "Alle installieren",
       diskUsage: "Speicherplatznutzung: {size}",
+      sizeOnDisk: "{size} auf der Festplatte",
       installed: "Installiert",
       notInstalled: "Nicht installiert",
       queued: "In Warteschlange",

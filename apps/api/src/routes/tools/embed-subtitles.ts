@@ -64,8 +64,19 @@ export function registerEmbedSubtitles(app: FastifyInstance) {
           "0:v:0",
           "-map",
           "0:a?",
+          // The new subtitle is mapped BEFORE the source's existing subtitle
+          // tracks so it is always output subtitle stream s:0, which the
+          // language tag below targets.
           "-map",
           "1:0",
+          // Preserve subtitle tracks already in the source (re-encoded to the
+          // container's text codec, matching the old `-map 0` behavior).
+          // Data streams stay unmapped on purpose: MPEG data tracks such as
+          // teletext cannot be remuxed into mp4/mkv and fail the whole job.
+          "-map",
+          "0:s?",
+          // MKV can carry attachment streams (embedded fonts); MP4 cannot.
+          ...(toMp4 ? [] : ["-map", "0:t?"]),
           ...(reencodeInputStreams
             ? [...videoEncodeArgsForContainer(outExt), ...audioEncodeArgsForContainer(outExt)]
             : ["-c:v", "copy", "-c:a", "copy"]),

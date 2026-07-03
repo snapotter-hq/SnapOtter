@@ -96,6 +96,14 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     maybeFinishInstallAll();
   };
 
+  const stopPolling = (bundleId: string) => {
+    const ref = pollRefs[bundleId];
+    if (ref) {
+      clearInterval(ref);
+      delete pollRefs[bundleId];
+    }
+  };
+
   const startPolling = (bundleId: string) => {
     if (pollRefs[bundleId]) return;
     pollRefs[bundleId] = setInterval(async () => {
@@ -126,8 +134,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         }
 
         // Terminal: installed / error / not_installed.
-        clearInterval(pollRefs[bundleId]);
-        delete pollRefs[bundleId];
+        stopPolling(bundleId);
         stopTracking(bundleId);
         onInstallSettled(
           bundleId,
@@ -138,6 +145,13 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   };
 
   const listenToProgress = (bundleId: string, jobId: string) => {
+    // One tracker per bundle: close any previous stream and stop any poll so
+    // a re-POST (which the server dedups to the same job) can never leave two
+    // live subscriptions whose terminal events each run the settle logic.
+    esRefs[bundleId]?.close();
+    delete esRefs[bundleId];
+    stopPolling(bundleId);
+
     const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
     esRefs[bundleId] = es;
 
@@ -277,7 +291,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     },
 
     installBundle: async (bundleId: string) => {
-      // Always POST immediately -- the server owns the queue now, so a POST is
+      // Always POST immediately: the server owns the queue now, so a POST is
       // durable even if this tab closes. Optimistically show "installing"; the
       // response tells us whether it actually started or got queued.
       const errors = { ...get().errors };
@@ -294,16 +308,21 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           {},
         );
         if (result.queued) {
-          // Server queued it behind an active install; show the pill instead of
-          // a progress bar until the first progress frame arrives.
+          // Server queued it behind an active install; show the pill and poll
+          // for the transition instead of holding an SSE connection open. An
+          // EventSource per queued bundle would let Install All pin up to 7
+          // connections for the whole run, exhausting the browser's
+          // per-origin limit on HTTP/1.1 and starving every other request.
           const installing = { ...get().installing };
           delete installing[bundleId];
           set({
             installing,
             queued: get().queued.includes(bundleId) ? get().queued : [...get().queued, bundleId],
           });
+          startPolling(bundleId);
+        } else {
+          listenToProgress(bundleId, result.jobId);
         }
-        listenToProgress(bundleId, result.jobId);
       } catch (err) {
         stopTracking(bundleId);
 
@@ -344,7 +363,12 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     },
 
     installAll: async () => {
-      const pending = get().bundles.filter((b) => b.status !== "installed");
+      // Skip bundles the server is already installing or holding in its
+      // queue: re-POSTing them just dedups server-side and used to leave a
+      // second progress subscription racing the first one's terminal events.
+      const pending = get().bundles.filter(
+        (b) => b.status !== "installed" && b.status !== "installing" && b.status !== "queued",
+      );
       if (pending.length === 0) return;
 
       // Mark every pending bundle up front so the run never looks "drained"

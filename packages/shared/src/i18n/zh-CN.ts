@@ -3243,6 +3243,7 @@ export const zhCN: TranslationKeys = {
       description: "管理用于高级文件处理的 AI 模型包。",
       installAll: "全部安装",
       diskUsage: "磁盘使用量：{size}",
+      sizeOnDisk: "占用磁盘 {size}",
       installed: "已安装",
       notInstalled: "未安装",
       queued: "排队中",

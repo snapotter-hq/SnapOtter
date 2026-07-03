@@ -3497,6 +3497,7 @@ export const uk: TranslationKeys = {
       description: "Керування пакетами AI-моделей для розширеної обробки файлів.",
       installAll: "Встановити все",
       diskUsage: "Використання диска: {size}",
+      sizeOnDisk: "{size} на диску",
       installed: "Встановлено",
       notInstalled: "Не встановлено",
       queued: "У черзі",

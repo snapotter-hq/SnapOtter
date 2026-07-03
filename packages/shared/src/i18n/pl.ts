@@ -3507,6 +3507,7 @@ export const pl: TranslationKeys = {
       description: "Zarządzanie pakietami modeli AI do zaawansowanego przetwarzania plików.",
       installAll: "Zainstaluj wszystkie",
       diskUsage: "Wykorzystanie dysku: {size}",
+      sizeOnDisk: "{size} na dysku",
       installed: "Zainstalowane",
       notInstalled: "Niezainstalowane",
       queued: "W kolejce",

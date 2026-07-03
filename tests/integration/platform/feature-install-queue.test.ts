@@ -5,7 +5,7 @@
  * The installer child process (spawn) and the venv lock (@snapotter/ai) are
  * mocked so no real Python runs: spawn returns a controllable fake child we can
  * drive with emit("close"). This lets us assert the route contract
- * deterministically -- a second concurrent install is queued (202 { queued:
+ * deterministically: a second concurrent install is queued (202 { queued:
  * true }) instead of rejected, the next queued bundle auto-starts when the
  * running one finishes, and a bundle queued while an import holds the lock
  * starts once the import route releases it.

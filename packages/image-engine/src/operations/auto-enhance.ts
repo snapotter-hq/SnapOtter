@@ -10,7 +10,7 @@ import type {
 } from "../types.js";
 
 /**
- * Above this pixel count, CLAHE is skipped in applyCorrections() -- see the
+ * Above this pixel count, CLAHE is skipped in applyCorrections(); see the
  * comment at its call site for why.
  */
 const MAX_CLAHE_PIXELS = 16_000_000;
@@ -230,7 +230,7 @@ export function applyCorrections(
 
   let result = image;
   // Tracks whether .clahe() actually ran (not just whether the toggle allowed
-  // it) -- Step 5 below applies a compensation boost keyed off this, and it
+  // it). Step 5 below applies a compensation boost keyed off this, and it
   // needs to stay correct now that CLAHE can also be skipped by image size.
   let claheApplied = false;
 
@@ -238,7 +238,7 @@ export function applyCorrections(
   // maxSlope must be an integer (Sharp requirement); skip for tiny images.
   // CLAHE's cost scales with total pixel count regardless of tile size (tile
   // size only bounds granularity, not the per-pixel histogram/interpolation
-  // work), so it's also skipped above MAX_CLAHE_PIXELS -- a 5504x3672 (20MP)
+  // work), so it's also skipped above MAX_CLAHE_PIXELS: a 5504x3672 (20MP)
   // real-world RAW photo measured 40+ seconds in this step alone versus ~1s
   // for every other correction combined. The other six corrections below
   // still apply at full resolution regardless of size.

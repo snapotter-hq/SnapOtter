@@ -3506,6 +3506,7 @@ export const it: TranslationKeys = {
       description: "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata dei file.",
       installAll: "Installa tutto",
       diskUsage: "Utilizzo del disco: {size}",
+      sizeOnDisk: "{size} su disco",
       installed: "Installato",
       notInstalled: "Non installato",
       queued: "Code",

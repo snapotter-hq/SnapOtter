@@ -6450,11 +6450,22 @@ paths:
                           description: Human-readable description of the feature bundle
                         status:
                           type: string
-                          enum: [installed, not_installed, installing, error]
+                          enum: [installed, not_installed, installing, queued, error]
                         installedVersion:
                           type: [string, "null"]
                         estimatedSize:
                           type: string
+                        downloadBytes:
+                          type: [integer, "null"]
+                          description: >-
+                            Compressed archive size for this host's
+                            architecture, when the manifest records it. Null in
+                            native (non-Docker) mode or when unmeasured.
+                        installedBytes:
+                          type: [integer, "null"]
+                          description: >-
+                            Extracted on-disk size for this host's
+                            architecture, when the manifest records it.
                         enablesTools:
                           type: array
                           items:

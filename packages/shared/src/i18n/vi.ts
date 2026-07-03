@@ -3492,6 +3492,7 @@ export const vi: TranslationKeys = {
       description: "Quản lý các gói mô hình AI cho xử lý tệp nâng cao.",
       installAll: "Cài đặt tất cả",
       diskUsage: "Dung lượng đĩa: {size}",
+      sizeOnDisk: "{size} trên ổ đĩa",
       installed: "Đã cài đặt",
       notInstalled: "Chưa cài đặt",
       queued: "Đang chờ",

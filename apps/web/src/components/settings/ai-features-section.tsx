@@ -285,7 +285,12 @@ function BundleCard({
           <p className="text-xs text-muted-foreground">
             {bundle.description} (~
             {bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize}
-            {bundle.installedBytes ? `, ${formatFileSize(bundle.installedBytes)} on disk` : ""})
+            {bundle.installedBytes
+              ? `, ${format(t.settings.aiFeatures.sizeOnDisk, {
+                  size: formatFileSize(bundle.installedBytes),
+                })}`
+              : ""}
+            )
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0 ms-4">

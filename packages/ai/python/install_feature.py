@@ -51,7 +51,7 @@ def detect_arch() -> str:
     Only two archive variants are currently published to the bundle repo:
     'amd64-gpu' and 'arm64-cpu' (see deepsafe/feature-bundles). There is no
     CPU-only amd64 variant yet, so amd64 hosts always resolve to 'amd64-gpu'
-    even when no GPU is present -- this downloads working CUDA-capable
+    even when no GPU is present: this downloads working CUDA-capable
     packages, just larger than a CPU-only host strictly needs. Do not change
     this to branch on GPU presence without first publishing an 'amd64-cpu'
     archive for every bundle; requesting a key that doesn't exist in the
@@ -97,7 +97,7 @@ def estimate_extracted(compressed: int, extracted: int) -> int:
     extractedSize (0), the budget would otherwise collapse to just the
     compressed size and under-reserve for the extracted payload; fall back to a
     conservative 3x of compressed (measured extracted/compressed ratios reach
-    ~3x). This is only the early sanity bail -- the accurate guard is the
+    ~3x). This is only the early sanity bail; the accurate guard is the
     real-on-disk re-check just before the destructive venv write."""
     return extracted if extracted > 0 else compressed * 3
 
@@ -499,22 +499,23 @@ def main() -> None:
     # -- Disk re-check before the first destructive venv write --
     # The upfront check ran before the download and used an estimate; now the
     # payload is really on disk, so measure it and verify there's room to place
-    # it before we start writing into the venv. On the same filesystem the move
-    # is a rename (no extra space needed, just a safety floor); across
-    # filesystems it is a copy that transiently needs the payload's size again.
-    # Running here (after the local/remote branches merge) also covers the
-    # offline-import path, which skipped the upfront check entirely.
-    staging_real = dir_size(staging_dir)
-    if same_filesystem(staging_dir, venv_path):
-        recheck_needed = 1024 ** 3  # 1 GB floor for fixups / installed.json / slack
-    else:
-        recheck_needed = staging_real + 1024 ** 3
-    check_disk_space(ai_dir, recheck_needed)
+    # it before we start writing into the venv. Running here (after the
+    # local/remote branches merge) also covers the offline-import path, which
+    # skipped the upfront check entirely. Each budget is checked against the
+    # filesystem the bytes actually land on: when the venv lives on a
+    # different filesystem than staging, the site-packages payload is COPIED
+    # onto the venv's disk, so that disk (not ai_dir's) must hold it. Models
+    # stay under ai_dir either way, moving by rename.
+    disk_floor = 1024 ** 3  # 1 GB for fixups / installed.json / slack
+    staging_sp = os.path.join(staging_dir, "site-packages")
+    if not same_filesystem(staging_dir, venv_path):
+        sp_bytes = dir_size(staging_sp) if os.path.isdir(staging_sp) else 0
+        check_disk_space(venv_path, sp_bytes + disk_floor)
+    check_disk_space(ai_dir, disk_floor)
 
     # -- Move site-packages --
     emit_progress(92, "Installing packages...")
     site_packages_dir = get_site_packages_dir(venv_path)
-    staging_sp = os.path.join(staging_dir, "site-packages")
 
     try:
         if os.path.isdir(staging_sp) and site_packages_dir:

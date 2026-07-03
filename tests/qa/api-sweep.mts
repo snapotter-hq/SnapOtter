@@ -640,7 +640,7 @@ async function main() {
               format: ext,
               status: statusCode,
               outputOk: false,
-              note: `BUG: custom body route returned ${statusCode} -- ${body.slice(0, 300)}`,
+              note: `BUG: custom body route returned ${statusCode}. ${body.slice(0, 300)}`,
             };
             results.push(r);
             bugs.push(r);
@@ -673,7 +673,7 @@ async function main() {
             outputOk: verification.ok,
             note: verification.ok
               ? `pass: ${verification.detail}`
-              : `BUG: corrupt success -- ${verification.detail}`,
+              : `BUG: corrupt success. ${verification.detail}`,
           };
           results.push(r);
           if (verification.ok) {
@@ -691,7 +691,7 @@ async function main() {
             format: ext,
             status: "network-error",
             outputOk: false,
-            note: `BUG: custom body request failed -- ${msg.slice(0, 200)}`,
+            note: `BUG: custom body request failed. ${msg.slice(0, 200)}`,
           };
           results.push(r);
           bugs.push(r);
@@ -817,7 +817,7 @@ async function main() {
           } catch {}
           const msg = parsed.error || parsed.details || body.slice(0, 200);
           const fullMsg =
-            [parsed.error, parsed.details].filter(Boolean).join(" -- ") || body.slice(0, 300);
+            [parsed.error, parsed.details].filter(Boolean).join(" | ") || body.slice(0, 300);
 
           // Check if this format is in the tool's own acceptedInputs
           const isSelfFormat = tool.acceptedInputs.includes(ext);
@@ -993,7 +993,7 @@ async function main() {
               outputOk: verification.ok,
               note: verification.ok
                 ? `pass: ${verification.detail}`
-                : `BUG: corrupt success -- ${verification.detail}`,
+                : `BUG: corrupt success. ${verification.detail}`,
             };
             results.push(r);
 

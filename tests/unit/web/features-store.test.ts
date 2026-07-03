@@ -448,6 +448,17 @@ describe("useFeaturesStore", () => {
         }),
       );
 
+      // The poll for the queued bundle reads server state from GET /v1/features.
+      let bundleBStatus: FeatureBundleState["status"] = "queued";
+      apiGetMock.mockImplementation(() =>
+        Promise.resolve({
+          bundles: [
+            makeBundleState({ id: "bundle-a", status: "installing" }),
+            makeBundleState({ id: "bundle-b", status: bundleBStatus }),
+          ],
+        }),
+      );
+
       await useFeaturesStore.getState().installAll();
 
       await vi.waitFor(() => {
@@ -456,21 +467,32 @@ describe("useFeaturesStore", () => {
       });
       expect(useFeaturesStore.getState().installing["bundle-b"]).toBeUndefined();
 
-      // Finish both; the second transitions queued -> installing on its first
-      // progress frame, then completes.
-      const esB = FakeEventSource.instances.find((es) => es.url.includes("bundle-b"));
-      esB?.onmessage?.({ data: JSON.stringify({ phase: "installing", percent: 10, stage: "Go" }) });
-      await vi.waitFor(() => {
-        expect(useFeaturesStore.getState().queued).not.toContain("bundle-b");
-      });
+      // A queued bundle must NOT hold an SSE connection open (it polls
+      // instead): only the actively-installing bundle has an EventSource.
+      expect(FakeEventSource.instances).toHaveLength(1);
+      expect(FakeEventSource.instances[0].url).toContain("bundle-a");
 
-      for (const es of FakeEventSource.instances) {
-        es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
-      }
-      await vi.waitFor(() => {
-        expect(useFeaturesStore.getState().installAllActive).toBe(false);
-      });
-    }, 15000);
+      // The server starts bundle-b; its poll moves it queued -> installing.
+      bundleBStatus = "installing";
+      await vi.waitFor(
+        () => {
+          expect(useFeaturesStore.getState().queued).not.toContain("bundle-b");
+          expect(useFeaturesStore.getState().installing["bundle-b"]).toBeDefined();
+        },
+        { timeout: 8000 },
+      );
+
+      // Finish both: bundle-a via its SSE stream, bundle-b via its poll
+      // observing the terminal server status.
+      bundleBStatus = "installed";
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await vi.waitFor(
+        () => {
+          expect(useFeaturesStore.getState().installAllActive).toBe(false);
+        },
+        { timeout: 8000 },
+      );
+    }, 25000);
 
     it("retries a bundle once if it fails during Install All, then stops", async () => {
       const bundles = [makeBundleState({ id: "flaky", status: "not_installed" })];

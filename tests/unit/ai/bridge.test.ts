@@ -1251,7 +1251,7 @@ describe("bridge - initDispatcher", () => {
     // pipe that teardown can surface as an EPIPE/ERR_STREAM_DESTROYED on the
     // stdin stream (observed in the container shutdown log as a spurious
     // "[bridge] Dispatcher crash #1"). The "close" handler alone is guarded,
-    // but the stdin error handler must be too -- otherwise shutdownDispatcher()
+    // but the stdin error handler must be too; otherwise shutdownDispatcher()
     // on every AI bundle install accrues false crashes toward the disable cap.
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);

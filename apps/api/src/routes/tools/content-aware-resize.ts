@@ -12,6 +12,8 @@ import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -59,37 +61,25 @@ export function registerContentAwareResize(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      // Decode HEIC/HEIF input (caire can't read HEIF containers)
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode HEIC/HEIF file",
-            details: friendlyError(err instanceof Error ? err.message : String(err)),
-          });
+      // Shared image input chain (validate, HEIC/RAW decode with filename
+      // rewrite, SVG sanitize, AVIF probe, autoOrient): the same handler the
+      // factory-based image routes use, replacing an inline copy that had
+      // already drifted (it never sanitized SVG or passed the file extension
+      // to the RAW decoder).
+      try {
+        const prepared = await inputHandlerFor("image").prepare(fileBuffer, filename, {
+          scratchDir: tmpdir(),
+        });
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename;
+      } catch (err) {
+        if (err instanceof InputValidationError) {
+          return reply.status(err.statusCode).send({ error: err.message, details: err.details });
         }
-      }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-      if (needsCliDecode(validation.format)) {
-        try {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        } catch (err) {
-          return reply.status(422).send({
-            error: `Failed to decode ${validation.format} file`,
-            details: friendlyError(err instanceof Error ? err.message : String(err)),
-          });
-        }
+        return reply.status(422).send({
+          error: "Failed to prepare image",
+          details: friendlyError(err instanceof Error ? err.message : String(err)),
+        });
       }
 
       // Validate settings
@@ -123,9 +113,6 @@ export function registerContentAwareResize(app: FastifyInstance) {
           },
           "Starting content-aware resize",
         );
-
-        // Auto-orient to fix EXIF rotation before seam carving
-        fileBuffer = await autoOrient(fileBuffer);
 
         const jobId = randomUUID();
         const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);

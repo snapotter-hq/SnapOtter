@@ -257,8 +257,17 @@ export function getInstallingBundle(): {
 let currentProgress: {
   bundleId: string;
   progress: { percent: number; stage: string } | null;
-  error: string | null;
 } | null = null;
+
+/**
+ * Failed-install errors keyed by bundle. Errors live outside the single
+ * progress slot because the queue pump starts the next install immediately
+ * after a failure: if the error sat in the slot, the next bundle's first
+ * progress frame would overwrite it and the failure would never surface to
+ * GET /features. An entry clears when a new install of the same bundle
+ * starts (its first setInstallProgress call with a null error).
+ */
+const installErrors = new Map<string, string>();
 
 export function setInstallProgress(
   bundleId: string | null,
@@ -267,9 +276,20 @@ export function setInstallProgress(
 ): void {
   if (!bundleId) {
     currentProgress = null;
+    installErrors.clear();
     return;
   }
-  currentProgress = { bundleId, progress, error };
+  if (error !== null) {
+    installErrors.set(bundleId, error);
+    if (currentProgress?.bundleId === bundleId) currentProgress = null;
+    return;
+  }
+  installErrors.delete(bundleId);
+  if (progress === null) {
+    if (currentProgress?.bundleId === bundleId) currentProgress = null;
+    return;
+  }
+  currentProgress = { bundleId, progress };
 }
 
 // ── Manifest reading ────────────────────────────────────────────────────
@@ -519,14 +539,15 @@ export function getFeatureStates(): FeatureBundleState[] {
     let error: string | null = null;
     let progress: { percent: number; stage: string } | null = null;
 
+    const installError = installErrors.get(bundle.id) ?? null;
     if (lock && lock.bundleId === bundle.id) {
       status = "installing";
       if (currentProgress && currentProgress.bundleId === bundle.id) {
         progress = currentProgress.progress;
-        if (currentProgress.error) {
-          status = "error";
-          error = currentProgress.error;
-        }
+      }
+      if (installError) {
+        status = "error";
+        error = installError;
       }
     } else if (installedBundle) {
       // Verify model files exist and are properly sized
@@ -540,9 +561,9 @@ export function getFeatureStates(): FeatureBundleState[] {
     } else if (queuedIds.has(bundle.id)) {
       // Waiting behind the active install in the server-side queue.
       status = "queued";
-    } else if (currentProgress?.bundleId === bundle.id && currentProgress.error) {
+    } else if (installError) {
       status = "error";
-      error = currentProgress.error;
+      error = installError;
     }
 
     const archive = manifest?.bundles[bundle.id]?.archives?.[arch];

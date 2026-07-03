@@ -74,6 +74,11 @@ function startInstall(bundleId: string, jobId: string): void {
   const installStartTime = Date.now();
 
   void (async () => {
+    // Mark the install as started right away: a zero-percent frame claims the
+    // progress slot and clears any stale error left by a previous failed
+    // attempt of this bundle, so a retry never shows the old failure.
+    setInstallProgress(bundleId, { percent: 0, stage: "" }, null);
+
     // Hold the venv lock across the whole install so no AI tool job loads
     // native libs from the venv while pip is rewriting them (that segfaults
     // the sidecar). This awaits any in-flight AI job before the installer
@@ -85,6 +90,21 @@ function startInstall(bundleId: string, jobId: string): void {
         venvReleased = true;
         releaseVenv();
       }
+    };
+
+    // A failed spawn fires BOTH "error" and "close", so both handlers funnel
+    // their teardown through this once-guard. Without it the second event
+    // would release the file lock and active slot that pump() just handed to
+    // the next queued bundle, letting two installers run into the same venv
+    // at once (the corruption the lock exists to prevent).
+    let finalized = false;
+    const finalizeOnce = (): boolean => {
+      if (finalized) return false;
+      finalized = true;
+      releaseVenvOnce();
+      releaseInstallLock();
+      clearActive();
+      return true;
     };
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
@@ -139,15 +159,12 @@ function startInstall(bundleId: string, jobId: string): void {
     });
 
     child.on("close", (code) => {
-      releaseVenvOnce();
-      releaseInstallLock();
-      clearActive();
-      pump();
+      if (!finalizeOnce()) return;
 
       if (code === 0) {
         invalidateCache();
         shutdownDispatcher();
-        setInstallProgress(null, null, null);
+        setInstallProgress(bundleId, null, null);
         updateSingleFileProgress({ jobId, phase: "complete", percent: 100, stage: "Complete" });
         trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
           bundle_id: bundleId,
@@ -195,16 +212,19 @@ function startInstall(bundleId: string, jobId: string): void {
         setInstallProgress(bundleId, null, errorMsg);
         updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
       }
+
+      // Record the outcome BEFORE starting the next install, so the next
+      // bundle's first progress frame cannot race with (or be wiped by) this
+      // install's completion/failure bookkeeping.
+      pump();
     });
 
     child.on("error", (err) => {
-      releaseVenvOnce();
-      releaseInstallLock();
-      clearActive();
-      pump();
+      if (!finalizeOnce()) return;
       const errorMsg = `Failed to spawn install process: ${err.message}`;
       setInstallProgress(bundleId, null, errorMsg);
       updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
+      pump();
     });
   })();
 }

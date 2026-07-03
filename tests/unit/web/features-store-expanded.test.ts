@@ -202,7 +202,7 @@ describe("useFeaturesStore (expanded)", () => {
 
       await useFeaturesStore.getState().installBundle("done-bundle");
 
-      // The client always POSTs now -- the server owns the queue/dedup decision.
+      // The client always POSTs now; the server owns the queue/dedup decision.
       expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/done-bundle/install", {});
       // A 409 already-installed clears installing + error and refreshes silently.
       const state = useFeaturesStore.getState();

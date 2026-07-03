@@ -3492,6 +3492,7 @@ export const sv: TranslationKeys = {
       description: "Hantera AI-modellpaket för avancerad filbehandling.",
       installAll: "Installera alla",
       diskUsage: "Diskanvändning: {size}",
+      sizeOnDisk: "{size} på disk",
       installed: "Installerad",
       notInstalled: "Inte installerad",
       queued: "I kö",

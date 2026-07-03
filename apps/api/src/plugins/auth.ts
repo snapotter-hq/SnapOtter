@@ -51,7 +51,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 /**
  * Fixed-cost hash used to equalize login timing for usernames that don't
- * exist (or have no local password). Computed once per process and cached --
+ * exist (or have no local password). Computed once per process and cached;
  * without this, a login attempt for an unknown username returns as soon as
  * the user lookup misses, while a wrong password for a real user waits on a
  * full scrypt run. That gap is a timing side-channel an attacker can use to

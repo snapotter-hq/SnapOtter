@@ -3502,6 +3502,7 @@ export const nl: TranslationKeys = {
       description: "Beheer AI-modelbundels voor geavanceerde bestandsverwerking.",
       installAll: "Alles installeren",
       diskUsage: "Schijfgebruik: {size}",
+      sizeOnDisk: "{size} op schijf",
       installed: "Geïnstalleerd",
       notInstalled: "Niet geïnstalleerd",
       queued: "In wachtrij",

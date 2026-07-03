@@ -67,7 +67,13 @@ export function UsageSurveyOverlay() {
     if (!eligibleAuthState || !eligibleRoute) return;
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => setSettings(data.settings))
-      .catch(() => setSettings({}));
+      .catch(() => {
+        // Fail closed: without settings we cannot know whether the admin
+        // already answered, and showing the full-screen overlay while the
+        // API is unhealthy would soft-lock them (the dismiss/continue
+        // writes would fail against the same unhealthy API). Skipping the
+        // survey for this load is the cheap, recoverable outcome.
+      });
   }, [eligibleAuthState, eligibleRoute]);
 
   const visible =

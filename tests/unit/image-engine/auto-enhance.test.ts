@@ -366,7 +366,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     const claheDisabledBuf = await claheDisabled.toBuffer();
 
     // Skipping CLAHE via the size cap must produce byte-identical output to
-    // skipping it via the explicit toggle -- proof the cap actually took effect.
+    // skipping it via the explicit toggle: proof the cap actually took effect.
     expect(Buffer.compare(overCapBuf, claheDisabledBuf)).toBe(0);
   });
 
@@ -380,7 +380,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
       denoise: 0,
     };
     // Use the real buffer's actual 200x150 dimensions (30,000 px, well under
-    // the 16M cap) -- CLAHE's tile size is derived from imageSize, and Sharp
+    // the 16M cap). CLAHE's tile size is derived from imageSize, and Sharp
     // rejects a tile window larger than the real underlying image, so a fake
     // imageSize far bigger than the actual small test buffer isn't valid here
     // (that's exactly what the "above the cap" test above uses instead,
@@ -408,7 +408,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     );
     const claheDisabledBuf = await claheDisabled.toBuffer();
 
-    // Under the cap, CLAHE should still run -- output must differ from the
+    // Under the cap, CLAHE should still run: output must differ from the
     // contrast-disabled baseline.
     expect(Buffer.compare(underCapBuf, claheDisabledBuf)).not.toBe(0);
   });

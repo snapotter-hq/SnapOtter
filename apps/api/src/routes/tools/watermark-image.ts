@@ -1,16 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
 
 const settingsSchema = z.object({
   position: z
@@ -81,86 +79,35 @@ export function registerWatermarkImage(app: FastifyInstance) {
     }
 
     try {
-      const valMain = await validateImageBuffer(mainBuffer, filename);
-      if (!valMain.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${valMain.reason}` });
-      }
-      if (valMain.format === "heif") {
-        try {
-          mainBuffer = await decodeHeic(mainBuffer);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-      if (needsCliDecode(valMain.format)) {
-        try {
-          const ext = filename.split(".").pop()?.toLowerCase();
-          mainBuffer = await decodeToSharpCompat(mainBuffer, valMain.format, ext);
-        } catch {
-          try {
-            await sharp(mainBuffer).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode ${valMain.format.toUpperCase()} file`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (valMain.format === "svg") {
-        try {
-          mainBuffer = decompressSvgz(mainBuffer);
-          mainBuffer = sanitizeSvg(mainBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
-        }
-      }
-      mainBuffer = await autoOrient(mainBuffer);
+      // Shared image input chain (validate, HEIC/RAW decode, SVG sanitize,
+      // AVIF probe, autoOrient), the same handler compare/vectorize/compose
+      // use. It also rewrites the filename extension after a decode so the
+      // output name and resolveOutputFormat below stay consistent.
+      const imageHandler = inputHandlerFor("image");
+      const preparedMain = await imageHandler.prepare(mainBuffer, filename, {
+        scratchDir: tmpdir(),
+      });
+      mainBuffer = preparedMain.buffer;
+      filename = preparedMain.filename;
 
-      const valWm = await validateImageBuffer(watermarkBuffer, watermarkFilename);
-      if (!valWm.valid) {
-        return reply.status(400).send({ error: `Invalid watermark image: ${valWm.reason}` });
-      }
-      if (valWm.format === "heif") {
-        try {
-          watermarkBuffer = await decodeHeic(watermarkBuffer);
-        } catch (err) {
-          return reply.status(422).send({
-            error: "Failed to decode watermark (HEIC). Ensure libheif-examples is installed.",
-            details: err instanceof Error ? err.message : String(err),
-          });
+      try {
+        watermarkBuffer = (
+          await imageHandler.prepare(watermarkBuffer, watermarkFilename, {
+            scratchDir: tmpdir(),
+          })
+        ).buffer;
+      } catch (err) {
+        // Attribute validation failures to the watermark upload so the user
+        // knows which of the two files was rejected, preserving the route's
+        // established "Invalid watermark image: ..." message contract.
+        if (err instanceof InputValidationError) {
+          const message = err.message.startsWith("Invalid image")
+            ? err.message.replace("Invalid image", "Invalid watermark image")
+            : `${err.message} (watermark)`;
+          throw new InputValidationError(message, err.statusCode, err.details);
         }
+        throw err;
       }
-      if (needsCliDecode(valWm.format)) {
-        try {
-          watermarkBuffer = await decodeToSharpCompat(watermarkBuffer, valWm.format);
-        } catch {
-          try {
-            await sharp(watermarkBuffer).metadata();
-          } catch (err) {
-            return reply.status(422).send({
-              error: `Failed to decode watermark (${valWm.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
-      if (valWm.format === "svg") {
-        try {
-          watermarkBuffer = decompressSvgz(watermarkBuffer);
-          watermarkBuffer = sanitizeSvg(watermarkBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG (watermark)",
-          });
-        }
-      }
-      watermarkBuffer = await autoOrient(watermarkBuffer);
 
       const mainImage = sharp(mainBuffer);
       const mainMeta = await mainImage.metadata();
@@ -242,6 +189,9 @@ export function registerWatermarkImage(app: FastifyInstance) {
         processedSize: result.length,
       });
     } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+      }
       return reply.status(422).send({
         error: "Processing failed",
         details: err instanceof Error ? err.message : "Image processing failed",

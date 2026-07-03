@@ -3241,6 +3241,7 @@ export const zhTW: TranslationKeys = {
       description: "管理用於進階檔案處理的AI模型套件。",
       installAll: "全部安裝",
       diskUsage: "磁碟使用量：{size}",
+      sizeOnDisk: "佔用磁碟 {size}",
       installed: "已安裝",
       notInstalled: "未安裝",
       queued: "等待中",

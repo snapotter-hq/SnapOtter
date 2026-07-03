@@ -8,8 +8,10 @@
 # Project/container names default to snapotter-qa. Two sessions on the same host
 # running this file verbatim at the same time will silently steal each other's
 # container (last `up` wins, no error) since container_name is fixed rather than
-# derived from the project name. If you need a second concurrent stack, override:
-#   QA_PROJECT_NAME=snapotter-qa-2 docker compose -f tests/qa/docker-compose.qa.yml up -d
+# derived from the project name. A second concurrent stack also needs its own
+# host port (the default stack holds 13499), so override both:
+#   QA_PROJECT_NAME=snapotter-qa-2 QA_APP_PORT=13498 \
+#     docker compose -f tests/qa/docker-compose.qa.yml up -d
 name: ${QA_PROJECT_NAME:-snapotter-qa}
 
 services:
@@ -17,7 +19,7 @@ services:
     image: snapotter/snapotter:latest
     container_name: ${QA_PROJECT_NAME:-snapotter-qa}
     ports:
-      - "13499:1349"
+      - "${QA_APP_PORT:-13499}:1349"
     volumes:
       - qa-data:/data
       - qa-workspace:/tmp/workspace

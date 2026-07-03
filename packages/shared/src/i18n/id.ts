@@ -3494,6 +3494,7 @@ export const id: TranslationKeys = {
       description: "Kelola bundel model AI untuk pemrosesan file tingkat lanjut.",
       installAll: "Instal Semua",
       diskUsage: "Penggunaan disk: {size}",
+      sizeOnDisk: "{size} di disk",
       installed: "Terinstal",
       notInstalled: "Belum terinstal",
       queued: "Dalam antrean",

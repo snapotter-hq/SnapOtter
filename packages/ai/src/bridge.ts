@@ -105,6 +105,8 @@ interface PendingRequest {
   reject: (err: Error) => void;
   onProgress?: ProgressCallback;
   stderrLines: string[];
+  /** Which child generation this request was written to (see startChild). */
+  generation: number;
 }
 
 // Crash recovery constants
@@ -133,11 +135,24 @@ export class PythonDispatcher {
   private childFailed = false;
   private gpuAvail = false;
   private pending = new Map<string, PendingRequest>();
-  private stdoutBuf = "";
   private crashes = 0;
   private lastCrashTs = 0;
   private backoffEnd = 0;
-  private shuttingDown = false;
+  /**
+   * Monotonic child counter. Each spawned child and every request written to
+   * it carry the generation current at spawn time, so a stale child's late
+   * close/error events (SIGTERM delivery can lag a replacement spawn) only
+   * ever touch their own generation's pending requests.
+   */
+  private generation = 0;
+  /**
+   * Children we SIGTERMed on purpose (shutdown/reload). Tracked per child
+   * rather than as an instance-wide flag: an instance flag reset by the next
+   * spawn would let the stale child's close event record a phantom crash and
+   * null out the fresh child. The request-timeout kill path deliberately does
+   * NOT add to this set, so a genuinely hung script still counts as a crash.
+   */
+  private stoppedChildren = new WeakSet<ChildProcess>();
 
   constructor(opts: { profile: "ai" | "docs" }) {
     this.profile = opts.profile;
@@ -173,9 +188,19 @@ export class PythonDispatcher {
     );
   }
 
+  /** Reject and drop the pending requests written to one child generation. */
+  private rejectPendingForGeneration(generation: number, message: string): void {
+    for (const [id, req] of this.pending.entries()) {
+      if (req.generation !== generation) continue;
+      req.reject(new Error(message));
+      this.pending.delete(id);
+    }
+  }
+
   private startChild(): ChildProcess | null {
     if (this.childFailed) return null;
-    this.shuttingDown = false;
+    this.generation++;
+    const gen = this.generation;
 
     try {
       const proc = spawn(getPythonPath(), [resolve(PYTHON_DIR, "dispatcher.py")], {
@@ -188,23 +213,23 @@ export class PythonDispatcher {
           console.error(
             `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
           );
-          for (const [id, req] of this.pending.entries()) {
-            req.reject(new Error("Python dispatcher stdin closed unexpectedly"));
-            this.pending.delete(id);
+          this.rejectPendingForGeneration(gen, "Python dispatcher stdin closed unexpectedly");
+          // An intentional shutdown() ends stdin then SIGTERMs the child,
+          // which can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is
+          // not a crash: counting it would let repeated legitimate restarts
+          // (shutdownDispatcher() runs after every AI bundle install) trip
+          // the crash limit and permanently disable the dispatcher. Guard
+          // mirrors the "close" handler below.
+          if (!this.stoppedChildren.has(proc)) this.recordCrash();
+          if (this.child === proc) {
+            this.child = null;
+            this.childReady = false;
           }
-          // An intentional shutdown() ends stdin then SIGTERMs the child, which
-          // can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is not a
-          // crash -- counting it would let repeated legitimate restarts (e.g.
-          // shutdownDispatcher() on every AI bundle install) trip the crash
-          // limit and permanently disable the dispatcher. Guard mirrors the
-          // "close" handler below.
-          if (!this.shuttingDown) this.recordCrash();
-          this.child = null;
-          this.childReady = false;
         }
       });
 
       let stderrBuf = "";
+      let stdoutBuf = "";
 
       proc.stderr?.on("data", (chunk: Buffer) => {
         stderrBuf += chunk.toString();
@@ -218,21 +243,24 @@ export class PythonDispatcher {
           try {
             const parsed = JSON.parse(trimmed);
 
-            // Readiness signal
+            // Readiness signal. Ignore it from a superseded child so a stale
+            // process can't mark a not-yet-ready replacement as ready.
             if (parsed.ready === true) {
-              this.childReady = true;
-              this.gpuAvail = parsed.gpu === true;
-              this.crashes = 0;
-              console.log(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
+              if (this.child === proc) {
+                this.childReady = true;
+                this.gpuAvail = parsed.gpu === true;
+                this.crashes = 0;
+                console.log(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
+              }
               continue;
             }
 
             // Progress event - route to the currently active request
             if (typeof parsed.progress === "number" && typeof parsed.stage === "string") {
-              // Progress goes to all pending requests (only one should be active at a time
-              // since Python processes synchronously)
+              // Progress goes to this child's pending requests (only one
+              // should be active at a time since Python processes synchronously)
               for (const req of this.pending.values()) {
-                req.onProgress?.(parsed.progress, parsed.stage);
+                if (req.generation === gen) req.onProgress?.(parsed.progress, parsed.stage);
               }
             }
           } catch {
@@ -242,16 +270,16 @@ export class PythonDispatcher {
               console.log(`[python] ${trimmed}`);
             }
             for (const req of this.pending.values()) {
-              req.stderrLines.push(trimmed);
+              if (req.generation === gen) req.stderrLines.push(trimmed);
             }
           }
         }
       });
 
       proc.stdout?.on("data", (chunk: Buffer) => {
-        this.stdoutBuf += chunk.toString();
-        const lines = this.stdoutBuf.split("\n");
-        this.stdoutBuf = lines.pop() ?? "";
+        stdoutBuf += chunk.toString();
+        const lines = stdoutBuf.split("\n");
+        stdoutBuf = lines.pop() ?? "";
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -292,29 +320,27 @@ export class PythonDispatcher {
         console.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`);
         if (err.code === "ENOENT") {
           this.childFailed = true;
-        } else if (!this.shuttingDown) {
+        } else if (!this.stoppedChildren.has(proc)) {
           // Skip crash accounting when we initiated the teardown (shutdown()
-          // sets shuttingDown before killing the child); mirrors "close".
+          // marks the child stopped before killing it); mirrors "close".
           this.recordCrash();
         }
-        for (const [id, req] of this.pending.entries()) {
-          req.reject(new Error(extractPythonError(err)));
-          this.pending.delete(id);
+        this.rejectPendingForGeneration(gen, extractPythonError(err));
+        if (this.child === proc) {
+          this.child = null;
+          this.childReady = false;
         }
-        this.child = null;
-        this.childReady = false;
       });
 
       proc.on("close", (code) => {
-        for (const [id, req] of this.pending.entries()) {
-          req.reject(new Error("Python dispatcher exited unexpectedly"));
-          this.pending.delete(id);
-        }
-        if (code !== 0 && !this.shuttingDown) {
+        this.rejectPendingForGeneration(gen, "Python dispatcher exited unexpectedly");
+        if (code !== 0 && !this.stoppedChildren.has(proc)) {
           this.recordCrash();
         }
-        this.child = null;
-        this.childReady = false;
+        if (this.child === proc) {
+          this.child = null;
+          this.childReady = false;
+        }
       });
 
       return proc;
@@ -378,6 +404,9 @@ export class PythonDispatcher {
         reject: wrappedReject,
         onProgress: options.onProgress,
         stderrLines: [],
+        // getChild() above either reused or just spawned the child this
+        // request is written to, so the current generation is its generation.
+        generation: this.generation,
       });
 
       const msg: Record<string, unknown> = { id, script: scriptName.replace(".py", ""), args };
@@ -541,7 +570,7 @@ export class PythonDispatcher {
    */
   shutdown(): void {
     if (this.child && !this.child.killed) {
-      this.shuttingDown = true;
+      this.stoppedChildren.add(this.child);
       this.child.stdin?.end();
       this.child.kill("SIGTERM");
       this.child = null;

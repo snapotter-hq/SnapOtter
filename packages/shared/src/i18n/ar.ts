@@ -3475,6 +3475,7 @@ export const ar: TranslationKeys = {
       description: "إدارة حزم نماذج AI لمعالجة الملفات المتقدمة.",
       installAll: "تثبيت الكل",
       diskUsage: "استخدام القرص: {size}",
+      sizeOnDisk: "{size} على القرص",
       installed: "مُثبَّت",
       notInstalled: "غير مُثبَّت",
       queued: "في قائمة الانتظار",

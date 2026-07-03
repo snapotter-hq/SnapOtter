@@ -1,7 +1,7 @@
 // Drives the REAL in-app AI bundle install flow (Settings > AI Features > Install
 // All) against a running Docker container, exactly as a user would click through
 // it. This is the primary AI-install path per docs/prompts/engineering/QA_PROMPT.md
-// Phase 2 -- the curl-based /api/v1/admin/features/<bundle>/install route is a
+// Phase 2: the curl-based /api/v1/admin/features/<bundle>/install route is a
 // verification/fallback path only, never the primary install.
 //
 // This script only KICKS OFF the install and captures pre/mid-install evidence; the
@@ -47,11 +47,11 @@ async function main() {
     console.log("  already authenticated (no login form shown)");
   }
 
-  // Bail loudly if we land on the forced password-change screen -- the caller
+  // Bail loudly if we land on the forced password-change screen; the caller
   // should set SKIP_MUST_CHANGE_PASSWORD=true for automated runs.
   if (page.url().includes("/change-password")) {
     throw new Error(
-      "Landed on /change-password -- set SKIP_MUST_CHANGE_PASSWORD=true on the container for automated QA runs",
+      "Landed on /change-password; set SKIP_MUST_CHANGE_PASSWORD=true on the container for automated QA runs",
     );
   }
 
