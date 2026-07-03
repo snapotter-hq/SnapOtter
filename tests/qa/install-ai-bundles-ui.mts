@@ -32,7 +32,9 @@ async function main() {
   const browser = await chromium.launch({ channel: "chrome" });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
-  console.log(`Logging in at ${BASE} as ${USERNAME}...`);
+  // Don't interpolate the env-derived base URL / username into the log
+  // (clear-text logging of environment values is flagged by static analysis).
+  console.log("Logging in...");
   await page.goto(BASE);
   await page.waitForLoadState("networkidle").catch(() => {});
   if (page.url().includes("/login")) {
