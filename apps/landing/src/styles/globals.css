@@ -162,6 +162,51 @@ code, pre, kbd {
   animation: mesh-drift 25s ease-in-out infinite reverse;
 }
 
+/* ─── HERO SHADERGRADIENT WARM-WASH LOOP ─── */
+/* A captured shadergradient-style loop, self-hosted (no framework/Three.js). */
+/* Softness is baked into the asset, so the runtime blur here is light. */
+.hero-gradient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;
+  transform: scale(1.05); /* push blurred edges off-screen for a full-bleed band */
+  filter: blur(6px) saturate(1.06);
+  /* Deep-warm fallback keeps white hero text legible if the asset ever fails to load. */
+  background-color: #7e3d24;
+  background-image: url("/hero-gradient-poster.webp?v=5");
+  background-size: cover;
+  background-position: center;
+  /* Vivid band behind the white headline, faded to the cream page before the search box. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 46%, transparent 66%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 46%, transparent 66%);
+}
+.hero-gradient video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* On small screens, drop the video and keep the still poster to save battery/data. */
+@media (max-width: 767px) {
+  .hero-gradient video {
+    display: none;
+  }
+}
+/* Respect reduced-motion: freeze the mesh drift and show the still, not the loop. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-gradient video {
+    display: none;
+  }
+  .hero-mesh::before,
+  .hero-mesh::after,
+  .hero-mesh-extra {
+    animation: none;
+  }
+}
+
 /* ─── SCROLL REVEAL ─── */
 .reveal {
   opacity: 0;

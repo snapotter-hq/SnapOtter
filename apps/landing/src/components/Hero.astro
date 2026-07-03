@@ -6,10 +6,10 @@ import HeroSearch from "./HeroSearch.astro";
 import TrustSignals from "./TrustSignals.astro";
 
 const trustBadges = [
-  "On-premise",
-  "Privacy-first",
-  "GDPR & HIPAA ready",
-  "Air-gap ready",
+  "Self-hosted",
+  "Privacy-sensitive",
+  "Compliance-friendly",
+  "Air-gap capable",
   "SAML SSO",
   "Audit logging",
   "Open source",
@@ -17,30 +17,40 @@ const trustBadges = [
 ---
 
 <section class="relative overflow-hidden px-6 pt-28 pb-12 md:pt-32 md:pb-16">
-  <!-- Gradient mesh background -->
+  <!-- Gradient mesh background (CSS fallback beneath the shadergradient loop) -->
   <div class="hero-mesh" aria-hidden="true"></div>
   <div class="hero-mesh-extra" aria-hidden="true"></div>
+
+  <!-- ShaderGradient warm-wash loop: captured, self-hosted, no framework. -->
+  <!-- Poster (still) doubles as the reduced-motion and load-failure fallback. -->
+  <div class="hero-gradient" aria-hidden="true">
+    <!-- biome-ignore lint/a11y/useMediaCaption: decorative silent background loop with no audio track. -->
+    <video autoplay muted loop playsinline preload="metadata" tabindex="-1">
+      <source src="/hero-gradient.webm?v=5" type="video/webm" />
+      <source src="/hero-gradient.mp4?v=5" type="video/mp4" />
+    </video>
+  </div>
 
   <div class="relative mx-auto max-w-4xl text-center">
     <!-- Enterprise trust badges -->
     <div class="animate-fade-up flex flex-wrap items-center justify-center gap-2">
       {trustBadges.map((badge) => (
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-dark">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/25 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
           <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           {badge}
         </span>
       ))}
     </div>
 
-    <!-- Headline: one sentence, rotating modality + fixed privacy promise -->
-    <h1 class="animate-fade-up mt-8 font-display text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl" style="animation-delay: 0.1s;">
-      Every <span class="word-rotator" aria-hidden="true"><span class="word-rotator-track"><span>file</span><span>image</span><span>video</span><span>audio</span><span>PDF</span><span>files</span><span>file</span></span></span><span class="sr-only">file</span> tool you need.
-      <span class="mt-3 block bg-gradient-to-r from-primary to-primary-light bg-clip-text text-2xl font-bold text-transparent sm:text-3xl md:text-4xl">Your files never leave your network.</span>
+    <!-- Headline: one precise promise for privacy-sensitive buyers -->
+    <h1 class="animate-fade-up mt-8 font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl" style="animation-delay: 0.1s; text-shadow: 0 2px 30px rgba(90, 20, 0, 0.28);">
+      Private file processing, self-hosted.
+      <span class="mt-3 block text-2xl font-bold text-white/90 sm:text-3xl md:text-4xl">Inside your infrastructure.</span>
     </h1>
 
     <!-- Subtitle: one calm supporting line -->
-    <p class="animate-fade-up mx-auto mt-6 max-w-2xl text-lg text-muted md:text-xl" style="animation-delay: 0.15s;">
-      The file-processing suite for teams that keep sensitive data in-house.
+    <p class="animate-fade-up mx-auto mt-6 max-w-2xl text-lg text-white/90 md:text-xl" style="animation-delay: 0.15s; text-shadow: 0 1px 16px rgba(90, 20, 0, 0.22);">
+      Run image, video, audio, PDF, and document tools with local AI, batch workflows, and enterprise controls.
     </p>
 
     <!-- Hero tool search -->
@@ -53,39 +63,3 @@ const trustBadges = [
     <TrustSignals />
   </div>
 </section>
-
-<style>
-  /* Pure-CSS rotating word (no client JS). Cycles the file type in the headline. */
-  .word-rotator {
-    display: inline-block;
-    height: 1em;
-    overflow: hidden;
-    vertical-align: top;
-    color: var(--color-primary);
-  }
-  .word-rotator-track {
-    display: flex;
-    flex-direction: column;
-    animation: word-rotate 13.2s infinite;
-  }
-  .word-rotator-track > span {
-    display: block;
-    height: 1em;
-    line-height: 1;
-    white-space: nowrap;
-  }
-  @keyframes word-rotate {
-    0%, 12% { transform: translateY(0); }
-    16.66%, 28.66% { transform: translateY(-1em); }
-    33.33%, 45.33% { transform: translateY(-2em); }
-    50%, 62% { transform: translateY(-3em); }
-    66.66%, 78.66% { transform: translateY(-4em); }
-    83.33%, 95.33% { transform: translateY(-5em); }
-    100% { transform: translateY(-6em); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .word-rotator-track {
-      animation: none;
-    }
-  }
-</style>
