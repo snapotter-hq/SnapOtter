@@ -3801,6 +3801,7 @@ export const ja: TranslationKeys = {
     connectionError: "接続エラー",
   },
   sidebar: {
+    sponsor: "無料を守る",
     tools: "ツール",
     grid: "グリッド",
     automate: "自動化",
@@ -3820,6 +3821,7 @@ export const ja: TranslationKeys = {
     mobileNavSettings: "設定",
   },
   a11y: {
+    sponsorLink: "GitHub Sponsors で SnapOtter を支援する",
     skipToContent: "メインコンテンツへスキップ",
     openSidebar: "サイドバーを開く",
     closeSidebar: "サイドバーを閉じる",

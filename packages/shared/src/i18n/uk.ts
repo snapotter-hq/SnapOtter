@@ -3854,6 +3854,7 @@ export const uk: TranslationKeys = {
     connectionError: "Помилка з'єднання",
   },
   sidebar: {
+    sponsor: "Нехай буде безкоштовним",
     tools: "Інструменти",
     grid: "Сітка",
     automate: "Автоматизація",
@@ -3873,6 +3874,7 @@ export const uk: TranslationKeys = {
     mobileNavSettings: "Налаштування",
   },
   a11y: {
+    sponsorLink: "Підтримати SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти до основного вмісту",
     openSidebar: "Відкрити бічну панель",
     closeSidebar: "Закрити бічну панель",

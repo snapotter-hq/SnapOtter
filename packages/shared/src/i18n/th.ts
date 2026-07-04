@@ -3805,6 +3805,7 @@ export const th: TranslationKeys = {
     connectionError: "ข้อผิดพลาดในการเชื่อมต่อ",
   },
   sidebar: {
+    sponsor: "ให้ใช้ฟรีต่อไป",
     tools: "เครื่องมือ",
     grid: "กริด",
     automate: "อัตโนมัติ",
@@ -3824,6 +3825,7 @@ export const th: TranslationKeys = {
     mobileNavSettings: "ตั้งค่า",
   },
   a11y: {
+    sponsorLink: "สนับสนุน SnapOtter บน GitHub Sponsors",
     skipToContent: "ข้ามไปยังเนื้อหาหลัก",
     openSidebar: "เปิดแถบด้านข้าง",
     closeSidebar: "ปิดแถบด้านข้าง",

@@ -3846,6 +3846,7 @@ export const sv: TranslationKeys = {
     connectionError: "Anslutningsfel",
   },
   sidebar: {
+    sponsor: "Håll det gratis",
     tools: "Verktyg",
     grid: "Rutnät",
     automate: "Automatisera",
@@ -3865,6 +3866,7 @@ export const sv: TranslationKeys = {
     mobileNavSettings: "Inställningar",
   },
   a11y: {
+    sponsorLink: "Stöd SnapOtter på GitHub Sponsors",
     skipToContent: "Hoppa till huvudinnehåll",
     openSidebar: "Öppna sidopanel",
     closeSidebar: "Stäng sidopanel",

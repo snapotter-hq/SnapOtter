@@ -3850,6 +3850,7 @@ export const id: TranslationKeys = {
     connectionError: "Kesalahan koneksi",
   },
   sidebar: {
+    sponsor: "Jaga tetap gratis",
     tools: "Alat",
     grid: "Kisi",
     automate: "Otomasi",
@@ -3869,6 +3870,7 @@ export const id: TranslationKeys = {
     mobileNavSettings: "Pengaturan",
   },
   a11y: {
+    sponsorLink: "Dukung SnapOtter di GitHub Sponsors",
     skipToContent: "Lewati ke konten utama",
     openSidebar: "Buka bilah sisi",
     closeSidebar: "Tutup bilah sisi",

@@ -3801,6 +3801,7 @@ export const en = {
     automate: "Automate",
     editor: "Editor",
     files: "Files",
+    sponsor: "Keep it free",
     help: "Help",
     settings: "Settings",
   },
@@ -3876,6 +3877,7 @@ export const en = {
     helpDialog: "Help",
     navigationMenu: "Navigation",
     homeLink: "SnapOtter home",
+    sponsorLink: "Support SnapOtter on GitHub Sponsors",
   },
   pipelineTemplates: {
     "web-optimize": {

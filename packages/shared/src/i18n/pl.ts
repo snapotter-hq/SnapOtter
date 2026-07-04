@@ -3865,6 +3865,7 @@ export const pl: TranslationKeys = {
     connectionError: "Błąd połączenia",
   },
   sidebar: {
+    sponsor: "Zachowaj darmowość",
     tools: "Narzędzia",
     grid: "Siatka",
     automate: "Automatyzacja",
@@ -3884,6 +3885,7 @@ export const pl: TranslationKeys = {
     mobileNavSettings: "Ustawienia",
   },
   a11y: {
+    sponsorLink: "Wesprzyj SnapOtter na GitHub Sponsors",
     skipToContent: "Przejdź do treści",
     openSidebar: "Otwórz panel boczny",
     closeSidebar: "Zamknij panel boczny",
