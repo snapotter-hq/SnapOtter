@@ -103,23 +103,16 @@ try {
   process.exit(1);
 }
 
-// Auto-import 1.x SQLite database on first boot (before default user creation)
-if (env.SQLITE_MIGRATE_PATH) {
-  const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM users`);
-  if ((rows[0].n as number) === 0) {
-    try {
-      const { migrateFromSqlite } = await import("./db/migrate-from-sqlite.js");
-      const result = await migrateFromSqlite(env.SQLITE_MIGRATE_PATH, { force: false });
-      console.log("Imported 1.x SQLite database:", JSON.stringify(result.tables));
-    } catch (err) {
-      console.error(
-        `FATAL: 1.x SQLite import failed from ${env.SQLITE_MIGRATE_PATH}: ${(err as Error).message}. No partial data was written.`,
-      );
-      process.exit(1);
-    }
-  } else {
-    console.log("SQLITE_MIGRATE_PATH set but target is not empty; skipping import");
-  }
+// Auto-import / detect a 1.x SQLite database on boot (before default user creation).
+// The orchestrator owns detection (explicit path, "off" sentinel, or DATA_DIR probe),
+// the four boot states, and the persisted marker. See db/sqlite-import.ts.
+{
+  const { runBootImport } = await import("./db/sqlite-import.js");
+  await runBootImport({
+    SQLITE_MIGRATE_PATH: env.SQLITE_MIGRATE_PATH,
+    DATA_DIR: env.DATA_DIR,
+    FILES_STORAGE_PATH: env.FILES_STORAGE_PATH,
+  });
 }
 
 // Seed built-in roles (admin, editor, user) that legacy SQLite migrations

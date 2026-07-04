@@ -27,6 +27,7 @@ const SENSITIVE_KEYS = new Set([
   "scim_token_hash",
   "siem_config",
   "siem_webhook_auth",
+  "sqlite_import",
   "webhook_destinations",
 ]);
 
