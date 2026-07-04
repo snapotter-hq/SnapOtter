@@ -179,4 +179,4 @@ docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
 
 ### Migrating from 1.x (SQLite)
 
-If you are upgrading from SnapOtter 1.x, set `SQLITE_MIGRATE_PATH` to the path of your old `snapotter.db` file on first boot. The migration runs once and imports users, settings, pipelines, and files into Postgres. Remove the variable after migration succeeds.
+Upgrading from SnapOtter 1.x has its own guide: see [Upgrading from 1.x to 2.0](./upgrading). In short, reuse your existing `/data` volume and 2.0 auto-detects and imports `/data/snapotter.db` on first boot (or set `SQLITE_MIGRATE_PATH` to point at it explicitly). Back up the whole `/data` volume first, not just `snapotter.db`: 1.x uses SQLite WAL mode, so a stopped container often leaves most of its data in `snapotter.db-wal` beside an almost-empty `snapotter.db`.

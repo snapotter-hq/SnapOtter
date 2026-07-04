@@ -70,7 +70,7 @@ services:
       DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
       REDIS_URL: redis://redis:6379
     volumes:
-      - snapotter-data:/data
+      - SnapOtter-data:/data
     depends_on: [postgres, redis]
     restart: unless-stopped
   postgres:
@@ -79,16 +79,16 @@ services:
       POSTGRES_USER: snapotter
       POSTGRES_PASSWORD: snapotter
       POSTGRES_DB: snapotter
-    volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]
     restart: unless-stopped
   redis:
     image: redis:8-alpine
-    volumes: ["snapotter-redisdata:/data"]
+    volumes: ["SnapOtter-redisdata:/data"]
     restart: unless-stopped
 volumes:
-  snapotter-data:
-  snapotter-pgdata:
-  snapotter-redisdata:
+  SnapOtter-data:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 Then start the stack:

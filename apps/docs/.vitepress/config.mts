@@ -134,6 +134,7 @@ export default defineConfig({
           { text: "SCIM Provisioning", link: "/guide/scim" },
           { text: "Users, Roles & Permissions", link: "/guide/users-roles" },
           { text: "Database", link: "/guide/database" },
+          { text: "Upgrading from 1.x", link: "/guide/upgrading" },
           { text: "Deployment", link: "/guide/deployment" },
           { text: "Security & Hardening", link: "/guide/security" },
           { text: "What SnapOtter collects", link: "/guide/telemetry" },

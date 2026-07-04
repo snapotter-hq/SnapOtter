@@ -51,7 +51,7 @@ services:
       DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
       REDIS_URL: redis://redis:6379
     volumes:
-      - snapotter-data:/data
+      - SnapOtter-data:/data
     depends_on: [postgres, redis]
     restart: unless-stopped
   postgres:
@@ -60,16 +60,16 @@ services:
       POSTGRES_USER: snapotter
       POSTGRES_PASSWORD: snapotter
       POSTGRES_DB: snapotter
-    volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+    volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]
     restart: unless-stopped
   redis:
     image: redis:8-alpine
-    volumes: ["snapotter-redisdata:/data"]
+    volumes: ["SnapOtter-redisdata:/data"]
     restart: unless-stopped
 volumes:
-  snapotter-data:
-  snapotter-pgdata:
-  snapotter-redisdata:
+  SnapOtter-data:
+  SnapOtter-pgdata:
+  SnapOtter-redisdata:
 ```
 
 Then start the stack:
@@ -143,7 +143,7 @@ OIDC, SSO, S3 storage, and the full variable reference are documented in [Config
 | `/data` | AI models and persistent user files; in single-container mode also the embedded PostgreSQL and Redis data. Back this up. |
 | `/tmp/workspace` | Temporary processing files (auto-cleaned). |
 
-In the Compose stack, PostgreSQL and Redis keep their own volumes (`snapotter-pgdata`, `snapotter-redisdata`).
+In the Compose stack, PostgreSQL and Redis keep their own volumes (`SnapOtter-pgdata`, `SnapOtter-redisdata`).
 
 ## Ports
 
