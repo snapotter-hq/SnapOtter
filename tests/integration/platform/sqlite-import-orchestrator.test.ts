@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  analyzeSqlite,
   countLibraryBlobs,
   evaluateBootState,
   resolveSource,
@@ -59,5 +60,22 @@ describe("countLibraryBlobs", () => {
     mkdirSync(filesDir, { recursive: true });
     writeFileSync(join(filesDir, "abc123.png"), "img");
     expect(await countLibraryBlobs(dbPath, filesDir)).toEqual({ present: 1, missing: 0 });
+  });
+});
+
+describe("analyzeSqlite", () => {
+  it("reports counts, blobs, and out-of-enum statuses without a live Postgres", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "analyze-"));
+    const dbPath = join(dir, "legacy.db");
+    buildLegacySqlite(dbPath);
+    await seedRealistic1xData(dbPath); // 1 user, 2 jobs (one "error"), 1 user_file
+    const filesDir = join(dir, "files");
+    mkdirSync(filesDir, { recursive: true });
+    writeFileSync(join(filesDir, "abc123.png"), "img"); // the uf-1 blob
+    const report = await analyzeSqlite(dbPath, filesDir);
+    expect(report.tables.users).toBe(1);
+    expect(report.tables.jobs).toBe(2);
+    expect(report.blobs).toEqual({ present: 1, missing: 0 });
+    expect(report.badStatuses).toContain("error"); // will be mapped to "failed" on import
   });
 });

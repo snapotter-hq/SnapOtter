@@ -10,7 +10,7 @@
     "lint": "biome check src/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "migrate:sqlite": "tsx src/db/migrate-from-sqlite.ts"
+    "migrate:sqlite": "tsx src/db/sqlite-import.ts"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",

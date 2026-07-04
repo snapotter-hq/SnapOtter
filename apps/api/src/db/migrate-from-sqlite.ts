@@ -218,25 +218,5 @@ export async function migrateFromSqlite(
   }
   return result;
 }
-
-// CLI entry: pnpm --filter @snapotter/api migrate:sqlite -- <path> [--force]
-const invokedDirectly = /migrate-from-sqlite\.[tj]s$/.test(process.argv[1] ?? "");
-if (invokedDirectly) {
-  // pnpm forwards "--" as a literal arg; skip it and any flags to find the positional path
-  const args = process.argv.slice(2);
-  const path = args.find((a) => a !== "--" && !a.startsWith("--"));
-  const force = args.includes("--force");
-  if (!path) {
-    console.error("Usage: migrate-from-sqlite <path-to-1.x-sqlite-db> [--force]");
-    process.exit(1);
-  }
-  migrateFromSqlite(path, { force })
-    .then((r) => {
-      console.log("Migration complete:", JSON.stringify(r.tables));
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error("Migration FAILED (no partial state; transaction rolled back):", err.message);
-      process.exit(1);
-    });
-}
+// The CLI (including --dry-run) lives in sqlite-import.ts, the orchestrator that
+// wraps this engine. `pnpm --filter @snapotter/api migrate:sqlite` runs that.
