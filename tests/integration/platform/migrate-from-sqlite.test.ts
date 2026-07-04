@@ -5,7 +5,11 @@ import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../../../apps/api/src/db/index.js";
-import { migrateFromSqlite } from "../../../apps/api/src/db/migrate-from-sqlite.js";
+import {
+  MIGRATED_TABLES,
+  migrateFromSqlite,
+} from "../../../apps/api/src/db/migrate-from-sqlite.js";
+import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
 
 function buildFixtureSqlite(path: string): void {
   const s = new Database(path);
@@ -456,7 +460,6 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     expect(result.tables.teams).toBe(3);
     expect(result.tables.settings).toBe(3);
     expect(result.tables.roles).toBe(2);
-    expect(result.tables.sessions).toBe(2);
     expect(result.tables.api_keys).toBe(2);
     expect(result.tables.pipelines).toBe(2);
     expect(result.tables.jobs).toBe(4);
@@ -580,10 +583,57 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     expect(maxUpload?.value).toBe("50");
   });
 
-  it("sessions: id_token null and non-null", async () => {
-    const [ses1] = (await db.execute(sql`SELECT * FROM sessions WHERE id = 'ses-1'`)).rows;
-    expect(ses1.id_token).toBeNull();
-    const [ses2] = (await db.execute(sql`SELECT * FROM sessions WHERE id = 'ses-2'`)).rows;
-    expect(ses2.id_token).toBe("eyJhbGciOiJSUzI1NiJ9.fake-jwt-token");
+  // Note: sessions are intentionally NOT migrated (see the real-1.17.2 suite below).
+});
+
+describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
+  const realDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-real-"));
+  const realPath = join(realDir, "real-1x.db");
+  let seeded: { password: string; adminId: string };
+
+  beforeAll(async () => {
+    buildLegacySqlite(realPath);
+    seeded = await seedRealistic1xData(realPath);
+    await db.execute(
+      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
+    );
+  });
+  afterAll(async () => {
+    await db.execute(
+      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
+    );
+  });
+
+  it("excludes sessions from the migrated set", () => {
+    expect(MIGRATED_TABLES).not.toContain("sessions");
+  });
+
+  it("imports a real 1.17.2 database (analytics columns do not break it)", async () => {
+    const result = await migrateFromSqlite(realPath, { force: false });
+    expect(result.tables.users).toBe(1);
+    expect(result.tables).not.toHaveProperty("sessions");
+    const [u] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u-admin'`)).rows;
+    expect(u.username).toBe("admin");
+    expect(u).not.toHaveProperty("analytics_enabled");
+  });
+
+  it("maps the out-of-enum job status 'error' to 'failed'", async () => {
+    const [j] = (await db.execute(sql`SELECT status FROM jobs WHERE id = 'j-err'`)).rows;
+    expect(j.status).toBe("failed");
+  });
+
+  it("does not copy the sessions table", async () => {
+    const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM sessions`);
+    expect(rows[0].n).toBe(0);
+  });
+
+  it("migrated user can still log in and the library row is intact", async () => {
+    const { verifyPassword } = await import("../../../apps/api/src/plugins/auth.js");
+    const [u] = (
+      await db.execute(sql`SELECT password_hash FROM users WHERE id = ${seeded.adminId}`)
+    ).rows;
+    expect(await verifyPassword(seeded.password, u.password_hash as string)).toBe(true);
+    const [f] = (await db.execute(sql`SELECT stored_name FROM user_files WHERE id = 'uf-1'`)).rows;
+    expect(f.stored_name).toBe("abc123.png");
   });
 });
