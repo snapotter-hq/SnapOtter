@@ -134,9 +134,9 @@
         },
         "arm64-cpu": {
           "file": "v2.0.0/object-eraser-colorize-arm64-cpu.tar.gz",
-          "sha256": "e043d91acca20b3259711fd3a54521890f624b9952e617159f21a97216830630",
-          "compressedSize": 1266922599,
-          "extractedSize": 0
+          "sha256": "252c0b4fc4ca6f807b2b93038a98469323d906d5c4d75df88e9f47497d30e67c",
+          "compressedSize": 1263259968,
+          "extractedSize": 1464884023
         }
       },
       "packages": {
@@ -408,9 +408,9 @@
         },
         "arm64-cpu": {
           "file": "v2.0.0/ocr-arm64-cpu.tar.gz",
-          "sha256": "5c40dfc5f3147dd61bf8f3b24604eefb5591e6412a2ca61f7e2fb7e1c7d11b9c",
-          "compressedSize": 1977460762,
-          "extractedSize": 0
+          "sha256": "569ca2ddad50529c4887da494ca1704bbe719ddc0253a5eb76002a2d87812c60",
+          "compressedSize": 1974010780,
+          "extractedSize": 3092260263
         }
       },
       "packages": {
@@ -484,9 +484,9 @@
         },
         "arm64-cpu": {
           "file": "v2.0.0/transcription-arm64-cpu.tar.gz",
-          "sha256": "6184434bc10986677d15e96e22b6998c3a780d6619b6457b8854c01dfd0f9a28",
-          "compressedSize": 531990919,
-          "extractedSize": 0
+          "sha256": "07088951300dec14b80f4723a3d5bd968574ce2650259be3fd487e7abb47e120",
+          "compressedSize": 528491203,
+          "extractedSize": 741534382
         }
       },
       "packages": {
