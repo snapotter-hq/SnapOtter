@@ -22,7 +22,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("FeedbackDialog global off-state handoff", () => {
+describe("FeedbackDialog off-state handoff", () => {
   it("reveals GitHub and email handoff when the server does not record the feedback", async () => {
     submitFeedback.mockResolvedValue({ ok: true, accepted: false });
     render(<FeedbackDialog open source="global" onClose={vi.fn()} />);
@@ -47,6 +47,33 @@ describe("FeedbackDialog global off-state handoff", () => {
     const emailBody = new URL(emailLink.getAttribute("href") ?? "").searchParams.get("body");
     expect(emailBody).toBe("The queue stalls on large PDFs");
 
+    expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
+  });
+
+  it("threads tool and error into the handoff for a failed run", async () => {
+    submitFeedback.mockResolvedValue({ ok: true, accepted: false });
+    render(
+      <FeedbackDialog
+        open
+        source="failed_job"
+        toolId="pdf-compress"
+        jobStatus="failed"
+        errorCategory="timeout"
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(MESSAGE_PLACEHOLDER), {
+      target: { value: "It hung on a 50MB file" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    const githubLink = await screen.findByRole("link", { name: "Open a GitHub issue" });
+    const details =
+      new URL(githubLink.getAttribute("href") ?? "").searchParams.get("details") ?? "";
+    expect(details).toContain("pdf-compress");
+    expect(details).toContain("timeout");
+    expect(details).toContain("It hung on a 50MB file");
     expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
   });
 
