@@ -36,6 +36,7 @@ const envSchema = z
     API_KEYS_RATE_LIMIT_PER_MIN: z.coerce.number().default(30),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
     SQLITE_MIGRATE_PATH: z.string().default(""),
+    DATA_DIR: z.string().default("./data"),
     FILES_STORAGE_PATH: z.string().default("./data/files"),
     WORKSPACE_PATH: z.string().default("./tmp/workspace"),
     DEFAULT_THEME: z.enum(["light", "dark", "system"]).default("light"),
