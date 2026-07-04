@@ -155,3 +155,33 @@ export function shouldShowUsageSurvey({
 export async function submitFeedback(payload: FeedbackPayload): Promise<FeedbackResponse> {
   return apiPost<FeedbackResponse>("/v1/feedback", payload);
 }
+
+const FEEDBACK_ISSUE_NEW_URL = "https://github.com/snapotter-hq/snapotter/issues/new";
+const MAX_FEEDBACK_LEN = 2000;
+
+export const SNAPOTTER_FEEDBACK_EMAIL = "contact@snapotter.com";
+
+/** Normalize newlines, trim, and clamp so the message is safe to put in a URL. */
+function sanitizeFeedbackMessage(message: string): string {
+  return message.replace(/\r\n/g, "\n").trim().slice(0, MAX_FEEDBACK_LEN);
+}
+
+/**
+ * Prefilled GitHub issue URL for general feedback. Blank issues are disabled on
+ * the repo, so we must target a template by file name; `details` matches the
+ * `id` of the textarea in `.github/ISSUE_TEMPLATE/feedback.yml`.
+ */
+export function buildFeedbackGithubUrl(message: string): string {
+  const params = new URLSearchParams({
+    template: "feedback.yml",
+    details: sanitizeFeedbackMessage(message),
+  });
+  return `${FEEDBACK_ISSUE_NEW_URL}?${params.toString()}`;
+}
+
+/** Prefilled mailto to the project address, for users who prefer a private channel. */
+export function buildFeedbackMailtoUrl(message: string): string {
+  const subject = encodeURIComponent("SnapOtter feedback");
+  const body = encodeURIComponent(sanitizeFeedbackMessage(message));
+  return `mailto:${SNAPOTTER_FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
+}
