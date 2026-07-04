@@ -51,7 +51,6 @@ import { ICON_MAP } from "@/lib/icon-map";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
 import { getToolRegistryEntry } from "@/lib/tool-registry";
-import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
@@ -327,8 +326,6 @@ export function ToolPage() {
   );
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [failedFeedbackOpen, setFailedFeedbackOpen] = useState(false);
-  const analyticsConfig = useAnalyticsStore((s) => s.config);
-  const feedbackEnabled = Boolean(analyticsConfig?.enabled);
   const [previewTransform, setPreviewTransform] = useState<PreviewTransform | null>(null);
   const [previewFilter, setPreviewFilter] = useState<string>("");
   const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
@@ -791,16 +788,14 @@ export function ToolPage() {
               >
                 {t.toolPage.tryDifferentFile}
               </button>
-              {feedbackEnabled && (
-                <button
-                  type="button"
-                  onClick={() => setFailedFeedbackOpen(true)}
-                  className="px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center justify-center gap-2"
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  {t.feedback.reportIssue}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setFailedFeedbackOpen(true)}
+                className="px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center justify-center gap-2"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                {t.feedback.reportIssue}
+              </button>
             </div>
           </div>
         </div>
@@ -1120,7 +1115,7 @@ export function ToolPage() {
           </Suspense>
         </div>
 
-        {feedbackEnabled && currentEntry?.status === "failed" && (
+        {currentEntry?.status === "failed" && (
           <button
             type="button"
             onClick={() => setFailedFeedbackOpen(true)}

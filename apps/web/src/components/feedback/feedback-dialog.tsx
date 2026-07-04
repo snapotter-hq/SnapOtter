@@ -118,6 +118,14 @@ export function FeedbackDialog({
   const isAdminInstall = source === "admin_installer";
   const isSearchMiss = source === "search_miss";
   const isGlobal = source === "global";
+  const isFailedJob = source === "failed_job";
+  // For a failed run, thread the tool and error into the offline handoff so the
+  // GitHub issue is actionable even if the message box is left empty.
+  const handoffMessage = isFailedJob
+    ? [`Tool: ${toolId ?? "unknown"}`, `Error category: ${errorCategory ?? "unknown"}`, "", message]
+        .join("\n")
+        .trim()
+    : message;
   const canSubmit = Boolean(
     message.trim() || sentiment || feedbackType !== "other" || isAdminInstall,
   );
@@ -206,13 +214,13 @@ export function FeedbackDialog({
 
         {submitted ? (
           <div className="p-6 space-y-4">
-            {isGlobal && !accepted ? (
+            {(isGlobal || isFailedJob) && !accepted ? (
               <div className="space-y-3">
                 <p className="text-sm text-foreground">{t.feedback.offlineDescription}</p>
                 <p className="text-xs text-muted-foreground">{t.feedback.offlinePublicNote}</p>
                 <div className="flex flex-col gap-2">
                   <a
-                    href={buildFeedbackGithubUrl(message)}
+                    href={buildFeedbackGithubUrl(handoffMessage)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
@@ -220,7 +228,7 @@ export function FeedbackDialog({
                     {t.feedback.offlineGithubButton}
                   </a>
                   <a
-                    href={buildFeedbackMailtoUrl(message)}
+                    href={buildFeedbackMailtoUrl(handoffMessage)}
                     className="w-full text-center py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     {t.feedback.offlineEmailButton}
