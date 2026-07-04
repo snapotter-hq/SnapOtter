@@ -81,8 +81,10 @@ DD="${DATA_DIR:-/data}"
 # user and fail fast with actionable guidance -- otherwise the venv bootstrap
 # and the app below would die later with a cryptic EACCES.
 if [ "$(id -u)" != "0" ]; then
-  mkdir -p "$DD/files" "$DD/logs" "$DD/ai/models" "$DD/ai/pip-cache" "$DD/ai/venv" "$WS" 2>/dev/null || true
-  ensure_writable "$WS" "$DD" || exit 1
+  mkdir -p "$DD/files" "$DD/logs" "$DD/ai/models" "$DD/ai/pip-cache" "$DD/ai/venv" "$WS" "$DD/.home" 2>/dev/null || true
+  # Group-writable so a second in-group-0 UID (OpenShift / fsGroup:0) can reuse HOME.
+  chmod g+rwX "$DD/.home" 2>/dev/null || true
+  ensure_writable "$WS" "$DD" "$DD/.home" || exit 1
 fi
 
 # Clean up any interrupted bootstrap from a previous start
@@ -216,7 +218,7 @@ if [ "$(id -u)" = "0" ]; then
   fi
 
   # Ensure all writable subdirectories exist before chown
-  mkdir -p /data/files /data/logs /data/ai/models /data/ai/pip-cache /data/ai/venv /tmp/workspace
+  mkdir -p /data/files /data/logs /data/ai/models /data/ai/pip-cache /data/ai/venv /tmp/workspace /data/.home
   [ -n "${EMBEDDED_MODE:-}" ] && mkdir -p /data/redis
 
   # Chown writable directories (/data is the persistent volume, /tmp/workspace is
@@ -238,7 +240,7 @@ if [ "$(id -u)" = "0" ]; then
   # Root can write anywhere, so verify as the unprivileged snapotter user that
   # actually runs the app. This catches root-squashed or foreign-owned mounts
   # where the chown above silently failed, and fails fast with guidance.
-  if ! gosu snapotter sh -c '. /usr/local/bin/entrypoint-lib.sh; ensure_writable "$@"' _ "$WS" "$DD"; then
+  if ! gosu snapotter sh -c '. /usr/local/bin/entrypoint-lib.sh; ensure_writable "$@"' _ "$WS" "$DD" /data/.home; then
     exit 1
   fi
 
@@ -250,10 +252,17 @@ if [ "$(id -u)" = "0" ]; then
   fi
   # External mode: tini becomes PID 1 (reaps zombies, forwards signals) and runs
   # the app as snapotter, the same end state as the prior tini ENTRYPOINT.
+  # gosu preserves the environment (unlike su), so HOME=/root would survive the
+  # drop; set a writable HOME or libraries that write under ~ (PaddleOCR's
+  # ~/.paddlex, plus the sidecar's expanduser caches) fail with EACCES.
+  export HOME=/data/.home
   exec tini -- gosu snapotter "$@"
 fi
 
 # Already running as snapotter (e.g. Kubernetes runAsUser). External mode only:
 # embedded mode requires root and exited earlier. tini becomes PID 1.
+# HOME points at the data volume (created and writability-checked in the
+# non-root preflight above) so ~-based caches land somewhere writable.
 print_banner
+export HOME="$DD/.home"
 exec tini -- "$@"

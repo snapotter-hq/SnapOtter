@@ -1,3 +1,8 @@
 #!/command/with-contenv sh
 cd /app/apps/api
+# s6-setuidgid preserves the environment and does not set HOME, so the app would
+# inherit root's HOME=/root. Scope a writable HOME to this service only (not a
+# global export before /init) so postgres/redis do not inherit a snapotter-owned
+# home. Created and chowned by the entrypoint root preflight before s6 starts.
+export HOME=/data/.home
 exec s6-setuidgid snapotter ./node_modules/.bin/tsx --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts

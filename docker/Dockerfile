@@ -557,7 +557,10 @@ ENV PYTHONWARNINGS=default \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 # Create non-root user for runtime
-RUN groupadd -r snapotter && useradd -r -g snapotter -d /app -s /sbin/nologin snapotter
+# Home is /data/.home (created + chowned by the entrypoint at runtime). Runtime
+# also exports HOME; this passwd entry is the writable fallback for any code that
+# resolves ~ via getpwuid when HOME is unset (the old /app home was read-only).
+RUN groupadd -r snapotter && useradd -r -g snapotter -d /data/.home -s /sbin/nologin snapotter
 # /app and /opt/venv are read-only at runtime -> owned by snapotter.
 # /data and /tmp/workspace are written at runtime: make them group-0 (root group)
 # owned and group-writable with the setgid bit so the app can still write when the
