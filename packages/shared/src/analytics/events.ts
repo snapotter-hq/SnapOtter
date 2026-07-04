@@ -12,6 +12,7 @@ export const ANALYTICS_EVENTS = {
   AI_BUNDLE_PROMPTED: "ai_bundle_prompted",
   BATCH_PROCESSED: "batch_processed",
   FEEDBACK_SUBMITTED: "feedback_submitted",
+  SPONSOR_CLICKED: "sponsor_clicked",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
