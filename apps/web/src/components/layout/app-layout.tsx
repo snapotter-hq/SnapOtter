@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useConnectionStore } from "@/stores/connection-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
@@ -22,10 +21,8 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
   const [helpOpen, setHelpOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const isMobile = useMobile();
-  const analyticsConfig = useAnalyticsStore((s) => s.config);
   const connectionStatus = useConnectionStore((s) => s.status);
   const bannerVisible = connectionStatus !== "connected";
-  const feedbackEnabled = Boolean(analyticsConfig?.enabled);
 
   // Load global settings (disabled tools, experimental flag, default theme) on
   // every authenticated page, not just the home grid. Without this, navigating
@@ -51,7 +48,6 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
         onHelpClick={() => setHelpOpen(true)}
         onFeedbackClick={() => setFeedbackOpen(true)}
         onSettingsClick={() => setSettingsOpen(true)}
-        feedbackEnabled={feedbackEnabled}
       />
 
       {/* Main content area */}
