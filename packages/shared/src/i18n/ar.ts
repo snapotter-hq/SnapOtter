@@ -1252,6 +1252,7 @@ export const ar: TranslationKeys = {
       stripIcc: "إزالة ICC (ملف تعريف الألوان)",
       stripXmp: "إزالة XMP (البيانات الوصفية الموسعة)",
       locationFound: "تم العثور على الموقع",
+      viewOnMap: "عرض على الخريطة",
       locationWarning: "تحتوي هذه الصورة على موقعك الدقيق. يُنصح بإزالة بيانات GPS قبل المشاركة.",
       metadataSections: "تم العثور على {count} قسم بيانات وصفية",
       metadataSectionsPlural: "تم العثور على {count} أقسام بيانات وصفية",

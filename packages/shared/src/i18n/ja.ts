@@ -1219,6 +1219,7 @@ export const ja: TranslationKeys = {
       stripIcc: "ICC削除（カラープロファイル）",
       stripXmp: "XMP削除（拡張メタデータ）",
       locationFound: "位置情報あり",
+      viewOnMap: "地図で表示",
       locationWarning:
         "この画像には正確な位置情報が含まれています。共有前にGPSデータの削除をご検討ください。",
       metadataSections: "{count}個のメタデータセクションが見つかりました",

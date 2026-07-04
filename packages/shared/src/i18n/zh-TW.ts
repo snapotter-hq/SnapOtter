@@ -1034,6 +1034,7 @@ export const zhTW: TranslationKeys = {
       stripIcc: "移除ICC（色彩描述檔）",
       stripXmp: "移除XMP（延伸中繼資料）",
       locationFound: "發現位置資訊",
+      viewOnMap: "在地圖上查看",
       locationWarning: "此影像包含您的精確位置資訊。建議在分享前移除GPS資料。",
       metadataSections: "找到{count}個中繼資料區段",
       metadataSectionsPlural: "找到{count}個中繼資料區段",

@@ -28,12 +28,14 @@ LAMA_HF_URL = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onn
 
 
 def _get_model_path():
-    """Return path to the LaMa ONNX model, downloading if needed."""
+    """Return path to the LaMa ONNX model, downloading only if allowed."""
     if os.path.exists(LAMA_MODEL_PATH):
         return LAMA_MODEL_PATH
     if os.path.exists(LAMA_LOCAL_PATH):
         return LAMA_LOCAL_PATH
 
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("LaMa inpainting model (lama_fp32.onnx)")
     emit_progress(5, "Downloading LaMa model")
     os.makedirs(LAMA_LOCAL_CACHE, exist_ok=True)
     import urllib.request

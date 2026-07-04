@@ -556,6 +556,14 @@ ENV PYTHONWARNINGS=default \
     TF_CPP_MIN_LOG_LEVEL=3 \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
+# Fail closed on runtime model fetches: the Python sidecar must never reach
+# Hugging Face on its own. User-initiated bundle installs lift these two in
+# their own process (install_feature.py), and SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1
+# re-enables runtime downloads explicitly. Placed in the runtime stage after
+# all build steps, so it cannot affect the image build itself.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
 # Create non-root user for runtime
 RUN groupadd -r snapotter && useradd -r -g snapotter -d /app -s /sbin/nologin snapotter
 # /app and /opt/venv are read-only at runtime -> owned by snapotter.

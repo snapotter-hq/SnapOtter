@@ -357,6 +357,29 @@ def write_installed_atomic(ai_dir: str, data: dict) -> None:
 # -- Main --
 
 def main() -> None:
+    """Run the install with runtime-download restrictions lifted.
+
+    The sidecar runs with HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE=1 so AI scripts
+    can never fetch models on their own; a bundle install is an explicitly
+    user-initiated download, so those flags are lifted here. The previous
+    values are restored in the finally block because this script can run
+    in-process inside the long-lived dispatcher, where os.environ changes
+    would otherwise leak into every later request.
+    """
+    saved = {key: os.environ.get(key) for key in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")}
+    os.environ["HF_HUB_OFFLINE"] = "0"
+    os.environ["TRANSFORMERS_OFFLINE"] = "0"
+    try:
+        _install()
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def _install() -> None:
     if len(sys.argv) < 4:
         fail(
             f"Usage: {sys.argv[0]} <bundleId> <manifestPath> <modelsDir>\n"

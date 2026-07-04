@@ -1258,6 +1258,7 @@ export const ru: TranslationKeys = {
       stripIcc: "Удалить ICC (цветовой профиль)",
       stripXmp: "Удалить XMP (расширяемые метаданные)",
       locationFound: "местоположение найдено",
+      viewOnMap: "Показать на карте",
       locationWarning:
         "Это изображение содержит Ваше точное местоположение. Рекомендуем удалить GPS-данные перед публикацией.",
       metadataSections: "Найден {count} раздел метаданных",

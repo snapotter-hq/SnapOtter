@@ -15,7 +15,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { TextAttrs } from "@/types/editor";
-import { getAllFonts, isSystemFont, loadGoogleFont } from "../common/font-loader";
+import { ensureFontLoaded, getAllFonts } from "../common/font-loader";
 
 // ---------------------------------------------------------------------------
 // Default attrs used when no text object is selected (next-text settings)
@@ -151,9 +151,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
 
   const handleSelect = useCallback(
     async (name: string) => {
-      if (!isSystemFont(name)) {
-        await loadGoogleFont(name);
-      }
+      await ensureFontLoaded(name);
       onChange(name);
       setOpen(false);
     },
@@ -202,26 +200,29 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
             </button>
           ))}
 
-          <div className="h-px bg-border my-1" />
-
-          {/* Google fonts */}
-          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Google Fonts
-          </div>
-          {fonts.google.map((name) => (
-            <button
-              type="button"
-              key={name}
-              onClick={() => handleSelect(name)}
-              className={cn(
-                "w-full text-start px-3 py-1.5 text-sm hover:bg-muted transition-colors",
-                value === name && "bg-muted font-medium",
-              )}
-              style={{ fontFamily: name }}
-            >
-              {name}
-            </button>
-          ))}
+          {/* Fonts bundled with the app (self-hosted, no network fetch) */}
+          {fonts.selfHosted.length > 0 && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                App Fonts
+              </div>
+              {fonts.selfHosted.map((name) => (
+                <button
+                  type="button"
+                  key={name}
+                  onClick={() => handleSelect(name)}
+                  className={cn(
+                    "w-full text-start px-3 py-1.5 text-sm hover:bg-muted transition-colors",
+                    value === name && "bg-muted font-medium",
+                  )}
+                  style={{ fontFamily: name }}
+                >
+                  {name}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

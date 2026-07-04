@@ -55,6 +55,8 @@ def _ensure_face_detect_model():
         return _DOCKER_MODEL_PATH
     if os.path.exists(_LOCAL_MODEL_PATH):
         return _LOCAL_MODEL_PATH
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("Face detection model (blaze_face_short_range.tflite)")
     os.makedirs(_LOCAL_MODEL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face detection model")
@@ -154,6 +156,12 @@ def enhance_with_gfpgan(img_array, only_center_face):
     if not os.path.exists(GFPGAN_MODEL_PATH):
         raise FileNotFoundError(f"GFPGAN model not found: {GFPGAN_MODEL_PATH}")
 
+    # GFPGANer resolves its facexlib helper weights relative to the cwd and
+    # downloads them from GitHub when missing; resolve them from the bundle
+    # instead (or fail closed).
+    from offline_guard import prepare_gfpgan_helper_weights
+    prepare_gfpgan_helper_weights(_MODELS_BASE)
+
     use_gpu = gpu_available()
     device = torch.device("cuda" if use_gpu else "cpu")
 
@@ -192,6 +200,12 @@ def enhance_with_codeformer(img_array, fidelity_weight):
     from gpu import gpu_available
 
     use_gpu = gpu_available()
+
+    # codeformer-pip downloads four weights into a cwd-relative tree at import
+    # time when they are missing; resolve the bundled ones first and fail
+    # closed on the rest instead of phoning home.
+    from offline_guard import prepare_codeformer_weights
+    prepare_codeformer_weights(_MODELS_BASE)
 
     _orig_cuda_check = torch.cuda.is_available
     if not use_gpu:

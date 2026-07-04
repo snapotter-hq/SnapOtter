@@ -1261,6 +1261,7 @@ export const uk: TranslationKeys = {
       stripIcc: "Видалити ICC (колірний профіль)",
       stripXmp: "Видалити XMP (розширювані метадані)",
       locationFound: "місцезнаходження знайдено",
+      viewOnMap: "Переглянути на карті",
       locationWarning:
         "Це зображення містить Ваше точне місцезнаходження. Рекомендуємо видалити GPS-дані перед публікацією.",
       metadataSections: "Знайдено {count} розділ метаданих",

@@ -164,12 +164,13 @@ def _filter_components(mask, total_pixels):
 # ── LaMa inpainting ──────────────────────────────────────────────────
 
 def _get_lama_path():
-    """Resolve LaMa model path, downloading if needed."""
+    """Resolve LaMa model path, downloading only if allowed."""
     if os.path.exists(LAMA_MODEL_PATH):
         return LAMA_MODEL_PATH
     if os.path.exists(LAMA_LOCAL_PATH):
         return LAMA_LOCAL_PATH
-    # Auto-download for local dev
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("LaMa inpainting model (lama_fp32.onnx)")
     os.makedirs(LAMA_LOCAL_CACHE, exist_ok=True)
     import urllib.request
     url = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"
@@ -294,13 +295,14 @@ def _inpaint_tiled(img_rgb, mask, session):
 # ── CodeFormer face enhancement ──────────────────────────────────────
 
 def _get_codeformer_path():
-    """Resolve CodeFormer ONNX model path, downloading if needed."""
+    """Resolve CodeFormer ONNX model path, downloading only if allowed."""
     if os.path.exists(CODEFORMER_MODEL_PATH):
         return CODEFORMER_MODEL_PATH
     if os.path.exists(CODEFORMER_LOCAL_PATH):
         return CODEFORMER_LOCAL_PATH
 
-    # Auto-download for local dev
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("CodeFormer model (codeformer.onnx)")
     os.makedirs(CODEFORMER_LOCAL_CACHE, exist_ok=True)
     emit_progress(35, "Downloading CodeFormer model")
     from huggingface_hub import hf_hub_download
@@ -326,6 +328,8 @@ def _ensure_face_detect_model():
         return _FACE_DETECT_DOCKER_PATH
     if os.path.exists(_FACE_DETECT_LOCAL_PATH):
         return _FACE_DETECT_LOCAL_PATH
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("Face detection model (blaze_face_short_range.tflite)")
     os.makedirs(_FACE_DETECT_LOCAL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face detection model")

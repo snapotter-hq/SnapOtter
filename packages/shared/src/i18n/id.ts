@@ -1259,6 +1259,7 @@ export const id: TranslationKeys = {
       stripIcc: "Hapus ICC (profil warna)",
       stripXmp: "Hapus XMP (metadata yang dapat diperluas)",
       locationFound: "lokasi ditemukan",
+      viewOnMap: "Lihat di peta",
       locationWarning:
         "Gambar ini berisi lokasi presisi Anda. Pertimbangkan untuk menghapus data GPS sebelum membagikan.",
       metadataSections: "{count} bagian metadata ditemukan",

@@ -1083,6 +1083,7 @@ export const hi: TranslationKeys = {
       stripIcc: "ICC हटाएं (कलर प्रोफाइल)",
       stripXmp: "XMP हटाएं (विस्तारित मेटाडेटा)",
       locationFound: "लोकेशन मिली",
+      viewOnMap: "मानचित्र पर देखें",
       locationWarning: "इस इमेज में आपकी सटीक लोकेशन है। शेयर करने से पहले GPS डेटा हटाने पर विचार करें।",
       metadataSections: "{count} मेटाडेटा सेक्शन मिला",
       metadataSectionsPlural: "{count} मेटाडेटा सेक्शन मिले",

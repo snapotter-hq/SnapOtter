@@ -1263,6 +1263,7 @@ export const nl: TranslationKeys = {
       stripIcc: "ICC verwijderen (kleurprofiel)",
       stripXmp: "XMP verwijderen (uitgebreide metadata)",
       locationFound: "locatie gevonden",
+      viewOnMap: "Op kaart bekijken",
       locationWarning:
         "Deze afbeelding bevat je precieze locatie. Overweeg GPS-data te verwijderen voor het delen.",
       metadataSections: "{count} metadata-sectie gevonden",

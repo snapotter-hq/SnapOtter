@@ -44,6 +44,18 @@ function buildMinimalEnv(): Record<string, string> {
       env[key] = process.env[key] as string;
     }
   }
+  // Fail closed on runtime model fetches: the sidecar must never reach the
+  // network on its own. SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 is the explicit
+  // opt-in; user-initiated bundle installs are exempt because
+  // install_feature.py lifts the offline flags in its own process.
+  if (process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD === "1") {
+    env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = "1";
+    env.HF_HUB_OFFLINE = "0";
+    env.TRANSFORMERS_OFFLINE = "0";
+  } else {
+    env.HF_HUB_OFFLINE = "1";
+    env.TRANSFORMERS_OFFLINE = "1";
+  }
   return env;
 }
 

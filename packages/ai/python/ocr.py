@@ -220,10 +220,17 @@ def run_paddleocr_v5(input_path, language):
         emit_progress(20, "Loading")
         mk = _bundled_paddle_kwargs(paddle_lang)
         # When a bundled recognizer is pinned, the model selects the script, so
-        # we omit lang (this is the proven fully-offline path). Only fall back to
-        # lang-based (online) resolution when no bundled rec exists (e.g. ja).
+        # we omit lang (this is the proven fully-offline path). Lang-based
+        # resolution for a language without a bundled recognizer (e.g. ja) and
+        # a missing detection model both make PaddleOCR fetch models over the
+        # network, so those paths fail closed unless downloads are enabled.
         if "text_recognition_model_dir" not in mk:
+            from offline_guard import ensure_download_allowed
+            ensure_download_allowed(f"PaddleOCR recognition model for language '{language}'")
             mk["lang"] = paddle_lang
+        if "text_detection_model_dir" not in mk:
+            from offline_guard import ensure_download_allowed
+            ensure_download_allowed(f"PaddleOCR text detection model ({PADDLE_DET_MODEL})")
         ocr = PaddleOCR(
             device=device,
             ocr_version="PP-OCRv5",

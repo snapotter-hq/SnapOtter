@@ -1215,6 +1215,7 @@ export const en = {
       stripIcc: "Strip ICC (color profile)",
       stripXmp: "Strip XMP (extensible metadata)",
       locationFound: "location found",
+      viewOnMap: "View on map",
       locationWarning:
         "This image contains your precise location. Consider removing GPS data before sharing.",
       metadataSections: "{count} metadata section found",

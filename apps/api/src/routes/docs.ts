@@ -189,6 +189,11 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     hideClientButton: true,
     showDeveloperTools: "never",
     theme: "default",
+    // Scalar's default typography loads Inter/JetBrains Mono from
+    // fonts.scalar.com at page load. Disable it and pin both font variables
+    // to local system stacks so the docs page makes no third-party requests
+    // (the docs CSP font-src is 'self' data: accordingly).
+    withDefaultFonts: false,
     customCss: `
         :root {
           --scalar-color-1: #09090b;
@@ -200,6 +205,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
           --scalar-background-3: #e4e4e7;
           --scalar-border-color: #e4e4e7;
           --scalar-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          --scalar-font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
         }
         /* Hide the "Powered by Scalar" sidebar footer link. Scalar exposes no
            config flag for it (unlike the cloud buttons disabled above). */

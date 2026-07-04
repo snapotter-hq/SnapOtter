@@ -1204,6 +1204,7 @@ export const ko: TranslationKeys = {
       stripIcc: "ICC 제거 (색상 프로파일)",
       stripXmp: "XMP 제거 (확장 메타데이터)",
       locationFound: "위치 정보 발견",
+      viewOnMap: "지도에서 보기",
       locationWarning:
         "이 이미지에 정확한 위치 정보가 포함되어 있습니다. 공유 전에 GPS 데이터 제거를 권장합니다.",
       metadataSections: "메타데이터 섹션 {count}개 발견",

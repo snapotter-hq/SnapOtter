@@ -1258,6 +1258,7 @@ export const sv: TranslationKeys = {
       stripIcc: "Ta bort ICC (färgprofil)",
       stripXmp: "Ta bort XMP (utökad metadata)",
       locationFound: "plats hittad",
+      viewOnMap: "Visa på karta",
       locationWarning:
         "Denna bild innehåller din exakta plats. Överväg att ta bort GPS-data innan du delar.",
       metadataSections: "{count} metadatasektion hittad",

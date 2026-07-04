@@ -1261,6 +1261,7 @@ export const ptBR: TranslationKeys = {
       stripIcc: "Remover ICC (perfil de cor)",
       stripXmp: "Remover XMP (metadados extensíveis)",
       locationFound: "localização encontrada",
+      viewOnMap: "Ver no mapa",
       locationWarning:
         "Esta imagem contém sua localização precisa. Considere remover os dados GPS antes de compartilhá-la.",
       metadataSections: "{count} seção de metadados encontrada",

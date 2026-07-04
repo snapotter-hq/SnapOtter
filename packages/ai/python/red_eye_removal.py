@@ -25,6 +25,8 @@ def _ensure_face_mesh_model():
         return _DOCKER_MODEL_PATH
     if os.path.exists(_LOCAL_MODEL_PATH):
         return _LOCAL_MODEL_PATH
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("Face landmark model (face_landmarker.task)")
     os.makedirs(_LOCAL_MODEL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face mesh model")

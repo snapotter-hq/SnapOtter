@@ -43,15 +43,16 @@ describe("buildCsp", () => {
     });
   });
 
-  describe("font-src allows Scalar docs fonts", () => {
-    it("docs pages include Scalar fonts origin", () => {
-      const sources = parseDirective(buildCsp(true), "font-src");
-      expect(sources).toContain("https://fonts.scalar.com");
+  describe("font-src is self-hosted only", () => {
+    it.each([true, false])("does not include the Scalar fonts origin (isDocs=%s)", (isDocs) => {
+      const sources = parseDirective(buildCsp(isDocs), "font-src");
+      expect(sources).not.toContain("https://fonts.scalar.com");
     });
 
-    it("app pages do not include Scalar fonts origin", () => {
-      const sources = parseDirective(buildCsp(false), "font-src");
-      expect(sources).not.toContain("https://fonts.scalar.com");
+    it.each([true, false])("keeps self and data: (isDocs=%s)", (isDocs) => {
+      const sources = parseDirective(buildCsp(isDocs), "font-src");
+      expect(sources).toContain("'self'");
+      expect(sources).toContain("data:");
     });
   });
 
@@ -60,9 +61,9 @@ describe("buildCsp", () => {
     expect(buildCsp(true)).not.toContain("frame-ancestors");
   });
 
-  it("allows OpenStreetMap tiles in img-src for app pages", () => {
-    const sources = parseDirective(buildCsp(false), "img-src");
-    expect(sources).toContain("https://tile.openstreetmap.org");
+  it.each([true, false])("does not allow OpenStreetMap tiles in img-src (isDocs=%s)", (isDocs) => {
+    const sources = parseDirective(buildCsp(isDocs), "img-src");
+    expect(sources).not.toContain("https://tile.openstreetmap.org");
   });
 
   it.each([

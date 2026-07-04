@@ -92,6 +92,8 @@ def ensure_model():
         return _DOCKER_MODEL_PATH
     if os.path.exists(MODEL_PATH):
         return MODEL_PATH
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed("Face landmark model (face_landmarker.task)")
     os.makedirs(MODEL_DIR, exist_ok=True)
     import urllib.request
     emit_progress(15, "Downloading face model")

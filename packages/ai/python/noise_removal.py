@@ -39,7 +39,8 @@ def _get_model_path(env_path, filename, url):
     if os.path.exists(local_path):
         return local_path
 
-    # Auto-download
+    from offline_guard import ensure_download_allowed
+    ensure_download_allowed(f"Denoising model ({filename})")
     emit_progress(10, f"Downloading {filename}")
     os.makedirs(_CACHE_DIR, exist_ok=True)
     import urllib.request

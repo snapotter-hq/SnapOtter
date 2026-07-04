@@ -1263,6 +1263,7 @@ export const it: TranslationKeys = {
       stripIcc: "Rimuovi ICC (profilo colore)",
       stripXmp: "Rimuovi XMP (metadati estensibili)",
       locationFound: "posizione trovata",
+      viewOnMap: "Vedi sulla mappa",
       locationWarning:
         "Questa immagine contiene la tua posizione precisa. Considera di rimuovere i dati GPS prima di condividerla.",
       metadataSections: "{count} sezione di metadati trovata",

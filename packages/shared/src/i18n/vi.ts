@@ -1261,6 +1261,7 @@ export const vi: TranslationKeys = {
       stripIcc: "Xóa ICC (cấu hình màu)",
       stripXmp: "Xóa XMP (siêu dữ liệu mở rộng)",
       locationFound: "đã tìm thấy vị trí",
+      viewOnMap: "Xem trên bản đồ",
       locationWarning:
         "Hình ảnh này chứa vị trí chính xác của bạn. Hãy cân nhắc xóa dữ liệu GPS trước khi chia sẻ.",
       metadataSections: "Đã tìm thấy {count} phần siêu dữ liệu",

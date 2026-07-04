@@ -104,6 +104,10 @@ def _register_matting_session(sessions_class):
         @classmethod
         def download_models(cls, *args, **kwargs):
             fname = f"{cls.name(*args, **kwargs)}.onnx"
+            target = os.path.join(cls.u2net_home(*args, **kwargs), fname)
+            if not os.path.exists(target):
+                from offline_guard import ensure_download_allowed
+                ensure_download_allowed(f"Background removal model '{cls.name(*args, **kwargs)}'")
             pooch.retrieve(
                 "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx",
                 None,  # Skip checksum for GitHub release assets
@@ -111,7 +115,7 @@ def _register_matting_session(sessions_class):
                 path=cls.u2net_home(*args, **kwargs),
                 progressbar=True,
             )
-            return os.path.join(cls.u2net_home(*args, **kwargs), fname)
+            return target
 
         @classmethod
         def name(cls, *args, **kwargs):
@@ -138,6 +142,10 @@ def _register_hr_matting_session(sessions_class):
         @classmethod
         def download_models(cls, *args, **kwargs):
             fname = f"{cls.name(*args, **kwargs)}.onnx"
+            target = os.path.join(cls.u2net_home(*args, **kwargs), fname)
+            if not os.path.exists(target):
+                from offline_guard import ensure_download_allowed
+                ensure_download_allowed(f"Background removal model '{cls.name(*args, **kwargs)}'")
             pooch.retrieve(
                 "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_HR-matting-epoch_135.onnx",
                 None,
@@ -145,7 +153,7 @@ def _register_hr_matting_session(sessions_class):
                 path=cls.u2net_home(*args, **kwargs),
                 progressbar=True,
             )
-            return os.path.join(cls.u2net_home(*args, **kwargs), fname)
+            return target
 
         @classmethod
         def name(cls, *args, **kwargs):
@@ -193,6 +201,16 @@ def main():
         # Register BiRefNet-matting (Ultra quality) if not already present
         _register_matting_session(sessions_class)
         _register_hr_matting_session(sessions_class)
+
+        # Fail closed before rembg resolves the model: every built-in session
+        # downloads its .onnx (pooch, GitHub/HuggingFace) when it is missing
+        # from the rembg home dir. Mirrors rembg's own home resolution.
+        model_home = os.path.expanduser(
+            os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
+        )
+        if not os.path.exists(os.path.join(model_home, f"{model}.onnx")):
+            from offline_guard import ensure_download_allowed
+            ensure_download_allowed(f"Background removal model '{model}'")
 
         emit_progress(10, "Loading model")
 

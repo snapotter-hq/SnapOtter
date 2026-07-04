@@ -1261,6 +1261,7 @@ export const tr: TranslationKeys = {
       stripIcc: "ICC kaldır (renk profili)",
       stripXmp: "XMP kaldır (genişletilmiş meta veri)",
       locationFound: "konum bulundu",
+      viewOnMap: "Haritada görüntüle",
       locationWarning:
         "Bu görüntü kesin konumunuzu içeriyor. Paylaşmadan önce GPS verilerini kaldırmanız önerilir.",
       metadataSections: "{count} meta veri bölümü bulundu",

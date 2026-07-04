@@ -1245,6 +1245,7 @@ export const th: TranslationKeys = {
       stripIcc: "ลบ ICC (โปรไฟล์สี)",
       stripXmp: "ลบ XMP (ข้อมูลเมตาขยาย)",
       locationFound: "พบตำแหน่ง",
+      viewOnMap: "ดูบนแผนที่",
       locationWarning: "ภาพนี้มีตำแหน่งที่ตั้งแม่นยำของคุณ ควรพิจารณาลบข้อมูล GPS ก่อนแชร์",
       metadataSections: "พบ {count} ส่วนข้อมูลเมตา",
       metadataSectionsPlural: "พบ {count} ส่วนข้อมูลเมตา",

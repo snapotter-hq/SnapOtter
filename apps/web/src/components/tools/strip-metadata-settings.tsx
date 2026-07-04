@@ -1,55 +1,13 @@
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { Download, Loader2, MapPin } from "lucide-react";
+import { Download, ExternalLink, Loader2, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
-
-/** Interactive Leaflet map with a red circle marker. */
-function MiniMap({ lat, lon, zoom = 15 }: { lat: number; lon: number; zoom?: number }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-
-    const map = L.map(containerRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([lat, lon], zoom);
-
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-    }).addTo(map);
-
-    L.circleMarker([lat, lon], {
-      radius: 7,
-      color: "#fff",
-      weight: 2,
-      fillColor: "#ef4444",
-      fillOpacity: 1,
-    }).addTo(map);
-
-    mapRef.current = map;
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [lat, lon, zoom]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-36 rounded-md overflow-hidden border border-border"
-    />
-  );
-}
 
 interface MetadataResult {
   filename: string;
@@ -196,6 +154,7 @@ export function StripMetadataControls({
 }
 
 export function StripMetadataSettings() {
+  const { t } = useTranslation();
   const { entries, selectedIndex, files } = useFileStore();
   const {
     processFiles,
@@ -324,7 +283,9 @@ export function StripMetadataSettings() {
 
           {metadata && hasAnyMetadata && (
             <div className="space-y-1.5">
-              {/* GPS warning banner + map */}
+              {/* GPS warning banner. Coordinates render as plain text: no map
+                  tiles are fetched, so the photo's location never leaves the
+                  browser unless the user clicks the external link below. */}
               {hasGps && gpsLat != null && gpsLon != null && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20">
@@ -333,7 +294,15 @@ export function StripMetadataSettings() {
                       Location data: {gpsLat.toFixed(6)}, {gpsLon.toFixed(6)}
                     </span>
                   </div>
-                  <MiniMap lat={gpsLat} lon={gpsLon} />
+                  <a
+                    href={`https://www.openstreetmap.org/?mlat=${gpsLat}&mlon=${gpsLon}#map=15/${gpsLat}/${gpsLon}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {t.toolSettings["strip-metadata"].viewOnMap}
+                  </a>
                   <p className="text-[10px] text-amber-600 dark:text-amber-400">
                     This image contains your precise location. Consider removing GPS data before
                     sharing.

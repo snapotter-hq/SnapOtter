@@ -1035,6 +1035,7 @@ export const zhCN: TranslationKeys = {
       stripIcc: "移除 ICC（颜色配置文件）",
       stripXmp: "移除 XMP（扩展元数据）",
       locationFound: "已发现位置信息",
+      viewOnMap: "在地图上查看",
       locationWarning: "此图片包含精确的位置信息。建议在分享前移除 GPS 数据。",
       metadataSections: "发现 {count} 个元数据部分",
       metadataSectionsPlural: "发现 {count} 个元数据部分",
