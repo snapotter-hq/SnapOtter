@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const th: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "นำเข้าข้อมูล SnapOtter 1.x แล้ว",
+    successBody: "ย้าย {users} ผู้ใช้และ {files} ไฟล์ที่บันทึกไว้จากเวอร์ชันก่อนหน้าของคุณ",
+    warningTitle: "พบฐานข้อมูล 1.x แต่ยังไม่ได้นำเข้า",
+    warningBody:
+      "อินสแตนซ์นี้มีข้อมูลอยู่แล้ว จึงไม่ได้นำเข้าฐานข้อมูล 1.x ของคุณ การนำเข้าต้องใช้อินสแตนซ์ที่ว่างเปล่า ดูคู่มือการอัปเกรด",
+    dismiss: "ปิด",
+  },
   common: {
     upload: "อัปโหลดจากคอมพิวเตอร์",
     process: "ประมวลผล",

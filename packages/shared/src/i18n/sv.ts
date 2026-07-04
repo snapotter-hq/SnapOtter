@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const sv: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x-data importerad.",
+    successBody: "Överförde {users} användare och {files} sparade filer från din tidigare version.",
+    warningTitle: "1.x-databas hittades men importerades inte.",
+    warningBody:
+      "Den här instansen har redan data, så din 1.x-databas importerades inte. Import kräver en tom instans. Se uppgraderingsguiden.",
+    dismiss: "Stäng",
+  },
   common: {
     upload: "Ladda upp från dator",
     process: "Bearbeta",

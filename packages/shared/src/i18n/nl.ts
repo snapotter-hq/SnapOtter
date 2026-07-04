@@ -1,6 +1,15 @@
 import type { TranslationKeys } from "./en.js";
 
 export const nl: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x-gegevens geïmporteerd.",
+    successBody:
+      "{users} gebruikers en {files} opgeslagen bestanden overgezet vanuit je vorige versie.",
+    warningTitle: "1.x-database gevonden, maar niet geïmporteerd.",
+    warningBody:
+      "Deze instantie bevat al gegevens, dus je 1.x-database is niet geïmporteerd. Voor importeren is een lege instantie nodig. Zie de upgradehandleiding.",
+    dismiss: "Sluiten",
+  },
   common: {
     upload: "Upload van computer",
     process: "Verwerken",

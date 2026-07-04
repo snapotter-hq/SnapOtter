@@ -152,6 +152,40 @@ export function shouldShowUsageSurvey({
   );
 }
 
+export interface MigrationMarker {
+  status: "completed" | "detected_locked";
+  tables?: Record<string, number>;
+  blobs?: { present: number; missing: number };
+}
+
+/** Parse the `sqlite_import` settings marker written by the 1.x import on boot. */
+export function parseMigrationMarker(raw: string | undefined): MigrationMarker | null {
+  if (!raw) return null;
+  try {
+    const marker = JSON.parse(raw) as MigrationMarker;
+    return marker.status === "completed" || marker.status === "detected_locked" ? marker : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Show the 1.x migration banner to admins when an import marker exists and has
+ * not been dismissed. The marker key is admin-only (SENSITIVE_KEYS on the API),
+ * so non-admins never receive it, and we gate on role here as well.
+ */
+export function shouldShowMigrationBanner({
+  settings,
+  role,
+}: {
+  settings: Record<string, string>;
+  role: string | null;
+}): boolean {
+  if (role !== "admin") return false;
+  if (settings["sqlite_import.dismissedAt"]) return false;
+  return parseMigrationMarker(settings.sqlite_import) !== null;
+}
+
 export async function submitFeedback(payload: FeedbackPayload): Promise<FeedbackResponse> {
   return apiPost<FeedbackResponse>("/v1/feedback", payload);
 }

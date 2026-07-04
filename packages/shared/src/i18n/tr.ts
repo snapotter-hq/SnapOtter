@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const tr: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x verileri içe aktarıldı.",
+    successBody: "Önceki sürümünüzden {users} kullanıcı ve {files} kayıtlı dosya taşındı.",
+    warningTitle: "1.x veritabanı bulundu ancak içe aktarılmadı.",
+    warningBody:
+      "Bu örnekte zaten veri var, bu yüzden 1.x veritabanınız içe aktarılmadı. İçe aktarma boş bir örnek gerektirir. Yükseltme kılavuzuna bakın.",
+    dismiss: "Kapat",
+  },
   common: {
     upload: "Bilgisayardan yükle",
     process: "İşle",

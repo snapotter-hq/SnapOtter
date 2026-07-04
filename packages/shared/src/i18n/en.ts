@@ -1,4 +1,12 @@
 export const en = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x data imported.",
+    successBody: "Brought over {users} users and {files} saved files from your previous version.",
+    warningTitle: "1.x database found but not imported.",
+    warningBody:
+      "This instance already has data, so your 1.x database was not imported. Importing requires an empty instance. See the upgrade guide.",
+    dismiss: "Dismiss",
+  },
   common: {
     upload: "Upload from computer",
     process: "Process",

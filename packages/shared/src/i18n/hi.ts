@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const hi: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x डेटा आयात किया गया।",
+    successBody: "आपके पिछले संस्करण से {users} उपयोगकर्ता और {files} सहेजी गई फ़ाइलें स्थानांतरित की गईं।",
+    warningTitle: "1.x डेटाबेस मिला, लेकिन आयात नहीं किया गया।",
+    warningBody:
+      "इस इंस्टेंस में पहले से डेटा है, इसलिए आपका 1.x डेटाबेस आयात नहीं किया गया। आयात के लिए खाली इंस्टेंस आवश्यक है। अपग्रेड गाइड देखें।",
+    dismiss: "बंद करें",
+  },
   common: {
     upload: "कंप्यूटर से अपलोड करें",
     process: "प्रोसेस करें",

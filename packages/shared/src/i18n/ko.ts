@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const ko: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "SnapOtter 1.x 데이터를 가져왔습니다.",
+    successBody: "이전 버전에서 사용자 {users}명과 저장된 파일 {files}개를 이전했습니다.",
+    warningTitle: "1.x 데이터베이스를 찾았지만 가져오지 않았습니다.",
+    warningBody:
+      "이 인스턴스에 이미 데이터가 있어 1.x 데이터베이스를 가져오지 않았습니다. 가져오려면 빈 인스턴스가 필요합니다. 업그레이드 가이드를 참조하세요.",
+    dismiss: "닫기",
+  },
   common: {
     upload: "컴퓨터에서 업로드",
     process: "처리",

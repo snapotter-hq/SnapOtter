@@ -1,6 +1,15 @@
 import type { TranslationKeys } from "./en.js";
 
 export const fr: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "Données SnapOtter 1.x importées.",
+    successBody:
+      "{users} utilisateurs et {files} fichiers enregistrés ont été migrés depuis votre version précédente.",
+    warningTitle: "Base de données 1.x détectée, mais non importée.",
+    warningBody:
+      "Cette instance contient déjà des données, votre base de données 1.x n'a donc pas été importée. L'importation nécessite une instance vide. Consultez le guide de mise à niveau.",
+    dismiss: "Ignorer",
+  },
   common: {
     upload: "Importer depuis l'ordinateur",
     process: "Traiter",

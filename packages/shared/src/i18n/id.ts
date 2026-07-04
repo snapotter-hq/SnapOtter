@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const id: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "Data SnapOtter 1.x diimpor.",
+    successBody: "Memindahkan {users} pengguna dan {files} file tersimpan dari versi sebelumnya.",
+    warningTitle: "Database 1.x ditemukan, tetapi tidak diimpor.",
+    warningBody:
+      "Instans ini sudah memiliki data, jadi database 1.x Anda tidak diimpor. Impor memerlukan instans kosong. Lihat panduan peningkatan.",
+    dismiss: "Tutup",
+  },
   common: {
     upload: "Unggah dari komputer",
     process: "Proses",

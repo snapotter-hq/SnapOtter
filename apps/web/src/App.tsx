@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { Toaster, toast } from "sonner";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
+import { MigrationBanner } from "./components/common/migration-banner";
 import { RouteAnnouncer } from "./components/common/route-announcer";
 import { UsageSurveyOverlay } from "./components/onboarding/usage-survey-overlay";
 import { I18nProvider } from "./contexts/i18n-context";
@@ -193,6 +194,7 @@ export function App() {
           <RouteAnnouncer />
           <KeyboardShortcutProvider>
             <AuthGuard>
+              <MigrationBanner />
               <UsageSurveyOverlay />
               <Suspense fallback={<PageLoader />}>
                 <Routes>

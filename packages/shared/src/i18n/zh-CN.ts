@@ -1,6 +1,13 @@
 import type { TranslationKeys } from "./en.js";
 
 export const zhCN: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "已导入 SnapOtter 1.x 数据。",
+    successBody: "已从旧版本迁移 {users} 个用户和 {files} 个已保存文件。",
+    warningTitle: "发现 1.x 数据库，但未导入。",
+    warningBody: "此实例已有数据，因此未导入你的 1.x 数据库。导入需要一个空实例。请参阅升级指南。",
+    dismiss: "关闭",
+  },
   common: {
     upload: "从电脑上传",
     process: "处理",

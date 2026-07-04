@@ -1,6 +1,14 @@
 import type { TranslationKeys } from "./en.js";
 
 export const ar: TranslationKeys = {
+  migrationBanner: {
+    successTitle: "تم استيراد بيانات SnapOtter 1.x.",
+    successBody: "تم نقل {users} مستخدمين و {files} ملفات محفوظة من إصدارك السابق.",
+    warningTitle: "تم العثور على قاعدة بيانات 1.x ولكن لم يتم استيرادها.",
+    warningBody:
+      "يحتوي هذا المثيل على بيانات بالفعل، لذلك لم يتم استيراد قاعدة بيانات 1.x. يتطلب الاستيراد مثيلاً فارغاً. راجع دليل الترقية.",
+    dismiss: "إغلاق",
+  },
   common: {
     upload: "رفع من الجهاز",
     process: "معالجة",

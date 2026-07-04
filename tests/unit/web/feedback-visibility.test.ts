@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shouldShowInstallFeedbackCard, shouldShowUsageSurvey } from "@/lib/feedback";
+import {
+  parseMigrationMarker,
+  shouldShowInstallFeedbackCard,
+  shouldShowMigrationBanner,
+  shouldShowUsageSurvey,
+} from "@/lib/feedback";
 
 const NOW = new Date("2026-01-15T00:00:00Z").getTime();
 
@@ -148,5 +153,53 @@ describe("shouldShowUsageSurvey", () => {
         analyticsEnabled: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldShowMigrationBanner", () => {
+  const marker = JSON.stringify({
+    status: "completed",
+    tables: { users: 2, user_files: 1 },
+    blobs: { present: 1, missing: 0 },
+  });
+
+  it("shows for admins when a marker exists and is not dismissed", () => {
+    expect(shouldShowMigrationBanner({ settings: { sqlite_import: marker }, role: "admin" })).toBe(
+      true,
+    );
+  });
+
+  it("is hidden for non-admins even with a marker", () => {
+    expect(shouldShowMigrationBanner({ settings: { sqlite_import: marker }, role: "user" })).toBe(
+      false,
+    );
+  });
+
+  it("is hidden once dismissed", () => {
+    expect(
+      shouldShowMigrationBanner({
+        settings: { sqlite_import: marker, "sqlite_import.dismissedAt": "2026-01-14T00:00:00Z" },
+        role: "admin",
+      }),
+    ).toBe(false);
+  });
+
+  it("is hidden when there is no marker", () => {
+    expect(shouldShowMigrationBanner({ settings: {}, role: "admin" })).toBe(false);
+  });
+});
+
+describe("parseMigrationMarker", () => {
+  it("parses completed and detected_locked markers", () => {
+    expect(parseMigrationMarker(JSON.stringify({ status: "completed" }))?.status).toBe("completed");
+    expect(parseMigrationMarker(JSON.stringify({ status: "detected_locked" }))?.status).toBe(
+      "detected_locked",
+    );
+  });
+
+  it("returns null for missing, invalid, or unknown-status input", () => {
+    expect(parseMigrationMarker(undefined)).toBeNull();
+    expect(parseMigrationMarker("not json")).toBeNull();
+    expect(parseMigrationMarker(JSON.stringify({ status: "bogus" }))).toBeNull();
   });
 });
