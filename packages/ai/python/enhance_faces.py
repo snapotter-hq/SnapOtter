@@ -158,7 +158,7 @@ def enhance_with_gfpgan(img_array, only_center_face):
 
     # GFPGANer resolves its facexlib helper weights relative to the cwd and
     # downloads them from GitHub when missing; resolve them from the bundle
-    # instead (or fail closed).
+    # first so no download is needed (strict offline mode errors instead).
     from offline_guard import prepare_gfpgan_helper_weights
     prepare_gfpgan_helper_weights(_MODELS_BASE)
 
@@ -202,8 +202,8 @@ def enhance_with_codeformer(img_array, fidelity_weight):
     use_gpu = gpu_available()
 
     # codeformer-pip downloads four weights into a cwd-relative tree at import
-    # time when they are missing; resolve the bundled ones first and fail
-    # closed on the rest instead of phoning home.
+    # time when they are missing; resolve the bundled ones first so only a
+    # genuinely unbundled weight can trigger the download fallback.
     from offline_guard import prepare_codeformer_weights
     prepare_codeformer_weights(_MODELS_BASE)
 

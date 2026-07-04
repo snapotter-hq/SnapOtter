@@ -1,29 +1,37 @@
-"""Fail-closed gate for runtime model downloads.
+"""Gate for runtime model downloads, with an optional strict offline mode.
 
-SnapOtter must never fetch models from the network on its own: models arrive
-through user-initiated feature bundle installs (install_feature.py). Every AI
-script calls ensure_download_allowed() immediately before any code path that
-would download a model at runtime, so a missing file surfaces as an
-actionable error instead of silent third-party egress.
+Models normally arrive through user-initiated feature bundle installs
+(install_feature.py), and the resolvers in the AI scripts always prefer those
+bundled files. When a model is missing, scripts may fetch the public model
+weights as a fallback so tools work out of the box; that fallback only ever
+downloads public model files, never user data.
 
-Setting SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 opts back in to runtime downloads.
+Setting SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict offline mode for
+airgapped or locked-down deployments: every script calls
+ensure_download_allowed() immediately before any download fallback, so a
+missing file then surfaces as an actionable error instead of an outbound
+fetch.
 """
 import os
 
 
 def downloads_allowed():
-    """True when the operator explicitly permits runtime model downloads."""
-    return os.environ.get("SNAPOTTER_ALLOW_MODEL_DOWNLOAD") == "1"
+    """True unless strict offline mode is explicitly enabled.
+
+    Runtime model downloads are allowed by default; only an explicit
+    SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 (or "false") blocks them.
+    """
+    return os.environ.get("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", "1").lower() not in ("0", "false")
 
 
 def ensure_download_allowed(what):
-    """Raise a clear, actionable error unless runtime downloads are enabled."""
+    """Raise a clear, actionable error when strict offline mode blocks a fetch."""
     if downloads_allowed():
         return
     raise RuntimeError(
-        f"{what} is missing and automatic downloads are disabled. "
-        "Reinstall the feature bundle from Settings, or set "
-        "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 to permit downloads."
+        f"{what} is missing and automatic downloads are disabled by "
+        "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0. Reinstall the feature bundle from "
+        "Settings, or unset SNAPOTTER_ALLOW_MODEL_DOWNLOAD to permit downloads."
     )
 
 
@@ -60,7 +68,8 @@ def prepare_gfpgan_helper_weights(models_base):
     a path relative to the process cwd, and facexlib downloads any file
     missing from it (GitHub release URLs). The feature bundles install those
     weights under <models>/gfpgan/facelib, so link them into the expected
-    location and fail closed when they cannot be resolved locally.
+    location; when a weight cannot be resolved locally, strict offline mode
+    errors instead of downloading.
     """
     for fname in GFPGAN_HELPER_WEIGHTS:
         link = os.path.join("gfpgan", "weights", fname)
@@ -74,9 +83,10 @@ def prepare_codeformer_weights(models_base):
 
     codeformer-pip 0.0.4 downloads four weights into a cwd-relative
     CodeFormer/weights/ tree at import time of codeformer.app. Three of them
-    ship in the feature bundles; RealESRGAN_x2plus.pth (a background-upscale
-    helper this app never invokes) is not bundled, so a host that has never
-    downloaded it fails closed unless downloads are explicitly enabled.
+    ship in the feature bundles and are linked here so they never re-download;
+    RealESRGAN_x2plus.pth (a background-upscale helper this app never invokes)
+    is not bundled, so it downloads once on first use unless strict offline
+    mode blocks it.
     """
     expected = {
         os.path.join("CodeFormer", "weights", "CodeFormer", "codeformer.pth"): os.path.join(

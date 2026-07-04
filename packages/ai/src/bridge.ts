@@ -44,15 +44,17 @@ function buildMinimalEnv(): Record<string, string> {
       env[key] = process.env[key] as string;
     }
   }
-  // Fail closed on runtime model fetches: the sidecar must never reach the
-  // network on its own. SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 is the explicit
-  // opt-in; user-initiated bundle installs are exempt because
-  // install_feature.py lifts the offline flags in its own process.
-  if (process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD === "1") {
-    env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = "1";
-    env.HF_HUB_OFFLINE = "0";
-    env.TRANSFORMERS_OFFLINE = "0";
-  } else {
+  // Runtime model downloads are allowed by default (public model weights
+  // only, never user data). SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict
+  // offline mode for airgapped deployments: the sidecar then gets the
+  // Hugging Face offline flags and every download fallback raises an
+  // actionable error instead of fetching. Bundle installs stay exempt
+  // because install_feature.py lifts the flags in its own process.
+  const allowModelDownload = process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD;
+  if (allowModelDownload !== undefined) {
+    env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = allowModelDownload;
+  }
+  if (allowModelDownload === "0" || allowModelDownload?.toLowerCase() === "false") {
     env.HF_HUB_OFFLINE = "1";
     env.TRANSFORMERS_OFFLINE = "1";
   }

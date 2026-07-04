@@ -174,8 +174,9 @@ def main():
                             )
                         # GFPGANer resolves its facexlib helper weights
                         # relative to the cwd and downloads them from GitHub
-                        # when missing; resolve them from the bundle instead
-                        # (or fail closed).
+                        # when missing; resolve them from the bundle first so
+                        # no download is needed (strict offline mode errors
+                        # instead).
                         from offline_guard import prepare_gfpgan_helper_weights
                         prepare_gfpgan_helper_weights(_MODELS_BASE)
                         face_enhancer = GFPGANer(

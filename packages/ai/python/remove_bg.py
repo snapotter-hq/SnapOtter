@@ -202,9 +202,10 @@ def main():
         _register_matting_session(sessions_class)
         _register_hr_matting_session(sessions_class)
 
-        # Fail closed before rembg resolves the model: every built-in session
-        # downloads its .onnx (pooch, GitHub/HuggingFace) when it is missing
-        # from the rembg home dir. Mirrors rembg's own home resolution.
+        # Every built-in rembg session downloads its .onnx (pooch,
+        # GitHub/HuggingFace) when it is missing from the rembg home dir;
+        # strict offline mode blocks that fallback with a clear error.
+        # Mirrors rembg's own home resolution.
         model_home = os.path.expanduser(
             os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
         )

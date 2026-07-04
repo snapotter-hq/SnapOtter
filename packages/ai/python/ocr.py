@@ -223,7 +223,7 @@ def run_paddleocr_v5(input_path, language):
         # we omit lang (this is the proven fully-offline path). Lang-based
         # resolution for a language without a bundled recognizer (e.g. ja) and
         # a missing detection model both make PaddleOCR fetch models over the
-        # network, so those paths fail closed unless downloads are enabled.
+        # network, which strict offline mode blocks with a clear error.
         if "text_recognition_model_dir" not in mk:
             from offline_guard import ensure_download_allowed
             ensure_download_allowed(f"PaddleOCR recognition model for language '{language}'")

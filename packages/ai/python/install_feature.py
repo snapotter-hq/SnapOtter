@@ -359,12 +359,12 @@ def write_installed_atomic(ai_dir: str, data: dict) -> None:
 def main() -> None:
     """Run the install with runtime-download restrictions lifted.
 
-    The sidecar runs with HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE=1 so AI scripts
-    can never fetch models on their own; a bundle install is an explicitly
-    user-initiated download, so those flags are lifted here. The previous
-    values are restored in the finally block because this script can run
-    in-process inside the long-lived dispatcher, where os.environ changes
-    would otherwise leak into every later request.
+    In strict offline mode (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0) the sidecar
+    runs with HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE=1; a bundle install is an
+    explicitly user-initiated download, so those flags are lifted here
+    regardless. The previous values are restored in the finally block because
+    this script can run in-process inside the long-lived dispatcher, where
+    os.environ changes would otherwise leak into every later request.
     """
     saved = {key: os.environ.get(key) for key in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")}
     os.environ["HF_HUB_OFFLINE"] = "0"
