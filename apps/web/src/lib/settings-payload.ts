@@ -14,7 +14,7 @@ export function writableSettings(settings: Record<string, string>): Record<strin
 
 // Only the keys this tab actually changed from the snapshot it loaded at mount.
 // Saving the whole settings blob lets a value captured at mount clobber another
-// admin's concurrent change — most dangerously flipping an instance-wide analytics
+// admin's concurrent change, most dangerously flipping an instance-wide analytics
 // opt-out back on when saving an unrelated field.
 export function changedSettings(
   original: Record<string, string>,
