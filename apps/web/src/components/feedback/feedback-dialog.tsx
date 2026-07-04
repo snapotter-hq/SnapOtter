@@ -9,6 +9,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import {
+  buildFeedbackGithubUrl,
+  buildFeedbackMailtoUrl,
   type FeedbackErrorCategory,
   type FeedbackFrictionArea,
   type FeedbackImportantArea,
@@ -115,6 +117,7 @@ export function FeedbackDialog({
 
   const isAdminInstall = source === "admin_installer";
   const isSearchMiss = source === "search_miss";
+  const isGlobal = source === "global";
   const canSubmit = Boolean(
     message.trim() || sentiment || feedbackType !== "other" || isAdminInstall,
   );
@@ -203,7 +206,28 @@ export function FeedbackDialog({
 
         {submitted ? (
           <div className="p-6 space-y-4">
-            {isSearchMiss && !accepted ? (
+            {isGlobal && !accepted ? (
+              <div className="space-y-3">
+                <p className="text-sm text-foreground">{t.feedback.offlineDescription}</p>
+                <p className="text-xs text-muted-foreground">{t.feedback.offlinePublicNote}</p>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={buildFeedbackGithubUrl(message)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+                  >
+                    {t.feedback.offlineGithubButton}
+                  </a>
+                  <a
+                    href={buildFeedbackMailtoUrl(message)}
+                    className="w-full text-center py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {t.feedback.offlineEmailButton}
+                  </a>
+                </div>
+              </div>
+            ) : isSearchMiss && !accepted ? (
               <p className="text-sm text-foreground">
                 <a
                   href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
