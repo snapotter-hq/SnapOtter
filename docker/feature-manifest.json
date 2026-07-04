@@ -142,7 +142,7 @@
       "packages": {
         "common": ["huggingface-hub"],
         "amd64": ["onnxruntime-gpu==1.20.1"],
-        "arm64": ["onnxruntime==1.20.1"]
+        "arm64": ["onnxruntime==1.20.1", "protobuf>=4.25.3,<5"]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -419,7 +419,11 @@
           "paddlepaddle-gpu>=3.2.1 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ --extra-index-url https://pypi.org/simple/",
           "paddleocr[doc-parser]>=3.4.0,<3.5.0"
         ],
-        "arm64": ["paddlepaddle>=3.2.1", "paddleocr[doc-parser]>=3.4.0,<3.5.0"]
+        "arm64": [
+          "paddlepaddle>=3.2.1",
+          "paddleocr[doc-parser]>=3.4.0,<3.5.0",
+          "protobuf>=4.25.3,<5"
+        ]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -488,7 +492,7 @@
       "packages": {
         "common": ["faster-whisper>=1.0.0"],
         "amd64": [],
-        "arm64": []
+        "arm64": ["protobuf>=4.25.3,<5"]
       },
       "pipFlags": {},
       "postInstall": [],
