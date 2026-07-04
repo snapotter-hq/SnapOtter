@@ -3853,6 +3853,7 @@ export const nl: TranslationKeys = {
     connectionError: "Verbindingsfout",
   },
   sidebar: {
+    sponsor: "Houd het gratis",
     tools: "Tools",
     grid: "Raster",
     automate: "Automatiseren",
@@ -3872,6 +3873,7 @@ export const nl: TranslationKeys = {
     mobileNavSettings: "Instellingen",
   },
   a11y: {
+    sponsorLink: "Steun SnapOtter op GitHub Sponsors",
     skipToContent: "Ga naar hoofdinhoud",
     openSidebar: "Zijbalk openen",
     closeSidebar: "Zijbalk sluiten",

@@ -3840,6 +3840,7 @@ export const vi: TranslationKeys = {
     connectionError: "Lỗi kết nối",
   },
   sidebar: {
+    sponsor: "Giữ nó miễn phí",
     tools: "Công cụ",
     grid: "Lưới",
     automate: "Tự động hóa",
@@ -3859,6 +3860,7 @@ export const vi: TranslationKeys = {
     mobileNavSettings: "Cài đặt",
   },
   a11y: {
+    sponsorLink: "Ủng hộ SnapOtter trên GitHub Sponsors",
     skipToContent: "Chuyển đến nội dung chính",
     openSidebar: "Mở thanh bên",
     closeSidebar: "Đóng thanh bên",

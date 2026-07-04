@@ -3583,6 +3583,7 @@ export const zhCN: TranslationKeys = {
     connectionError: "连接错误",
   },
   sidebar: {
+    sponsor: "保持免费",
     tools: "工具",
     grid: "网格",
     automate: "自动化",
@@ -3602,6 +3603,7 @@ export const zhCN: TranslationKeys = {
     mobileNavSettings: "设置",
   },
   a11y: {
+    sponsorLink: "在 GitHub Sponsors 上支持 SnapOtter",
     skipToContent: "跳到主要内容",
     openSidebar: "打开侧边栏",
     closeSidebar: "关闭侧边栏",

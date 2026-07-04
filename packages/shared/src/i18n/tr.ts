@@ -3851,6 +3851,7 @@ export const tr: TranslationKeys = {
     connectionError: "Bağlantı hatası",
   },
   sidebar: {
+    sponsor: "Ücretsiz kalsın",
     tools: "Araçlar",
     grid: "Izgara",
     automate: "Otomatikleştir",
@@ -3870,6 +3871,7 @@ export const tr: TranslationKeys = {
     mobileNavSettings: "Ayarlar",
   },
   a11y: {
+    sponsorLink: "SnapOtter'ı GitHub Sponsors'ta destekleyin",
     skipToContent: "Ana içeriğe geç",
     openSidebar: "Kenar çubuğunu aç",
     closeSidebar: "Kenar çubuğunu kapat",

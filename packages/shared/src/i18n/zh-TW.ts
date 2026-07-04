@@ -3583,6 +3583,7 @@ export const zhTW: TranslationKeys = {
     connectionError: "連線錯誤",
   },
   sidebar: {
+    sponsor: "保持免費",
     tools: "工具",
     grid: "格線",
     automate: "自動化",
@@ -3602,6 +3603,7 @@ export const zhTW: TranslationKeys = {
     mobileNavSettings: "設定",
   },
   a11y: {
+    sponsorLink: "在 GitHub Sponsors 上支持 SnapOtter",
     skipToContent: "跳至主要內容",
     openSidebar: "開啟側邊欄",
     closeSidebar: "關閉側邊欄",

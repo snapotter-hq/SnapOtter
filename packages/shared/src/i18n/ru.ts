@@ -3847,6 +3847,7 @@ export const ru: TranslationKeys = {
     connectionError: "Ошибка подключения",
   },
   sidebar: {
+    sponsor: "Пусть будет бесплатным",
     tools: "Инструменты",
     grid: "Сетка",
     automate: "Автоматизация",
@@ -3866,6 +3867,7 @@ export const ru: TranslationKeys = {
     mobileNavSettings: "Настройки",
   },
   a11y: {
+    sponsorLink: "Поддержать SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти к основному содержимому",
     openSidebar: "Открыть боковую панель",
     closeSidebar: "Закрыть боковую панель",

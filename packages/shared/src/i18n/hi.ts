@@ -3649,6 +3649,7 @@ export const hi: TranslationKeys = {
     connectionError: "कनेक्शन त्रुटि",
   },
   sidebar: {
+    sponsor: "इसे मुफ़्त रखें",
     tools: "टूल्स",
     grid: "ग्रिड",
     automate: "ऑटोमेट",
@@ -3668,6 +3669,7 @@ export const hi: TranslationKeys = {
     mobileNavSettings: "सेटिंग्स",
   },
   a11y: {
+    sponsorLink: "GitHub Sponsors पर SnapOtter का समर्थन करें",
     skipToContent: "मुख्य सामग्री पर जाएं",
     openSidebar: "साइडबार खोलें",
     closeSidebar: "साइडबार बंद करें",

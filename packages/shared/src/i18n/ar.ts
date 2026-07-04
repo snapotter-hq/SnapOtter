@@ -3819,6 +3819,7 @@ export const ar: TranslationKeys = {
     connectionError: "خطأ في الاتصال",
   },
   sidebar: {
+    sponsor: "أبقِه مجانيًا",
     tools: "الأدوات",
     grid: "شبكة",
     automate: "أتمتة",
@@ -3838,6 +3839,7 @@ export const ar: TranslationKeys = {
     mobileNavSettings: "الإعدادات",
   },
   a11y: {
+    sponsorLink: "ادعم SnapOtter على GitHub Sponsors",
     skipToContent: "تخطي إلى المحتوى الرئيسي",
     openSidebar: "فتح الشريط الجانبي",
     closeSidebar: "إغلاق الشريط الجانبي",

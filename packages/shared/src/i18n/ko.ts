@@ -3776,6 +3776,7 @@ export const ko: TranslationKeys = {
     connectionError: "연결 오류",
   },
   sidebar: {
+    sponsor: "무료로 유지하기",
     tools: "도구",
     grid: "그리드",
     automate: "자동화",
@@ -3795,6 +3796,7 @@ export const ko: TranslationKeys = {
     mobileNavSettings: "설정",
   },
   a11y: {
+    sponsorLink: "GitHub Sponsors에서 SnapOtter 후원하기",
     skipToContent: "본문으로 건너뛰기",
     openSidebar: "사이드바 열기",
     closeSidebar: "사이드바 닫기",
