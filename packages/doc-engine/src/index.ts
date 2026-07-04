@@ -45,6 +45,7 @@ export {
   pdfMetadataSetPy,
   pdfPageCountPy,
   pdfRedactPy,
+  pdfScrubProducerPy,
   pdfSignPy,
   pdfTextPy,
   pdfToWordPy,

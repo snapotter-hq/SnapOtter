@@ -98,6 +98,7 @@ DOCS_SCRIPTS = {
     "doc_metadata",
     "doc_html_pdf",
     "doc_sign",
+    "doc_scrub_meta",
 }
 
 if DISPATCHER_PROFILE == "docs":

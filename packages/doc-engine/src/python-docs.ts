@@ -20,6 +20,19 @@ export async function pdfFlattenPy(inPath: string, outPath: string): Promise<voi
   }
 }
 
+/**
+ * Stamp SnapOtter as Producer/Creator on a GENERATED PDF (PyMuPDF), replacing
+ * the conversion engine's self-promotion (LibreOffice, Ghostscript, pdfcpu,
+ * WeasyPrint, PDFKit). Encrypted files are copied through untouched.
+ */
+export async function pdfScrubProducerPy(inPath: string, outPath: string): Promise<void> {
+  const stdout = await runDocsScript("doc_scrub_meta", { path: inPath, out: outPath });
+  const parsed = JSON.parse(stdout.trim()) as { ok?: boolean; error?: string };
+  if (parsed.error) {
+    throw new Error(`doc_scrub_meta failed: ${parsed.error}`);
+  }
+}
+
 /** True redaction with verification pass (PyMuPDF search + apply_redactions). */
 export async function pdfRedactPy(
   inPath: string,

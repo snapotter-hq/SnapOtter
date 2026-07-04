@@ -37,6 +37,7 @@ import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
+import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
 import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
 import {
   getToolConfig,
@@ -253,6 +254,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         resultContentType,
       );
 
+      // Generated PDFs carry the conversion engine's name as Producer/Creator
+      // (LibreOffice, Ghostscript, pdfcpu, ...); stamp SnapOtter instead.
+      // Best effort: a failed scrub keeps the original bytes.
+      if (SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && outName.toLowerCase().endsWith(".pdf")) {
+        resultBuffer = await scrubPdfProducer(resultBuffer);
+      }
+
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
       await putObject(primaryKey, resultBuffer);
@@ -262,7 +270,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       if (extraOutputs) {
         for (const extra of extraOutputs) {
           const extraKey = `outputs/${jobId}/${extra.name}`;
-          await putObject(extraKey, extra.buffer);
+          const body =
+            SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && extra.name.toLowerCase().endsWith(".pdf")
+              ? await scrubPdfProducer(extra.buffer)
+              : extra.buffer;
+          await putObject(extraKey, body);
           outputRefs.push(extraKey);
         }
       }
