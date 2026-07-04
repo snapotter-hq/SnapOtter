@@ -9,9 +9,6 @@ rembg==2.0.69
 realesrgan==0.3.0
 paddleocr==2.9.1
 paddlepaddle-gpu==3.0.0
-# GPU builds are x86_64 only and get mediapipe 0.10.35, which works with protobuf
-# 7.x, so protobuf stays unpinned here. The protobuf<5 constraint is arm64-only
-# (see requirements.txt) because aarch64 mediapipe caps at 0.10.18.
 mediapipe>=0.10.21
 onnxruntime-gpu==1.20.1
 numpy==1.26.4
