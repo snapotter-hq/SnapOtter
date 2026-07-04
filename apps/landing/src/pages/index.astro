@@ -15,6 +15,10 @@ import Base from "@/layouts/Base.astro";
 
 const toolCount = TOOLS.length;
 
+const pageTitle = "SnapOtter | Self-Hosted File Processing for Privacy-Sensitive Teams";
+const pageDescription =
+  "Self-hosted file processing for privacy-sensitive teams. Image, video, audio, PDF, and file tools with local AI and enterprise controls, on infrastructure you own. The open-source alternative to Smallpdf, iLovePDF, and CloudConvert.";
+
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -100,7 +104,7 @@ const navSchema = {
 };
 ---
 
-<Base canonical="https://snapotter.com">
+<Base title={pageTitle} description={pageDescription} canonical="https://snapotter.com">
   <Fragment slot="head">
     <JsonLd data={[websiteSchema, softwareSchema, navSchema]} />
   </Fragment>
