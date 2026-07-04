@@ -20,12 +20,24 @@
 
 <p align="center">
   <strong>Self-hosted file toolkit. 200+ tools across image, video, audio, PDF, and files.</strong><br />
-  The open-source alternative to Smallpdf, iLovePDF, TinyPNG, CloudConvert, and Otter.ai, in one stack you host yourself.
+  The open-source alternative to Smallpdf, iLovePDF, TinyPNG, TinyWow, CloudConvert, and Otter.ai, in one stack you host yourself.
 </p>
 
 ![SnapOtter - Dashboard](branding/dashboard.gif)
 
 Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all five, and your files never leave your server. Edit images, convert video, transcribe audio, repair PDFs, batch your files: one Docker stack, on hardware you own.
+
+## Quick Start
+
+One command, no setup. An embedded Postgres 17 + Redis 8 boot inside the container, so there's nothing else to wire up:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
+```
+
+Open [http://localhost:1349](http://localhost:1349) and log in with `admin` / `admin`. That's the whole install.
+
+For the production Compose stack, NVIDIA GPU acceleration, and configuration, see [Deployment](#deployment) below.
 
 ## Key Features
 
@@ -45,15 +57,9 @@ Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all fi
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
 - **Privacy first:** Your files never leave your network. Basic analytics help us catch bugs and improve tools -- disable anytime by rebuilding with `SNAPOTTER_ANALYTICS=off` ([Here's how to do it](https://docs.snapotter.com/guide/deployment.html#analytics))
 
-## Quick Start
+## Deployment
 
-One container, no setup. It starts an embedded Postgres 17 + Redis 8 on loopback and stores data in the `SnapOtter-data` volume:
-
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
-```
-
-For production, run the 3-container Compose stack (app + Postgres 17 + Redis 8). Save this as `compose.yaml`:
+The [Quick Start](#quick-start) one-liner above is all most people need. For production, run the 3-container Compose stack (app + Postgres 17 + Redis 8). Save this as `compose.yaml`:
 
 ```yaml
 services:
@@ -140,7 +146,7 @@ We welcome bug reports, feature ideas, and pull requests. See [CONTRIBUTING.md](
 
 SnapOtter is built and maintained independently with no venture capital or corporate backing. Sponsorships fund infrastructure, keep releases flowing, and ensure the project stays free and open for everyone.
 
-If SnapOtter saves you from paying for cloud file-processing services, consider supporting its development:
+If SnapOtter has replaced a paid subscription or two in your workflow, a small sponsorship helps keep it that way:
 
 <a href="https://github.com/sponsors/snapotter-hq">
   <img src="branding/sponsor-banner.svg" width="100%" alt="Sponsor SnapOtter on GitHub">

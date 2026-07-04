@@ -22,8 +22,8 @@ const out = resolve(repoRoot, "branding/social-preview.png");
 // sibling logo and the ../apps fonts as file:// subresources.
 const htmlPath = resolve(repoRoot, "branding/.og.html");
 
-// Enterprise trust badges (subset of Hero.astro's list).
-const BADGES = ["On-premise", "GDPR & HIPAA", "Air-gap", "SAML SSO", "Open source"];
+// Trust badges (subset of Hero.astro's trustBadges list).
+const BADGES = ["Self-hosted", "Privacy-sensitive", "Compliance-friendly", "Air-gap capable", "Open source"];
 
 // lucide icon inner-SVG (stroke), matching the icons used in CategoryCards.astro.
 const ICON = {
