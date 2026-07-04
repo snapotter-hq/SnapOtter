@@ -1,8 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import {
   ChevronLeft,
   ChevronRight,
   FolderOpen,
   Globe,
+  Heart,
   HelpCircle,
   LayoutGrid,
   MessageSquare,
@@ -127,6 +129,8 @@ export function TopNav({
             <MessageSquare className="h-4 w-4" />
           </button>
         )}
+
+        <SponsorButton isDark={isDark} compact />
 
         <button
           type="button"
@@ -280,9 +284,55 @@ export function TopNav({
           <HelpCircle className="h-4 w-4" />
         </button>
 
+        <SponsorButton isDark={isDark} />
+
         {!isMobile && <AvatarDropdown onSettingsClick={onSettingsClick} variant={variant} />}
       </div>
     </header>
+  );
+}
+
+const SPONSOR_URL = "https://github.com/sponsors/snapotter-hq";
+
+function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?: boolean }) {
+  const { t } = useTranslation();
+
+  const handleClick = () => {
+    import("@/lib/analytics").then(({ track }) => {
+      track(ANALYTICS_EVENTS.SPONSOR_CLICKED);
+    });
+  };
+
+  if (compact) {
+    return (
+      <a
+        href={SPONSOR_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleClick}
+        aria-label={t.a11y.sponsorLink}
+        title={t.a11y.sponsorLink}
+        className={cn(
+          "p-1.5 rounded-md transition-colors text-primary",
+          isDark ? "hover:bg-[#333]" : "hover:bg-muted",
+        )}
+      >
+        <Heart className="h-4 w-4 fill-current" />
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={SPONSOR_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={handleClick}
+      className="ms-1 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-[#1a1814] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+    >
+      <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+      {t.sidebar.sponsor}
+    </a>
   );
 }
 
