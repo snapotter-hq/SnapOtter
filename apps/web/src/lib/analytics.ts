@@ -67,6 +67,14 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 
   if (posthog) {
+    // Clear any persisted opt-out from a previous disabled period. opt_out_capturing()
+    // writes a localStorage flag that survives reloads, so without this a browser that
+    // once opted out would stay silent even after the instance re-enables analytics.
+    try {
+      posthog.opt_in_capturing();
+    } catch {
+      // ignore
+    }
     // app_version only; no instance_id, so plain events stay person-less.
     posthog.register({ app_version: (await import("@snapotter/shared")).APP_VERSION });
   }
@@ -159,4 +167,14 @@ export function optOut(): void {
       Sentry.getClient()?.close();
     })
     .catch(() => {});
+}
+
+/** Reverse a prior optOut() in this tab: resume PostHog capture without a reload. */
+export function optIn(): void {
+  enabled = true;
+  try {
+    posthog?.opt_in_capturing();
+  } catch {
+    // ignore
+  }
 }

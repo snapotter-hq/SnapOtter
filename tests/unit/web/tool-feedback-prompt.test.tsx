@@ -139,6 +139,17 @@ describe("ToolFeedbackPrompt", () => {
     expect(screen.getByText("How did this tool work?")).toBeDefined();
   });
 
+  it("stops nagging on the next result once shown, even without interaction", () => {
+    const { unmount } = render(<ToolFeedbackPrompt toolId="resize" />);
+    expect(screen.getByText("How did this tool work?")).toBeDefined();
+    unmount();
+
+    // A different tool finishes moments later. The user never touched the first
+    // prompt, but it must not reappear on the very next result.
+    render(<ToolFeedbackPrompt toolId="convert" />);
+    expect(screen.queryByText("How did this tool work?")).toBeNull();
+  });
+
   it("supports Don't ask again suppression", () => {
     const { unmount } = render(<ToolFeedbackPrompt toolId="resize" />);
 

@@ -35,6 +35,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
+import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -529,25 +530,15 @@ function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
-// PUT /v1/settings rejects server-managed read-only keys (instance_id, cookie_secret)
-// with 400 READONLY_SETTING, and GET returns redacted secrets as the literal "********"
-// (cookie_secret, oidc_client_secret, siem_webhook_auth). Echoing either back breaks the
-// save or overwrites a real secret with the mask, so strip both before any bulk save.
-const READONLY_SETTING_KEYS = new Set(["instance_id", "cookie_secret"]);
-function writableSettings(settings: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(settings).filter(
-      ([key, value]) => !READONLY_SETTING_KEYS.has(key) && value !== "********",
-    ),
-  );
-}
-
 function SystemSection() {
   const { t } = useTranslation();
   const { role } = useAuth();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  // Snapshot of the last server state, so a save sends only the fields this tab
+  // changed (never a stale value that could clobber another admin's concurrent edit).
+  const originalSettingsRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -557,15 +548,20 @@ function SystemSection() {
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
-      .then((data) => setSettings(data.settings))
+      .then((data) => {
+        setSettings(data.settings);
+        originalSettingsRef.current = data.settings;
+      })
       .catch(() => {
         // Fallback defaults if endpoint not ready
-        setSettings({
+        const fallback = {
           fileUploadLimitMb: "100",
           defaultTheme: "system",
           defaultLocale: "en",
           loginAttemptLimit: "5",
-        });
+        };
+        setSettings(fallback);
+        originalSettingsRef.current = fallback;
       })
       .finally(() => setLoading(false));
   }, []);
@@ -596,18 +592,22 @@ function SystemSection() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", writableSettings(settings));
-      if (settings.analyticsEnabled === "false") {
-        const { optOut } = await import("@/lib/analytics");
-        optOut();
-      } else {
-        // Re-enabling takes effect on the next config refetch / reload.
+      const changed = changedSettings(originalSettingsRef.current, settings);
+      await apiPut("/v1/settings", writableSettings(changed));
+      if ("analyticsEnabled" in changed) {
+        const { optIn, optOut } = await import("@/lib/analytics");
+        if (settings.analyticsEnabled === "false") optOut();
+        else optIn();
+        // Refresh the cached config so this tab converges immediately: optOut()
+        // stops the SDKs but leaves the store enabled, which would keep feedback
+        // surfaces visible (and silently drop their submissions) until a refocus.
         useAnalyticsStore.getState().fetchConfig();
       }
       if (settings.defaultTheme) {
         const theme = settings.defaultTheme as "light" | "dark" | "system";
         useThemeStore.getState().setTheme(theme);
       }
+      originalSettingsRef.current = { ...settings };
       setSaveMsg(t.settings.system.saveSuccess);
     } catch {
       setSaveMsg(t.settings.system.saveFailed);
@@ -1076,13 +1076,20 @@ function SecuritySection() {
 function AdminSecuritySettings() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<Record<string, string>>({});
+  // Snapshot of the last server state; a save sends only the fields this tab changed
+  // so an unrelated edit here can never echo (and revert) another admin's change,
+  // such as an instance-wide analytics opt-out.
+  const originalSettingsRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
-      .then((data) => setSettings(data.settings))
+      .then((data) => {
+        setSettings(data.settings);
+        originalSettingsRef.current = data.settings;
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -1095,7 +1102,11 @@ function AdminSecuritySettings() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await apiPut("/v1/settings", writableSettings(settings));
+      await apiPut(
+        "/v1/settings",
+        writableSettings(changedSettings(originalSettingsRef.current, settings)),
+      );
+      originalSettingsRef.current = { ...settings };
       setSaveMsg(t.settings.security.securitySettingsSaved);
     } catch {
       setSaveMsg(t.settings.security.securitySettingsFailed);

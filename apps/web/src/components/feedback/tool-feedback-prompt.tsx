@@ -19,10 +19,15 @@ interface ToolFeedbackPromptProps {
 }
 
 const GLOBAL_LAST_PROMPT_KEY = "snapotter-feedback-last-prompt-at";
+const GLOBAL_LAST_SHOWN_KEY = "snapotter-feedback-last-shown-at";
 const PROMPTS_DISABLED_KEY = "snapotter-feedback-prompts-disabled";
 const TOOL_PROMPT_PREFIX = "snapotter-feedback-tool-prompt:";
 const GLOBAL_PROMPT_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const TOOL_PROMPT_COOLDOWN_MS = 90 * 24 * 60 * 60 * 1000;
+// A prompt that was merely shown (not acted on) still arms a short cooldown so an
+// ignored card does not reappear on the very next result. Interacting arms the much
+// longer cooldowns above.
+const SHOWN_PROMPT_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
 function readNumber(key: string): number {
   try {
@@ -61,6 +66,8 @@ function disablePrompts(): void {
 function shouldShowPrompt(toolId: string): boolean {
   if (!toolId || promptsDisabled()) return false;
   const now = Date.now();
+  const lastShown = readNumber(GLOBAL_LAST_SHOWN_KEY);
+  if (lastShown && now - lastShown < SHOWN_PROMPT_COOLDOWN_MS) return false;
   const lastGlobal = readNumber(GLOBAL_LAST_PROMPT_KEY);
   if (lastGlobal && now - lastGlobal < GLOBAL_PROMPT_COOLDOWN_MS) return false;
   const lastTool = readNumber(`${TOOL_PROMPT_PREFIX}${toolId}`);
@@ -71,6 +78,10 @@ function shouldShowPrompt(toolId: string): boolean {
 function markPromptHandled(toolId: string): void {
   writeNow(GLOBAL_LAST_PROMPT_KEY);
   writeNow(`${TOOL_PROMPT_PREFIX}${toolId}`);
+}
+
+function markPromptShown(): void {
+  writeNow(GLOBAL_LAST_SHOWN_KEY);
 }
 
 export function ToolFeedbackPrompt({
@@ -88,7 +99,9 @@ export function ToolFeedbackPrompt({
 
   useEffect(() => {
     if (!analyticsLoaded || !analyticsConfig?.enabled) return;
-    setVisible(shouldShowPrompt(toolId));
+    const show = shouldShowPrompt(toolId);
+    if (show) markPromptShown();
+    setVisible(show);
   }, [analyticsLoaded, analyticsConfig?.enabled, toolId]);
 
   if (!analyticsLoaded || !analyticsConfig?.enabled) return null;

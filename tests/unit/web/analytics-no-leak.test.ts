@@ -234,4 +234,33 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       ).toBeNull();
     });
   });
+
+  describe("runtime opt-out / opt-in toggle", () => {
+    it("opts in to capturing when analytics initializes enabled (clears a stale persisted opt-out)", async () => {
+      await mod.initAnalytics(enabledConfig);
+      const instance = mockPosthogInit.mock.results.at(-1)?.value;
+      expect(instance.opt_in_capturing).toHaveBeenCalled();
+    });
+
+    it("optOut() stops track() and opts out of capturing", async () => {
+      await mod.initAnalytics(enabledConfig);
+      const instance = mockPosthogInit.mock.results.at(-1)?.value;
+      mockCapture.mockClear();
+      mod.optOut();
+      mod.track("tool_opened", { tool_id: "resize" });
+      expect(mockCapture).not.toHaveBeenCalled();
+      expect(instance.opt_out_capturing).toHaveBeenCalled();
+    });
+
+    it("optIn() resumes track() and opts back in after an optOut()", async () => {
+      await mod.initAnalytics(enabledConfig);
+      const instance = mockPosthogInit.mock.results.at(-1)?.value;
+      mod.optOut();
+      mockCapture.mockClear();
+      mod.optIn();
+      mod.track("tool_opened", { tool_id: "resize" });
+      expect(mockCapture).toHaveBeenCalledWith("tool_opened", { tool_id: "resize" });
+      expect(instance.opt_in_capturing).toHaveBeenCalled();
+    });
+  });
 });

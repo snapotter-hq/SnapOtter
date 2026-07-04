@@ -26,7 +26,13 @@ import {
   surveyIdForSource,
 } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
+import { withTimeout } from "@/lib/with-timeout";
 import { useAnalyticsStore } from "@/stores/analytics-store";
+
+// A hung write (connection black-holed, never erroring) would otherwise leave both
+// buttons disabled forever with no exit but a page reload; time it out so the overlay
+// re-enables and the admin can retry or dismiss.
+const WRITE_TIMEOUT_MS = 15_000;
 
 const USAGE_TYPES: { value: FeedbackUsageType; Icon: typeof User; wide?: boolean }[] = [
   { value: "personal", Icon: User },
@@ -97,7 +103,7 @@ export function UsageSurveyOverlay() {
 
   async function recordSettingsKey(key: string) {
     const value = new Date().toISOString();
-    await apiPut("/v1/settings", { [key]: value });
+    await withTimeout(apiPut("/v1/settings", { [key]: value }), WRITE_TIMEOUT_MS);
     setSettings((current) => ({ ...(current ?? {}), [key]: value }));
   }
 
@@ -107,13 +113,16 @@ export function UsageSurveyOverlay() {
     const answerKey = JSON.stringify({ usageType, importantAreas: [...importantAreas].sort() });
     try {
       if (submittedAnswerKeyRef.current !== answerKey) {
-        await submitFeedback({
-          source: "onboarding",
-          surveyId: surveyIdForSource("onboarding"),
-          promptVariant: promptVariantForSource("onboarding"),
-          usageType,
-          importantAreas,
-        });
+        await withTimeout(
+          submitFeedback({
+            source: "onboarding",
+            surveyId: surveyIdForSource("onboarding"),
+            promptVariant: promptVariantForSource("onboarding"),
+            usageType,
+            importantAreas,
+          }),
+          WRITE_TIMEOUT_MS,
+        );
         submittedAnswerKeyRef.current = answerKey;
       }
       await recordSettingsKey("onboarding.usageSurvey.answeredAt");

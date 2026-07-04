@@ -27,6 +27,11 @@ if (ANALYTICS_BAKED.sentryDsn) {
       environment: process.env.NODE_ENV || "production",
       tracesSampleRate: ANALYTICS_BAKED.sampleRate,
       sendDefaultPii: false,
+      // Release-health request-sessions and client-report envelopes are sent outside
+      // beforeSend/beforeSendTransaction, so the runtime opt-out below would not stop
+      // them. Disable both so an opted-out instance truly stops phoning home.
+      integrations: [Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false })],
+      sendClientReports: false,
       // Runtime opt-out: drop the whole transaction when analytics is off.
       tracesSampler: () => (sentryActive() ? ANALYTICS_BAKED.sampleRate : 0),
       beforeSend(event) {
