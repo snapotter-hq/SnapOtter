@@ -194,15 +194,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-          "sha256": "37f0e7a62dcb83b2dc0760532fb41ac9d1c40d336abe1aea01d889ad039ebc65",
-          "compressedSize": 5314188723,
-          "extractedSize": 8412712960
+          "sha256": "089fdecbcd36090013ed4adf3a96650c757ce06871c2e1f1b155ccdd8487e413",
+          "compressedSize": 5376987856,
+          "extractedSize": 8455327174
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu.tar.gz",
-          "sha256": "de65321f1cc5d5664c63e38e49cd39c36fe88e0569d666821e982ff6d6999bea",
-          "compressedSize": 2262502457,
-          "extractedSize": 0
+          "sha256": "b9e948c8308371ccb3defce4323a85884e46d5bde52791115d34d1c1f92e4f23",
+          "compressedSize": 2335658971,
+          "extractedSize": 3661453942
         }
       },
       "packages": {

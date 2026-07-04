@@ -112,6 +112,11 @@ export function getToolsForBundle(bundleId: string): string[] {
  */
 export const TOOL_EXTRA_BUNDLES: Record<string, string[]> = {
   "passport-photo": ["face-detection"],
+  // enhance-faces runs MediaPipe face detection (blaze_face) before CodeFormer/
+  // GFPGAN; that model ships in face-detection, not its primary upscale-enhance
+  // bundle, so require both or it fails on a standalone install (offline: hard
+  // error; online: a surprise download).
+  "enhance-faces": ["face-detection"],
 };
 
 /**
