@@ -235,6 +235,12 @@
           "minSize": 60000000
         },
         {
+          "id": "realesrgan-x2plus",
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+          "path": "realesrgan/RealESRGAN_x2plus.pth",
+          "minSize": 60000000
+        },
+        {
           "id": "gfpgan-v1.3",
           "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
           "path": "gfpgan/GFPGANv1.3.pth",

@@ -82,11 +82,11 @@ def prepare_codeformer_weights(models_base):
     """Resolve codeformer-pip's cwd-relative weights offline.
 
     codeformer-pip 0.0.4 downloads four weights into a cwd-relative
-    CodeFormer/weights/ tree at import time of codeformer.app. Three of them
-    ship in the feature bundles and are linked here so they never re-download;
-    RealESRGAN_x2plus.pth (a background-upscale helper this app never invokes)
-    is not bundled, so it downloads once on first use unless strict offline
-    mode blocks it.
+    CodeFormer/weights/ tree at import time of codeformer.app -- unconditionally,
+    even though this app calls inference_app with background_enhance=False and so
+    never uses the RealESRGAN background upsampler (RealESRGAN_x2plus.pth). All
+    four ship in the upscale-enhance bundle and are linked here from models_base
+    so the import never triggers a download; strict offline mode then works.
     """
     expected = {
         os.path.join("CodeFormer", "weights", "CodeFormer", "codeformer.pth"): os.path.join(
@@ -98,11 +98,10 @@ def prepare_codeformer_weights(models_base):
         os.path.join("CodeFormer", "weights", "facelib", "parsing_parsenet.pth"): os.path.join(
             models_base, "gfpgan", "facelib", "parsing_parsenet.pth"
         ),
+        os.path.join("CodeFormer", "weights", "realesrgan", "RealESRGAN_x2plus.pth"): os.path.join(
+            models_base, "realesrgan", "RealESRGAN_x2plus.pth"
+        ),
     }
     for link, target in expected.items():
         if not link_bundled_weight(link, target):
             ensure_download_allowed(f"CodeFormer weight {os.path.basename(link)}")
-
-    x2plus = os.path.join("CodeFormer", "weights", "realesrgan", "RealESRGAN_x2plus.pth")
-    if not os.path.exists(x2plus):
-        ensure_download_allowed("CodeFormer helper weight RealESRGAN_x2plus.pth")
