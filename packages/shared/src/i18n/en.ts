@@ -40,6 +40,7 @@ export const en = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Feedback",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -63,6 +64,11 @@ export const en = {
     searchMissTitle: "Request a tool",
     searchMissContext: "You searched for: {query}",
     searchMissDiscussionsFallback: "We couldn't record that. Open a request in Discussions.",
+    offlineDescription:
+      "This instance has analytics turned off, so feedback isn't recorded here. You can still reach the SnapOtter team directly.",
+    offlinePublicNote: "GitHub issues are public.",
+    offlineGithubButton: "Open a GitHub issue",
+    offlineEmailButton: "Email us",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

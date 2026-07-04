@@ -42,6 +42,7 @@ export const zhCN: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "反馈",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const zhCN: TranslationKeys = {
     searchMissTitle: "请求工具",
     searchMissContext: "你搜索了：{query}",
     searchMissDiscussionsFallback: "我们无法记录。请在 Discussions 中发起请求。",
+    offlineDescription:
+      "此实例已关闭分析功能，因此反馈不会记录在这里。你仍然可以直接联系 SnapOtter 团队。",
+    offlinePublicNote: "GitHub issue 是公开的。",
+    offlineGithubButton: "创建 GitHub issue",
+    offlineEmailButton: "给我们发邮件",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

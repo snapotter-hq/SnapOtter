@@ -42,6 +42,7 @@ export const sv: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Feedback",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -66,6 +67,11 @@ export const sv: TranslationKeys = {
     searchMissContext: "Du sökte efter: {query}",
     searchMissDiscussionsFallback:
       "Vi kunde inte registrera det. Öppna en förfrågan i Discussions.",
+    offlineDescription:
+      "Den här instansen har stängt av analysen, så feedback registreras inte här. Du kan ändå nå SnapOtter-teamet direkt.",
+    offlinePublicNote: "GitHub-ärenden är offentliga.",
+    offlineGithubButton: "Öppna ett GitHub-ärende",
+    offlineEmailButton: "Mejla oss",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

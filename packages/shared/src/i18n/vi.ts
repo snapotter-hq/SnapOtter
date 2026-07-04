@@ -42,6 +42,7 @@ export const vi: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Phản hồi",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -66,6 +67,11 @@ export const vi: TranslationKeys = {
     searchMissContext: "Bạn đã tìm: {query}",
     searchMissDiscussionsFallback:
       "Chúng tôi không ghi lại được. Mở một yêu cầu trong Discussions.",
+    offlineDescription:
+      "Bản cài đặt này đã tắt phân tích, nên phản hồi không được ghi lại ở đây. Bạn vẫn có thể liên hệ trực tiếp với nhóm SnapOtter.",
+    offlinePublicNote: "Issue trên GitHub là công khai.",
+    offlineGithubButton: "Mở một issue trên GitHub",
+    offlineEmailButton: "Gửi email cho chúng tôi",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

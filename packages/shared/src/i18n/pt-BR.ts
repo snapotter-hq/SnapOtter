@@ -42,6 +42,7 @@ export const ptBR: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Feedback",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -66,6 +67,11 @@ export const ptBR: TranslationKeys = {
     searchMissContext: "Você pesquisou: {query}",
     searchMissDiscussionsFallback:
       "Não conseguimos registrar. Abra uma solicitação no Discussions.",
+    offlineDescription:
+      "Esta instância está com a análise desativada, então o feedback não é registrado aqui. Mesmo assim, você pode falar diretamente com a equipe do SnapOtter.",
+    offlinePublicNote: "As issues do GitHub são públicas.",
+    offlineGithubButton: "Abrir uma issue no GitHub",
+    offlineEmailButton: "Envie um e-mail",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

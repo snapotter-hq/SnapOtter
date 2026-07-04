@@ -42,6 +42,7 @@ export const ko: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "피드백",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const ko: TranslationKeys = {
     searchMissTitle: "도구 요청",
     searchMissContext: "검색한 내용: {query}",
     searchMissDiscussionsFallback: "기록하지 못했습니다. Discussions에서 요청을 열어 주세요.",
+    offlineDescription:
+      "이 인스턴스는 분석이 꺼져 있어 피드백이 여기에 기록되지 않습니다. 그래도 SnapOtter 팀에 직접 연락할 수 있습니다.",
+    offlinePublicNote: "GitHub 이슈는 공개됩니다.",
+    offlineGithubButton: "GitHub 이슈 열기",
+    offlineEmailButton: "이메일 보내기",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

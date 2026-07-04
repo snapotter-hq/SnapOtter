@@ -42,6 +42,7 @@ export const uk: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Відгук",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const uk: TranslationKeys = {
     searchMissTitle: "Запитати інструмент",
     searchMissContext: "Ви шукали: {query}",
     searchMissDiscussionsFallback: "Не вдалося записати. Відкрийте запит у Discussions.",
+    offlineDescription:
+      "У цьому екземплярі аналітику вимкнено, тому відгуки тут не записуються. Ви все одно можете напряму звернутися до команди SnapOtter.",
+    offlinePublicNote: "Issue на GitHub є публічними.",
+    offlineGithubButton: "Відкрити issue на GitHub",
+    offlineEmailButton: "Напишіть нам",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

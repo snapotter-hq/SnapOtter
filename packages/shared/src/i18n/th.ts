@@ -42,6 +42,7 @@ export const th: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "ความคิดเห็น",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const th: TranslationKeys = {
     searchMissTitle: "ขอเครื่องมือ",
     searchMissContext: "คุณค้นหา: {query}",
     searchMissDiscussionsFallback: "เราบันทึกไม่ได้ เปิดคำขอใน Discussions",
+    offlineDescription:
+      "อินสแตนซ์นี้ปิดการวิเคราะห์ไว้ ความคิดเห็นจึงไม่ถูกบันทึกที่นี่ คุณยังสามารถติดต่อทีม SnapOtter ได้โดยตรง",
+    offlinePublicNote: "Issue บน GitHub เป็นสาธารณะ",
+    offlineGithubButton: "เปิด Issue บน GitHub",
+    offlineEmailButton: "ส่งอีเมลถึงเรา",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

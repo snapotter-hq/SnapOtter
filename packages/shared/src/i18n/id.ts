@@ -42,6 +42,7 @@ export const id: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "Masukan",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const id: TranslationKeys = {
     searchMissTitle: "Minta alat",
     searchMissContext: "Anda mencari: {query}",
     searchMissDiscussionsFallback: "Kami tidak dapat mencatatnya. Buka permintaan di Discussions.",
+    offlineDescription:
+      "Instance ini menonaktifkan analitik, jadi masukan tidak dicatat di sini. Anda tetap bisa menghubungi tim SnapOtter secara langsung.",
+    offlinePublicNote: "Issue GitHub bersifat publik.",
+    offlineGithubButton: "Buka issue GitHub",
+    offlineEmailButton: "Kirim email ke kami",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",

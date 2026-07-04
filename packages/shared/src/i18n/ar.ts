@@ -42,6 +42,7 @@ export const ar: TranslationKeys = {
   },
   feedback: {
     navLabel: "Share feedback",
+    navButtonLabel: "ملاحظات",
     dialogTitle: "Share feedback",
     toolDialogTitle: "How did this tool work?",
     failedDialogTitle: "Report a tool issue",
@@ -65,6 +66,11 @@ export const ar: TranslationKeys = {
     searchMissTitle: "طلب أداة",
     searchMissContext: "لقد بحثت عن: {query}",
     searchMissDiscussionsFallback: "تعذّر تسجيل ذلك. افتح طلبًا في Discussions.",
+    offlineDescription:
+      "التحليلات معطّلة في هذا المثيل، لذلك لا تُسجَّل الملاحظات هنا. لا يزال بإمكانك التواصل مباشرةً مع فريق SnapOtter.",
+    offlinePublicNote: "مشكلات GitHub علنية.",
+    offlineGithubButton: "افتح مشكلة على GitHub",
+    offlineEmailButton: "راسلنا",
     thanksTitle: "Thanks for the feedback.",
     thanksDescription: "It helps us improve SnapOtter without collecting files or private content.",
     quickThanks: "Thanks for the signal.",
