@@ -1,0 +1,16 @@
+name: General feedback
+description: Share general feedback, ideas, or reactions about SnapOtter.
+title: "[Feedback]: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking a moment to share feedback.
+  - type: textarea
+    id: details
+    attributes:
+      label: Your feedback
+      description: What is on your mind?
+      placeholder: Tell us what you think...
+    validations:
+      required: true
