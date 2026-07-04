@@ -1,25 +1,16 @@
 name: CI
 
+# Path filtering happens at the JOB level (see the `changes` job), not here.
+# Workflow-level paths-ignore never creates the check runs at all, which
+# deadlocks required status checks on docs-only PRs (contexts stay "expected"
+# forever). Job-level skips complete with conclusion "skipped", which
+# satisfies branch protection.
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "branding/**"
-      - "apps/docs/**"
-      - "apps/landing/**"
-      - "docs/**"
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "branding/**"
-      - "apps/docs/**"
-      - "apps/landing/**"
-      - "docs/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,9 +27,56 @@ env:
   TESTCONTAINERS_RYUK_DISABLED: "true"
 
 jobs:
+  # Detects whether anything outside the docs/landing/branding surfaces
+  # changed. Downstream jobs skip when code is untouched; a skipped job still
+  # reports a conclusion, so required status checks stay mergeable.
+  # Fails open: any uncertainty (unknown base, force push, dispatch) runs
+  # the full pipeline.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - id: filter
+        name: Diff against the base commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          code=true
+          if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ]; then
+            if git fetch --no-tags --depth=1 origin "$base" && git cat-file -e "$base" 2>/dev/null; then
+              changed=$(git diff --name-only "$base" HEAD)
+              echo "Changed files:"
+              printf '%s\n' "$changed"
+              code=false
+              for f in $changed; do
+                case "$f" in
+                  README.md|CONTRIBUTING.md|branding/*|apps/docs/*|apps/landing/*|docs/*) ;;
+                  *) code=true; break ;;
+                esac
+              done
+            else
+              echo "Base commit unavailable; running the full pipeline"
+            fi
+          else
+            echo "No usable base (dispatch, force push, or new branch); running the full pipeline"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
@@ -49,6 +87,8 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
@@ -58,6 +98,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -82,6 +124,8 @@ jobs:
     name: Integration (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -131,6 +175,8 @@ jobs:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     services:
       postgres:
         image: postgres:17-alpine
@@ -187,6 +233,8 @@ jobs:
     name: E2E Mobile Smoke (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     services:
       postgres:
         image: postgres:17-alpine
@@ -238,6 +286,8 @@ jobs:
   pip-audit:
     name: Python Dependency Audit
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -276,7 +326,17 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test-unit, test-integration, test-e2e-smoke, test-e2e-mobile-smoke]
+    needs:
+      [
+        changes,
+        lint,
+        typecheck,
+        test-unit,
+        test-integration,
+        test-e2e-smoke,
+        test-e2e-mobile-smoke,
+      ]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
