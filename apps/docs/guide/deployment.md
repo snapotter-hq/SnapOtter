@@ -207,34 +207,40 @@ docker logs SnapOtter 2>&1 | head -20
 
 ## Hardware Requirements
 
-These numbers come from benchmarks run across four systems (Apple M2 Max, AMD Ryzen 5 7500F + RTX 4070, Intel i7-7600U, Docker Desktop on Windows).
+These numbers come from benchmarks across a range of systems, from a modern amd64 workstation with an NVIDIA RTX 4070 down to a Raspberry Pi, running the whole tool catalog on each and sweeping Docker resource limits to find the real floor.
 
 ### Quick Reference
 
 | Tier | Use Case | CPU | RAM | GPU | Storage |
 |------|----------|-----|-----|-----|---------|
-| Minimum | Core tools, single user | 1 core | 1 GB | None | 5 GB |
-| Recommended | All tools + AI on CPU | 4 cores | 4 GB | None | 20 GB |
-| Full | All tools + AI on NVIDIA CUDA | 4+ cores | 8 GB | NVIDIA 8 GB+ | 30 GB |
+| Minimum | Image, data, and light PDF tools; single user; small batches | 2 cores | 2 GB | None | ~7 GB |
+| Recommended | All five modalities incl. video, documents, and AI on CPU; batches; a few users | 4 cores | 4 GB | None | ~25 GB |
+| Full | Everything at speed incl. GPU AI; large batches; many users | 6-8 cores | 8 GB | NVIDIA 8 GB+ VRAM (12 GB comfortable) | ~35 GB |
 
-### Minimum (core tools, no AI)
+**Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`) — no image is built for it — nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
+
+### Minimum (image, data, and light PDF tools; no AI)
 
 | Resource | Requirement |
 |---|---|
-| CPU | 1 core |
-| RAM | 1 GB |
-| Disk | 3 GB (image) + 1 GB (data volume) |
+| CPU | 2 cores |
+| RAM | 2 GB |
+| Disk | ~5.5 GB (image) + data volume |
 | GPU | Not required |
 
-All 138 non-AI tools (image resize/crop/convert, video trim/merge, audio normalize/convert, PDF merge/split/compress, data format conversion, and more) run on any hardware. Most operations complete in under 1 second even on a single core. The exception is AVIF encoding, which takes ~27s on 1 core but drops to ~5s on 4 cores.
+Every non-AI tool — image (resize, crop, convert, compress, adjust, watermark…), video (trim, mute, remux), audio (convert, normalize, trim), PDF (merge, split, compress, rotate, protect), and data/file conversions — runs on modest hardware. Most operations finish in well under a second even on a large file: a 2.7 MB image resizes in ~0.05 s and re-encodes to WebP in ~2 s.
+
+The memory floor is real, from a Docker resource-limit sweep: **512 MB cannot start the stack** (even a single image resize is killed), **1 GB** handles single-file operations but a multi-file batch runs out of memory, and **2 GB / 2 cores** is the smallest configuration that handles batches comfortably.
 
 ```yaml
 deploy:
   resources:
     limits:
-      cpus: '1'
-      memory: 1G
+      cpus: '2'
+      memory: 2G
 ```
+
+**The one CPU-heavy exception is video re-encoding.** Stream-copy operations (trim, mute, container remux) are instant, but transcoding to a different codec is CPU-bound. A 1080p / 45-second clip re-encoded to VP9 (WebM) takes roughly **~40 s** on a fast modern CPU, ~45 s on Apple Silicon, ~80 s on an older mobile 4-core, and **~130 s** on an older 4-core server. If your workload is video-heavy, prioritize CPU cores and clock speed, or raise the container's `cpus:` limit — the shipped compose caps the app at 4 cores by default (8 on the GPU compose).
 
 ### Recommended (AI tools on CPU)
 
@@ -245,15 +251,18 @@ deploy:
 | Disk | 3 GB (image) + 14 GB (AI models) + workspace |
 | GPU | Not required (CPU fallback) |
 
-AI tools work on CPU but are significantly slower. Some tools are practical on CPU, others are not:
+**Installing the AI bundles is what pushes RAM to 4 GB.** With no AI installed the app idles around 360 MB; with all seven bundles installed it holds ~2.6 GB resident, because the Python AI sidecar pre-loads its models (background removal, upscaling, OCR, transcription, face detection, restoration) at startup. Non-AI installs stay light; AI installs need ≥4 GB.
 
-| AI Tool | CPU Time | Usable? |
+Most AI tools are perfectly usable on CPU; a couple really want a GPU. Measured on a modern 4-core CPU:
+
+| AI Tool | CPU Time | Usable on CPU? |
 |---|---|---|
-| blur-faces, smart-crop, red-eye-removal | 2-5s | Yes |
-| remove-background | 37-41s | Marginal (long wait) |
-| upscale (small image) | 22s | Marginal |
-| upscale (large image) | 241s | No |
-| enhance-faces, colorize, noise-removal | 30-90s | Marginal to No |
+| Face detection (blur-faces, smart-crop, red-eye), noise-removal | under 1 s | Yes |
+| OCR, transcription, subtitles | 1-3 s | Yes |
+| Colorize, face enhancement | ~10 s | Yes |
+| Background removal / replace / blur | ~29 s | Yes (you'll wait) |
+| AI upscale (RealESRGAN) | ~33 s small; minutes on large images | Marginal — GPU strongly recommended |
+| Photo restoration (full pipeline) | several minutes | No — needs a GPU or a fast many-core CPU |
 
 AI model download sizes:
 
@@ -279,23 +288,24 @@ deploy:
 
 | Resource | Requirement |
 |---|---|
-| CPU | 4+ cores |
+| CPU | 6-8 cores (video prep + concurrency run on CPU even with GPU AI) |
 | RAM | 8 GB |
 | GPU | NVIDIA with 8+ GB VRAM (12 GB recommended) |
-| Disk | 30 GB total |
+| Disk | ~35 GB total |
 
-NVIDIA CUDA acceleration gives 3-13,000x speedup depending on the operation. Measured on an RTX 4070 vs Intel i7-7600U:
+An NVIDIA GPU (CUDA) dramatically speeds up the heavy AI models. Measured on an RTX 4070 vs a modern CPU:
 
-| AI Tool | GPU Time | CPU Time | Speedup |
-|---|---|---|---|
-| noise-removal (quick) | 17ms | 228s | 13,400x |
-| blur-faces | 0.27s | 27s | 100x |
-| upscale 2x | 6.3s | >300s (timeout) | 47x+ |
-| enhance-faces (GFPGAN) | 2.3s | 28s | 12x |
-| remove-background | 5-10s | 21-41s | 3-8x |
-| OCR (best) | 70s | 243s | 3.5x |
-| restore-photo | 31s | 90s | 2.9x |
-| colorize | 10s | 13s | 1.3x |
+| AI Tool | Speedup with GPU | Notes |
+|---|---|---|
+| AI upscale (RealESRGAN 2×) | **~47×** | The biggest win — under a second vs ~33 s (minutes on large images) |
+| Face enhancement (CodeFormer) | **~12×** | ~0.9 s vs ~11 s |
+| Transcription (Whisper) | ~4.5× | |
+| Background removal / replace / blur | ~4× | ~7 s on GPU vs ~29 s on CPU |
+| Colorize | ~1.8× | |
+| OCR, face detection, red-eye, noise-removal | ~1× | Already fast on CPU — a GPU doesn't help |
+| Photo restoration | none | CPU-bound even on a GPU (0% GPU utilisation); a fast CPU matters more than a GPU here |
+
+The tools worth a GPU are **upscale, face enhancement, transcription, and background removal**. Face detection, OCR, and red-eye are CPU-bound and already fast, so a GPU adds nothing.
 
 Peak VRAM usage reaches 7.5 GB during upscale with face enhancement. A 6 GB NVIDIA GPU works for most AI tools individually but will fail on upscale. 8-12 GB VRAM handles everything.
 
@@ -316,16 +326,15 @@ deploy:
 
 ### Concurrent Users
 
-Benchmarked with parallel resize requests on a large image (Mac M2 Max, 10 Docker CPUs):
+Parallel image-resize requests against the default 4-core-capped app container:
 
-| Concurrent Users | Avg Response Time | Errors |
+| Concurrent Requests | Avg Response Time | Errors |
 |---|---|---|
-| 1 | 0.28s | 0 |
-| 5 | 0.54s | 0 |
-| 10 | 1.08s | 0 |
-| 20 | 2.10s | 0 |
+| 1 | 0.4s | 0 |
+| 5 | 1.2s | 0 |
+| 10 | 2.1s | 0 |
 
-The server scales linearly with no errors or crashes up to 20 concurrent requests.
+Response time degrades sub-linearly with no errors as the worker pool saturates. Raising the app container's `cpus:` limit (or using a host with more cores) lifts the ceiling. Note that heavy jobs (video transcode, CPU AI) hold a worker for their full duration, so size CPU to your expected number of concurrent heavy jobs, not just request count.
 
 ### Supported Image Formats
 
