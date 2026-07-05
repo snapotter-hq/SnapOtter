@@ -88,6 +88,9 @@ export function ReviewPanel({
       const res = await fetch(downloadUrl);
       const blob = await res.blob();
       const formData = new FormData();
+      // Record which tool produced this file so the library shows it under
+      // "Tools Used" (append before the file so the field is parsed first).
+      if (currentToolId) formData.append("toolId", currentToolId);
       formData.append("file", new File([blob], filename, { type: fileType }));
       const uploadRes = await fetch("/api/v1/files/upload", {
         method: "POST",
@@ -100,7 +103,7 @@ export function ReviewPanel({
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
-  }, [downloadUrl, filename, fileType]);
+  }, [downloadUrl, filename, fileType, currentToolId]);
 
   const hasBatchStats =
     totalCount != null && totalCount > 1 && successCount != null && failedCount != null;

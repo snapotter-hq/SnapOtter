@@ -254,7 +254,16 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       const parts = request.parts();
 
+      // Optional "toolId" field records the tool that produced these files so the
+      // library shows it under "Tools Used". Sent before the file part(s).
+      let sourceToolId: string | null = null;
+
       for await (const part of parts) {
+        if (part.type === "field" && part.fieldname === "toolId") {
+          const value = typeof part.value === "string" ? part.value : "";
+          if (/^[a-z0-9-]{1,40}$/.test(value)) sourceToolId = value;
+          continue;
+        }
         if (part.type !== "file") continue;
 
         // Consume the stream into a buffer
@@ -304,7 +313,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             height: isValidImage ? validation.height : null,
             version: 1,
             parentId: null,
-            toolChain: null,
+            toolChain: sourceToolId ? [sourceToolId] : null,
           });
         } catch {
           return reply.status(409).send({ error: "Failed to save file record" });
