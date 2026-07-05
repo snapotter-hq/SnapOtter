@@ -2976,6 +2976,7 @@ export const de: TranslationKeys = {
     allTools: "Alle Werkzeuge",
     searchPlaceholder: "{count} Werkzeuge durchsuchen...",
     recent: "Zuletzt verwendet",
+    pinned: "Angeheftet",
     popular: "Beliebt",
     browseByCategory: "Nach Kategorie durchsuchen",
     gettingStarted: "Erste Schritte",
@@ -3891,7 +3892,8 @@ export const de: TranslationKeys = {
     settings: "Einstellungen",
   },
   toolCard: {
-    addToFavourites: "Zu Favoriten hinzufügen",
+    pin: "Anheften",
+    unpin: "Lösen",
   },
   appLayout: {
     mobileNavTools: "Werkzeuge",

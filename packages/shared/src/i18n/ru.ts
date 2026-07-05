@@ -2967,6 +2967,7 @@ export const ru: TranslationKeys = {
     allTools: "Все инструменты",
     searchPlaceholder: "Поиск среди {count} инструментов...",
     recent: "Недавние",
+    pinned: "Закреплённые",
     popular: "Популярные",
     browseByCategory: "По категориям",
     gettingStarted: "Начало работы",
@@ -3872,7 +3873,8 @@ export const ru: TranslationKeys = {
     settings: "Настройки",
   },
   toolCard: {
-    addToFavourites: "Добавить в избранное",
+    pin: "Закрепить",
+    unpin: "Открепить",
   },
   appLayout: {
     mobileNavTools: "Инструменты",

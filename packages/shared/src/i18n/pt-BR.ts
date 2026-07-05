@@ -2967,6 +2967,7 @@ export const ptBR: TranslationKeys = {
     allTools: "Todas as ferramentas",
     searchPlaceholder: "Buscar em {count} ferramentas...",
     recent: "Recentes",
+    pinned: "Fixados",
     popular: "Populares",
     browseByCategory: "Navegar por categoria",
     gettingStarted: "Primeiros passos",
@@ -3875,7 +3876,8 @@ export const ptBR: TranslationKeys = {
     settings: "Configurações",
   },
   toolCard: {
-    addToFavourites: "Adicionar aos favoritos",
+    pin: "Fixar",
+    unpin: "Desafixar",
   },
   appLayout: {
     mobileNavTools: "Ferramentas",

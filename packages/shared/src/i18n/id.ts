@@ -2965,6 +2965,7 @@ export const id: TranslationKeys = {
     allTools: "Semua Alat",
     searchPlaceholder: "Cari {count} alat...",
     recent: "Terbaru",
+    pinned: "Disematkan",
     popular: "Populer",
     browseByCategory: "Jelajahi berdasarkan Kategori",
     gettingStarted: "Memulai",
@@ -3868,7 +3869,8 @@ export const id: TranslationKeys = {
     settings: "Pengaturan",
   },
   toolCard: {
-    addToFavourites: "Tambah ke favorit",
+    pin: "Sematkan",
+    unpin: "Lepas sematan",
   },
   appLayout: {
     mobileNavTools: "Alat",

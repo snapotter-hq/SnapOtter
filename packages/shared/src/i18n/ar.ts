@@ -2952,6 +2952,7 @@ export const ar: TranslationKeys = {
     allTools: "جميع الأدوات",
     searchPlaceholder: "بحث في {count} أداة...",
     recent: "الأخيرة",
+    pinned: "مثبّت",
     popular: "الشائعة",
     browseByCategory: "تصفح حسب الفئة",
     gettingStarted: "البدء",
@@ -3843,7 +3844,8 @@ export const ar: TranslationKeys = {
     settings: "الإعدادات",
   },
   toolCard: {
-    addToFavourites: "إضافة إلى المفضلة",
+    pin: "تثبيت",
+    unpin: "إلغاء التثبيت",
   },
   appLayout: {
     mobileNavTools: "الأدوات",

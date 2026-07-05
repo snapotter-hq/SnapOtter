@@ -2724,6 +2724,7 @@ export const zhTW: TranslationKeys = {
     allTools: "全部工具",
     searchPlaceholder: "搜尋 {count} 個工具...",
     recent: "最近使用",
+    pinned: "已釘選",
     popular: "熱門",
     browseByCategory: "依分類瀏覽",
     gettingStarted: "快速入門",
@@ -3607,7 +3608,8 @@ export const zhTW: TranslationKeys = {
     settings: "設定",
   },
   toolCard: {
-    addToFavourites: "加入收藏",
+    pin: "釘選",
+    unpin: "取消釘選",
   },
   appLayout: {
     mobileNavTools: "工具",

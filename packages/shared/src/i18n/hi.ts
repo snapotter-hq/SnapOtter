@@ -2784,6 +2784,7 @@ export const hi: TranslationKeys = {
     allTools: "सभी टूल्स",
     searchPlaceholder: "{count} टूल में खोजें...",
     recent: "हाल के",
+    pinned: "पिन किए गए",
     popular: "लोकप्रिय",
     browseByCategory: "श्रेणी के अनुसार देखें",
     gettingStarted: "शुरू करें",
@@ -3673,7 +3674,8 @@ export const hi: TranslationKeys = {
     settings: "सेटिंग्स",
   },
   toolCard: {
-    addToFavourites: "पसंदीदा में जोड़ें",
+    pin: "पिन करें",
+    unpin: "अनपिन करें",
   },
   appLayout: {
     mobileNavTools: "टूल्स",

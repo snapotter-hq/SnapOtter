@@ -2923,6 +2923,7 @@ export const ja: TranslationKeys = {
     allTools: "すべてのツール",
     searchPlaceholder: "{count} 個のツールを検索...",
     recent: "最近",
+    pinned: "ピン留め",
     popular: "人気",
     browseByCategory: "カテゴリで探す",
     gettingStarted: "はじめに",
@@ -3820,7 +3821,8 @@ export const ja: TranslationKeys = {
     settings: "設定",
   },
   toolCard: {
-    addToFavourites: "お気に入りに追加",
+    pin: "ピン留め",
+    unpin: "ピン留め解除",
   },
   appLayout: {
     mobileNavTools: "ツール",

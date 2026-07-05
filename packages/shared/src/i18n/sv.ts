@@ -2964,6 +2964,7 @@ export const sv: TranslationKeys = {
     allTools: "Alla verktyg",
     searchPlaceholder: "Sök bland {count} verktyg...",
     recent: "Senaste",
+    pinned: "Fästa",
     popular: "Populära",
     browseByCategory: "Utforska per kategori",
     gettingStarted: "Kom igång",
@@ -3864,7 +3865,8 @@ export const sv: TranslationKeys = {
     settings: "Inställningar",
   },
   toolCard: {
-    addToFavourites: "Lägg till i favoriter",
+    pin: "Fäst",
+    unpin: "Ta bort",
   },
   appLayout: {
     mobileNavTools: "Verktyg",

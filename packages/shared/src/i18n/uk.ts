@@ -2969,6 +2969,7 @@ export const uk: TranslationKeys = {
     allTools: "Усі інструменти",
     searchPlaceholder: "Пошук серед {count} інструментів...",
     recent: "Нещодавні",
+    pinned: "Закріплені",
     popular: "Популярні",
     browseByCategory: "Перегляд за категорією",
     gettingStarted: "Початок роботи",
@@ -3873,7 +3874,8 @@ export const uk: TranslationKeys = {
     settings: "Налаштування",
   },
   toolCard: {
-    addToFavourites: "Додати до обраного",
+    pin: "Закріпити",
+    unpin: "Відкріпити",
   },
   appLayout: {
     mobileNavTools: "Інструменти",
