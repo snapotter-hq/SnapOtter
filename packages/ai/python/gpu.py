@@ -43,12 +43,16 @@ def gpu_available():
     if onnx_available:
         return True
 
-    # Last resort: check nvidia-smi alone. The GPU is present even if
-    # neither torch nor ONNX Runtime can use it (e.g. CPU-only packages).
+    # A GPU is physically present but neither torch nor ONNX Runtime can use it.
+    # The OCR bundle ships paddlepaddle-gpu, which still can, so probe paddle in
+    # an isolated subprocess. This runs only now that nvidia-smi confirms a GPU,
+    # and never in-process, because a GPU-less paddle import segfaults.
     gpu_name = _nvidia_smi_gpu_name()
     if gpu_name:
-        print(f"[gpu] nvidia-smi found GPU ({gpu_name}) but neither torch "
-              "nor ONNX Runtime can use it -- reinstall AI features for GPU support",
+        if _try_paddle_cuda_subprocess():
+            return True
+        print(f"[gpu] nvidia-smi found GPU ({gpu_name}) but neither torch, ONNX "
+              "Runtime, nor paddle can use it; reinstall AI features for GPU support",
               file=sys.stderr, flush=True)
     return False
 
@@ -111,6 +115,36 @@ def _try_onnx_cuda():
         return False
     except (ImportError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
+
+
+def _try_paddle_cuda_subprocess():
+    """Check GPU via paddle in an isolated subprocess.
+
+    The OCR bundle ships paddlepaddle-gpu with no torch or ONNX Runtime, so paddle
+    is the only framework that can see the GPU on an OCR-only host. Importing
+    paddlepaddle-gpu in-process segfaults on a GPU-less machine, so this runs in a
+    throwaway subprocess and callers must confirm a GPU is present (via nvidia-smi)
+    before invoking it. Returns True only when paddle has a CUDA build and a
+    visible GPU. The result is signalled through the exit code so paddle's own
+    import chatter on stdout cannot corrupt the reading.
+    """
+    probe = (
+        "import paddle, sys; "
+        "sys.exit(0 if (paddle.is_compiled_with_cuda() "
+        "and paddle.device.cuda.device_count() > 0) else 1)"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if result.returncode == 0:
+        print("[gpu] CUDA available via paddle (paddlepaddle-gpu)",
+              file=sys.stderr, flush=True)
+        return True
+    return False
 
 
 def onnx_providers():
