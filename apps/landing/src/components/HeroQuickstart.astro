@@ -1,0 +1,128 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+
+// One-command self-host quickstart shown in the hero, between the category cards
+// and the stats. Keep this command in sync with the canonical one in DOCKERHUB.md,
+// README.md, and apps/docs/guide/getting-started.md.
+const DOCKER_CMD =
+  "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
+---
+
+<div class="animate-fade-up mt-6 text-center" style="animation-delay: 0.24s;">
+  <p class="mb-3 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+    Self-host in one command
+  </p>
+
+  <!-- The whole bar is the copy button: click anywhere (or the copy icon) to copy. -->
+  <button
+    type="button"
+    id="hero-docker-copy"
+    class="so-cmd group relative inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-terminal-bg px-4 py-3.5 text-start font-mono text-[0.8125rem] leading-[1.7] text-terminal-fg"
+    data-copy={DOCKER_CMD}
+    aria-label="Copy the Docker run command to your clipboard"
+    title="Click to copy"
+  >
+    <span class="shrink-0 select-none font-bold text-terminal-green">$</span>
+    <span dir="ltr" class="flex min-w-0 flex-1 items-center overflow-x-auto">
+      <code class="whitespace-nowrap">{DOCKER_CMD}</code>
+      <span class="so-caret ms-0.5 inline-block h-[1.05em] w-2 shrink-0 bg-terminal-green" aria-hidden="true"></span>
+    </span>
+    <span class="shrink-0 text-terminal-muted transition-colors group-hover:text-primary-light" aria-hidden="true">
+      <svg class="copy-idle h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <svg class="copy-done hidden h-4 w-4 text-terminal-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </span>
+    <span class="copy-toast pointer-events-none absolute -top-7 end-3 rounded-md bg-foreground px-2 py-0.5 font-body text-[0.6875rem] font-semibold text-white opacity-0 transition-opacity">Copied</span>
+  </button>
+
+  <div class="mt-3.5 flex items-center justify-center">
+    <a
+      href="https://demo.snapotter.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-foreground transition-all hover:-translate-y-px hover:border-primary hover:bg-primary-subtle"
+    >
+      <svg class="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+      Try the live demo
+    </a>
+  </div>
+
+  <span class="sr-only" aria-live="polite" id="hero-docker-copy-status"></span>
+</div>
+
+<style>
+  .so-cmd {
+    transition: transform 0.12s, border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 50px -18px rgba(224, 120, 50, 0.4), 0 12px 30px -14px rgba(26, 18, 16, 0.55);
+  }
+  .so-cmd:hover {
+    transform: translateY(-1px);
+    border-color: rgba(224, 120, 50, 0.5);
+    box-shadow: 0 0 60px -14px rgba(224, 120, 50, 0.55), 0 14px 34px -14px rgba(26, 18, 16, 0.6);
+  }
+  .so-cmd:focus-visible {
+    outline: 2px solid var(--color-primary-light);
+    outline-offset: 3px;
+  }
+  .so-caret {
+    animation: so-blink 1.1s step-end infinite;
+  }
+  @keyframes so-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  .so-cmd.copied {
+    border-color: rgba(74, 222, 128, 0.55);
+  }
+  .so-cmd.copied .copy-toast {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .so-caret { animation: none; }
+    .so-cmd:hover { transform: none; }
+  }
+</style>
+
+<script>
+  const btn = document.getElementById("hero-docker-copy");
+  if (btn) {
+    const idle = btn.querySelector(".copy-idle");
+    const done = btn.querySelector(".copy-done");
+    const status = document.getElementById("hero-docker-copy-status");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const flip = (copied: boolean) => {
+      idle?.classList.toggle("hidden", copied);
+      done?.classList.toggle("hidden", !copied);
+      btn.classList.toggle("copied", copied);
+    };
+
+    btn.addEventListener("click", async () => {
+      const text = btn.getAttribute("data-copy") ?? "";
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Clipboard API can be unavailable in insecure contexts; fall back to execCommand.
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+        } catch {
+          // Nothing else to try; the icon still flips so the user can copy manually.
+        }
+        document.body.removeChild(ta);
+      }
+      flip(true);
+      if (status) status.textContent = "Copied to clipboard";
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        flip(false);
+        if (status) status.textContent = "";
+      }, 2000);
+    });
+  }
+</script>

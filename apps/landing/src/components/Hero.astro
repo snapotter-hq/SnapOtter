@@ -2,13 +2,14 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import CategoryCards from "./CategoryCards.astro";
+import HeroQuickstart from "./HeroQuickstart.astro";
 import HeroSearch from "./HeroSearch.astro";
 import TrustSignals from "./TrustSignals.astro";
 
 const trustBadges = ["Self-hosted", "Open source", "Air-gap capable", "Compliance-friendly"];
 ---
 
-<section class="relative overflow-hidden px-6 pt-28 pb-12 md:pt-32 md:pb-16">
+<section class="relative overflow-hidden px-6 pt-24 pb-12 md:pt-24 md:pb-16">
   <!-- Gradient mesh background (CSS fallback beneath the shadergradient loop) -->
   <div class="hero-mesh" aria-hidden="true"></div>
   <div class="hero-mesh-extra" aria-hidden="true"></div>
@@ -49,6 +50,9 @@ const trustBadges = ["Self-hosted", "Open source", "Air-gap capable", "Complianc
 
     <!-- Category cards -->
     <CategoryCards />
+
+    <!-- Self-host one-command quickstart + live demo -->
+    <HeroQuickstart />
 
     <!-- Stats strip -->
     <TrustSignals />
