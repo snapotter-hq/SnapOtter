@@ -6,10 +6,6 @@
 > [!IMPORTANT]
 > **Coming from 1.x?** Many of you have trusted SnapOtter since day one, and your feedback and suggestions shaped everything that followed. 2.0 is a big step, and we worked to make sure it doesn't break what you already depend on. Your accounts, saved files, settings, API keys, and pipelines carry over automatically on first boot, and your old database is never modified. We wrote a full [migration guide](./MIGRATING.md) so the move is safe and boring. Thank you for being here.
 
-<!-- TEMP: 1.x to 2.0 migration note. Remove once 2.0 has been out for a while and most users have upgraded. -->
-> [!IMPORTANT]
-> **Coming from 1.x?** Many of you have trusted SnapOtter since day one, and your feedback and suggestions shaped everything that followed. 2.0 is a big step, and we worked to make sure it doesn't break what you already depend on. Your accounts, saved files, settings, API keys, and pipelines carry over automatically on first boot, and your old database is never modified. We wrote a full [migration guide](./MIGRATING.md) so the move is safe and boring. Thank you for being here.
-
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
   <a href="https://github.com/orgs/snapotter-hq/packages/container/package/snapotter"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fsnapotter--hq%2Fsnapotter-blue?logo=github" alt="GHCR"></a>
