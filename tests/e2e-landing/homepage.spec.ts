@@ -7,13 +7,13 @@ test.describe("Landing Homepage", () => {
 
   test("page loads with self-hosted title", async ({ page }) => {
     await expect(page).toHaveTitle(
-      /SnapOtter \| Self-Hosted File Processing \(Image, Video, Audio, PDF, Files\)/,
+      /SnapOtter \| Self-Hosted File Processing for Privacy-Sensitive Teams/,
     );
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
-    for (const name of ["Features", "Enterprise", "Pricing", "Docs", "Contact"]) {
+    for (const name of ["Features", "Enterprise", "Pricing", "Docs", "Talk to a human"]) {
       await expect(page.getByRole("link", { name }).first()).toBeVisible();
     }
   });
@@ -22,17 +22,18 @@ test.describe("Landing Homepage", () => {
     await expect(page.getByRole("link", { name: "Book a Demo" }).first()).toBeVisible();
   });
 
-  test("hero renders the rotating headline and privacy promise", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("tool you need.");
-    await expect(page.locator("h1")).toContainText("Your files never leave your network.");
+  test("hero renders the headline", async ({ page }) => {
+    await expect(page.locator("h1")).toContainText("File processing for privacy-sensitive teams.");
   });
 
-  test("hero renders the enterprise subtitle", async ({ page }) => {
-    await expect(page.getByText("for teams that keep sensitive data in-house")).toBeVisible();
+  test("hero renders the subtitle", async ({ page }) => {
+    await expect(
+      page.getByText("Run image, video, audio, PDF, and file tools with local AI"),
+    ).toBeVisible();
   });
 
-  test("hero renders enterprise trust badges", async ({ page }) => {
-    for (const badge of ["On-premise", "Privacy-first", "Air-gap ready", "Audit logging"]) {
+  test("hero renders trust badges", async ({ page }) => {
+    for (const badge of ["Self-hosted", "Open source", "Air-gap capable", "Compliance-friendly"]) {
       await expect(page.getByText(badge, { exact: true }).first()).toBeVisible();
     }
   });
