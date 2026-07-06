@@ -1,6 +1,6 @@
 import type { Tool } from "@snapotter/shared";
 import { PYTHON_SIDECAR_TOOLS, SECTIONS, TOOL_BUNDLE_MAP, toolSection } from "@snapotter/shared";
-import { Clock, Download, FileImage, Loader2 } from "lucide-react";
+import { Clock, Download, FileImage, Loader2, Pin } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -8,18 +8,51 @@ import { ICON_MAP } from "@/lib/icon-map";
 import { getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
+import { usePinnedToolsStore } from "@/stores/pinned-tools-store";
 
 interface ToolCardProps {
   tool: Tool;
   variant?: "compact" | "descriptive";
   showModalityBadge?: boolean;
+  showPin?: boolean;
+}
+
+function PinButton({ toolId }: { toolId: string }) {
+  const { t } = useTranslation();
+  const pinned = usePinnedToolsStore((s) => s.pinnedTools.includes(toolId));
+  const pin = usePinnedToolsStore((s) => s.pin);
+  const unpin = usePinnedToolsStore((s) => s.unpin);
+  const label = pinned ? t.toolCard.unpin : t.toolCard.pin;
+  return (
+    <button
+      type="button"
+      data-testid={`pin-toggle-${toolId}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (pinned) unpin(toolId);
+        else pin(toolId);
+      }}
+      aria-pressed={pinned}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "absolute top-2 end-2 z-10 p-1.5 rounded-md transition-colors",
+        pinned
+          ? "text-primary hover:bg-primary/10"
+          : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted",
+      )}
+    >
+      <Pin className={cn("h-4 w-4", pinned && "fill-current")} aria-hidden="true" />
+    </button>
+  );
 }
 
 const SECTION_COLOR_MAP: Record<string, string> = Object.fromEntries(
   SECTIONS.map((s) => [s.id, s.color]),
 );
 
-export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolCardProps) {
+export function ToolCard({ tool, variant = "compact", showModalityBadge, showPin }: ToolCardProps) {
   const { t } = useTranslation();
   const IconComponent =
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
@@ -66,12 +99,13 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
     ) : null;
 
   if (variant === "descriptive") {
-    return (
+    const card = (
       <Link
         to={tool.route}
         className={cn(
           "flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-card transition-all",
           "hover:border-border hover:shadow-sm",
+          showPin && "pe-10",
           tool.disabled && "opacity-50 pointer-events-none",
         )}
       >
@@ -99,6 +133,15 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge }: ToolC
           </p>
         </div>
       </Link>
+    );
+
+    if (!showPin) return card;
+
+    return (
+      <div className="relative">
+        {card}
+        <PinButton toolId={tool.id} />
+      </div>
     );
   }
 

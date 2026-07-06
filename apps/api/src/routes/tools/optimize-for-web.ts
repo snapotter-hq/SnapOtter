@@ -46,7 +46,7 @@ async function processImage(inputBuffer: Buffer, settings: Settings, filename: s
 
   const image = sharp(inputBuffer);
   const result = await optimizeForWeb(image, engineSettings);
-  let buffer = await result.toBuffer();
+  let buffer: Buffer = await result.toBuffer();
 
   if (isJxl) {
     buffer = await encodeJxl(buffer, settings.quality);

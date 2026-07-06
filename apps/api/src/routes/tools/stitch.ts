@@ -249,7 +249,7 @@ export function registerStitch(app: FastifyInstance) {
         pipeline = pipeline.png();
       }
 
-      let result = await pipeline.toBuffer();
+      let result: Buffer = await pipeline.toBuffer();
 
       if (settings.format === "jxl") {
         result = await encodeJxl(result, settings.quality);

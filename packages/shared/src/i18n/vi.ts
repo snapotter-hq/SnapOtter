@@ -2965,6 +2965,7 @@ export const vi: TranslationKeys = {
     allTools: "Tất cả công cụ",
     searchPlaceholder: "Tìm kiếm {count} công cụ...",
     recent: "Gần đây",
+    pinned: "Đã ghim",
     popular: "Phổ biến",
     browseByCategory: "Duyệt theo danh mục",
     gettingStarted: "Bắt đầu",
@@ -3864,7 +3865,8 @@ export const vi: TranslationKeys = {
     settings: "Cài đặt",
   },
   toolCard: {
-    addToFavourites: "Thêm vào yêu thích",
+    pin: "Ghim",
+    unpin: "Bỏ ghim",
   },
   appLayout: {
     mobileNavTools: "Công cụ",

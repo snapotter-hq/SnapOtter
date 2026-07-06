@@ -70,7 +70,7 @@ async function processImageEnhancement(
     { width: meta.width ?? 1, height: meta.height ?? 1 },
   );
 
-  let buffer = await image
+  let buffer: Buffer = await image
     .toFormat(outputFormat.format, { quality: outputFormat.quality })
     .toBuffer();
 

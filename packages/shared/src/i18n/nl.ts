@@ -2973,6 +2973,7 @@ export const nl: TranslationKeys = {
     allTools: "Alle tools",
     searchPlaceholder: "Zoeken in {count} tools...",
     recent: "Recent",
+    pinned: "Vastgezet",
     popular: "Populair",
     browseByCategory: "Bladeren op categorie",
     gettingStarted: "Aan de slag",
@@ -3878,7 +3879,8 @@ export const nl: TranslationKeys = {
     settings: "Instellingen",
   },
   toolCard: {
-    addToFavourites: "Aan favorieten toevoegen",
+    pin: "Vastzetten",
+    unpin: "Losmaken",
   },
   appLayout: {
     mobileNavTools: "Tools",

@@ -2973,6 +2973,7 @@ export const it: TranslationKeys = {
     allTools: "Tutti gli strumenti",
     searchPlaceholder: "Cerca tra {count} strumenti...",
     recent: "Recenti",
+    pinned: "Fissati",
     popular: "Popolari",
     browseByCategory: "Esplora per categoria",
     gettingStarted: "Per iniziare",
@@ -3883,7 +3884,8 @@ export const it: TranslationKeys = {
     settings: "Impostazioni",
   },
   toolCard: {
-    addToFavourites: "Aggiungi ai preferiti",
+    pin: "Fissa",
+    unpin: "Rimuovi",
   },
   appLayout: {
     mobileNavTools: "Strumenti",

@@ -2937,6 +2937,7 @@ export const th: TranslationKeys = {
     allTools: "เครื่องมือทั้งหมด",
     searchPlaceholder: "ค้นหา {count} เครื่องมือ...",
     recent: "ล่าสุด",
+    pinned: "ที่ปักหมุด",
     popular: "ยอดนิยม",
     browseByCategory: "เรียกดูตามหมวดหมู่",
     gettingStarted: "เริ่มต้นใช้งาน",
@@ -3823,7 +3824,8 @@ export const th: TranslationKeys = {
     settings: "ตั้งค่า",
   },
   toolCard: {
-    addToFavourites: "เพิ่มในรายการโปรด",
+    pin: "ปักหมุด",
+    unpin: "เลิกปักหมุด",
   },
   appLayout: {
     mobileNavTools: "เครื่องมือ",

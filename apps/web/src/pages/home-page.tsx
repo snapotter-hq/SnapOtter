@@ -17,6 +17,7 @@ import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
 import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
 import { cn } from "@/lib/utils.js";
 import { useAnalyticsStore } from "@/stores/analytics-store";
+import { usePinnedToolsStore } from "@/stores/pinned-tools-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface TabDef {
@@ -47,6 +48,8 @@ export function HomePage() {
   const [search, setSearch] = useState("");
   const { fetch: fetchSettings, disabledTools, experimentalEnabled, loaded } = useSettingsStore();
   const recentToolIds = useRecentTools();
+  const pinnedIds = usePinnedToolsStore((s) => s.pinnedTools);
+  const fetchPins = usePinnedToolsStore((s) => s.fetch);
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const analyticsOn = analyticsConfigLoaded && analyticsConfig?.enabled === true;
@@ -66,6 +69,10 @@ export function HomePage() {
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  useEffect(() => {
+    fetchPins();
+  }, [fetchPins]);
 
   // Open a specific section tab when arriving via a breadcrumb link
   // (/?section=<sectionId>), then clean the URL so refresh/back doesn't re-pin it.
@@ -137,13 +144,18 @@ export function HomePage() {
     return counts;
   }, [visibleTools]);
 
-  const recentTools = useMemo(
-    () =>
-      recentToolIds
-        .map((id) => visibleTools.find((tool) => tool.id === id))
-        .filter((tool): tool is Tool => tool != null),
-    [recentToolIds, visibleTools],
-  );
+  const pinnedTools = useMemo(() => {
+    const byId = new Map(visibleTools.map((tool) => [tool.id, tool]));
+    return pinnedIds.map((id) => byId.get(id)).filter((tool): tool is Tool => tool != null);
+  }, [pinnedIds, visibleTools]);
+
+  const recentTools = useMemo(() => {
+    const pinnedSet = new Set(pinnedIds);
+    return recentToolIds
+      .filter((id) => !pinnedSet.has(id))
+      .map((id) => visibleTools.find((tool) => tool.id === id))
+      .filter((tool): tool is Tool => tool != null);
+  }, [recentToolIds, visibleTools, pinnedIds]);
 
   return (
     <AppLayout>
@@ -174,7 +186,11 @@ export function HomePage() {
               onRequest={openRequest}
             />
           ) : activeTab === "all" ? (
-            <AllTabContent recentTools={recentTools} visibleTools={visibleTools} />
+            <AllTabContent
+              pinnedTools={pinnedTools}
+              recentTools={recentTools}
+              visibleTools={visibleTools}
+            />
           ) : (
             <CategoryGrid groupedTools={groupedTools} />
           )}
@@ -387,7 +403,7 @@ function SearchResults({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {results.map((tool) => (
-          <ToolCard key={tool.id} tool={tool} variant="descriptive" showModalityBadge />
+          <ToolCard key={tool.id} tool={tool} variant="descriptive" showModalityBadge showPin />
         ))}
       </div>
       <div className="pt-1 text-center">
@@ -405,9 +421,11 @@ function SearchResults({
 // ── All Tab: Grouped by section, then by category ───────────────
 
 function AllTabContent({
+  pinnedTools,
   recentTools,
   visibleTools,
 }: {
+  pinnedTools: Tool[];
   recentTools: Tool[];
   visibleTools: Tool[];
 }) {
@@ -442,6 +460,20 @@ function AllTabContent({
 
   return (
     <div className="space-y-6">
+      {/* Pinned */}
+      {pinnedTools.length > 0 && (
+        <section>
+          <h2 className="text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-widest mb-2">
+            {t.homePage.pinned}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {pinnedTools.map((tool) => (
+              <ToolCard key={tool.id} tool={tool} variant="descriptive" showPin />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Recent */}
       {recentTools.length > 0 && (
         <section>
@@ -513,7 +545,7 @@ function AllTabContent({
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {tools.map((tool) => (
-                          <ToolCard key={tool.id} tool={tool} variant="descriptive" />
+                          <ToolCard key={tool.id} tool={tool} variant="descriptive" showPin />
                         ))}
                       </div>
                     </div>
@@ -550,7 +582,7 @@ function CategoryGrid({ groupedTools }: { groupedTools: Map<string, Tool[]> }) {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {tools.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} variant="descriptive" />
+                <ToolCard key={tool.id} tool={tool} variant="descriptive" showPin />
               ))}
             </div>
           </section>

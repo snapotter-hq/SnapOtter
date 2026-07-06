@@ -2905,6 +2905,7 @@ export const ko: TranslationKeys = {
     allTools: "모든 도구",
     searchPlaceholder: "{count}개 도구 검색...",
     recent: "최근",
+    pinned: "고정됨",
     popular: "인기",
     browseByCategory: "카테고리별 탐색",
     gettingStarted: "시작하기",
@@ -3800,7 +3801,8 @@ export const ko: TranslationKeys = {
     settings: "설정",
   },
   toolCard: {
-    addToFavourites: "즐겨찾기에 추가",
+    pin: "고정",
+    unpin: "고정 해제",
   },
   appLayout: {
     mobileNavTools: "도구",

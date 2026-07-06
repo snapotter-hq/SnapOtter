@@ -2918,6 +2918,7 @@ export const en = {
     allTools: "All Tools",
     searchPlaceholder: "Search {count} tools...",
     recent: "Recent",
+    pinned: "Pinned",
     popular: "Popular",
     browseByCategory: "Browse by Category",
     gettingStarted: "Getting Started",
@@ -3814,7 +3815,8 @@ export const en = {
     settings: "Settings",
   },
   toolCard: {
-    addToFavourites: "Add to favourites",
+    pin: "Pin",
+    unpin: "Unpin",
   },
   appLayout: {
     mobileNavTools: "Tools",

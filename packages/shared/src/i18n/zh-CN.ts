@@ -2725,6 +2725,7 @@ export const zhCN: TranslationKeys = {
     allTools: "所有工具",
     searchPlaceholder: "搜索 {count} 个工具...",
     recent: "最近",
+    pinned: "已固定",
     popular: "热门",
     browseByCategory: "按分类浏览",
     gettingStarted: "开始使用",
@@ -3606,7 +3607,8 @@ export const zhCN: TranslationKeys = {
     settings: "设置",
   },
   toolCard: {
-    addToFavourites: "添加到收藏",
+    pin: "固定",
+    unpin: "取消固定",
   },
   appLayout: {
     mobileNavTools: "工具",

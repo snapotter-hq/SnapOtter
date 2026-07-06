@@ -2968,6 +2968,7 @@ export const tr: TranslationKeys = {
     allTools: "Tüm Araçlar",
     searchPlaceholder: "{count} araç içinde ara...",
     recent: "Son Kullanılan",
+    pinned: "Sabitlenenler",
     popular: "Popüler",
     browseByCategory: "Kategoriye Göre Göz At",
     gettingStarted: "Başlarken",
@@ -3875,7 +3876,8 @@ export const tr: TranslationKeys = {
     settings: "Ayarlar",
   },
   toolCard: {
-    addToFavourites: "Favorilere ekle",
+    pin: "Sabitle",
+    unpin: "Kaldır",
   },
   appLayout: {
     mobileNavTools: "Araçlar",
