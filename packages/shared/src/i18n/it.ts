@@ -1534,7 +1534,7 @@ export const it: TranslationKeys = {
     },
     "erase-object": {
       brushSize: "Dimensione pennello",
-      fine: "Fine",
+      fine: "Sottile",
       wide: "Largo",
       undo: "Annulla",
       clear: "Cancella",
