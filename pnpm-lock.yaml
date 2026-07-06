@@ -524,8 +524,8 @@ importers:
         specifier: ^1
         version: 1.1.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       wavesurfer.js:
-        specifier: ^7.12.8
-        version: 7.12.9
+        specifier: ^7.12.10
+        version: 7.12.10
       zundo:
         specifier: ^2
         version: 2.3.0(zustand@5.0.14(@types/react@19.2.17)(react@19.2.7))
@@ -8130,8 +8130,8 @@ packages:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
 
-  wavesurfer.js@7.12.9:
-    resolution: {integrity: sha512-+uuIcFvtpto36AYgt2VPp28FQKlbaSjaeZGBdwa+cLgVXIPnC6W0mtjLPXNQ4LR/FTV8GzXmA0AZ91V72HWfig==}
+  wavesurfer.js@7.12.10:
+    resolution: {integrity: sha512-M3AC5biFmvfy7Oxe8FN6I88H0z1c8Vuz81N6Oq2CY4kOumNDb6U1/0qg4pomjP619vJqdWADlgUcpOKvfGifng==}
 
   weapon-regex@1.3.6:
     resolution: {integrity: sha512-wsf1m1jmMrso5nhwVFJJHSubEBf3+pereGd7+nBKtYJ18KoB/PWJOHS3WRkwS04VrOU0iJr2bZU+l1QaTJ+9nA==}
@@ -16793,7 +16793,7 @@ snapshots:
     dependencies:
       xml-name-validator: 5.0.0
 
-  wavesurfer.js@7.12.9: {}
+  wavesurfer.js@7.12.10: {}
 
   weapon-regex@1.3.6: {}
 
