@@ -25,7 +25,7 @@
     "konva": "^10",
     "lucide-react": "^0.577.0",
     "pdfjs-dist": "^6.1.200",
-    "posthog-js": "^1.396.6",
+    "posthog-js": "^1.396.8",
     "qr-code-styling": "^1.9.2",
     "react": "^19.2.7",
     "react-colorful": "^5",
