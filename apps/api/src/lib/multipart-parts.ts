@@ -60,6 +60,19 @@ export async function* multipartParts(request: FastifyRequest): AsyncGenerator<M
     // Parity with @fastify/multipart's throwFileSizeLimit default: a stream
     // that hit the fileSize limit fails its consumer instead of silently
     // truncating the stored object.
+    //
+    // A file part can be destroyed before any consumer starts draining it: on
+    // a fast enough connection (or with a fully-buffered body, e.g. Fastify's
+    // inject()), busboy can process enough bytes to hit the limit before the
+    // route handler's `await receiveUpload(part, ...)` has attached its own
+    // stream listener. Readable.destroy(error) emits "error" on the stream
+    // itself, and Node crashes the process if that event has zero listeners
+    // at emit time. This baseline listener guarantees one is always present
+    // from the moment the stream exists; the real consumer (async iteration
+    // in receiveUpload -> putObjectStream) still receives the same event and
+    // throws it normally, since EventEmitter delivers "error" to every
+    // registered listener, not just the first.
+    stream.on("error", () => {});
     stream.on("limit", () => stream.destroy(new Error("request file too large")));
     push({
       type: "file",
