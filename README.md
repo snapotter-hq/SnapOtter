@@ -2,8 +2,9 @@
   <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
 </p>
 
-> [!NOTE]
-> **SnapOtter v2.0.0** is the current monorepo version, with 200+ tools across image, video, audio, PDF, and files. For published image channels and GPU variants, see the Docker Tags guide.
+<!-- TEMP: 1.x to 2.0 migration note. Remove once 2.0 has been out for a while and most users have upgraded. -->
+> [!IMPORTANT]
+> **Coming from 1.x?** Many of you have trusted SnapOtter since day one, and your feedback and suggestions shaped everything that followed. 2.0 is a big step, and we worked to make sure it doesn't break what you already depend on. Your accounts, saved files, settings, API keys, and pipelines carry over automatically on first boot, and your old database is never modified. We wrote a full [migration guide](./MIGRATING.md) so the move is safe and boring. Thank you for being here.
 
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
@@ -119,6 +120,7 @@ For Docker Compose, persistent storage, and other setup options, see the [Gettin
 ## Documentation
 
 - [Getting Started](https://docs.snapotter.com/guide/getting-started)
+- [Upgrading from 1.x to 2.0](https://docs.snapotter.com/guide/upgrading)
 - [Configuration](https://docs.snapotter.com/guide/configuration)
 - [OIDC / SSO](https://docs.snapotter.com/guide/oidc)
 - [Deployment](https://docs.snapotter.com/guide/deployment)
