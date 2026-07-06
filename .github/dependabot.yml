@@ -44,6 +44,14 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # nvidia/cuda base is pinned to 12.6.x on purpose. The AI bundle wheels are
+      # cu126 (torch/paddle/onnxruntime-gpu), libcublas-12-6 matches it, and a 12.9
+      # base requires driver R575+ so the container fails to start on common 570.x
+      # production drivers. See the comment above the FROM in docker/Dockerfile.
+      # Allow 12.6.x patch bumps; block 12.7+ until the wheels and driver baseline
+      # move together (closed dependabot #441 for this reason).
+      - dependency-name: "nvidia/cuda"
+        versions: [">= 12.7"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
