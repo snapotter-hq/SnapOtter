@@ -3,7 +3,7 @@ import sys
 import json
 import os
 
-from gpu import gpu_available
+from gpu import ctranslate2_gpu_available
 
 
 MODELS_PATH = os.environ.get(
@@ -42,7 +42,7 @@ def main():
         if not os.path.isdir(model_dir):
             ensure_download_allowed("Whisper transcription model (faster-whisper-small)")
 
-        if gpu_available():
+        if ctranslate2_gpu_available():
             device, compute_type = "cuda", "float16"
         else:
             device, compute_type = "cpu", "int8"

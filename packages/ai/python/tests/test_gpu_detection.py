@@ -11,6 +11,7 @@ GPU-less host and would wedge the shared AI dispatcher).
 import os
 import subprocess
 import sys
+import types
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import gpu  # noqa: E402
@@ -80,3 +81,59 @@ def test_gpu_available_never_probes_paddle_without_a_gpu(monkeypatch):
     monkeypatch.setattr(gpu, "_try_paddle_cuda_subprocess", spy)
     assert gpu.gpu_available() is False
     assert called["paddle"] is False
+
+
+# --- Per-framework detection (torch, ctranslate2) --------------------------
+#
+# Torch and CTranslate2 tools must gate on their OWN framework, not the general
+# gpu_available(), which can report True based on paddle or ONNX Runtime while
+# torch is a CPU-only build. Consuming the shared boolean would make those tools
+# route to CUDA on a device their framework cannot use.
+
+def test_torch_gpu_available_true_when_torch_can_use_cuda(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setattr(gpu, "_try_torch_cuda", lambda: True)
+    assert gpu.torch_gpu_available() is True
+
+
+def test_torch_gpu_available_false_when_override_disables_gpu(monkeypatch):
+    monkeypatch.setenv("SNAPOTTER_GPU", "0")
+    monkeypatch.setattr(gpu, "_try_torch_cuda", lambda: True)
+    assert gpu.torch_gpu_available() is False
+
+
+def test_torch_gpu_available_false_when_torch_is_cpu_only(monkeypatch):
+    # The crux: gpu_available() may be True via paddle or ONNX on a GPU box, but a
+    # CPU-only torch build must report no GPU so torch tools do not touch CUDA.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setattr(gpu, "_try_torch_cuda", lambda: False)
+    assert gpu.torch_gpu_available() is False
+
+
+def test_ctranslate2_gpu_available_true_when_cuda_device_present(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    fake = types.SimpleNamespace(get_cuda_device_count=lambda: 1)
+    monkeypatch.setitem(sys.modules, "ctranslate2", fake)
+    assert gpu.ctranslate2_gpu_available() is True
+
+
+def test_ctranslate2_gpu_available_false_when_no_cuda_device(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    fake = types.SimpleNamespace(get_cuda_device_count=lambda: 0)
+    monkeypatch.setitem(sys.modules, "ctranslate2", fake)
+    assert gpu.ctranslate2_gpu_available() is False
+
+
+def test_ctranslate2_gpu_available_false_when_override_disables_gpu(monkeypatch):
+    monkeypatch.setenv("SNAPOTTER_GPU", "0")
+    fake = types.SimpleNamespace(get_cuda_device_count=lambda: 4)
+    monkeypatch.setitem(sys.modules, "ctranslate2", fake)
+    assert gpu.ctranslate2_gpu_available() is False
+
+
+def test_ctranslate2_gpu_available_false_when_not_installed(monkeypatch):
+    # A None entry in sys.modules makes `import ctranslate2` raise ImportError,
+    # which models the framework being absent (e.g. no transcription bundle).
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setitem(sys.modules, "ctranslate2", None)
+    assert gpu.ctranslate2_gpu_available() is False

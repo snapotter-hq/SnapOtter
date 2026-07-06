@@ -151,7 +151,7 @@ def enhance_with_gfpgan(img_array, only_center_face):
     """Enhance faces using GFPGAN. Returns the enhanced image array."""
     import torch
     from gfpgan import GFPGANer
-    from gpu import gpu_available
+    from gpu import torch_gpu_available
 
     if not os.path.exists(GFPGAN_MODEL_PATH):
         raise FileNotFoundError(f"GFPGAN model not found: {GFPGAN_MODEL_PATH}")
@@ -162,7 +162,7 @@ def enhance_with_gfpgan(img_array, only_center_face):
     from offline_guard import prepare_gfpgan_helper_weights
     prepare_gfpgan_helper_weights(_MODELS_BASE)
 
-    use_gpu = gpu_available()
+    use_gpu = torch_gpu_available()
     device = torch.device("cuda" if use_gpu else "cpu")
 
     enhancer = GFPGANer(
@@ -197,9 +197,9 @@ def enhance_with_codeformer(img_array, fidelity_weight):
     import cv2
     import numpy as np
     import torch
-    from gpu import gpu_available
+    from gpu import torch_gpu_available
 
-    use_gpu = gpu_available()
+    use_gpu = torch_gpu_available()
 
     # codeformer-pip downloads four weights into a cwd-relative tree at import
     # time when they are missing; resolve the bundled ones first so only a

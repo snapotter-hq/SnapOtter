@@ -108,7 +108,7 @@ def main():
                 try:
                     from basicsr.archs.rrdbnet_arch import RRDBNet
                     from realesrgan import RealESRGANer
-                    from gpu import gpu_available
+                    from gpu import torch_gpu_available
                     import numpy as np
                     import torch
 
@@ -117,7 +117,7 @@ def main():
                             f"RealESRGAN model not found: {REALESRGAN_MODEL_PATH}"
                         )
 
-                    use_gpu = gpu_available()
+                    use_gpu = torch_gpu_available()
                     device = torch.device("cuda" if use_gpu else "cpu")
 
                     # RealESRGAN_x4plus is a 4x model internally

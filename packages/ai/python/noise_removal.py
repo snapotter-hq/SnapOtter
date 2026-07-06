@@ -296,7 +296,7 @@ def denoise_quality(img_array, strength, detail, color_noise, model_path):
     Uses the Swin-Conv-UNet architecture trained on real-world noise.
     """
     import torch
-    from gpu import gpu_available
+    from gpu import torch_gpu_available
 
     emit_progress(15, "Loading SCUNet model")
 
@@ -313,7 +313,7 @@ def denoise_quality(img_array, strength, detail, color_noise, model_path):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "models"))
         from scunet_arch import SCUNet
 
-        use_gpu = gpu_available()
+        use_gpu = torch_gpu_available()
         device = torch.device("cuda" if use_gpu else "cpu")
 
         model = SCUNet(in_nc=3, config=[4, 4, 4, 4, 4, 4, 4], dim=64)
@@ -352,7 +352,7 @@ def denoise_maximum(img_array, strength, detail, color_noise, model_path):
     state-of-the-art image restoration.
     """
     import torch
-    from gpu import gpu_available
+    from gpu import torch_gpu_available
 
     emit_progress(15, "Loading NAFNet model")
 
@@ -369,7 +369,7 @@ def denoise_maximum(img_array, strength, detail, color_noise, model_path):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "models"))
         from nafnet_arch import NAFNet
 
-        use_gpu = gpu_available()
+        use_gpu = torch_gpu_available()
         device = torch.device("cuda" if use_gpu else "cpu")
 
         model = NAFNet(

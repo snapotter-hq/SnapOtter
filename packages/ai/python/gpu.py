@@ -25,11 +25,23 @@ def _nvidia_smi_gpu_name():
     return None
 
 
+def _override_disables_gpu():
+    """True if SNAPOTTER_GPU is explicitly set to a falsy value (0/false/no)."""
+    override = os.environ.get("SNAPOTTER_GPU")
+    return override is not None and override.lower() in ("0", "false", "no")
+
+
 @functools.lru_cache(maxsize=1)
 def gpu_available():
-    """Return True if a usable CUDA GPU is present at runtime."""
-    override = os.environ.get("SNAPOTTER_GPU")
-    if override is not None and override.lower() in ("0", "false", "no"):
+    """Return True if a usable CUDA GPU is present at runtime.
+
+    This is the general "can any framework use a GPU" check (torch, then ONNX
+    Runtime, then paddle). Tools bound to a single framework should instead call
+    the matching per-framework helper (torch_gpu_available,
+    ctranslate2_gpu_available) so a GPU that only paddle or ONNX can use is not
+    mistaken for a torch GPU.
+    """
+    if _override_disables_gpu():
         return False
 
     # Try torch first -- it probes the hardware directly.
@@ -145,6 +157,35 @@ def _try_paddle_cuda_subprocess():
               file=sys.stderr, flush=True)
         return True
     return False
+
+
+def torch_gpu_available():
+    """True iff torch itself can use CUDA (honors the SNAPOTTER_GPU override).
+
+    Torch-based tools (upscale, denoise, face enhancement, restore) must gate on
+    this rather than gpu_available(), which can report True based on paddle or
+    ONNX Runtime while torch is a CPU-only build. Routing those tools to CUDA on a
+    device torch cannot use would crash them.
+    """
+    if _override_disables_gpu():
+        return False
+    return _try_torch_cuda()
+
+
+def ctranslate2_gpu_available():
+    """True iff CTranslate2 (faster-whisper's backend) can use CUDA.
+
+    Transcription runs on CTranslate2, not torch, so it cannot reuse torch's
+    probe; torch may not even be installed in the transcription bundle. Honors the
+    SNAPOTTER_GPU override and returns False when CTranslate2 is absent.
+    """
+    if _override_disables_gpu():
+        return False
+    try:
+        import ctranslate2
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
 
 
 def onnx_providers():
