@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "pagefind": "^1.5.2",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.0",
     "vitepress": "^1.1.4",
     "vitepress-plugin-llms": "^1.13.2",
     "vitepress-plugin-pagefind": "^0.4.20"
