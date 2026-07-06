@@ -4,6 +4,10 @@ SnapOtter 1.x stored everything in a single SQLite file and ran as one container
 
 The short version: reuse your existing `/data` volume, and 2.0 imports your 1.x database automatically on first boot. Your users, saved files, settings, API keys, and pipelines come across. The old database is never modified, so you can always roll back.
 
+::: tip A note for our 1.x users
+Many of you have trusted SnapOtter since day one, and your feedback shaped this release. 2.0 changes a lot under the hood, and this guide exists so the move doesn't cost you anything you care about. Your accounts, files, settings, API keys, and pipelines carry over, and your old database is never touched. Thank you for upgrading with us.
+:::
+
 ## Before you start: back up the whole `/data` volume
 
 Do this first, every time. Back up the **entire** `/data` volume, not just the `snapotter.db` file.
