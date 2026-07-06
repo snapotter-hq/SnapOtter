@@ -151,9 +151,7 @@ describe("Dropzone", () => {
 
     it("shows supported formats hint", () => {
       render(<Dropzone />);
-      expect(
-        screen.getByText("Images, Videos, Audio, PDFs, Documents, and 150+ formats"),
-      ).toBeDefined();
+      expect(screen.getByText("Images, Videos, Audio, PDF, Files, and 150+ formats")).toBeDefined();
     });
 
     it("renders the drop zone section with aria label", () => {
