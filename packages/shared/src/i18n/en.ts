@@ -3477,7 +3477,7 @@ export const en = {
       heading: "About",
       appName: "SnapOtter",
       appDescription:
-        "A self-hosted, privacy-first file processing suite with 200+ tools. Convert, compress, edit, transcribe, OCR, and automate image, video, audio, document, and data workflows without sending data to the cloud.",
+        "A self-hosted, privacy-first file processing suite with 200+ tools. Convert, compress, edit, transcribe, OCR, and automate image, video, audio, PDF, and file workflows without sending data to the cloud.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub Repository",
@@ -3693,7 +3693,7 @@ export const en = {
     dropPrompt: "Drop your files here",
     browseOrPaste: "use the upload button, or paste from clipboard",
     uploadButton: "Upload",
-    defaultFormats: "Images, Videos, Audio, PDFs, Documents, and 150+ formats",
+    defaultFormats: "Images, Videos, Audio, PDF, Files, and 150+ formats",
     orSeparator: "or",
     urlPlaceholder: "Paste file URL...",
     urlLoadingIndicator: "...",

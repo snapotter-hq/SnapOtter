@@ -3510,7 +3510,7 @@ export const ar: TranslationKeys = {
       heading: "حول",
       appName: "SnapOtter",
       appDescription:
-        "مجموعة أدوات معالجة ملفات ذاتية الاستضافة تركز على الخصوصية مع 200+ أداة. تحويل وضغط وتحرير ونسخ صوتي وتعرّف ضوئي وأتمتة سير عمل الصور والفيديو والصوت والمستندات والبيانات دون إرسال البيانات إلى السحابة.",
+        "مجموعة أدوات معالجة ملفات ذاتية الاستضافة تركز على الخصوصية مع 200+ أداة. تحويل وضغط وتحرير ونسخ صوتي وتعرّف ضوئي وأتمتة سير عمل الصور والفيديو والصوت وPDF والملفات دون إرسال البيانات إلى السحابة.",
       versionLabel: "الإصدار:",
       linksHeading: "روابط",
       githubLink: "مستودع GitHub",
@@ -3723,7 +3723,7 @@ export const ar: TranslationKeys = {
     dropPrompt: "اسحب صورك هنا",
     browseOrPaste: "استخدم زر التحميل، أو الصق من الحافظة",
     uploadButton: "رفع",
-    defaultFormats: "PNG، JPG، WebP، HEIC، RAW، PSD، وأكثر من 65 صيغة",
+    defaultFormats: "صور، فيديوهات، صوت، PDF، ملفات، وأكثر من 150 صيغة",
     orSeparator: "أو",
     urlPlaceholder: "الصق رابط الصورة...",
     urlLoadingIndicator: "...",

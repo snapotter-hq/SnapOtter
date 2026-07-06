@@ -2,7 +2,7 @@
 
 ![SnapOtter, a self-hosted file manipulation suite](https://raw.githubusercontent.com/snapotter-hq/SnapOtter/main/branding/social-preview.png)
 
-Open-source, self-hostable file manipulation suite. 200+ tools across image, video, audio, documents, and files, plus a layer-based image editor and local AI. Everything runs on your own hardware, so your files never leave your network.
+Open-source, self-hostable file manipulation suite. 200+ tools across image, video, audio, PDF, and files, plus a layer-based image editor and local AI. Everything runs on your own hardware, so your files never leave your network.
 
 [![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue)](https://github.com/snapotter-hq/SnapOtter/blob/main/LICENSE)
 [![Website](https://img.shields.io/badge/Website-snapotter.com-blue?logo=googlechrome&logoColor=white)](https://snapotter.com)

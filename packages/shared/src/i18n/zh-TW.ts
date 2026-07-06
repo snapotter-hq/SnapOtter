@@ -3276,7 +3276,7 @@ export const zhTW: TranslationKeys = {
       heading: "關於",
       appName: "SnapOtter",
       appDescription:
-        "自架式、隱私優先的檔案處理套件，內含200+個工具。轉檔、壓縮、編輯、轉錄、OCR，自動化影像、影片、音訊、文件和資料工作流程，無需將資料傳送到雲端。",
+        "自架式、隱私優先的檔案處理套件，內含200+個工具。轉檔、壓縮、編輯、轉錄、OCR，自動化影像、影片、音訊、PDF 和檔案工作流程，無需將資料傳送到雲端。",
       versionLabel: "版本：",
       linksHeading: "連結",
       githubLink: "GitHub儲存庫",
@@ -3487,7 +3487,7 @@ export const zhTW: TranslationKeys = {
     dropPrompt: "將影像拖放到此處",
     browseOrPaste: "使用上傳按鈕，或從剪貼簿貼上",
     uploadButton: "上傳",
-    defaultFormats: "PNG、JPG、WebP、HEIC、RAW、PSD及65+種格式",
+    defaultFormats: "圖片、影片、音訊、PDF、檔案與150+種格式",
     orSeparator: "或",
     urlPlaceholder: "貼上影像URL...",
     urlLoadingIndicator: "...",

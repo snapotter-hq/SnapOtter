@@ -219,11 +219,11 @@ export const ALTERNATIVES: Alternative[] = [
     pageTitle: "The Open-Source, Self-Hosted Alternative to CloudConvert",
     h1: "The open-source, self-hosted alternative to CloudConvert",
     metaDescription:
-      "CloudConvert is a hosted conversion platform with an API. SnapOtter converts image, video, audio, PDF, and data files on your own server with open-source pipelines.",
+      "CloudConvert is a hosted conversion platform with an API. SnapOtter converts image, video, audio, PDF, and files on your own server with open-source pipelines.",
     intro:
       "CloudConvert is a mature hosted converter and API. SnapOtter is the self-hosted alternative when conversion should happen inside your own infrastructure, with pipelines you control.",
     breadth:
-      "CloudConvert is broad and API-friendly for conversion. SnapOtter converts across image, video, audio, PDF, and data formats, then adds compression, editing, OCR, transcription, and local pipelines.",
+      "CloudConvert is broad and API-friendly for conversion. SnapOtter converts across image, video, audio, PDF, and file formats, then adds compression, editing, OCR, transcription, and local pipelines.",
     competitorOpenSource: false,
     lastReviewed: REVIEW_DATE,
     sources: [
@@ -239,7 +239,7 @@ export const ALTERNATIVES: Alternative[] = [
     faqs: [
       {
         q: "Can I self-host a CloudConvert alternative?",
-        a: "Yes. SnapOtter is open source and runs on Docker. It converts image, video, audio, PDF, and data formats locally, with no per-conversion billing from SnapOtter.",
+        a: "Yes. SnapOtter is open source and runs on Docker. It converts image, video, audio, PDF, and file formats locally, with no per-conversion billing from SnapOtter.",
       },
       {
         q: "Does SnapOtter convert video and audio too?",
@@ -321,7 +321,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         q: "Does SnapOtter replace TinyWow's AI writing tools?",
-        a: "Not directly. SnapOtter focuses on file manipulation: images, video, audio, PDFs, documents, archives, and data files. It is a better fit when the file-processing layer matters more than writing templates.",
+        a: "Not directly. SnapOtter focuses on file manipulation: images, video, audio, PDF, archives, and files. It is a better fit when the file-processing layer matters more than writing templates.",
       },
     ],
   },
@@ -375,7 +375,7 @@ export const ALTERNATIVES: Alternative[] = [
     intro:
       "FreeConvert is a broad hosted converter for browser-based file conversion and compression. SnapOtter is the self-hosted alternative when you want those file operations to run inside your own deployment.",
     breadth:
-      "FreeConvert is useful for quick online conversions across many categories. SnapOtter covers conversion too, then adds local image tools, video/audio workflows, PDFs, archives, data tools, APIs, and pipelines.",
+      "FreeConvert is useful for quick online conversions across many categories. SnapOtter covers conversion too, then adds local image tools, video/audio workflows, PDFs, archives, file tools, APIs, and pipelines.",
     competitorOpenSource: false,
     lastReviewed: REVIEW_DATE,
     sources: [
@@ -392,7 +392,7 @@ export const ALTERNATIVES: Alternative[] = [
     faqs: [
       {
         q: "Can SnapOtter replace FreeConvert?",
-        a: "For many image, video, audio, PDF, archive, and data conversions, yes. SnapOtter is strongest when you want the converter deployed privately instead of using a hosted web service.",
+        a: "For many image, video, audio, PDF, archive, and file conversions, yes. SnapOtter is strongest when you want the converter deployed privately instead of using a hosted web service.",
       },
       {
         q: "Does SnapOtter support large files?",
@@ -473,7 +473,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         q: "Does SnapOtter cover more than conversion?",
-        a: "Yes. SnapOtter includes conversion, compression, editing, OCR, transcription, PDF operations, metadata tools, archives, data tools, and pipelines.",
+        a: "Yes. SnapOtter includes conversion, compression, editing, OCR, transcription, PDF operations, metadata tools, archives, file tools, and pipelines.",
       },
     ],
   },

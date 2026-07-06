@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API for SnapOtter, a self-hosted file processing suite with 200+ tools across image, video, audio, document, and data.
+    REST API for SnapOtter, a self-hosted file processing suite with 200+ tools across image, video, audio, PDF, and files.
 
     ## Authentication
 
@@ -24,7 +24,7 @@ servers:
 
 tags:
   - name: Tools
-    description: File processing tools spanning image, video, audio, document, and data. Each accepts a multipart file upload and returns a download URL.
+    description: File processing tools spanning image, video, audio, PDF, and files. Each accepts a multipart file upload and returns a download URL.
   - name: Batch
     description: Process multiple files through a tool in one request.
   - name: Pipelines

@@ -3539,7 +3539,7 @@ export const nl: TranslationKeys = {
       heading: "Over",
       appName: "SnapOtter",
       appDescription:
-        "Een zelf-gehoste, privacy-first bestandsverwerkingssuite met 200+ tools. Converteren, comprimeren, bewerken, transcriberen, OCR en automatiseer je beeld-, video-, audio-, document- en dataworkflows zonder data naar de cloud te sturen.",
+        "Een zelf-gehoste, privacy-first bestandsverwerkingssuite met 200+ tools. Converteren, comprimeren, bewerken, transcriberen, OCR en automatiseer je beeld-, video-, audio-, PDF- en bestandsworkflows zonder data naar de cloud te sturen.",
       versionLabel: "Versie:",
       linksHeading: "Links",
       githubLink: "GitHub-repository",
@@ -3756,7 +3756,7 @@ export const nl: TranslationKeys = {
     dropPrompt: "Sleep je afbeeldingen hierheen",
     browseOrPaste: "gebruik de uploadknop of plak vanuit het klembord",
     uploadButton: "Uploaden",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD en 65+ formaten",
+    defaultFormats: "Afbeeldingen, Video's, Audio, PDF, Bestanden en 150+ formaten",
     orSeparator: "of",
     urlPlaceholder: "Plak afbeeldings-URL...",
     urlLoadingIndicator: "...",

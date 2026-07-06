@@ -1,10 +1,10 @@
 ---
-description: Supported file formats across all modalities - 55+ image input formats, video, audio, document, and data formats.
+description: Supported file formats across all modalities - 55+ image input formats, video, audio, PDF, and file formats.
 ---
 
 # Supported Formats
 
-SnapOtter processes files across five modalities: image, video, audio, document, and data. This page lists all supported formats.
+SnapOtter processes files across five modalities: image, video, audio, PDF, and files. This page lists all supported formats.
 
 ## Image Formats
 

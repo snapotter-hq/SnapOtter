@@ -3482,7 +3482,7 @@ export const ja: TranslationKeys = {
       heading: "SnapOtterについて",
       appName: "SnapOtter",
       appDescription:
-        "セルフホスト型、プライバシー第一のファイル処理スイート。200+のツールを搭載。変換、圧縮、編集、文字起こし、OCRなど、画像・動画・音声・ドキュメント・データのワークフローをクラウドにデータを送ることなく自動化できます。",
+        "セルフホスト型、プライバシー第一のファイル処理スイート。200+のツールを搭載。変換、圧縮、編集、文字起こし、OCRなど、画像・動画・音声・PDF・ファイルのワークフローをクラウドにデータを送ることなく自動化できます。",
       versionLabel: "バージョン：",
       linksHeading: "リンク",
       githubLink: "GitHubリポジトリ",
@@ -3697,7 +3697,7 @@ export const ja: TranslationKeys = {
     dropPrompt: "ここに画像をドロップ",
     browseOrPaste: "アップロードボタンを使用するか、クリップボードから貼り付け",
     uploadButton: "アップロード",
-    defaultFormats: "PNG、JPG、WebP、HEIC、RAW、PSD、65以上のフォーマット",
+    defaultFormats: "画像、動画、オーディオ、PDF、ファイル、150以上のフォーマット",
     orSeparator: "または",
     urlPlaceholder: "画像URLを貼り付け...",
     urlLoadingIndicator: "...",

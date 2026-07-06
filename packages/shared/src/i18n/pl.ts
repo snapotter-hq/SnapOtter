@@ -3543,7 +3543,7 @@ export const pl: TranslationKeys = {
       heading: "Informacje",
       appName: "SnapOtter",
       appDescription:
-        "Samoobsługowy pakiet narzędzi do przetwarzania plików z priorytetem prywatności. 200+ narzędzi. Konwersja, kompresja, edycja, transkrypcja, OCR i automatyzacja procesów obrazów, wideo, audio, dokumentów i danych bez wysyłania danych do chmury.",
+        "Samoobsługowy pakiet narzędzi do przetwarzania plików z priorytetem prywatności. 200+ narzędzi. Konwersja, kompresja, edycja, transkrypcja, OCR i automatyzacja procesów obrazów, wideo, audio, PDF i plików bez wysyłania danych do chmury.",
       versionLabel: "Wersja:",
       linksHeading: "Odnośniki",
       githubLink: "Repozytorium GitHub",
@@ -3762,7 +3762,7 @@ export const pl: TranslationKeys = {
     dropPrompt: "Przeciągnij tutaj swoje obrazy",
     browseOrPaste: "użyj przycisku przesyłania lub wklej ze schowka",
     uploadButton: "Prześlij",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD i ponad 65 formatów",
+    defaultFormats: "Obrazy, Wideo, Audio, PDF, Pliki i ponad 150 formatów",
     orSeparator: "lub",
     urlPlaceholder: "Wklej adres URL obrazu...",
     urlLoadingIndicator: "...",

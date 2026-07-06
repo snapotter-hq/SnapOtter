@@ -3338,7 +3338,7 @@ export const hi: TranslationKeys = {
       heading: "जानकारी",
       appName: "SnapOtter",
       appDescription:
-        "200+ टूल्स के साथ गोपनीयता-पहले, सेल्फ-होस्टेड फ़ाइल प्रोसेसिंग सूट। क्लाउड को डेटा भेजे बिना कन्वर्ट, कंप्रेस, एडिट, ट्रांसक्राइब, OCR और इमेज, वीडियो, ऑडियो, डॉक्यूमेंट और डेटा वर्कफ्लो ऑटोमेट करें।",
+        "200+ टूल्स के साथ गोपनीयता-पहले, सेल्फ-होस्टेड फ़ाइल प्रोसेसिंग सूट। क्लाउड को डेटा भेजे बिना कन्वर्ट, कंप्रेस, एडिट, ट्रांसक्राइब, OCR और इमेज, वीडियो, ऑडियो, PDF और फ़ाइल वर्कफ्लो ऑटोमेट करें।",
       versionLabel: "वर्शन:",
       linksHeading: "लिंक्स",
       githubLink: "GitHub रिपॉज़िटरी",
@@ -3553,7 +3553,7 @@ export const hi: TranslationKeys = {
     dropPrompt: "अपनी इमेज यहां खींचें",
     browseOrPaste: "अपलोड बटन का उपयोग करें, या क्लिपबोर्ड से पेस्ट करें",
     uploadButton: "अपलोड",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD, और 65+ फॉर्मेट",
+    defaultFormats: "इमेज, वीडियो, ऑडियो, PDF, फ़ाइलें, और 150+ फॉर्मेट",
     orSeparator: "या",
     urlPlaceholder: "इमेज URL पेस्ट करें...",
     urlLoadingIndicator: "...",

@@ -213,13 +213,13 @@ These numbers come from benchmarks across a range of systems, from a modern amd6
 
 | Tier | Use Case | CPU | RAM | GPU | Storage |
 |------|----------|-----|-----|-----|---------|
-| Minimum | Image, data, and light PDF tools; single user; small batches | 2 cores | 2 GB | None | ~7 GB |
-| Recommended | All five modalities incl. video, documents, and AI on CPU; batches; a few users | 4 cores | 4 GB | None | ~25 GB |
+| Minimum | Image, files, and light PDF tools; single user; small batches | 2 cores | 2 GB | None | ~7 GB |
+| Recommended | All five modalities incl. video, PDF, and AI on CPU; batches; a few users | 4 cores | 4 GB | None | ~25 GB |
 | Full | Everything at speed incl. GPU AI; large batches; many users | 6-8 cores | 8 GB | NVIDIA 8 GB+ VRAM (12 GB comfortable) | ~35 GB |
 
 **Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`) — no image is built for it — nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
 
-### Minimum (image, data, and light PDF tools; no AI)
+### Minimum (image, files, and light PDF tools; no AI)
 
 | Resource | Requirement |
 |---|---|

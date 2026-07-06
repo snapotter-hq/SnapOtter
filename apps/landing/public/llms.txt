@@ -1,6 +1,6 @@
 # SnapOtter
 
-> Open-source, self-hostable file processing suite with 200+ tools across 5 modalities (image, video, audio, document, data). Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
+> Open-source, self-hostable file processing suite with 200+ tools across 5 modalities (image, video, audio, PDF, files). Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
 
 SnapOtter runs entirely on your own infrastructure. Files are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need. Supports GDPR, HIPAA, and CCPA compliance by architecture.
 
@@ -38,7 +38,7 @@ Convert Video (MP4/MOV/WebM), Compress Video, Trim Video, Mute Video, Resize Vid
 
 Transcribe Audio (AI speech-to-text), Convert Audio (MP3/WAV/OGG/FLAC/AAC), Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels (mono/stereo), Silence Removal, Noise Reduction (FFT), Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata.
 
-## Document Tools
+## PDF Tools
 
 PDF: Merge, Split, Compress, Rotate, Extract Pages, Remove Pages, Organize, Protect (AES-256), Unlock, Repair, Web-Optimize (linearize), Grayscale, PDF/A Convert, Crop, N-up, Booklet, Watermark, Page Numbers, Flatten, Redact, PDF to Text, PDF to Word, PDF to Image, PDF Metadata, PDF OCR (AI).
 
@@ -60,7 +60,7 @@ SAML SSO (Okta, Azure AD, Google Workspace, any OIDC), SCIM Provisioning, Multi-
 
 - Self-hosted: all processing on your infrastructure, no cloud dependency
 - Privacy-first: files never leave your network, air-gapped capable
-- 200+ tools across 5 modalities (image, video, audio, document, data)
+- 200+ tools across 5 modalities (image, video, audio, PDF, files)
 - 15 local AI models, no external API calls
 - Batch processing with ZIP output
 - Pipeline automation: chain tools sequentially

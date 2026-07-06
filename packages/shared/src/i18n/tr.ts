@@ -3535,7 +3535,7 @@ export const tr: TranslationKeys = {
       heading: "Hakkında",
       appName: "SnapOtter",
       appDescription:
-        "200+ araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir dosya işleme paketi. Buluta veri göndermeden dönüştürme, sıkıştırma, düzenleme, transkripsiyon, OCR ve görüntü, video, ses, belge ve veri iş akışlarınızı otomatikleştirme.",
+        "200+ araçla gizlilik odaklı, kendi sunucunuzda barındırılan bir dosya işleme paketi. Buluta veri göndermeden dönüştürme, sıkıştırma, düzenleme, transkripsiyon, OCR ve görüntü, video, ses, PDF ve dosya iş akışlarınızı otomatikleştirme.",
       versionLabel: "Sürüm:",
       linksHeading: "Bağlantılar",
       githubLink: "GitHub Deposu",
@@ -3753,7 +3753,7 @@ export const tr: TranslationKeys = {
     dropPrompt: "Görüntülerinizi buraya bırakın",
     browseOrPaste: "yükleme düğmesini kullanın veya panodan yapıştırın",
     uploadButton: "Yükle",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD ve 65+ biçim",
+    defaultFormats: "Görseller, Videolar, Ses, PDF, Dosyalar ve 150+ biçim",
     orSeparator: "veya",
     urlPlaceholder: "Görüntü URL'si yapıştırın...",
     urlLoadingIndicator: "...",

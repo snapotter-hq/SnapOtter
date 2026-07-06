@@ -3527,7 +3527,7 @@ export const sv: TranslationKeys = {
       heading: "Om",
       appName: "SnapOtter",
       appDescription:
-        "En självhostad, integritetsfokuserad filbehandlingssvit med 200+ verktyg. Konvertera, komprimera, redigera, transkribera, OCR, och automatisera bild-, video-, ljud-, dokument- och dataarbetsflöden utan att skicka data till molnet.",
+        "En självhostad, integritetsfokuserad filbehandlingssvit med 200+ verktyg. Konvertera, komprimera, redigera, transkribera, OCR, och automatisera bild-, video-, ljud-, PDF- och filarbetsflöden utan att skicka data till molnet.",
       versionLabel: "Version:",
       linksHeading: "Länkar",
       githubLink: "GitHub-arkiv",
@@ -3743,7 +3743,7 @@ export const sv: TranslationKeys = {
     dropPrompt: "Släpp dina bilder här",
     browseOrPaste: "använd uppladdningsknappen eller klistra in från urklipp",
     uploadButton: "Ladda upp",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD och 65+ format",
+    defaultFormats: "Bilder, Videor, Audio, PDF, Filer och 150+ format",
     orSeparator: "eller",
     urlPlaceholder: "Klistra in bild-URL...",
     urlLoadingIndicator: "...",

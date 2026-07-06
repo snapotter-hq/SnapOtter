@@ -3277,7 +3277,7 @@ export const zhCN: TranslationKeys = {
       heading: "关于",
       appName: "SnapOtter",
       appDescription:
-        "自托管、隐私优先的文件处理套件，包含 200+ 种工具。转换、压缩、编辑、转录、OCR，自动化图片、视频、音频、文档和数据工作流，无需将数据发送到云端。",
+        "自托管、隐私优先的文件处理套件，包含 200+ 种工具。转换、压缩、编辑、转录、OCR，自动化图片、视频、音频、PDF 和文件工作流，无需将数据发送到云端。",
       versionLabel: "版本：",
       linksHeading: "链接",
       githubLink: "GitHub 仓库",
@@ -3487,7 +3487,7 @@ export const zhCN: TranslationKeys = {
     dropPrompt: "将图片拖放到此处",
     browseOrPaste: "使用上传按钮，或从剪贴板粘贴",
     uploadButton: "上传",
-    defaultFormats: "PNG、JPG、WebP、HEIC、RAW、PSD 及 65+ 种格式",
+    defaultFormats: "图片、视频、音频、PDF、文件及 150+ 种格式",
     orSeparator: "或",
     urlPlaceholder: "粘贴图片 URL...",
     urlLoadingIndicator: "...",

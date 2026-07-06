@@ -3527,7 +3527,7 @@ export const vi: TranslationKeys = {
       heading: "Giới thiệu",
       appName: "SnapOtter",
       appDescription:
-        "Bộ công cụ xử lý tệp tự lưu trữ, ưu tiên quyền riêng tư với 200+ công cụ. Chuyển đổi, nén, chỉnh sửa, phiên âm, OCR và tự động hóa quy trình xử lý ảnh, video, âm thanh, tài liệu và dữ liệu mà không cần gửi dữ liệu lên đám mây.",
+        "Bộ công cụ xử lý tệp tự lưu trữ, ưu tiên quyền riêng tư với 200+ công cụ. Chuyển đổi, nén, chỉnh sửa, phiên âm, OCR và tự động hóa quy trình xử lý ảnh, video, âm thanh, PDF và tệp mà không cần gửi dữ liệu lên đám mây.",
       versionLabel: "Phiên bản:",
       linksHeading: "Liên kết",
       githubLink: "Kho mã nguồn GitHub",
@@ -3743,7 +3743,7 @@ export const vi: TranslationKeys = {
     dropPrompt: "Kéo thả hình ảnh vào đây",
     browseOrPaste: "dùng nút tải lên hoặc dán từ bộ nhớ tạm",
     uploadButton: "Tải lên",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD và hơn 65 định dạng",
+    defaultFormats: "Hình ảnh, Video, Audio, PDF, Tệp và hơn 150 định dạng",
     orSeparator: "hoặc",
     urlPlaceholder: "Dán URL hình ảnh...",
     urlLoadingIndicator: "...",

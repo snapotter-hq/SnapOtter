@@ -3491,7 +3491,7 @@ export const th: TranslationKeys = {
       heading: "เกี่ยวกับ",
       appName: "SnapOtter",
       appDescription:
-        "ชุดเครื่องมือประมวลผลไฟล์แบบโฮสต์เองที่เน้นความเป็นส่วนตัวพร้อม 200+ เครื่องมือ แปลง บีบอัด แก้ไข ถอดเสียง OCR และทำงานอัตโนมัติกับภาพ วิดีโอ เสียง เอกสาร และข้อมูลโดยไม่ต้องส่งข้อมูลไปคลาวด์",
+        "ชุดเครื่องมือประมวลผลไฟล์แบบโฮสต์เองที่เน้นความเป็นส่วนตัวพร้อม 200+ เครื่องมือ แปลง บีบอัด แก้ไข ถอดเสียง OCR และทำงานอัตโนมัติกับภาพ วิดีโอ เสียง PDF และไฟล์โดยไม่ต้องส่งข้อมูลไปคลาวด์",
       versionLabel: "เวอร์ชัน:",
       linksHeading: "ลิงก์",
       githubLink: "คลังเก็บโค้ด GitHub",
@@ -3703,7 +3703,7 @@ export const th: TranslationKeys = {
     dropPrompt: "ลากภาพมาวางที่นี่",
     browseOrPaste: "ใช้ปุ่มอัปโหลดหรือวางจากคลิปบอร์ด",
     uploadButton: "อัปโหลด",
-    defaultFormats: "PNG, JPG, WebP, HEIC, RAW, PSD และรูปแบบอื่นกว่า 65 รูปแบบ",
+    defaultFormats: "รูปภาพ วิดีโอ เสียง PDF ไฟล์ และรูปแบบอื่นกว่า 150 รูปแบบ",
     orSeparator: "หรือ",
     urlPlaceholder: "วาง URL ภาพ...",
     urlLoadingIndicator: "...",

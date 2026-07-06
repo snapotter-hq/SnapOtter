@@ -31,7 +31,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "pdf-optimize", name: "Optimize", icon: "Zap", color: "#10B981" },
   { id: "doc-convert", name: "Convert", icon: "FileType", color: "#14B8A6" },
   // Data & Files
-  { id: "data", name: "Data Files", icon: "Table", color: "#F59E0B" },
+  { id: "data", name: "Files", icon: "Table", color: "#F59E0B" },
   { id: "archives", name: "Archives", icon: "FolderArchive", color: "#6366F1" },
 ];
 
