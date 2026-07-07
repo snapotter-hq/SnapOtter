@@ -118,3 +118,22 @@ test("mobile bottom nav renders a visible image-editor icon", async ({ page }) =
   expect(box?.width ?? 0).toBeGreaterThan(0);
   expect(box?.height ?? 0).toBeGreaterThan(0);
 });
+
+test("files library is populated with sample files and thumbnails render", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/files");
+
+  // Sample files across modalities show up instead of the empty state.
+  await expect(page.getByText("mountain-sunrise.jpg")).toBeVisible();
+  await expect(page.getByText("quarterly-report.pdf")).toBeVisible();
+  await expect(page.getByText("product-tour.mp4")).toBeVisible();
+
+  // Opening a file shows its details; the thumbnail is fetched into a blob and
+  // rendered as an <img>, confirming the generated SVG thumbnail pipeline works.
+  await page.getByText("mountain-sunrise.jpg").click();
+  await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
+
+  expect(pageErrors).toEqual([]);
+});

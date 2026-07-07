@@ -161,4 +161,63 @@ describe("demo mock API", () => {
     const data = (await readJson(response as Response)) as { error: string };
     expect(data.error).toContain("demo");
   });
+
+  it("lists sample files in the library with the shape the page reads", async () => {
+    const data = (await readJson(matchDemoRoute("/api/v1/files", "GET") as Response)) as {
+      files: Array<{ id: string; originalName: string; mimeType: string; size: number }>;
+      total: number;
+    };
+    expect(Array.isArray(data.files)).toBe(true);
+    expect(data.files.length).toBeGreaterThan(3);
+    expect(data.total).toBe(data.files.length);
+    for (const file of data.files) {
+      expect(typeof file.originalName).toBe("string");
+      expect(typeof file.mimeType).toBe("string");
+      expect(typeof file.size).toBe("number");
+    }
+  });
+
+  it("filters the file library by the search query", async () => {
+    const data = (await readJson(
+      matchDemoRoute("/api/v1/files?search=mp4", "GET") as Response,
+    )) as { files: Array<{ originalName: string }> };
+    expect(data.files.length).toBeGreaterThan(0);
+    for (const file of data.files) {
+      expect(file.originalName.toLowerCase()).toContain("mp4");
+    }
+  });
+
+  it("serves an SVG thumbnail for a file so the grid can render it", async () => {
+    const list = (await readJson(matchDemoRoute("/api/v1/files", "GET") as Response)) as {
+      files: Array<{ id: string }>;
+    };
+    const id = list.files[0].id;
+    const thumb = matchDemoRoute(`/api/v1/files/${id}/thumbnail`, "GET");
+    expect(thumb?.status).toBe(200);
+    expect(thumb?.headers.get("Content-Type")).toContain("image/svg+xml");
+    expect(await (thumb as Response).text()).toContain("<svg");
+  });
+
+  it("returns file details with a version history", async () => {
+    const details = (await readJson(
+      matchDemoRoute("/api/v1/files/file_mockup", "GET") as Response,
+    )) as {
+      file: { id: string };
+      versions: Array<{ version: number }>;
+    };
+    expect(details.file.id).toBe("file_mockup");
+    expect(Array.isArray(details.versions)).toBe(true);
+    expect(details.versions.length).toBeGreaterThan(0);
+  });
+
+  it("deletes files from the library so the page reflects the change", async () => {
+    const del = matchDemoRoute("/api/v1/files", "DELETE", JSON.stringify({ ids: ["file_assets"] }));
+    expect(del?.status).toBe(200);
+    const data = (await readJson(del as Response)) as { deleted: number };
+    expect(data.deleted).toBe(1);
+    const list = (await readJson(matchDemoRoute("/api/v1/files", "GET") as Response)) as {
+      files: Array<{ id: string }>;
+    };
+    expect(list.files.some((f) => f.id === "file_assets")).toBe(false);
+  });
 });
