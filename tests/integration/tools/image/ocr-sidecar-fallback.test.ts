@@ -108,6 +108,39 @@ describe("ocr sidecar fallback coverage", () => {
     expect(json.details).toContain("language data missing");
   });
 
+  it("falls back to a lower tier when PaddleOCR itself is unavailable (e.g. an ABI conflict), instead of hard-failing", async () => {
+    // Exact message shapes ocr.py produces on ImportError from run_paddleocr_v5/vl
+    // (e.g. "cannot import name '_promote' from 'scipy.spatial.transform._rotation'",
+    // the BUG-2 scipy ABI conflict) -- previously matched none of the crash-only
+    // substrings below and hard-failed with 422 instead of degrading gracefully.
+    mocks.extractText
+      .mockRejectedValueOnce(
+        new Error(
+          "PaddleOCR-VL is not available: cannot import name '_promote' from 'scipy.spatial.transform._rotation'. Install the OCR feature or use quality=balanced for PP-OCRv5.",
+        ),
+      )
+      .mockRejectedValueOnce(
+        new Error(
+          "PaddleOCR is not installed: cannot import name '_promote' from 'scipy.spatial.transform._rotation'. Install the OCR feature or use quality=fast for Tesseract.",
+        ),
+      )
+      .mockResolvedValueOnce({ text: "SnapOtter OCR", engine: "tesseract" });
+
+    const res = await postOcr({ quality: "best", language: "en", enhance: false });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.extractText).toHaveBeenCalledTimes(3);
+    expect(mocks.extractText.mock.calls.map((call) => call[2].quality)).toEqual([
+      "best",
+      "balanced",
+      "fast",
+    ]);
+
+    const json = JSON.parse(res.body);
+    expect(json.text).toBe("SnapOtter OCR");
+    expect(json.engine).toBe("tesseract");
+  });
+
   it("validates settings after the bundle gate passes", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "ocr-clean.png", contentType: "image/png", content: PNG },

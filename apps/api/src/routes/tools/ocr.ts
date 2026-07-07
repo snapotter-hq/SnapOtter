@@ -202,12 +202,17 @@ export function registerOcr(app: FastifyInstance) {
         } catch (err) {
           lastError = err;
           const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-          // If the Python process crashed (segfault, dispatcher exit), try next tier
+          // If the Python process crashed (segfault, dispatcher exit) or the
+          // PaddleOCR engine itself is unusable (missing dependency, an ABI
+          // conflict like the scipy strand in project_ai_bundle_numpy_abi_strand),
+          // try the next tier instead of hard-failing -- ocr.py's own error
+          // messages already suggest the lower tier, this just acts on it.
           if (
             msg.includes("exited unexpectedly") ||
             msg.includes("exited with code") ||
             msg.includes("segmentation fault") ||
-            msg.includes("process crashed")
+            msg.includes("process crashed") ||
+            msg.includes("paddleocr")
           ) {
             request.log.warn(
               { toolId: "ocr", quality: tier, err },
