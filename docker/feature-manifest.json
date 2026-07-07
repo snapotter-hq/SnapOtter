@@ -201,14 +201,14 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-          "sha256": "089fdecbcd36090013ed4adf3a96650c757ce06871c2e1f1b155ccdd8487e413",
-          "compressedSize": 5376987856,
-          "extractedSize": 8455327174
+          "sha256": "b725a0b18a8295cb87e15f79b31c294f1de98101dedd76389728300a8d377a15",
+          "compressedSize": 5358573124,
+          "extractedSize": 8406943960
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu.tar.gz",
-          "sha256": "b9e948c8308371ccb3defce4323a85884e46d5bde52791115d34d1c1f92e4f23",
-          "compressedSize": 2335658971,
+          "sha256": "bfb25ff1468d426ba6a125632beabece11e1afebfa6a3adefc64f7b81d7bf469",
+          "compressedSize": 2319501276,
           "extractedSize": 3661453942
         }
       },
@@ -310,15 +310,15 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/photo-restoration-amd64-gpu.tar.gz",
-          "sha256": "2ccac73c862f04dafc8d7ecc6543bbe8481b9d796a53a9c4e7cf34e53f261a24",
-          "compressedSize": 4698091043,
-          "extractedSize": 8246353920
+          "sha256": "4747953db35c71b83db19ce12cc6c591730f0cb9f64621f239db17ae3e3563fd",
+          "compressedSize": 4680254837,
+          "extractedSize": 8172949791
         },
         "arm64-cpu": {
           "file": "v2.0.0/photo-restoration-arm64-cpu.tar.gz",
-          "sha256": "13afbaae45d84f1148d00b76a20115283ab3f75d7b2a9e33b940c9bf800b40e1",
-          "compressedSize": 1367026285,
-          "extractedSize": 0
+          "sha256": "261a27a176b9f3e76d8cd92576b73a1c014b19e87b4f16e58ed46d17c77697c0",
+          "compressedSize": 1361837793,
+          "extractedSize": 2584214411
         }
       },
       "packages": {
