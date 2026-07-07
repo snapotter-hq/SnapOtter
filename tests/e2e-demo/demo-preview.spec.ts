@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("demo preview uses the real app theme and reaches a tool page", async ({ page }) => {
+test("demo boots straight into the dashboard with no login screen", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
 
@@ -11,9 +11,10 @@ test("demo preview uses the real app theme and reaches a tool page", async ({ pa
     pageErrors.push(error.message);
   });
 
-  await page.goto("/login");
+  // Visiting the root lands directly on the dashboard, not the login page.
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("This is a live demo. Processing is disabled.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
 
   const theme = await page.evaluate(() => {
     const bannerLink = Array.from(document.querySelectorAll("a")).find((link) =>
@@ -34,22 +35,16 @@ test("demo preview uses the real app theme and reaches a tool page", async ({ pa
   expect(theme.themeColor?.toLowerCase()).toBe("#e07832");
   expect(theme.bannerBackground).toBe("rgb(224, 120, 50)");
 
-  await page.getByLabel("Username").fill("demo");
-  await page.getByLabel("Password").fill("demo");
-  await page.getByRole("button", { name: /^login$/i }).click();
-
-  await page.waitForURL(/\/change-password$/);
-  await expect(page.getByRole("heading", { name: "Change your password" })).toBeVisible();
-
-  await page.evaluate(() => {
-    localStorage.setItem("snapotter-demo-state", JSON.stringify({ passwordChanged: true }));
-  });
-
-  await page.goto("/");
+  // The dashboard tool grid renders without any login/change-password gate.
   const allTab = page.getByRole("button", { name: /^All\s*\d+$/ });
   await expect(allTab).toBeVisible();
   const allCount = Number((await allTab.textContent())?.match(/\d+$/)?.[0] ?? 0);
   expect(allCount).toBeGreaterThan(100);
+
+  // Even hitting /login directly bounces to the dashboard.
+  await page.goto("/login");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(allTab).toBeVisible();
 
   await page.goto("/image/compress");
   await expect(page.getByRole("heading", { name: "Compress" })).toBeVisible();
@@ -76,13 +71,8 @@ test("admin settings sections render sample data without crashing", async ({ pag
     }
   });
 
-  // Seed an authenticated session (past the forced change-password) so we land
-  // straight in the app, then open Settings from the avatar menu.
-  await page.addInitScript(() => {
-    localStorage.setItem("snapotter-token", "demo-token");
-    localStorage.setItem("snapotter-demo-state", JSON.stringify({ passwordChanged: true }));
-  });
-
+  // No login step needed: the demo is signed in on load. Open Settings from
+  // the avatar menu straight away.
   await page.goto("/");
   await page.getByTestId("user-menu").click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();

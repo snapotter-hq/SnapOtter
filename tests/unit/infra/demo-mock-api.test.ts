@@ -36,6 +36,17 @@ describe("demo mock API", () => {
     });
   });
 
+  it("returns an authenticated admin session so the demo skips the login screen", async () => {
+    const response = matchDemoRoute("/api/auth/session", "GET");
+    expect(response?.status).toBe(200);
+    const data = (await readJson(response as Response)) as {
+      user: { role: string; mustChangePassword: boolean; permissions: string[] };
+    };
+    expect(data.user.role).toBe("admin");
+    expect(data.user.mustChangePassword).toBe(false);
+    expect(Array.isArray(data.user.permissions)).toBe(true);
+  });
+
   // These lock in the exact response shapes the admin settings screens read.
   // A missing array here is what produced the "can't access property filter"
   // crash: the People tab calls /auth/users, and the mock used to answer only

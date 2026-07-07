@@ -736,9 +736,11 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
   }
 
   if (path === "/api/auth/session" && method === "GET") {
-    const token = localStorage.getItem("snapotter-token");
-    if (!token) return json({ error: "Unauthorized" }, 401);
-    const state = loadState();
+    // The demo is always signed in as an admin, so it boots straight into the
+    // dashboard with no login or change-password screen, and every settings
+    // tab (including the auth-gated People/Teams/Roles/Security ones) stays
+    // available. mustChangePassword is always false; the session is returned
+    // regardless of token so a stray logout can't drop you onto /login.
     return json({
       user: {
         id: 1,
@@ -746,7 +748,8 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
         displayName: "Demo User",
         role: "admin",
         permissions: PERMISSIONS,
-        mustChangePassword: !state.passwordChanged,
+        mustChangePassword: false,
+        mfaRequired: false,
         loginMethod: "local",
         hasLocalPassword: true,
       },
@@ -1036,7 +1039,26 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
   return null;
 }
 
+/**
+ * Boot the demo as an already-signed-in admin so there is no login screen.
+ * Runs before the app mounts: seeds an auth token and, if the URL is a login
+ * or change-password route (manual navigation, or the logout redirect),
+ * rewrites it to the dashboard before React Router reads the location.
+ */
+function primeDemoAuth() {
+  try {
+    localStorage.setItem("snapotter-token", "demo-token");
+    localStorage.setItem("snapotter-username", "demo");
+  } catch {}
+  const p = window.location.pathname;
+  if (p === "/login" || p === "/change-password") {
+    window.history.replaceState(null, "", "/");
+  }
+}
+
 export function installMocks() {
+  primeDemoAuth();
+
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
