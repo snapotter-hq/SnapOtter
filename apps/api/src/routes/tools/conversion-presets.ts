@@ -34,7 +34,7 @@ function presetSchema(base: string) {
  * three custom ZIP bases (image-to-pdf, pdf-to-image, svg-to-raster) reuse their
  * own parameterized registrars.
  */
-export function registerConversionPresets(app: FastifyInstance) {
+export function registerConversionPresets(app: FastifyInstance): number {
   for (const preset of CONVERSION_PRESETS) {
     const cfg = BASE_CONFIG[preset.base];
     if (cfg.group === "image-to-pdf") {
@@ -72,4 +72,6 @@ export function registerConversionPresets(app: FastifyInstance) {
       },
     });
   }
+
+  return CONVERSION_PRESETS.length;
 }

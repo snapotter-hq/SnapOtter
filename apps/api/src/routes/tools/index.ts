@@ -392,12 +392,13 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     register(app);
   }
 
-  const registered = toolRegistrations.length - skipped;
-  app.log.info(
-    `Tool routes: ${registered} active, ${skipped} skipped (${toolRegistrations.length} total)`,
-  );
-
   // Conversion presets delegate to base tools' registered processV2, so they
   // must be registered after the base loop above has populated the registry.
-  registerConversionPresets(app);
+  // Logging the boot count also waits until after this call, otherwise it
+  // undercounts by exactly the preset total (registered here, not above).
+  const presetsRegistered = registerConversionPresets(app);
+
+  const registered = toolRegistrations.length - skipped + presetsRegistered;
+  const total = toolRegistrations.length + presetsRegistered;
+  app.log.info(`Tool routes: ${registered} active, ${skipped} skipped (${total} total)`);
 }
