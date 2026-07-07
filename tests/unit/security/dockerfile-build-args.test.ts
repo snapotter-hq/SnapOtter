@@ -13,6 +13,8 @@ const postgresReady = readFileSync(
   resolve(here, "../../../docker/s6/s6-rc.d/postgres-ready/up"),
   "utf8",
 );
+const composeCpu = readFileSync(resolve(here, "../../../docker/docker-compose.yml"), "utf8");
+const composeGpu = readFileSync(resolve(here, "../../../docker/docker-compose-gpu.yml"), "utf8");
 
 function stageBody(stageName: string): string {
   const lines = dockerfile.split(/\r?\n/);
@@ -112,5 +114,40 @@ describe("Dockerfile build args", () => {
     expect(postgresReady).toContain("pg_isready");
     expect(postgresReady).toContain("-U snapotter");
     expect(postgresReady).toContain("-d snapotter");
+  });
+
+  it("bakes a real, non-zero rate limit default for the one-liner all-in-one install", () => {
+    // The one-liner `docker run` path has no compose file to override this, so
+    // whatever ships here is what a self-hoster following the documented
+    // single-container install actually gets. RATE_LIMIT_PER_MIN=0 means
+    // "unlimited" (see apps/api/src/index.ts), which left every route
+    // (including auth) without meaningful throttling.
+    const production = stageBody("production");
+    const match = production.match(/^\s*RATE_LIMIT_PER_MIN=(\d+)/m);
+
+    expect(match).not.toBeNull();
+    const value = Number(match?.[1]);
+    expect(value).toBeGreaterThan(0);
+    // Generous on purpose (self-hosted, single-user/small-team usage
+    // shouldn't ever brush up against it) but a real, finite ceiling.
+    expect(value).toBeGreaterThanOrEqual(1000);
+  });
+
+  it("keeps the compose files' rate limit fallback at least as generous as the Dockerfile default", () => {
+    // Compose previously hardened this to 300/min while the raw one-liner
+    // shipped 0 (unlimited) -- a real gap between two equally-documented
+    // install paths' default security posture. Both should converge on the
+    // same non-zero floor rather than leaving the one-liner as the outlier.
+    const production = stageBody("production");
+    const dockerfileDefault = Number(production.match(/^\s*RATE_LIMIT_PER_MIN=(\d+)/m)?.[1] ?? 0);
+
+    for (const [name, compose] of [
+      ["docker-compose.yml", composeCpu],
+      ["docker-compose-gpu.yml", composeGpu],
+    ] as const) {
+      const fallback = compose.match(/RATE_LIMIT_PER_MIN:-(\d+)/);
+      expect(fallback, `${name} should set a RATE_LIMIT_PER_MIN fallback`).not.toBeNull();
+      expect(Number(fallback?.[1])).toBeGreaterThanOrEqual(dockerfileDefault);
+    }
   });
 });

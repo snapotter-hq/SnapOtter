@@ -34,7 +34,7 @@ services:
       # --- Limits (set 0 for unlimited) ---
       # - MAX_UPLOAD_SIZE_MB=100   # Per-file upload limit in MB
       # - MAX_BATCH_SIZE=100       # Max files per batch request
-      # - RATE_LIMIT_PER_MIN=0     # API rate limit (0 = disabled, 100 = recommended for public)
+      # - RATE_LIMIT_PER_MIN=1000  # API rate limit per IP, default shown (0 = disabled)
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
@@ -417,7 +417,7 @@ The startup error names the exact UID to use, so the quickest path is to start t
 | `DEFAULT_PASSWORD` | `admin` | Initial admin password (forced change on first login) |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Per-file upload limit |
 | `MAX_BATCH_SIZE` | `100` | Max files per batch request |
-| `RATE_LIMIT_PER_MIN` | `0` (disabled) | API requests per minute per IP |
+| `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP (set 0 to disable) |
 | `MAX_USERS` | `0` (unlimited) | Maximum user accounts |
 | `TRUST_PROXY` | `true` | Trust X-Forwarded-For headers from reverse proxy |
 | `PUID` | `999` | Run as this UID (for bind mount permissions) |

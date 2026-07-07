@@ -25,7 +25,7 @@ services:
     environment:
       - AUTH_ENABLED=true
       - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=100
+      - RATE_LIMIT_PER_MIN=1000
       - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
       - REDIS_URL=redis://redis:6379
     depends_on:

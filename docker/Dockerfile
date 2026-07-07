@@ -515,7 +515,11 @@ ENV PORT=1349 \
     MAX_BATCH_SIZE=0 \
     CONCURRENT_JOBS=0 \
     MAX_MEGAPIXELS=0 \
-    RATE_LIMIT_PER_MIN=0 \
+    # Unlike its neighbors, this one is never 0/unlimited: it's the only
+    # knob here that guards against an external attacker rather than just
+    # limiting the owner's own usage, so the one-liner (no compose file to
+    # harden it) needs a real, if generous, ceiling out of the box.
+    RATE_LIMIT_PER_MIN=1000 \
     MAX_USERS=0 \
     MAX_WORKER_THREADS=0 \
     PROCESSING_TIMEOUT_S=0 \
