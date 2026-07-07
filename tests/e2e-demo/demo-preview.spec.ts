@@ -18,6 +18,14 @@ test("demo boots straight into the dashboard with no login screen", async ({ pag
   await expect(page.getByText(/live demo/i).first()).toBeVisible();
   await expect(page.getByText(/sample data/i).first()).toBeVisible();
 
+  // "Self-host SnapOtter" points at the getting-started guide, opening a new tab.
+  const selfHostLink = page.getByRole("link", { name: "Self-host SnapOtter" });
+  await expect(selfHostLink).toHaveAttribute(
+    "href",
+    "https://docs.snapotter.com/guide/getting-started",
+  );
+  await expect(selfHostLink).toHaveAttribute("target", "_blank");
+
   const theme = await page.evaluate(() => {
     const bannerLink = Array.from(document.querySelectorAll("a")).find((link) =>
       link.textContent?.includes("Self-host SnapOtter"),

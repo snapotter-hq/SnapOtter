@@ -11,7 +11,7 @@ export function DemoBanner() {
         This is a live demo. All users, teams, and activity shown are sample data, and file
         processing is disabled.{" "}
         <a
-          href="https://github.com/snapotter-hq/SnapOtter"
+          href="https://docs.snapotter.com/guide/getting-started"
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold underline underline-offset-2 hover:text-primary-subtle"
