@@ -806,6 +806,43 @@ describe("AI Bridge - progress event parsing", () => {
 
     await expect(resultPromise).rejects.toThrow("CUDA out of memory");
   });
+
+  it("forwards {info} shaped stderr JSON to the logger instead of dropping it", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const proc = await spawnReadyDispatcher();
+
+    const resultPromise = bridge.runPythonWithProgress("ocr.py", []);
+    const request = JSON.parse(proc.stdin._written[0].trim());
+
+    // This is the exact shape ocr.py emits on its GPU-to-tesseract downgrade notice.
+    proc._pushStderr(`${JSON.stringify({ info: "best OCR needs a GPU; using tesseract" })}\n`);
+    proc._pushStdout(`${JSON.stringify({ id: request.id, stdout: "ok", exitCode: 0 })}\n`);
+    await resultPromise;
+
+    expect(
+      logSpy.mock.calls.some((call) =>
+        String(call[0]).includes("best OCR needs a GPU; using tesseract"),
+      ),
+    ).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  it("forwards {warning} shaped stderr JSON to the logger instead of dropping it", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const proc = await spawnReadyDispatcher();
+
+    const resultPromise = bridge.runPythonWithProgress("ocr.py", []);
+    const request = JSON.parse(proc.stdin._written[0].trim());
+
+    proc._pushStderr(`${JSON.stringify({ warning: "Enhancement skipped: boom" })}\n`);
+    proc._pushStdout(`${JSON.stringify({ id: request.id, stdout: "ok", exitCode: 0 })}\n`);
+    await resultPromise;
+
+    expect(
+      warnSpy.mock.calls.some((call) => String(call[0]).includes("Enhancement skipped: boom")),
+    ).toBe(true);
+    warnSpy.mockRestore();
+  });
 });
 
 describe("AI Bridge - stdout buffering (partial JSON lines)", () => {

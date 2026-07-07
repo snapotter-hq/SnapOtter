@@ -276,6 +276,18 @@ export class PythonDispatcher {
               for (const req of this.pending.values()) {
                 if (req.generation === gen) req.onProgress?.(parsed.progress, parsed.stage);
               }
+              continue;
+            }
+
+            // Diagnostic notices (e.g. ocr.py's GPU-to-tesseract downgrade
+            // notice) - forward so they reach docker logs instead of being
+            // silently dropped for matching neither shape above.
+            if (typeof parsed.info === "string") {
+              console.log(`[python] ${parsed.info}`);
+              continue;
+            }
+            if (typeof parsed.warning === "string") {
+              console.warn(`[python] ${parsed.warning}`);
             }
           } catch {
             // Not JSON - forward diagnostic messages to Node.js logger,
