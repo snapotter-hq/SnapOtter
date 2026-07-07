@@ -3538,6 +3538,13 @@ export const it: TranslationKeys = {
       importing: "Importazione in corso...",
       importSuccess: "Bundle importato correttamente.",
       importError: "Importazione del bundle non riuscita: {error}",
+      resetTitle: "Ripristina ambiente IA",
+      resetDescription:
+        "Elimina tutte le funzionalità IA installate e i modelli scaricati, quindi riparte da zero. Usa questa opzione se gli strumenti IA si comportano in modo anomalo dopo un aggiornamento e la reinstallazione di un bundle non risolve il problema.",
+      resetButton: "Ripristina",
+      resetConfirmMessage:
+        "Questa operazione elimina tutte le funzionalità e i modelli IA installati. Dovrai reinstallarli da Hugging Face. L'operazione non può essere annullata.",
+      resetFailed: "Ripristino non riuscito: {error}",
     },
     about: {
       heading: "Informazioni",

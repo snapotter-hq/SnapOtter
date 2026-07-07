@@ -3524,6 +3524,13 @@ export const es: TranslationKeys = {
       importing: "Importando...",
       importSuccess: "Paquete importado correctamente.",
       importError: "Error al importar el paquete: {error}",
+      resetTitle: "Restablecer entorno de AI",
+      resetDescription:
+        "Elimina todas las funciones de AI instaladas y los modelos descargados, y vuelve a empezar desde cero. Utiliza esto si las herramientas de AI se comportan de forma inesperada tras una actualización y reinstalar un paquete no soluciona el problema.",
+      resetButton: "Restablecer",
+      resetConfirmMessage:
+        "Esto elimina todas las funciones y modelos de AI instalados. Tendrás que reinstalarlos desde Hugging Face. Esta acción no se puede deshacer.",
+      resetFailed: "Error al restablecer: {error}",
     },
     about: {
       heading: "Acerca de",

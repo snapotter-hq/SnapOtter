@@ -3455,6 +3455,13 @@ export const en = {
       importing: "Importing...",
       importSuccess: "Bundle imported successfully.",
       importError: "Bundle import failed: {error}",
+      resetTitle: "Reset AI Environment",
+      resetDescription:
+        "Deletes every installed AI feature and downloaded model, then starts fresh. Use this if AI tools are behaving unexpectedly after an update and reinstalling a bundle doesn't fix it.",
+      resetButton: "Reset",
+      resetConfirmMessage:
+        "This deletes all installed AI features and models. You'll need to reinstall them from Hugging Face. This can't be undone.",
+      resetFailed: "Reset failed: {error}",
     },
     fileManagement: {
       title: "File Management",

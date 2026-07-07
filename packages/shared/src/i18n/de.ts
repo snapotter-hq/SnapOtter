@@ -3546,6 +3546,13 @@ export const de: TranslationKeys = {
       importing: "Wird importiert...",
       importSuccess: "Paket erfolgreich importiert.",
       importError: "Paketimport fehlgeschlagen: {error}",
+      resetTitle: "AI-Umgebung zurücksetzen",
+      resetDescription:
+        "Löscht alle installierten AI-Funktionen und heruntergeladenen Modelle und beginnt anschließend neu. Verwenden Sie dies, wenn sich AI-Tools nach einem Update unerwartet verhalten und die Neuinstallation eines Pakets das Problem nicht behebt.",
+      resetButton: "Zurücksetzen",
+      resetConfirmMessage:
+        "Dadurch werden alle installierten AI-Funktionen und Modelle gelöscht. Sie müssen sie erneut von Hugging Face installieren. Dies kann nicht rückgängig gemacht werden.",
+      resetFailed: "Zurücksetzen fehlgeschlagen: {error}",
     },
     about: {
       heading: "Info",

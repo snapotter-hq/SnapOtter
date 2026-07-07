@@ -3270,6 +3270,13 @@ export const zhTW: TranslationKeys = {
       importing: "匯入中...",
       importSuccess: "套件匯入成功。",
       importError: "套件匯入失敗：{error}",
+      resetTitle: "重設 AI 環境",
+      resetDescription:
+        "刪除所有已安裝的 AI 功能與已下載的模型，然後重新開始。如果更新後 AI 工具出現異常，且重新安裝套件也無法解決問題，請使用此功能。",
+      resetButton: "重設",
+      resetConfirmMessage:
+        "此操作將刪除所有已安裝的 AI 功能與模型，你需要從 Hugging Face 重新安裝。此操作無法復原。",
+      resetFailed: "重設失敗：{error}",
     },
     about: {
       heading: "關於",

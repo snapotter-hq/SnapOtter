@@ -3505,6 +3505,13 @@ export const ar: TranslationKeys = {
       importing: "جارٍ الاستيراد...",
       importSuccess: "تم استيراد الحزمة بنجاح.",
       importError: "فشل استيراد الحزمة: {error}",
+      resetTitle: "إعادة تعيين بيئة AI",
+      resetDescription:
+        "يحذف كل ميزات AI المثبتة والنماذج التي تم تنزيلها، ثم يبدأ من جديد. استخدم هذا إذا كانت أدوات AI تتصرف بشكل غير متوقع بعد التحديث، وإعادة تثبيت الحزمة لا تحل المشكلة.",
+      resetButton: "إعادة تعيين",
+      resetConfirmMessage:
+        "سيؤدي هذا إلى حذف جميع ميزات AI والنماذج المثبتة. ستحتاج إلى إعادة تثبيتها من Hugging Face. لا يمكن التراجع عن هذا الإجراء.",
+      resetFailed: "فشلت إعادة التعيين: {error}",
     },
     about: {
       heading: "حول",

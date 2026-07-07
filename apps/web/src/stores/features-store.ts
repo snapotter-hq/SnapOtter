@@ -39,6 +39,8 @@ interface FeaturesState {
   reinstallBundle: (bundleId: string) => Promise<void>;
   installAll: () => Promise<void>;
   clearError: (bundleId: string) => void;
+  resetEnvironment: () => Promise<void>;
+  resetError: string | null;
 }
 
 export const useFeaturesStore = create<FeaturesState>((set, get) => {
@@ -249,6 +251,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     queued: [],
     installAllActive: false,
     startTimes: {},
+    resetError: null,
 
     fetch: async () => {
       if (get().loaded && !get().loadError) {
@@ -396,6 +399,17 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       const errors = { ...get().errors };
       delete errors[bundleId];
       set({ errors });
+    },
+
+    resetEnvironment: async () => {
+      set({ resetError: null });
+      try {
+        await apiPost("/v1/admin/features/reset", {});
+        set({ installing: {}, errors: {}, queued: [], startTimes: {} });
+        await refreshBundles();
+      } catch (err) {
+        set({ resetError: err instanceof Error ? err.message : "Reset failed" });
+      }
     },
   };
 });

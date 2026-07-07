@@ -1,5 +1,14 @@
 import type { FeatureBundleState } from "@snapotter/shared";
-import { Clock, Download, Loader2, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  Download,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet, formatHeaders } from "@/lib/api";
@@ -60,6 +69,8 @@ export function AiFeaturesSection() {
     uninstallBundle,
     reinstallBundle,
     installAll,
+    resetEnvironment,
+    resetError,
   } = useFeaturesStore();
   const [diskUsage, setDiskUsage] = useState<number | null>(null);
 
@@ -134,6 +145,98 @@ export function AiFeaturesSection() {
           loadDiskUsage();
         }}
       />
+
+      <ResetEnvironmentSection
+        onReset={resetEnvironment}
+        error={resetError}
+        onResetDone={loadDiskUsage}
+      />
+    </div>
+  );
+}
+
+function ResetEnvironmentSection({
+  onReset,
+  error,
+  onResetDone,
+}: {
+  onReset: () => Promise<void>;
+  error: string | null;
+  onResetDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const [confirming, setConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = async () => {
+    setConfirming(false);
+    setResetting(true);
+    try {
+      await onReset();
+      onResetDone();
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div className="pt-4 border-t border-border space-y-2">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <h4 className="text-sm font-medium text-foreground">
+            {t.settings.aiFeatures.resetTitle}
+          </h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t.settings.aiFeatures.resetDescription}
+          </p>
+        </div>
+      </div>
+
+      {!confirming && (
+        <button
+          type="button"
+          disabled={resetting}
+          onClick={() => setConfirming(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+        >
+          {resetting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+          {t.settings.aiFeatures.resetButton}
+        </button>
+      )}
+
+      {confirming && (
+        <div className="space-y-2">
+          <p className="text-xs text-destructive">{t.settings.aiFeatures.resetConfirmMessage}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {t.common.confirm}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+            >
+              {t.common.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-destructive">
+          {format(t.settings.aiFeatures.resetFailed, { error })}
+        </p>
+      )}
     </div>
   );
 }

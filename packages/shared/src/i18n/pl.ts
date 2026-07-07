@@ -3538,6 +3538,13 @@ export const pl: TranslationKeys = {
       importing: "Importowanie...",
       importSuccess: "Pakiet zaimportowany pomyślnie.",
       importError: "Import pakietu nie powiódł się: {error}",
+      resetTitle: "Zresetuj środowisko AI",
+      resetDescription:
+        "Usuwa wszystkie zainstalowane funkcje AI i pobrane modele, a następnie zaczyna od nowa. Użyj tej opcji, jeśli narzędzia AI zachowują się nieprawidłowo po aktualizacji, a ponowna instalacja pakietu nie rozwiązuje problemu.",
+      resetButton: "Resetuj",
+      resetConfirmMessage:
+        "Spowoduje to usunięcie wszystkich zainstalowanych funkcji i modeli AI. Konieczna będzie ich ponowna instalacja z Hugging Face. Tej operacji nie można cofnąć.",
+      resetFailed: "Resetowanie nie powiodło się: {error}",
     },
     about: {
       heading: "Informacje",

@@ -3549,6 +3549,13 @@ export const fr: TranslationKeys = {
       importing: "Importation...",
       importSuccess: "Bundle importé avec succès.",
       importError: "Échec de l'importation du bundle : {error}",
+      resetTitle: "Réinitialiser l'environnement AI",
+      resetDescription:
+        "Supprime toutes les fonctionnalités AI installées et les modèles téléchargés, puis repart de zéro. Utilisez cette option si les outils AI se comportent de manière inattendue après une mise à jour et que la réinstallation d'un bundle ne résout pas le problème.",
+      resetButton: "Réinitialiser",
+      resetConfirmMessage:
+        "Cette action supprime toutes les fonctionnalités et tous les modèles AI installés. Vous devrez les réinstaller depuis Hugging Face. Cette action est irréversible.",
+      resetFailed: "Échec de la réinitialisation : {error}",
     },
     about: {
       heading: "À propos",

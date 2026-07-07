@@ -3271,6 +3271,13 @@ export const zhCN: TranslationKeys = {
       importing: "导入中...",
       importSuccess: "包导入成功。",
       importError: "包导入失败：{error}",
+      resetTitle: "重置 AI 环境",
+      resetDescription:
+        "删除所有已安装的 AI 功能和已下载的模型，然后重新开始。如果更新后 AI 工具出现异常，且重新安装包也无法解决问题，请使用此功能。",
+      resetButton: "重置",
+      resetConfirmMessage:
+        "此操作将删除所有已安装的 AI 功能和模型，你需要从 Hugging Face 重新安装它们。此操作无法撤销。",
+      resetFailed: "重置失败：{error}",
     },
     about: {
       heading: "关于",

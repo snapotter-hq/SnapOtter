@@ -119,11 +119,7 @@ if [ -d "/opt/venv" ]; then
   fi
 
   if [ "$NEED_BOOTSTRAP" = true ]; then
-    mkdir -p /data/ai/models /data/ai/pip-cache
-    rm -rf "$AI_VENV"
-    cp -r /opt/venv "$AI_VENV_TMP"
-    mv "$AI_VENV_TMP" "$AI_VENV"
-    rewrite_venv_paths "$AI_VENV" "/opt/venv" "$AI_VENV"
+    /usr/local/bin/reseed-ai-venv.sh
     # Reset installed-bundle state: their packages lived in the old venv.
     # Models in /data/ai/models survive, so reinstalling a bundle only
     # reruns pip (model downloads are idempotent and skip existing files).

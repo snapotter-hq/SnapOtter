@@ -276,6 +276,70 @@ describe("Install lock", () => {
   });
 });
 
+describe("resetAiEnvironment", () => {
+  function markDockerEnvironment() {
+    // isDockerEnvironment() checks for the manifest path, which the
+    // beforeEach already points at a file under tempDir; write something
+    // there so ensureAiDirs() actually recreates the skeleton afterward.
+    writeFileSync(process.env.FEATURE_MANIFEST_PATH ?? "", JSON.stringify({ bundles: {} }));
+  }
+
+  it("removes venv, models, and pip-cache directories", () => {
+    markDockerEnvironment();
+    const venvDir = join(aiDir, "venv");
+    const pipCacheDir = join(aiDir, "pip-cache");
+    mkdirSync(join(venvDir, "lib", "python3.12", "site-packages", "scipy"), { recursive: true });
+    writeFileSync(join(modelsDir, "some-model.onnx"), "fake weights");
+    mkdirSync(pipCacheDir, { recursive: true });
+    writeFileSync(join(pipCacheDir, "cached.whl"), "fake wheel");
+
+    mod.resetAiEnvironment();
+
+    expect(existsSync(join(venvDir, "lib"))).toBe(false);
+    expect(existsSync(join(modelsDir, "some-model.onnx"))).toBe(false);
+    expect(existsSync(join(pipCacheDir, "cached.whl"))).toBe(false);
+  });
+
+  it("resets installed.json to empty", () => {
+    markDockerEnvironment();
+    mod.markInstalled("ocr", "2.0.0", ["paddleocr-server-det"]);
+    mod.markInstalled("background-removal", "2.0.0", ["rembg-u2net"]);
+    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+
+    mod.resetAiEnvironment();
+
+    const data = JSON.parse(readFileSync(installedPath, "utf-8"));
+    expect(data.bundles).toEqual({});
+    expect(mod.isFeatureInstalled("ocr")).toBe(false);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(false);
+  });
+
+  it("recreates an empty directory skeleton so a fresh install has somewhere to write", () => {
+    markDockerEnvironment();
+    mod.resetAiEnvironment();
+
+    expect(existsSync(join(aiDir, "venv"))).toBe(true);
+    expect(existsSync(modelsDir)).toBe(true);
+    expect(existsSync(join(aiDir, "pip-cache"))).toBe(true);
+  });
+
+  it("refuses to reset while a bundle install is in progress", () => {
+    markDockerEnvironment();
+    mod.acquireInstallLock("ocr");
+
+    expect(() => mod.resetAiEnvironment()).toThrow(/install.*progress/i);
+
+    // Nothing should have been torn down.
+    expect(existsSync(lockPath)).toBe(true);
+  });
+
+  it("releases its own lock after completing", () => {
+    markDockerEnvironment();
+    mod.resetAiEnvironment();
+    expect(existsSync(lockPath)).toBe(false);
+  });
+});
+
 describe("Feature status queries", () => {
   it("isFeatureInstalled returns true for installed bundle", () => {
     mod.markInstalled("background-removal", "1.0.0", []);

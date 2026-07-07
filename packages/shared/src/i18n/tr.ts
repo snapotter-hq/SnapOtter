@@ -3532,6 +3532,13 @@ export const tr: TranslationKeys = {
       importing: "İçe aktarılıyor...",
       importSuccess: "Paket başarıyla içe aktarıldı.",
       importError: "Paket içe aktarılamadı: {error}",
+      resetTitle: "AI Ortamını Sıfırla",
+      resetDescription:
+        "Kurulu tüm AI özelliklerini ve indirilen modelleri siler, ardından sıfırdan başlar. Bir güncellemeden sonra AI araçları beklenmedik şekilde davranıyorsa ve paketi yeniden kurmak sorunu çözmüyorsa bunu kullanın.",
+      resetButton: "Sıfırla",
+      resetConfirmMessage:
+        "Bu işlem, kurulu tüm AI özelliklerini ve modellerini siler. Bunları Hugging Face üzerinden yeniden kurmanız gerekir. Bu işlem geri alınamaz.",
+      resetFailed: "Sıfırlama başarısız oldu: {error}",
     },
     about: {
       heading: "Hakkında",

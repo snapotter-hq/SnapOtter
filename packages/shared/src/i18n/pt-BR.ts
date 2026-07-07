@@ -3532,6 +3532,13 @@ export const ptBR: TranslationKeys = {
       importing: "Importando...",
       importSuccess: "Pacote importado com sucesso.",
       importError: "Falha ao importar pacote: {error}",
+      resetTitle: "Redefinir ambiente de AI",
+      resetDescription:
+        "Exclui todos os recursos de AI instalados e os modelos baixados, e recomeça do zero. Use isso se as ferramentas de AI estiverem se comportando de forma inesperada após uma atualização e a reinstalação de um pacote não resolver o problema.",
+      resetButton: "Redefinir",
+      resetConfirmMessage:
+        "Isso exclui todos os recursos e modelos de AI instalados. Você precisará reinstalá-los pelo Hugging Face. Essa ação não pode ser desfeita.",
+      resetFailed: "Falha ao redefinir: {error}",
     },
     about: {
       heading: "Sobre",

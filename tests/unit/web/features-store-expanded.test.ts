@@ -223,6 +223,49 @@ describe("useFeaturesStore (expanded)", () => {
     });
   });
 
+  describe("resetEnvironment", () => {
+    it("posts to the reset endpoint and refreshes bundles on success", async () => {
+      apiPostMock.mockResolvedValueOnce({});
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/reset", {});
+      expect(apiGetMock).toHaveBeenCalledWith("/v1/features");
+      expect(useFeaturesStore.getState().resetError).toBeNull();
+    });
+
+    it("clears stale installing/errors/queued state on success", async () => {
+      useFeaturesStore.setState({
+        installing: { ocr: { percent: 40, stage: "downloading" } },
+        errors: { ocr: "some old error" },
+        queued: ["ocr"],
+        startTimes: { ocr: Date.now() },
+      });
+      apiPostMock.mockResolvedValueOnce({});
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      const state = useFeaturesStore.getState();
+      expect(state.installing).toEqual({});
+      expect(state.errors).toEqual({});
+      expect(state.queued).toEqual([]);
+      expect(state.startTimes).toEqual({});
+    });
+
+    it("sets resetError on failure and does not refresh bundles", async () => {
+      apiPostMock.mockRejectedValueOnce(new Error("a bundle install is already in progress"));
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      expect(useFeaturesStore.getState().resetError).toBe(
+        "a bundle install is already in progress",
+      );
+      expect(apiGetMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("clearError", () => {
     it("does not affect other errors when clearing one", () => {
       useFeaturesStore.setState({

@@ -3525,6 +3525,13 @@ export const vi: TranslationKeys = {
       importing: "Đang nhập...",
       importSuccess: "Đã nhập gói thành công.",
       importError: "Nhập gói thất bại: {error}",
+      resetTitle: "Đặt lại môi trường AI",
+      resetDescription:
+        "Xóa mọi tính năng AI đã cài đặt và các mô hình đã tải xuống, sau đó bắt đầu lại từ đầu. Hãy dùng tùy chọn này nếu công cụ AI hoạt động bất thường sau khi cập nhật và việc cài đặt lại gói không khắc phục được sự cố.",
+      resetButton: "Đặt lại",
+      resetConfirmMessage:
+        "Thao tác này sẽ xóa mọi tính năng và mô hình AI đã cài đặt. Bạn sẽ cần cài đặt lại chúng từ Hugging Face. Hành động này không thể hoàn tác.",
+      resetFailed: "Đặt lại thất bại: {error}",
     },
     about: {
       heading: "Giới thiệu",

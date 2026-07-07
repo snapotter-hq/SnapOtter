@@ -3461,6 +3461,13 @@ export const ko: TranslationKeys = {
       importing: "가져오는 중...",
       importSuccess: "번들을 가져왔습니다.",
       importError: "번들 가져오기 실패: {error}",
+      resetTitle: "AI 환경 재설정",
+      resetDescription:
+        "설치된 모든 AI 기능과 다운로드한 모델을 삭제한 후 처음부터 다시 시작합니다. 업데이트 후 AI 도구가 예상치 못하게 동작하고 번들을 다시 설치해도 문제가 해결되지 않을 때 사용하세요.",
+      resetButton: "재설정",
+      resetConfirmMessage:
+        "설치된 모든 AI 기능과 모델이 삭제됩니다. Hugging Face에서 다시 설치해야 합니다. 이 작업은 되돌릴 수 없습니다.",
+      resetFailed: "재설정 실패: {error}",
     },
     about: {
       heading: "정보",

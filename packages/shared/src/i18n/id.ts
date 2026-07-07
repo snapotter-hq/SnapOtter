@@ -3526,6 +3526,13 @@ export const id: TranslationKeys = {
       importing: "Mengimpor...",
       importSuccess: "Bundel berhasil diimpor.",
       importError: "Impor bundel gagal: {error}",
+      resetTitle: "Reset Lingkungan AI",
+      resetDescription:
+        "Menghapus semua fitur AI yang terinstal dan model yang telah diunduh, lalu memulai dari awal. Gunakan ini jika alat AI berperilaku tidak semestinya setelah pembaruan dan menginstal ulang bundel tidak menyelesaikan masalah.",
+      resetButton: "Reset",
+      resetConfirmMessage:
+        "Ini akan menghapus semua fitur dan model AI yang terinstal. Anda perlu menginstalnya kembali dari Hugging Face. Tindakan ini tidak dapat dibatalkan.",
+      resetFailed: "Reset gagal: {error}",
     },
     about: {
       heading: "Tentang",

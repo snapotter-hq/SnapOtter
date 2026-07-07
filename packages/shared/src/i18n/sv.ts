@@ -3524,6 +3524,13 @@ export const sv: TranslationKeys = {
       importing: "Importerar...",
       importSuccess: "Paket importerat.",
       importError: "Paketimport misslyckades: {error}",
+      resetTitle: "Återställ AI-miljö",
+      resetDescription:
+        "Tar bort alla installerade AI-funktioner och nedladdade modeller, och börjar sedan om från grunden. Använd det här om AI-verktyg beter sig oväntat efter en uppdatering och det inte hjälper att installera om ett paket.",
+      resetButton: "Återställ",
+      resetConfirmMessage:
+        "Detta tar bort alla installerade AI-funktioner och modeller. Du måste installera om dem från Hugging Face. Det går inte att ångra.",
+      resetFailed: "Återställning misslyckades: {error}",
     },
     about: {
       heading: "Om",

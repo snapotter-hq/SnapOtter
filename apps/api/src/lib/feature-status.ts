@@ -252,6 +252,50 @@ export function getInstallingBundle(): {
   }
 }
 
+/**
+ * Wipe the shared AI venv, downloaded models, and pip cache, then reset
+ * installed.json to empty. For self-hosters whose venv already has stale or
+ * conflicting package files from a previous bundle version (the class of bug
+ * in project_ai_bundle_numpy_abi_strand): uninstalling a bundle only removes
+ * its model weights, never the shared site-packages it wrote into, so a
+ * reinstall just overlays corrected files on top of the old ones rather than
+ * replacing them. This is the blunt, reliable alternative: everything AI
+ * related is deleted and every bundle needs reinstalling (a fresh download
+ * from the HuggingFace bundle repo), but there is no partial/stale state left
+ * to reason about afterward.
+ */
+export function resetAiEnvironment(): void {
+  if (!acquireInstallLock("__reset__")) {
+    const installing = getInstallingBundle();
+    throw new Error(
+      `Cannot reset: a bundle install is already in progress (${installing?.bundleId ?? "unknown"})`,
+    );
+  }
+
+  try {
+    rmSync(MODELS_DIR, { recursive: true, force: true });
+    rmSync(join(AI_DIR, "pip-cache"), { recursive: true, force: true });
+    writeInstalled({ bundles: {} });
+    invalidateCache();
+
+    // Reseed the venv from the image's baked /opt/venv (base packages: numpy,
+    // Pillow, opencv) via the same script the entrypoint uses on a base-venv
+    // upgrade. A fresh install right after a reset needs a real, working venv
+    // to install into -- leaving an empty directory (no python3 binary) would
+    // make the very next install fail with "spawn .../python3 ENOENT".
+    if (existsSync("/opt/venv")) {
+      execFileSync("/usr/local/bin/reseed-ai-venv.sh", { stdio: "ignore", timeout: 120_000 });
+    } else {
+      // Not a Docker image build (local dev, or a test fixture): nothing to
+      // reseed from, just leave an empty directory.
+      rmSync(join(AI_DIR, "venv"), { recursive: true, force: true });
+    }
+    ensureAiDirs();
+  } finally {
+    releaseInstallLock();
+  }
+}
+
 // ── Progress tracking (in-memory, for SSE) ──────────────────────────────
 
 let currentProgress: {

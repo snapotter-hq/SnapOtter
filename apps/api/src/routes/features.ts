@@ -4,6 +4,7 @@
  * GET  /api/v1/features                           - List feature bundles and their statuses
  * POST /api/v1/admin/features/:bundleId/install    - Install a feature bundle (async)
  * POST /api/v1/admin/features/:bundleId/uninstall  - Uninstall a feature bundle
+ * POST /api/v1/admin/features/reset                - Wipe the AI venv/models, reset all bundles
  * GET  /api/v1/admin/features/disk-usage           - Get AI model disk usage
  * POST /api/v1/admin/features/import               - Import an offline bundle archive
  */
@@ -47,6 +48,7 @@ import {
   isFeatureInstalled,
   markUninstalled,
   releaseInstallLock,
+  resetAiEnvironment,
   setInstallProgress,
   verifyBundleModels,
 } from "../lib/feature-status.js";
@@ -442,6 +444,36 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
         bundle_id: bundleId,
         action: "uninstalled",
+        duration_ms: 0,
+      });
+
+      return reply.send({ ok: true });
+    },
+  );
+
+  // POST /api/v1/admin/features/reset - Wipe the AI venv/models/pip-cache and
+  // reset every bundle to not-installed. Existing installs can't self-heal a
+  // stale/conflicting venv via uninstall+reinstall alone (uninstall only
+  // removes model weights), so this is the reliable full reset.
+  app.post(
+    "/api/v1/admin/features/reset",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const admin = await requirePermission("features:manage")(_request, reply);
+      if (!admin) return;
+
+      try {
+        resetAiEnvironment();
+      } catch (err) {
+        return reply.status(409).send({
+          error: err instanceof Error ? err.message : "Reset failed",
+        });
+      }
+      shutdownDispatcher();
+
+      trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+        bundle_id: "all",
+        action: "reset_environment",
         duration_ms: 0,
       });
 

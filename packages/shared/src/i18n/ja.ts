@@ -3479,6 +3479,13 @@ export const ja: TranslationKeys = {
       importing: "インポート中...",
       importSuccess: "バンドルのインポートに成功しました。",
       importError: "バンドルのインポートに失敗しました: {error}",
+      resetTitle: "AI環境をリセット",
+      resetDescription:
+        "インストール済みのAI機能とダウンロード済みのモデルをすべて削除し、まっさらな状態からやり直します。アップデート後にAIツールの動作がおかしくなり、バンドルを再インストールしても直らない場合に使用してください。",
+      resetButton: "リセット",
+      resetConfirmMessage:
+        "インストール済みのAI機能とモデルがすべて削除されます。Hugging Faceから再インストールする必要があります。この操作は取り消せません。",
+      resetFailed: "リセットに失敗しました: {error}",
     },
     about: {
       heading: "SnapOtterについて",

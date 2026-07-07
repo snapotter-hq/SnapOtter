@@ -3535,6 +3535,13 @@ export const nl: TranslationKeys = {
       importing: "Importeren...",
       importSuccess: "Bundel succesvol geïmporteerd.",
       importError: "Bundel importeren mislukt: {error}",
+      resetTitle: "AI-omgeving resetten",
+      resetDescription:
+        "Verwijdert alle geïnstalleerde AI-functies en gedownloade modellen, en begint daarna helemaal opnieuw. Gebruik dit als AI-tools zich na een update onverwacht gedragen en het opnieuw installeren van een bundel het probleem niet oplost.",
+      resetButton: "Resetten",
+      resetConfirmMessage:
+        "Hiermee worden alle geïnstalleerde AI-functies en modellen verwijderd. Je moet ze opnieuw installeren vanaf Hugging Face. Dit kan niet ongedaan worden gemaakt.",
+      resetFailed: "Resetten mislukt: {error}",
     },
     about: {
       heading: "Over",
