@@ -14,7 +14,9 @@ test("demo boots straight into the dashboard with no login screen", async ({ pag
   // Visiting the root lands directly on the dashboard, not the login page.
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("This is a live demo. Processing is disabled.")).toBeVisible();
+  // The demo banner is visible and makes clear the admin data is sample data.
+  await expect(page.getByText(/live demo/i).first()).toBeVisible();
+  await expect(page.getByText(/sample data/i).first()).toBeVisible();
 
   const theme = await page.evaluate(() => {
     const bannerLink = Array.from(document.querySelectorAll("a")).find((link) =>

@@ -8,7 +8,8 @@ export function DemoBanner() {
   return (
     <div className="relative z-[9999] flex items-center justify-center gap-3 bg-primary px-4 py-2 text-sm text-primary-foreground">
       <span>
-        This is a live demo. Processing is disabled.{" "}
+        This is a live demo. All users, teams, and activity shown are sample data, and file
+        processing is disabled.{" "}
         <a
           href="https://github.com/snapotter-hq/SnapOtter"
           target="_blank"
