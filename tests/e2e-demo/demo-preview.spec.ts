@@ -101,11 +101,20 @@ test("admin settings sections render sample data without crashing", async ({ pag
   expect(pageErrors).toEqual([]);
 });
 
-test("serves the editor icon asset so the mobile nav icon renders", async ({ request }) => {
-  // The mobile bottom-nav editor icon is a CSS mask over /edit-image.png. When
-  // that asset was missing from the demo build the mask resolved to nothing and
-  // the icon vanished on phones. Guard the asset so it can't regress.
-  const response = await request.get("/edit-image.png");
-  expect(response.status()).toBe(200);
-  expect(response.headers()["content-type"]).toContain("image");
+test("mobile bottom nav renders a visible image-editor icon", async ({ page }) => {
+  // The editor icon used to be a CSS mask over /edit-image.png and vanished on
+  // phones when that asset didn't load. It is now an inline SVG. Render the
+  // mobile nav (viewport under the 768px breakpoint) and assert the editor
+  // link's icon is actually drawn with a non-zero box.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const editorLink = page.getByRole("link", { name: /editor/i });
+  await expect(editorLink).toBeVisible();
+
+  const icon = editorLink.locator("svg");
+  await expect(icon).toBeVisible();
+  const box = await icon.boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(0);
+  expect(box?.height ?? 0).toBeGreaterThan(0);
 });
