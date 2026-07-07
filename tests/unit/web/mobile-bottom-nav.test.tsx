@@ -66,18 +66,20 @@ describe("MobileBottomNav", () => {
     expect(screen.queryByText("Settings")).toBeNull();
   });
 
-  it("renders icons for each navigation item", () => {
+  it("renders an svg icon for each navigation item", () => {
     renderNav(() => {});
 
-    // 4 items use lucide SVG icons (Tools, Automate, Files, Settings)
-    // Editor uses ImageEditIcon which is a CSS-masked <span>, not SVG
+    // All five items (Tools, Automate, Editor, Files, Settings) render inline
+    // SVG icons. The Editor icon used to be a CSS-masked <span> that rendered
+    // as nothing when its mask asset failed to load; it is now an inline SVG
+    // like the rest, so it always draws.
     const svgs = document.querySelectorAll("nav svg");
-    expect(svgs.length).toBe(4);
+    expect(svgs.length).toBe(5);
 
-    // The Editor icon is a span with a mask-image
-    const spans = document.querySelectorAll("nav span");
-    const maskedSpan = Array.from(spans).find((s) => (s as HTMLElement).style.maskImage !== "");
-    expect(maskedSpan).toBeDefined();
+    const editorLink = Array.from(document.querySelectorAll("a")).find(
+      (a) => a.getAttribute("href") === "/editor",
+    );
+    expect(editorLink?.querySelector("svg")).not.toBeNull();
   });
 
   it("nav has backdrop blur and border-top styling", () => {
