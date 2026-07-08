@@ -1,11 +1,16 @@
 # Licensing
 
-SnapOtter is open-core:
+SnapOtter is open-core and dual-licensed:
 
 - **All content in this repository is licensed under AGPL-3.0 (see `LICENSE`),
-  EXCEPT the contents of `packages/enterprise/`.**
+  EXCEPT the contents of `packages/enterprise/`, unless you have purchased a
+  commercial license from SnapOtter.**
 - `packages/enterprise/` is governed by the SnapOtter Commercial License
   (see `packages/enterprise/LICENSE`).
+
+For use without AGPL-3.0 obligations, such as proprietary products or SaaS
+offerings without source disclosure, contact SnapOtter for commercial license
+terms.
 
 The community edition is fully functional without any code from
 `packages/enterprise`: all tools, batch, pipelines, API keys, and single-node
