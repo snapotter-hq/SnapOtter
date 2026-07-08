@@ -27,7 +27,7 @@ import { getQueuedBundleIds } from "./feature-install-queue.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "../../../..");
 
-const DATA_DIR = process.env.DATA_DIR || "/data";
+const DATA_DIR = process.env.DATA_DIR || "./data";
 const AI_DIR = join(DATA_DIR, "ai");
 const MODELS_DIR = join(AI_DIR, "models");
 const INSTALLED_PATH = join(AI_DIR, "installed.json");
@@ -61,10 +61,8 @@ export function ensureAiDirs(): void {
     mkdirSync(MODELS_DIR, { recursive: true });
     mkdirSync(join(AI_DIR, "pip-cache"), { recursive: true });
   } catch (err: unknown) {
-    // Never refuse to boot over the AI data dir. On native checkouts the
-    // default DATA_DIR (/data) is often uncreatable (ENOENT/EROFS on a
-    // sealed macOS root, EACCES on restrictive volumes); AI tools simply
-    // report as not installed until DATA_DIR points somewhere writable.
+    // Never refuse to boot over the AI data dir. AI tools simply report as not
+    // installed until DATA_DIR points somewhere writable.
     const code = (err as NodeJS.ErrnoException).code;
     console.error(
       `WARNING: Cannot create AI directories under "${AI_DIR}" (${code}). AI features will be unavailable. Set DATA_DIR to a writable path (or check volume permissions / PUID / PGID in Docker).`,

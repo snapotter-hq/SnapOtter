@@ -388,6 +388,16 @@ describe("Feature status queries", () => {
     expect(mod.isToolInstalled("passport-photo")).toBe(true);
   });
 
+  it("isToolInstalled is false for enhance-faces when only upscale-enhance is installed", () => {
+    mod.markInstalled("upscale-enhance", "1.0.0", []);
+    expect(mod.isToolInstalled("enhance-faces")).toBe(false);
+  });
+
+  it("getFirstMissingBundleForTool names face-detection for enhance-faces when only upscale-enhance is installed", () => {
+    mod.markInstalled("upscale-enhance", "1.0.0", []);
+    expect(mod.getFirstMissingBundleForTool("enhance-faces")).toBe("face-detection");
+  });
+
   it("getFirstMissingBundleForTool names face-detection when only background-removal is installed", () => {
     mod.markInstalled("background-removal", "1.0.0", []);
     expect(mod.getFirstMissingBundleForTool("passport-photo")).toBe("face-detection");

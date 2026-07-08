@@ -341,6 +341,58 @@ describe("useFeaturesStore", () => {
     });
   });
 
+  describe("installTool()", () => {
+    it("starts every missing hard dependency for a multi-bundle AI tool from one server request", async () => {
+      const bundles = [
+        makeBundleState({ id: "background-removal", status: "not_installed" }),
+        makeBundleState({ id: "face-detection", status: "not_installed" }),
+      ];
+      useFeaturesStore.setState({ bundles, loaded: true });
+      apiPostMock.mockResolvedValueOnce({
+        bundles: [
+          { bundleId: "background-removal", jobId: "job-bg", queued: false },
+          { bundleId: "face-detection", jobId: "job-face", queued: true },
+        ],
+      });
+
+      await useFeaturesStore.getState().installTool("passport-photo");
+
+      expect(apiPostMock).toHaveBeenCalledWith(
+        "/v1/admin/tools/passport-photo/features/install",
+        {},
+      );
+      expect(FakeEventSource.instances).toHaveLength(1);
+      expect(FakeEventSource.instances[0].url).toBe("/api/v1/jobs/job-bg/progress");
+      expect(useFeaturesStore.getState().installing["background-removal"]).toBeDefined();
+      expect(useFeaturesStore.getState().installing["face-detection"]).toBeUndefined();
+      expect(useFeaturesStore.getState().queued).toContain("face-detection");
+    });
+
+    it("only tracks missing dependencies when a multi-bundle AI tool is partially installed", async () => {
+      const bundles = [
+        makeBundleState({ id: "background-removal", status: "installed" }),
+        makeBundleState({ id: "face-detection", status: "not_installed" }),
+      ];
+      useFeaturesStore.setState({ bundles, loaded: true });
+      apiPostMock.mockResolvedValueOnce({
+        bundles: [
+          { bundleId: "background-removal", skipped: true },
+          { bundleId: "face-detection", jobId: "job-face", queued: false },
+        ],
+      });
+
+      await useFeaturesStore.getState().installTool("passport-photo");
+
+      expect(apiPostMock).toHaveBeenCalledWith(
+        "/v1/admin/tools/passport-photo/features/install",
+        {},
+      );
+      expect(useFeaturesStore.getState().installing["background-removal"]).toBeUndefined();
+      expect(useFeaturesStore.getState().installing["face-detection"]).toBeDefined();
+      expect(FakeEventSource.instances[0].url).toBe("/api/v1/jobs/job-face/progress");
+    });
+  });
+
   describe("uninstallBundle()", () => {
     it("calls API and refreshes", async () => {
       apiPostMock.mockResolvedValueOnce({});

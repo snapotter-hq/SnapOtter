@@ -2,11 +2,12 @@
  * Feature bundle management routes.
  *
  * GET  /api/v1/features                           - List feature bundles and their statuses
- * POST /api/v1/admin/features/:bundleId/install    - Install a feature bundle (async)
- * POST /api/v1/admin/features/:bundleId/uninstall  - Uninstall a feature bundle
- * POST /api/v1/admin/features/reset                - Wipe the AI venv/models, reset all bundles
- * GET  /api/v1/admin/features/disk-usage           - Get AI model disk usage
- * POST /api/v1/admin/features/import               - Import an offline bundle archive
+ * POST /api/v1/admin/features/:bundleId/install       - Install a feature bundle (async)
+ * POST /api/v1/admin/tools/:toolId/features/install   - Install every bundle a tool requires
+ * POST /api/v1/admin/features/:bundleId/uninstall     - Uninstall a feature bundle
+ * POST /api/v1/admin/features/reset                   - Wipe the AI venv/models, reset all bundles
+ * GET  /api/v1/admin/features/disk-usage              - Get AI model disk usage
+ * POST /api/v1/admin/features/import                  - Import an offline bundle archive
  */
 
 import { spawn } from "node:child_process";
@@ -22,7 +23,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { acquireVenvLock, shutdownDispatcher } from "@snapotter/ai";
-import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { trackEvent } from "../lib/analytics.js";
 import {
@@ -250,6 +251,23 @@ interface BundleIdParams {
   bundleId: string;
 }
 
+interface ToolIdParams {
+  toolId: string;
+}
+
+interface EnqueuedBundleInstall {
+  bundleId: string;
+  jobId: string;
+  queued: boolean;
+}
+
+interface ToolBundleInstallResult {
+  bundleId: string;
+  jobId?: string;
+  queued: boolean;
+  skipped?: boolean;
+}
+
 interface ManifestModel {
   id: string;
   path?: string;
@@ -273,6 +291,32 @@ function readManifest(): Manifest | null {
   } catch {
     return null;
   }
+}
+
+function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | null {
+  if (isFeatureInstalled(bundleId)) {
+    const modelError = verifyBundleModels(bundleId);
+    if (!modelError) return null;
+    markUninstalled(bundleId);
+  }
+
+  // Queue the install on the server so the POST is durable: enqueue()
+  // dedups an already-active/queued bundle and returns the effective jobId,
+  // then pump() starts it immediately if nothing else is installing. A bundle
+  // that lands behind another install stays queued server-side and starts
+  // automatically when the running install finishes.
+  const jobId = crypto.randomUUID();
+  const effectiveJobId = enqueue({ bundleId, jobId });
+  pump();
+
+  // queued === true means it did NOT start right now (another install is
+  // active, or an offline import holds the lock). The client polls queued
+  // bundles and opens SSE only for the active install.
+  return {
+    bundleId,
+    jobId: effectiveJobId,
+    queued: getActiveBundleId() !== bundleId,
+  };
 }
 
 /** Recursively calculate total size of a directory in bytes. */
@@ -348,30 +392,40 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
       }
 
-      if (isFeatureInstalled(bundleId)) {
-        const modelError = verifyBundleModels(bundleId);
-        if (!modelError) {
-          return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
-        }
-        markUninstalled(bundleId);
+      const result = queueBundleInstallIfNeeded(bundleId);
+      if (!result) {
+        return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
 
-      // Queue the install on the server so the POST is durable: enqueue()
-      // dedups an already-active/queued bundle and returns the effective jobId,
-      // then pump() starts it immediately if nothing else is installing. A
-      // bundle that lands behind another install stays queued server-side and
-      // starts automatically when the running install finishes.
-      const jobId = crypto.randomUUID();
-      const effectiveJobId = enqueue({ bundleId, jobId });
-      pump();
+      return reply.status(202).send({ jobId: result.jobId, queued: result.queued });
+    },
+  );
 
-      // queued === true means it did NOT start right now (another install is
-      // active, or an offline import holds the lock). The client still opens
-      // the SSE stream for the returned jobId; the progress route tolerates a
-      // not-yet-started jobId and streams once the installer begins.
-      const queued = getActiveBundleId() !== bundleId;
+  // POST /api/v1/admin/tools/:toolId/features/install - Install all bundles a tool needs
+  app.post(
+    "/api/v1/admin/tools/:toolId/features/install",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest<{ Params: ToolIdParams }>, reply: FastifyReply) => {
+      const admin = await requirePermission("features:manage")(request, reply);
+      if (!admin) return;
 
-      return reply.status(202).send({ jobId: effectiveJobId, queued });
+      const { toolId } = request.params;
+      const requiredBundles = getRequiredBundlesForTool(toolId);
+      if (requiredBundles.length === 0) {
+        return reply.status(404).send({ error: `No feature bundles required for tool: ${toolId}` });
+      }
+
+      const bundles: ToolBundleInstallResult[] = [];
+      for (const bundleId of requiredBundles) {
+        if (!FEATURE_BUNDLES[bundleId]) {
+          return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
+        }
+
+        const result = queueBundleInstallIfNeeded(bundleId);
+        bundles.push(result ?? { bundleId, queued: false, skipped: true });
+      }
+
+      return reply.status(202).send({ bundles });
     },
   );
 

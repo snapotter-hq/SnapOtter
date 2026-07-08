@@ -1,5 +1,10 @@
 import type { Tool } from "@snapotter/shared";
-import { PYTHON_SIDECAR_TOOLS, SECTIONS, TOOL_BUNDLE_MAP, toolSection } from "@snapotter/shared";
+import {
+  getRequiredBundlesForTool,
+  PYTHON_SIDECAR_TOOLS,
+  SECTIONS,
+  toolSection,
+} from "@snapotter/shared";
 import { Clock, Download, FileImage, Loader2, Pin } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -63,12 +68,15 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge, showPin
   const queued = useFeaturesStore((s) => s.queued);
   const aiStatus = useMemo(() => {
     if (!isAiTool) return "installed";
-    const bundleId = TOOL_BUNDLE_MAP[tool.id];
-    if (!bundleId) return "installed";
-    if (queued.includes(bundleId)) return "queued";
-    if (installing[bundleId]) return "installing";
-    const bundle = bundles.find((b) => b.id === bundleId);
-    return bundle?.status === "installed" ? "installed" : "not_installed";
+    const requiredBundleIds = getRequiredBundlesForTool(tool.id);
+    if (requiredBundleIds.length === 0) return "installed";
+    if (requiredBundleIds.some((bundleId) => queued.includes(bundleId))) return "queued";
+    if (requiredBundleIds.some((bundleId) => installing[bundleId])) return "installing";
+    return requiredBundleIds.every(
+      (bundleId) => bundles.find((bundle) => bundle.id === bundleId)?.status === "installed",
+    )
+      ? "installed"
+      : "not_installed";
   }, [isAiTool, tool.id, bundles, installing, queued]);
 
   const section = toolSection(tool);

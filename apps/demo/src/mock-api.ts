@@ -191,12 +191,25 @@ interface DemoAuditEntry {
   createdAt: string;
 }
 
+interface DemoUserFile {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  version: number;
+  toolChain: string[];
+  createdAt: string;
+}
+
 const db: {
   users: DemoUser[];
   teams: DemoTeam[];
   roles: DemoRole[];
   apiKeys: DemoApiKey[];
   audit: DemoAuditEntry[];
+  files: DemoUserFile[];
   settings: Record<string, string>;
   preferences: Record<string, unknown>;
 } = {
@@ -457,6 +470,96 @@ const db: {
     defaultToolView: "sidebar",
     pinnedTools: ["compress-image", "remove-background", "pdf-merge", "resize-image"],
   },
+  files: [
+    {
+      id: "file_sunrise",
+      originalName: "mountain-sunrise.jpg",
+      mimeType: "image/jpeg",
+      size: 2_517_320,
+      width: 4032,
+      height: 3024,
+      version: 1,
+      toolChain: [],
+      createdAt: isoDaysAgo(2),
+    },
+    {
+      id: "file_team",
+      originalName: "team-portrait.png",
+      mimeType: "image/png",
+      size: 5_204_880,
+      width: 3000,
+      height: 2000,
+      version: 1,
+      toolChain: [],
+      createdAt: isoDaysAgo(5),
+    },
+    {
+      id: "file_mockup",
+      originalName: "product-mockup.webp",
+      mimeType: "image/webp",
+      size: 842_130,
+      width: 1600,
+      height: 1200,
+      version: 2,
+      toolChain: ["remove-background"],
+      createdAt: isoDaysAgo(6),
+    },
+    {
+      id: "file_report",
+      originalName: "quarterly-report.pdf",
+      mimeType: "application/pdf",
+      size: 1_238_442,
+      width: null,
+      height: null,
+      version: 2,
+      toolChain: ["merge-pdf"],
+      createdAt: isoDaysAgo(9),
+    },
+    {
+      id: "file_tour",
+      originalName: "product-tour.mp4",
+      mimeType: "video/mp4",
+      size: 18_734_210,
+      width: 1920,
+      height: 1080,
+      version: 1,
+      toolChain: [],
+      createdAt: isoDaysAgo(12),
+    },
+    {
+      id: "file_podcast",
+      originalName: "episode-intro.mp3",
+      mimeType: "audio/mpeg",
+      size: 3_402_118,
+      width: null,
+      height: null,
+      version: 1,
+      toolChain: [],
+      createdAt: isoDaysAgo(14),
+    },
+    {
+      id: "file_scan",
+      originalName: "invoice-scan.jpg",
+      mimeType: "image/jpeg",
+      size: 1_104_970,
+      width: 2480,
+      height: 3508,
+      version: 2,
+      toolChain: ["ocr"],
+      createdAt: isoDaysAgo(18),
+    },
+    {
+      id: "file_assets",
+      originalName: "brand-assets.zip",
+      mimeType: "application/zip",
+      size: 6_845_002,
+      width: null,
+      height: null,
+      version: 1,
+      toolChain: [],
+      createdAt: isoDaysAgo(21),
+    },
+  ],
 };
 
 function seedAudit(): DemoAuditEntry[] {
@@ -673,6 +776,98 @@ function buildUsage(days: number): unknown {
       { teamName: "Support", totalBytes: "3221225472", userCount: 2 },
     ],
   };
+}
+
+/* ────────────────────── sample file thumbnails ──────────────────────
+   The file library renders thumbnails by fetching the thumbnail URL into a
+   blob (AuthImage), so the mock can answer with a generated SVG tile. No real
+   file bytes are needed; each tile is colour-coded by type. */
+
+type FileKind = "image" | "video" | "audio" | "pdf" | "archive" | "doc";
+
+function fileKind(mimeType: string): FileKind {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType === "application/pdf") return "pdf";
+  if (/zip|compressed|tar|rar|7z/.test(mimeType)) return "archive";
+  return "doc";
+}
+
+const KIND_COLORS: Record<FileKind, [string, string]> = {
+  image: ["#F09550", "#C06520"],
+  video: ["#8B7CF6", "#5B44C7"],
+  audio: ["#34C77B", "#1F8F55"],
+  pdf: ["#EF6A6A", "#C23B3B"],
+  archive: ["#8A94A6", "#5B6472"],
+  doc: ["#5B9BF6", "#2F6FD0"],
+};
+
+function fileGlyph(kind: FileKind): string {
+  switch (kind) {
+    case "image":
+      return '<rect x="104" y="70" width="112" height="140" rx="10" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.65)" stroke-width="3"/><circle cx="140" cy="112" r="12" fill="rgba(255,255,255,0.85)"/><path d="M126 176 150 150 166 166 188 140 194 176Z" fill="rgba(255,255,255,0.85)"/>';
+    case "video":
+      return '<rect x="96" y="82" width="128" height="116" rx="14" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.65)" stroke-width="3"/><path d="M146 116 184 140 146 164Z" fill="rgba(255,255,255,0.9)"/>';
+    case "audio":
+      return '<g fill="rgba(255,255,255,0.85)"><rect x="120" y="120" width="12" height="50" rx="6"/><rect x="142" y="96" width="12" height="98" rx="6"/><rect x="164" y="112" width="12" height="66" rx="6"/><rect x="186" y="104" width="12" height="82" rx="6"/></g>';
+    case "archive":
+      return '<rect x="112" y="82" width="96" height="120" rx="10" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.65)" stroke-width="3"/><rect x="152" y="82" width="16" height="120" fill="rgba(255,255,255,0.22)"/><g fill="rgba(255,255,255,0.85)"><rect x="154" y="96" width="12" height="10"/><rect x="154" y="118" width="12" height="10"/><rect x="154" y="140" width="12" height="10"/></g>';
+    default:
+      return '<rect x="112" y="74" width="96" height="132" rx="8" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.65)" stroke-width="3"/><g stroke="rgba(255,255,255,0.8)" stroke-width="5" stroke-linecap="round"><path d="M128 108H192"/><path d="M128 128H192"/><path d="M128 148H176"/></g>';
+  }
+}
+
+const KIND_LABELS: Record<FileKind, string> = {
+  image: "Image",
+  video: "Video",
+  audio: "Audio",
+  pdf: "PDF Document",
+  archive: "Archive",
+  doc: "Document",
+};
+
+function fileThumbnailSvg(f: DemoUserFile): string {
+  const kind = fileKind(f.mimeType);
+  const [c1, c2] = KIND_COLORS[kind];
+  const ext = (f.originalName.split(".").pop() || "file").toUpperCase();
+  const label = f.width && f.height ? `${f.width} x ${f.height}` : KIND_LABELS[kind];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="320" height="320" fill="url(#g)"/>${fileGlyph(kind)}<text x="160" y="252" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#ffffff">${ext}</text><text x="160" y="282" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="rgba(255,255,255,0.9)">${label}</text></svg>`;
+}
+
+function svgResponse(svg: string, extraHeaders: Record<string, string> = {}): Response {
+  return new Response(svg, {
+    status: 200,
+    headers: { "Content-Type": "image/svg+xml", ...extraHeaders },
+  });
+}
+
+function fileVersions(f: DemoUserFile): Array<{
+  id: string;
+  version: number;
+  size: number;
+  toolChain: string[];
+  createdAt: string;
+}> {
+  if (f.version >= 2) {
+    return [
+      {
+        id: `${f.id}_v2`,
+        version: 2,
+        size: f.size,
+        toolChain: f.toolChain,
+        createdAt: f.createdAt,
+      },
+      {
+        id: `${f.id}_v1`,
+        version: 1,
+        size: Math.round(f.size * 1.6),
+        toolChain: [],
+        createdAt: f.createdAt,
+      },
+    ];
+  }
+  return [{ id: `${f.id}_v1`, version: 1, size: f.size, toolChain: [], createdAt: f.createdAt }];
 }
 
 /* ────────────────────── persisted flags ────────────────────── */
@@ -1008,12 +1203,55 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
     return json({ error: DEMO_DISABLED_MESSAGE }, 403);
   }
 
+  /* ---- file library ---- */
+
   if (path === "/api/v1/files" && method === "GET") {
-    return json({ files: [], total: 0 });
+    const search = (query.get("search") || "").toLowerCase();
+    const limit = Number(query.get("limit") || "50");
+    const offset = Number(query.get("offset") || "0");
+    const matched = search
+      ? db.files.filter((f) => f.originalName.toLowerCase().includes(search))
+      : db.files;
+    return json({
+      files: matched.slice(offset, offset + limit),
+      total: matched.length,
+      limit,
+      offset,
+    });
   }
 
   if (path === "/api/v1/files" && method === "DELETE") {
-    return json({ deleted: 0 });
+    const b = parseBody(body);
+    const ids = Array.isArray(b.ids) ? (b.ids as string[]) : [];
+    const before = db.files.length;
+    db.files = db.files.filter((f) => !ids.includes(f.id));
+    return json({ deleted: before - db.files.length });
+  }
+
+  // Thumbnails/previews are fetched into a blob, so answer with a generated SVG.
+  const fileImageMatch = path.match(/^\/api\/v1\/files\/([^/]+)\/(thumbnail|preview)$/);
+  if (fileImageMatch && method === "GET") {
+    const file = db.files.find((f) => f.id === fileImageMatch[1]);
+    if (!file) return json({ error: "Not found" }, 404);
+    return svgResponse(fileThumbnailSvg(file));
+  }
+
+  const fileDownloadMatch = path.match(/^\/api\/v1\/files\/([^/]+)\/download$/);
+  if (fileDownloadMatch && method === "GET") {
+    const file = db.files.find((f) => f.id === fileDownloadMatch[1]);
+    if (!file) return json({ error: "Not found" }, 404);
+    // The real file doesn't exist in the demo; hand back the representative
+    // tile so the download resolves instead of erroring.
+    return svgResponse(fileThumbnailSvg(file), {
+      "Content-Disposition": `attachment; filename="${file.originalName}"`,
+    });
+  }
+
+  const fileDetailMatch = path.match(/^\/api\/v1\/files\/([^/]+)$/);
+  if (fileDetailMatch && method === "GET") {
+    const file = db.files.find((f) => f.id === fileDetailMatch[1]);
+    if (!file) return json({ error: "Not found" }, 404);
+    return json({ file, versions: fileVersions(file) });
   }
 
   if (path.startsWith("/api/v1/pipelines") && method === "GET") {

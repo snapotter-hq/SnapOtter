@@ -9,6 +9,11 @@ import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
 
+function appendEnvPath(base: string, suffix: string): string {
+  const normalizedBase = base.replace(/\/+$/, "");
+  return `${normalizedBase || "/"}${normalizedBase === "" ? "" : "/"}${suffix}`;
+}
+
 /**
  * Build a minimal environment for spawned Python processes.
  * Only passes through variables needed for venv, CUDA, model cache,
@@ -44,6 +49,10 @@ function buildMinimalEnv(): Record<string, string> {
       env[key] = process.env[key] as string;
     }
   }
+
+  env.DATA_DIR ??= "./data";
+  env.MODELS_PATH ??= appendEnvPath(env.DATA_DIR, "ai/models");
+
   // Runtime model downloads are allowed by default (public model weights
   // only, never user data). SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict
   // offline mode for airgapped deployments: the sidecar then gets the

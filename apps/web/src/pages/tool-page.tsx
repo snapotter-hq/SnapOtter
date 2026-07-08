@@ -600,6 +600,7 @@ export function ToolPage() {
           <FeatureInstallPrompt
             bundle={featureBundle}
             isAdmin={isAdmin}
+            toolId={toolId}
             toolName={tool?.name}
             toolDescription={tool?.description}
           />

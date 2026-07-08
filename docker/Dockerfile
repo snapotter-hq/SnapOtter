@@ -366,6 +366,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         Pillow==12.2.0 \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84 \
+        "huggingface-hub[hf_xet]==0.36.2" \
         pikepdf==10.8.0 \
         PyMuPDF==1.27.2.3 \
         weasyprint==69.0 \

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import {
   apiToolPath,
-  getBundleForTool,
+  FEATURE_BUNDLES,
   type Section,
   TOOL_BUNDLE_MAP,
   TOOLS,
@@ -16,7 +16,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
 import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
-import { isToolInstalled } from "../lib/feature-status.js";
+import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
@@ -470,13 +470,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // Guard: check if the tool's AI feature bundle is installed
         const bundleId = TOOL_BUNDLE_MAP[config.toolId];
         if (bundleId && !isToolInstalled(config.toolId)) {
-          const bundle = getBundleForTool(config.toolId);
+          const missingBundleId = getFirstMissingBundleForTool(config.toolId) ?? bundleId;
+          const bundle = FEATURE_BUNDLES[missingBundleId];
           // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(501).send({
             error: "Feature not installed",
             code: "FEATURE_NOT_INSTALLED",
-            feature: bundleId,
-            featureName: bundle?.name ?? bundleId,
+            feature: missingBundleId,
+            featureName: bundle?.name ?? missingBundleId,
             estimatedSize: bundle?.estimatedSize ?? "unknown",
           });
         }

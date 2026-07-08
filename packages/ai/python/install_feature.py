@@ -27,6 +27,9 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+DOWNLOAD_CHUNK_BYTES = 4 * 1024 * 1024
+DOWNLOAD_META_BYTES = 64 * 1024 * 1024
+
 
 # -- Helpers --
 
@@ -149,6 +152,101 @@ def verify_sha256(filepath: str, expected: str) -> bool:
 
 # -- Download with resume --
 
+def _set_env_temporarily(key: str, value: str):
+    previous = os.environ.get(key)
+    os.environ[key] = value
+    return previous
+
+
+def _restore_env(key: str, previous) -> None:
+    if previous is None:
+        os.environ.pop(key, None)
+    else:
+        os.environ[key] = previous
+
+
+def _cleanup_hf_local_dir(local_dir: str, archive_file: str) -> None:
+    if "/" in archive_file:
+        top_level = archive_file.split("/", 1)[0]
+        shutil.rmtree(os.path.join(local_dir, top_level), ignore_errors=True)
+    shutil.rmtree(os.path.join(local_dir, ".cache"), ignore_errors=True)
+
+
+def download_with_hf_hub(
+    bundle_repo: str,
+    archive_file: str,
+    dest: str,
+    expected_size: int,
+    progress_start: int,
+    progress_end: int,
+    force_download: bool = False,
+) -> bool:
+    """Download through huggingface_hub when available.
+
+    huggingface_hub 0.32+ can use hf_xet for faster large-file transfers and
+    manages retries/resume internally. Return False when the client is missing
+    or fails so callers can fall back to the manual urllib downloader.
+    """
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception:
+        return False
+
+    local_dir = os.path.dirname(dest)
+    os.makedirs(local_dir, exist_ok=True)
+    emit_progress(progress_start, "Downloading with accelerated Hugging Face client...")
+
+    previous_progress = _set_env_temporarily("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    try:
+        downloaded_path = hf_hub_download(
+            repo_id=bundle_repo,
+            filename=archive_file,
+            repo_type="model",
+            local_dir=local_dir,
+            force_download=force_download,
+        )
+    except Exception as e:
+        emit_progress(
+            progress_start,
+            f"Accelerated download unavailable, using resumable fallback: {e}",
+        )
+        return False
+    finally:
+        _restore_env("HF_HUB_DISABLE_PROGRESS_BARS", previous_progress)
+
+    try:
+        if not os.path.exists(downloaded_path):
+            emit_progress(
+                progress_start,
+                "Accelerated download did not produce an archive, using resumable fallback...",
+            )
+            return False
+
+        if os.path.abspath(downloaded_path) != os.path.abspath(dest):
+            if os.path.exists(dest):
+                os.unlink(dest)
+            os.replace(downloaded_path, dest)
+
+        size = os.path.getsize(dest)
+        if expected_size > 0:
+            pct = min(size / expected_size, 1.0)
+            progress = int(progress_start + pct * (progress_end - progress_start))
+        else:
+            progress = progress_end
+        emit_progress(
+            min(progress, progress_end),
+            f"Downloaded with accelerated client ({size / (1024**3):.1f} GB)",
+        )
+        _cleanup_hf_local_dir(local_dir, archive_file)
+        return True
+    except Exception as e:
+        emit_progress(
+            progress_start,
+            f"Accelerated download post-processing failed, using resumable fallback: {e}",
+        )
+        return False
+
+
 def download_with_resume(
     url: str,
     dest: str,
@@ -194,9 +292,10 @@ def download_with_resume(
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=300) as resp:
                 mode = "ab" if bytes_downloaded > 0 else "wb"
+                next_meta_at = bytes_downloaded + DOWNLOAD_META_BYTES
                 with open(partial_path, mode) as f:
                     while True:
-                        chunk = resp.read(65536)
+                        chunk = resp.read(DOWNLOAD_CHUNK_BYTES)
                         if not chunk:
                             break
                         f.write(chunk)
@@ -212,10 +311,11 @@ def download_with_resume(
                             stage = f"Downloading... {bytes_downloaded / (1024**3):.1f} GB"
                             emit_progress(progress, stage)
 
-                        # Write meta periodically (every 10 MB)
-                        if bytes_downloaded % (10 * 1024 * 1024) < 65536:
+                        # Write meta periodically so a crash can resume.
+                        if bytes_downloaded >= next_meta_at:
                             with open(meta_path, "w") as mf:
                                 json.dump({"bytesDownloaded": bytes_downloaded}, mf)
+                            next_meta_at = bytes_downloaded + DOWNLOAD_META_BYTES
 
             # Download complete
             os.rename(partial_path, dest)
@@ -462,7 +562,15 @@ def _install() -> None:
         emit_progress(2, f"Downloading {bundle.get('name', bundle_id)} bundle...")
 
         try:
-            download_with_resume(url, tar_path, compressed_size, 2, 85)
+            if not download_with_hf_hub(
+                bundle_repo,
+                archive_file,
+                tar_path,
+                compressed_size,
+                2,
+                85,
+            ):
+                download_with_resume(url, tar_path, compressed_size, 2, 85)
         except RuntimeError as e:
             fail(
                 f"{e}\n\n"
@@ -478,7 +586,16 @@ def _install() -> None:
             os.unlink(tar_path)
             emit_progress(86, "Checksum mismatch, retrying download...")
             try:
-                download_with_resume(url, tar_path, compressed_size, 2, 85)
+                if not download_with_hf_hub(
+                    bundle_repo,
+                    archive_file,
+                    tar_path,
+                    compressed_size,
+                    2,
+                    85,
+                    force_download=True,
+                ):
+                    download_with_resume(url, tar_path, compressed_size, 2, 85)
             except RuntimeError as e:
                 fail(str(e))
 
