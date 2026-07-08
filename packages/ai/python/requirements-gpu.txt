@@ -19,7 +19,7 @@ codeformer-pip==0.0.4
 # OpenTelemetry: enables the innermost sidecar.<script> span when
 # OTEL_EXPORTER_OTLP_ENDPOINT is set (enterprise distributed_tracing). Pure-Python,
 # no numpy/scipy deps, so safe for the numpy==1.26.4-locked stack.
-opentelemetry-api==1.28.2
+opentelemetry-api==1.43.0
 opentelemetry-sdk==1.28.2
 opentelemetry-exporter-otlp-proto-http==1.28.2
 
