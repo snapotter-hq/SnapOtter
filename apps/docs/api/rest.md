@@ -589,12 +589,13 @@ Query parameters:
 
 ## Features / AI Bundles
 
-Manage AI feature bundles (install/uninstall AI model packages in the Docker environment).
+Manage AI feature bundles (install/uninstall AI model packages in the Docker environment). Prefer the tool-level install endpoint when enabling a tool from custom automation: some AI tools need more than one shared bundle, and this endpoint skips already-installed bundles while queuing only the missing ones.
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | List all feature bundles and their install status |
 | `POST` | `/api/v1/admin/features/:bundleId/install` | Admin (`features:manage`) | Install a feature bundle (async, returns `jobId` for progress tracking) |
+| `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Install every bundle a tool requires; returns per-bundle queued/skipped status |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Uninstall a feature bundle and clean up model files |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Get total disk usage of AI models |
 | `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Import an offline AI bundle archive |

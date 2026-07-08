@@ -45,17 +45,30 @@ A separate "docs" dispatcher profile replaces the AI allowlist with document-pro
 
 ## Feature Bundles
 
-Each AI tool requires a model bundle to be installed before use. Bundles are installed on demand via the admin UI or `install_feature.py`.
+AI models are packaged by shared dependency stack, not one archive per tool. A feature bundle can enable several tools when they use the same model family, Python wheels, or native libraries. This keeps the release Docker image smaller and avoids storing duplicate copies of the same background matting, face detection, OCR, restoration, and speech models.
 
-| Bundle | Size | Tools |
-|--------|------|-------|
-| `background-removal` | 4-5 GB | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | restore-photo |
-| `ocr` | 5-6 GB | ocr, ocr-pdf |
-| `transcription` | ~600 MB | transcribe-audio, auto-subtitles |
+The Docker image ships the application plus the common runtime. Large model archives are downloaded on demand into the persistent `/data/ai` volume, then reused by every tool that needs them. If a bundle is already installed because another tool needed it, enabling a new dependent tool does not download that bundle again.
+
+Each AI tool requires one or more feature bundles before it can run. The admin UI installs by tool through `POST /api/v1/admin/tools/:toolId/features/install`, which resolves the full bundle list, skips bundles that are already installed, and queues only the missing downloads. For example, enabling Passport Photo on a fresh instance queues `background-removal` and `face-detection`; enabling it after Background Removal is already installed queues only `face-detection`.
+
+| Bundle | Size | Shared dependency group | Tools that use it |
+|--------|------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
+| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | scratch repair and restoration pipeline | restore-photo |
+| `ocr` | 5-6 GB | PaddleOCR / Tesseract OCR stack | ocr, ocr-pdf |
+| `transcription` | ~600 MB | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
+
+Tools with cross-bundle dependencies:
+
+| Tool | Required bundles | Why |
+|------|------------------|-----|
+| `passport-photo` | `background-removal`, `face-detection` | Removes the background, then uses face landmarks to frame the crop to passport and ID photo rules. |
+| `enhance-faces` | `upscale-enhance`, `face-detection` | Detects faces before running GFPGAN or CodeFormer enhancement on the selected face regions. |
+
+A tool is available only when all of its required bundles are installed. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
 
 ---
 

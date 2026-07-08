@@ -264,6 +264,10 @@ Most AI tools are perfectly usable on CPU; a couple really want a GPU. Measured 
 | AI upscale (RealESRGAN) | ~33 s small; minutes on large images | Marginal — GPU strongly recommended |
 | Photo restoration (full pipeline) | several minutes | No — needs a GPU or a fast many-core CPU |
 
+SnapOtter intentionally does not bake these model downloads into the Docker image. AI bundles are pulled only when an admin enables the related tool, stored in the persistent `/data/ai` volume, and shared by every tool that depends on the same model stack. This keeps the final container image small while still letting a full AI installation reach the larger storage numbers below.
+
+Some tools depend on more than one shared bundle. For example, Passport Photo needs both `background-removal` and `face-detection`; if `background-removal` is already installed, enabling Passport Photo only downloads the missing `face-detection` bundle. The same reuse applies across all AI tools.
+
 AI model download sizes:
 
 | Bundle | Disk Size |
