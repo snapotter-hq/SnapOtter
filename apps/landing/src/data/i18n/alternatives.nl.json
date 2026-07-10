@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online is sterk voor PDF-bewerking, ondertekenen, conversie en Acrobat-abonnementen. SnapOtter probeert niet het hele Adobe-ecosysteem te vervangen; het geeft teams zelf gehoste PDF-tools plus workflows voor beeld, video, audio en bestanden in één opensource stack.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "eb2a1ffebdea",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Niet voor elke Acrobat-workflow. SnapOtter is op zijn best wanneer je zelf gehoste PDF-verwerking, conversie, OCR, compressie, paginabewerkingen en automatisering nodig hebt. Acrobat blijft een uitgebreid document platform voor desktop en cloud.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "c40dbb5c99c4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "Is SnapOtter een vervanging voor Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "14a9521a6bd5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Kies SnapOtter wanneer controle over de implementatie, inzicht in de broncode, air-gapped-gebruik of herhaalbare bestandspipelines belangrijker zijn dan Adobe-accountfuncties en het bredere Acrobat-ecosysteem.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "31d29bc0eb92",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Waarom SnapOtter kiezen boven Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "8ab7014d9ee2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "cca8933fc3bc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online is een verzorgde gehoste PDF-workflow van het bedrijf achter PDF. SnapOtter is het zelf gehoste alternatief voor teams die PDF-werk op hun eigen infrastructuur willen houden.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "901992f4a024",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online is een gehoste PDF-toolset van Adobe. SnapOtter geeft teams zelf gehoste PDF-tools en bredere bestandsworkflows met opensource-implementatie.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "8513b3acd8e9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor Adobe Acrobat online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "cca8933fc3bc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe stelt dat bestanden van de online-editor door Adobe-servers worden verwerkt",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "1e8f93980334",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Gratis onlinetools, proefversies en betaalde Acrobat-abonnementen",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "de12771b2ae4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF-, e-handtekening-, AI- en Acrobat-accountworkflows",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "14685b2b1d75",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Meer dan PDF's",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b7dd84184591",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Browserworkflow of door de leverancier beheerde API, afhankelijk van het product",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "6946d1a4c7ab",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert is breed en API-vriendelijk voor conversie. SnapOtter converteert tussen beeld-, video-, audio-, PDF- en bestandsformaten, en voegt daar compressie, bewerking, OCR, transcriptie en lokale pipelines aan toe.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "98912fe2cea6",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Ja. SnapOtter is opensource en draait op Docker. Het converteert beeld-, video-, audio-, PDF- en bestandsformaten lokaal, zonder afrekening per conversie vanuit SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "966fb4236a29",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Kan ik een alternatief voor CloudConvert zelf hosten?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "ab75bcf3049d",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Ja. SnapOtter gebruikt FFmpeg onder de motorkap voor video en audio, naast Sharp voor afbeeldingen en qpdf, LibreOffice en verwante tools voor documenten.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "81db1e0507dc",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "Converteert SnapOtter ook video en audio?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "ee057442e47d",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "f703c57d29fa",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert is een volwassen gehoste converter met API. SnapOtter is het zelf gehoste alternatief wanneer conversie binnen je eigen infrastructuur hoort te gebeuren, met pipelines die je zelf beheert.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "a93b9572aa7d",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert is een gehost conversieplatform met een API. SnapOtter converteert beeld, video, audio, PDF en bestanden op je eigen server met opensource pipelines.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "6a094bbed32f",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "f703c57d29fa",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Bestanden worden voor verwerking geüpload naar een dienst van de leverancier",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "de1b45df7846",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Cloudprijzen op basis van gebruik en abonnement",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "70648b3ab578",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Gehoste conversie voor veel bestandscategorieën",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "da6fa6b450b5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Meer dan bestandsconversie",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "f829d47aaee6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "Gehoste API en browserworkflows",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "9c6732ef77b6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio is handig voor snelle conversies en gebruik van de developer-API. SnapOtter houdt conversie lokaal en voegt bredere bestandsverwerking toe: compressie, bewerking, OCR, transcriptie, PDF-bewerkingen en herhaalbare pipelines.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "87b5482eff0e",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter geeft je een via Docker te implementeren converter en bestandsverwerkingssuite. In plaats van bestanden naar een cloudconverter te sturen, draait je eigen server de conversiepipeline.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "54e1cccfa83f",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Wat is een zelf gehost alternatief voor Convertio?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "e40ee5752eff",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Ja. SnapOtter bevat REST-API's en ondersteuning voor pipelines, zodat teams bestandsworkflows binnen hun eigen omgeving kunnen automatiseren.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "2dd361e60242",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "Heeft SnapOtter een API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "636bb82870cc",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "f71b11e296e3",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio is een cloudconverter voor bestandsconversie in de browser tussen veel formaten. SnapOtter is het zelf gehoste alternatief wanneer je conversietaken binnen je eigen infrastructuur wilt houden.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "21ce9cafdbb7",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio is een cloudbestandsconverter met browsertools en een API. SnapOtter is het zelf gehoste alternatief voor privé conversieworkflows en lokale pipelines.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "1338c877a6e1",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "f71b11e296e3",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Cloudconversie; Convertio stelt dat geüploade bestanden meteen en geconverteerde bestanden na 24 uur worden verwijderd",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "caece43deb3b",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Gratis laag met bestands- en credit-limieten plus premiumabonnementen",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "99c09de447cb",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Cloudconversie voor meer dan 300 formaten en API-workflows",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "f035f5a963f9",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Meer dan bestandsconversie",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "f829d47aaee6",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "Gehoste conversie-API en browserworkflows",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "b8803705a661",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX is een gerichte converter en verwerkt een enorme lijst formaten. SnapOtter converteert ook, en voegt daar compressie, bewerking, redigeren, OCR, transcriptie en pipelines aan toe, zodat het past wanneer conversie één stap is tussen vele.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "c1859dd4e4f7",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Als je vooral formaatconversie tussen veel formaten nodig hebt, is ConvertX een strakke, gerichte optie. Bewerk, comprimeer, redigeer, OCR of transcribeer je ook, dan doet SnapOtter dat allemaal in één stack.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "1b60f0d249bc",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Moet ik SnapOtter of ConvertX gebruiken?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "b0b5bf3fc606",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Ja. Beide zijn zelf gehost, dus bestanden blijven op je eigen infrastructuur. Het verschil is de breedte, niet waar je data staat.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "4011f5a70722",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Houden beide bestanden op mijn server?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "f9b503840174",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter versus ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "2a71494ed073",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX en SnapOtter zijn beide zelf gehost en opensource. ConvertX draait om formaatconversie; SnapOtter doet conversie plus de rest van een bestandsworkflow.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "4900c37d93ab",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX is een zelf gehoste bestandsconverter voor meer dan 1000 formaten. SnapOtter converteert ook, en voegt bewerking, compressie, OCR en transcriptie toe voor vijf modaliteiten.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "1fbdc1a67296",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter versus ConvertX: zelf gehoste bestandstools vergeleken",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "bc82750b6851",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Zelf gehost",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "37c90b4c8ab9",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Opensource",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "6abca7ef8c92",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Ja, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cecbefe36c1a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Formaatconversie",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "54dda95ad0ad",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Primaire focus",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "976a17b2d8d7",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Volledige bestandsworkflow voor vijf typen",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "3c6c20c246d8",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Op conversie gerichte workflow",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "7fef55d8322e",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Meer dan conversie",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "089a34045653",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Comprimeren, bewerken, redigeren, OCR, transcriberen",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "a6fcf6fdc466",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "Meer dan 1000 conversieformaten",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "94f6447228e0",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Aantal tools",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "6345bf23bea5",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Geen primaire focus",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "717476d1123d",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Lokale AI-tools",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "38063c981e95",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, transcriptie, opschalen en meer",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "760a22ebab3a",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Geen primaire focus",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "717476d1123d",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Op lagen gebaseerde beeldbewerker",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "f6d937667d8f",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert is handig voor snelle online conversies in veel categorieën. SnapOtter dekt conversie ook, en voegt daar lokale beeldtools, video-/audioworkflows, PDF's, archieven, bestandstools, API's en pipelines aan toe.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "d4135bdba9aa",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Voor veel conversies van beeld, video, audio, PDF, archieven en bestanden wel. SnapOtter is het sterkst wanneer je de converter privé wilt implementeren in plaats van een gehoste webdienst te gebruiken.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "a920deb66120",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "Kan SnapOtter FreeConvert vervangen?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "6b48bfda79a9",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "De praktische grenzen van SnapOtter komen van je server, opslag, geheugen en ingestelde runtime-limieten. Daardoor past het beter wanneer je de capaciteit zelf wilt afstemmen.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "dafc9688c5f2",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "Ondersteunt SnapOtter grote bestanden?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "554dd9647bea",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "8230ea694a88",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert is een brede gehoste converter voor bestandsconversie en compressie in de browser. SnapOtter is het zelf gehoste alternatief wanneer je die bestandsbewerkingen binnen je eigen implementatie wilt draaien.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "83a9f8fde015",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert converteert en comprimeert bestanden online. SnapOtter is het zelf gehoste alternatief voor conversie van beeld, video, audio, PDF en bestanden op je eigen server.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "e23d586253e0",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "8230ea694a88",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Bestanden worden geüpload naar FreeConvert; FreeConvert stelt dat geconverteerde bestanden na enkele uren automatisch worden verwijderd",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "034c0b27169b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Gratis weblaag plus betaalde abonnementen voor grotere of hoger geprioriteerde workloads",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "4f8f15663b4e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Online conversie en compressie voor veel formaten",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "b5ce6f25ffbe",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Meer dan bestandsconversie",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "f829d47aaee6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Browserworkflow of door de leverancier beheerde API, afhankelijk van het product",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "6946d1a4c7ab",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF is sterk voor online PDF-taken. SnapOtter combineert PDF-tools met tools voor beeld, video, audio en bestanden, zodat dezelfde implementatie een contract, een schermopname en een podcastbewerking aankan.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "29cd2dc59fe0",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. Het is opensource onder AGPLv3, implementeert met Docker en geeft je samenvoegen, splitsen, comprimeren, converteren, beveiligen, OCR en verwante PDF-workflows op je eigen hardware.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "a51764d53ed8",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Wat is een zelf gehost alternatief voor iLovePDF?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "5c3f40fcdfb5",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "De opensource-editie is gratis. Een betaalde enterprise-laag voegt functies toe zoals SSO en auditlogging, maar de bestandstools zitten in de opensource stack.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "fd5416bccf63",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "Is SnapOtter gratis?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "36e99627dd2d",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "ec25fac8a4ef",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF is een gehoste PDF-dienst voor snel documentwerk in de browser. SnapOtter is het zelf gehoste alternatief wanneer je diezelfde soort PDF-workflow op je eigen server wilt draaien.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "e2a954283f28",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF is een online PDF-dienst. SnapOtter geeft teams zelf gehoste PDF-tools plus workflows voor beeld, video, audio en bestanden in één opensource stack.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "61c43b5a59a8",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "ec25fac8a4ef",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Bestanden worden voor verwerking geüpload naar een dienst van de leverancier",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "de1b45df7846",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Gratis en premium-abonnementen met abonnementsspecifieke functies",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "aeab8fcb1485",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF-workflowsuite",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "43886344b32c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Meer dan PDF's",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b7dd84184591",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Browserworkflow of door de leverancier beheerde API, afhankelijk van het product",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "6946d1a4c7ab",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert dekt veel conversiecategorieën en heeft via API2Convert een API-ecosysteem. SnapOtter is gebouwd voor privé-implementaties waarbij conversie, compressie, PDF-werk, audio-/videoverwerking en lokale AI-tools in één stack zitten.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "fe434f50f119",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Kies SnapOtter wanneer privacy, interne implementatie, opensource-code of air-gapped bestandsverwerking belangrijk is. Kies Online-Convert wanneer je liever een gehoste converter hebt zonder een server te onderhouden.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "78032ec3bf3a",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Waarom SnapOtter kiezen boven Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "a7c9f3aa820f",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Ja. SnapOtter bevat conversie, compressie, bewerking, OCR, transcriptie, PDF-bewerkingen, metadatatools, archieven, bestandstools en pipelines.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "9d9a62412de2",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "Dekt SnapOtter meer dan conversie?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "ec26da77511d",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "af5e9bb47632",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert is een al lang bestaande gehoste converter voor veel bestandscategorieën. SnapOtter is het zelf gehoste alternatief voor teams die conversie en verwerking op hun eigen server willen laten plaatsvinden.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "41f0c4dac91a",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert converteert video-, beeld-, audio-, document-, ebook- en archiefbestanden online. SnapOtter is het zelf gehoste alternatief voor privé bestandsworkflows.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "79542e3b51a7",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "af5e9bb47632",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Browseruploads naar de clouddiensten van Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "7540ba8cce93",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Gratis proefversie, creditpakketten, abonnementen en enterprise-opties",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "9eb28d3e0711",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Onlineconverters voor media, documenten, ebooks en archieven",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "59e299e8a71e",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Meer dan bestandsconversie",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "f829d47aaee6",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "Gehoste API2Convert-API en browserworkflows",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "030eb2cdc1aa",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai draait om vergaderingen, notities en samenwerking. SnapOtter richt zich op lokale spraak-naar-tekst plus de rest van een audioworkflow: bijknippen, normaliseren, ruisonderdrukking, formaatconversie, video-ondertitels en tools voor beeld, PDF en bestanden.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "618794ca92d4",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Ja. SnapOtter draait transcriptie lokaal met Whisper-modellen op je eigen CPU of NVIDIA CUDA-GPU. Het past beter bij privé audio- en videobestanden dan bij samenwerking via vergaderagents.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "dae2791e2833",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Is er een zelf gehost alternatief voor Otter.ai?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "73bac4aeba05",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "Een GPU is sneller, maar transcriptie draait ook op een CPU. De modellen worden op aanvraag geïnstalleerd zodra je de functie voor het eerst gebruikt.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "95d437a9018b",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Heb ik een GPU nodig?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "f33c3b4c8393",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "e9ec2a664779",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai is een gehost platform voor vergadertranscriptie. SnapOtter is het zelf gehoste alternatief wanneer je transcriptie op je eigen CPU of NVIDIA CUDA-GPU wilt draaien met lokale modellen.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "1f56ec90cd86",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai transcribeert vergaderingen in de cloud. SnapOtter draait spraak-naar-tekst op je eigen CPU of NVIDIA CUDA-GPU met lokale Whisper-modellen en zonder audio te uploaden.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "4986701288e8",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "e9ec2a664779",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Audio- en vergaderinhoud wordt verwerkt door de gehoste Otter.ai-dienst",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "259597cc2ec3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Gratis en betaalde abonnementen met minuten-/importlimieten per abonnement",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "00e875cf57d9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Vergadernotities, AI-samenvattingen, samenwerking en transcriptie",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "eb6eaeefba6d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Meer dan transcriptie",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "4cd55f9f261e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Gehoste app-integraties en vergaderworkflows",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "6c1d60f83693",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf richt zich op PDF's, en dat is precies wat veel mensen nodig hebben. SnapOtter dekt dat terrein met samenvoegen, splitsen, comprimeren, converteren, redigeren, OCR en meer, en voegt daar in dezelfde implementatie workflows voor beeld, video, audio en bestanden aan toe.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "5dfda7c4f3d3",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Ja. SnapOtter is opensource onder AGPLv3 en draait met Docker op je eigen server. Het dekt samenvoegen, splitsen, comprimeren, converteren, beveiligen, redigeren, watermerken, paginanummers en OCR, zonder kosten per bestand vanuit SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "fe8afcc2fb8f",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Is er een gratis, zelf gehost alternatief voor Smallpdf?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "ccf05d27a957",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter verwerkt bestanden op de machine waarop je het draait. Implementeer je het binnen je eigen netwerk, dan blijven bestanden binnen die implementatie in plaats van naar een externe PDF-dienst te gaan.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "106b77ec14bc",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Worden mijn documenten ergens naartoe geüpload?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "42ba299fd717",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Ja. Naast PDF-tools verwerkt SnapOtter ook taken voor beeld, video, audio en bestanden, zodat één implementatie meerdere dagelijkse bestandsworkflows kan dekken.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "f2020551b368",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "Doet SnapOtter meer dan PDF's?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "6ca68c721e23",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "f0760796625b",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf is een verzorgde gehoste PDF-suite. SnapOtter is het zelf gehoste alternatief voor teams die hun PDF-tools willen draaien op infrastructuur die ze zelf beheren, zonder gevoelige documenten naar een externe PDF-dienst te sturen.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "a3115d96a70a",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf is een gehoste PDF-toolkit. SnapOtter voert PDF-samenvoegen, splitsen, comprimeren, converteren, OCR en meer uit op je eigen server, met meer dan 200 extra tools voor vijf bestandstypen.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "c25cad3742d9",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "f0760796625b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Bestanden worden voor verwerking geüpload naar een dienst van de leverancier",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "de1b45df7846",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Gratis en betaalde abonnementen met abonnementsspecifieke functies",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "95a0fb063161",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF-workflowsuite",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "43886344b32c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Meer dan PDF's",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b7dd84184591",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Browserworkflow of door de leverancier beheerde API, afhankelijk van het product",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "6946d1a4c7ab",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Als je alleen ooit met PDF's werkt, is Stirling-PDF uitstekend en zeker een blik waard. Bewerk je ook afbeeldingen, converteer je video, transcribeer je audio of verwerk je bestanden in batch, dan doet SnapOtter dat allemaal in één implementatie in plaats van meerdere tools naast elkaar te draaien.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "8018383c7791",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Dat kan, als je één stack wilt voor meer dan PDF's. De PDF-dekking van SnapOtter is breed, en het voegt tools voor beeld, video, audio en bestanden toe. Voor een PDF-only opzet is Stirling-PDF een degelijke, gerichte keuze.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "b4c87c951ce1",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "Is SnapOtter een vervanging voor Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "e5f06a31bc3c",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Beide projecten zijn opensource en zelf te hosten. SnapOtter is AGPLv3 en voegt een optionele betaalde enterprise-laag toe voor SSO, auditlogging en vergelijkbare functies.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "9dff2b93a9ba",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Zijn beide gratis en opensource?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "9021abad4ebc",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter versus Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "7f9267f328b2",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF en SnapOtter zijn beide zelf gehost en opensource, dus je bestanden blijven hoe dan ook op je eigen server. Het verschil is de reikwijdte: Stirling-PDF richt zich op PDF's, terwijl SnapOtter alle vijf de bestandstypen omvat.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "f4ebbf028987",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF is een sterke zelf gehoste PDF-toolkit. SnapOtter dekt PDF's ook, plus tools voor beeld, video, audio en bestanden in één stack. Beide zijn opensource.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "c648a763259c",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter versus Stirling-PDF: zelf gehoste bestandstools vergeleken",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "01b08f7894d6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Zelf gehost",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "37c90b4c8ab9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Opensource",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "6abca7ef8c92",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Ja, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cecbefe36c1a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF-workflows",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "410c1697b9f2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Primaire focus",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "976a17b2d8d7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Volledige bestandsworkflow voor vijf typen",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "3c6c20c246d8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ PDF-bewerkingen",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "56cc7eb6c6ff",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Aantal tools",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "6345bf23bea5",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF-gerichte OCR-workflows",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "1c65a037825e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "Lokale AI (OCR, transcriptie, opschalen)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "8427fd5ac928",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, transcriptie, opschalen en meer",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "760a22ebab3a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Niet de focus",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "b36eb2ad2b38",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Op lagen gebaseerde beeldbewerker",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "f6d937667d8f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF-automatiseringsworkflows",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "a0f84b2f7386",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Pipelines en batchverwerking",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "6e722514d8ae",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG is uitstekend wanneer de taak beeldcompressie is. SnapOtter comprimeert PNG, JPEG, WebP en AVIF, en gaat verder met formaatwijziging, bijsnijden, conversie, watermerken, metadatatools, video, audio, PDF en bestandsworkflows.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "f0c3c69ebaac",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Ja. SnapOtter draait beeldcompressie lokaal, dus de praktische grens is je eigen hardware in plaats van een quotum van een externe beelddienst.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "66ad854ba3bb",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Is er een zelf gehost alternatief voor TinyPNG?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "bcd0a6445dff",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP en AVIF, met conversie tussen formaten. SnapOtter leest ook veel invoerformaten, waaronder RAW-formaten van camera's.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "1561cd27b899",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Welke formaten kan SnapOtter comprimeren?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "8e086244fd4b",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "e816939775ca",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG is een gerichte online beeldcompressor. SnapOtter is het zelf gehoste alternatief voor teams die compressie, conversie, formaatwijziging, metadata en ander beeldwerk lokaal willen laten draaien.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "3a586896c201",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG comprimeert afbeeldingen online en via de API van Tinify. SnapOtter comprimeert en converteert afbeeldingen op je eigen server, met bredere bestandsworkflows in één stack.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "4886cd383a6b",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "e816939775ca",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Bestanden worden voor verwerking geüpload naar een dienst van de leverancier",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "de1b45df7846",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Gratis webgebruik en betaalde/developer-API-opties",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "e2a20e0ed839",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Beeldcompressie en Tinify-API-workflows",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "7fe89b7d068b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Meer dan beeldcompressie",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "0bc1fa4e7076",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Browserworkflow of door de leverancier beheerde API, afhankelijk van het product",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "6946d1a4c7ab",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow is handig als je snel een browsertool wilt en niets wilt installeren. SnapOtter is gebouwd voor de andere kant van die afweging: privé-implementaties, interne workflows, herhaalbare pipelines en lokale bestandsverwerking voor beeld, video, audio, PDF en bestanden.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "f27c21cacfad",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Nee. TinyWow is een brede gehoste webtoolbox. SnapOtter is een zelf gehoste bestandsverwerkingssuite voor teams die privé-implementatie, inzicht in de broncode, API's en pipelines willen.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "8e002ae3ed87",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "Is SnapOtter een kloon van TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "58bfe6fcda16",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Gebruik TinyWow voor snelle eenmalige browsertaken waarbij gehoste verwerking acceptabel is. Gebruik SnapOtter wanneer bestanden gevoelig zijn, workflows zich herhalen of je organisatie de verwerking wil laten plaatsvinden op infrastructuur die ze zelf beheert.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "a126783f36c6",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Moet ik TinyWow of SnapOtter gebruiken?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "771f6bebb7e4",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Niet direct. SnapOtter richt zich op bestandsbewerking: afbeeldingen, video, audio, PDF, archieven en bestanden. Het past beter wanneer de bestandsverwerkingslaag belangrijker is dan schrijfsjablonen.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "435e1b025f45",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "Vervangt SnapOtter de AI-schrijftools van TinyWow?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "6b678d442bba",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Het opensource, zelf gehoste alternatief voor TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "d001974c9f4c",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow is een brede gehoste toolbox voor snelle taken met PDF, beeld, video, AI-schrijven en bestanden. SnapOtter is het zelf gehoste alternatief voor teams die dagelijkse bestandshulpmiddelen willen draaien op infrastructuur die ze zelf beheren.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "d3ded8c487b8",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow is een brede gehoste toolbox voor PDF-, beeld-, video-, AI-schrijf- en bestandstaken. SnapOtter is het zelf gehoste alternatief voor privé bestandsworkflows.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "405d6bd386fe",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Het opensource, zelf gehoste alternatief voor TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "d001974c9f4c",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Gehoste online toolbox",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "f8240beef4ab",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Zelf gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "a63c43b00cf6",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Uploads naar de servers van TinyWow; TinyWow stelt dat bestanden na 1 uur worden verwijderd",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "ca7aa869060f",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Hulpmiddelen voor PDF, beeld, video, AI-schrijven en bestanden",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "03c2b22b74f9",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Toolbereik",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "d876ee5844cd",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Beeld, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "372cc8366479",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Gratis tools plus betaalde supporter-/contentabonnementen",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "c7d8c709783f",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Gratis onder AGPLv3; de grens ligt bij je hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "cbec9cbea8cc",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Ontworpen voor browsergebruik online",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "40f2f05fc424",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Offline- of air-gapped-gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7e8e2d3c79ab",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Mogelijk wanneer geïmplementeerd binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1b95a20c62c2",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van de broncode hoort niet bij het productmodel",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "dc4fa66ebe74",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Vooral snelle webtool-workflows",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "dc8c58241be3",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST-API en pipelines in je eigen implementatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "69d86711bad5",
+    "stale": false
+  }
+}
