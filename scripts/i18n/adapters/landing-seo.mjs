@@ -1,5 +1,5 @@
 // scripts/i18n/adapters/landing-seo.mjs
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -105,6 +105,7 @@ export function makeLandingSeoAdapter(opts = {}) {
 
     async write(locale, entries) {
       const altRecord = toRecord(entries);
+      await mkdir(dir, { recursive: true });
       await writeFile(altFileFor(dir, locale), `${JSON.stringify(altRecord, null, 2)}\n`);
     },
   };
