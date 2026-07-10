@@ -708,6 +708,24 @@ export async function importBundleArchive(
       extractor.on("finish", () => res());
       extractor.on("error", rej);
       stream.on("error", rej);
+    }).catch((err: unknown) => {
+      // Malformed uploads (non-gzip data, corrupt/truncated gzip, garbage
+      // tar) surface as ZlibError or tar parse errors here. Map them to a
+      // 400-able validation error instead of letting them escape as a 500
+      // (Sentry NODE-1Z). Fatal node-tar parse errors always carry tarCode
+      // (TAR_ABORT, TAR_BAD_ARCHIVE); recoverable ones never reach "error".
+      if (err instanceof ImportValidationError) throw err;
+      const name = (err as Error | null)?.name ?? "";
+      const msg = String((err as Error | null)?.message ?? "");
+      const tarCode = (err as { tarCode?: unknown } | null)?.tarCode;
+      if (
+        name === "ZlibError" ||
+        typeof tarCode === "string" ||
+        /unexpected end of (file|data)|invalid tar|incorrect header check|zlib/i.test(msg)
+      ) {
+        throw new ImportValidationError("Not a valid bundle archive");
+      }
+      throw err;
     });
 
     // Read and validate bundle.json
