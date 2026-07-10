@@ -5,7 +5,8 @@ import { formatCompact, getStarCount } from "@/lib/stats";
 // Fetched at build time; refreshed by the scheduled landing rebuild.
 const starCount = formatCompact(await getStarCount());
 
-const productLinks = [
+type NavItem = { label: string; href: string; external?: boolean; desc?: string };
+const productLinks: NavItem[] = [
   {
     label: "Developers",
     href: "/self-hosted/file-conversion-api",
@@ -14,7 +15,7 @@ const productLinks = [
   { label: "Self-hosted tools", href: "/self-hosted", desc: "Private, on your own infrastructure" },
   { label: "Alternatives", href: "/alternatives", desc: "vs CloudConvert, TinyPNG, Otter.ai" },
 ];
-const links = [
+const links: NavItem[] = [
   { label: "Enterprise", href: "/#enterprise" },
   { label: "Pricing", href: "/#pricing" },
   { label: "Docs", href: "https://docs.snapotter.com", external: true },
