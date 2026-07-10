@@ -24,8 +24,9 @@
 </p>
 
 <p align="center">
-  <strong>Self-hosted file toolkit. 200+ tools across image, video, audio, PDF, and files.</strong><br />
-  The open-source alternative to Smallpdf, iLovePDF, TinyPNG, TinyWow, and CloudConvert, in one stack you host yourself.
+  <strong>Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, strip metadata, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. Your files never leave your network.</strong>
+  <br /><br />
+  The one self-hosted stack that replaces CloudConvert, Smallpdf, TinyPNG, TinyWow, and Otter.ai. 200+ tools across five modalities, on hardware you own.
 </p>
 
 ![SnapOtter - Dashboard](branding/dashboard.gif)
