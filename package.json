@@ -30,6 +30,7 @@
     "wiki:dev": "cd .local-wiki && npm run docs:dev",
     "docs:dev": "pnpm --filter @snapotter/docs docs:dev",
     "i18n:translate": "apps/api/node_modules/.bin/tsx scripts/i18n/translate.mjs",
+    "i18n:check": "apps/api/node_modules/.bin/tsx scripts/i18n/check-parity.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "biome check --write .",
