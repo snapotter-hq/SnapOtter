@@ -1,5 +1,5 @@
 // scripts/i18n/adapters/api-spec.mjs
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
@@ -9,6 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // The real spec lives next to the API source. Tests pass a `dir` override.
 const DEFAULT_DIR = join(__dirname, "../../../apps/api/src");
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
+
+// structuredClone is global in Node 22+, used to deep-copy the parsed spec.
+const clone = (value) => structuredClone(value);
 
 /**
  * Read and parse the English OpenAPI document.
@@ -89,11 +92,54 @@ export function makeApiSpecAdapter({ dir = DEFAULT_DIR } = {}) {
       const spec = loadEnglishSpec(dir);
       return proseFields(spec).map(([id, sourceText]) => ({ id, sourceText, kind: "text" }));
     },
-    async load(_locale) {
-      throw new Error("load() not implemented yet");
+
+    async write(locale, entries) {
+      const english = loadEnglishSpec(dir);
+      const localized = clone(english);
+      const stamp = {};
+
+      // Replace only the prose fields that have a translation; anything missing
+      // keeps its English text so the document is always complete and valid.
+      for (const [id] of proseFields(english)) {
+        const entry = entries.get(id);
+        if (!entry) continue;
+        setProseField(localized, id, entry.text);
+        stamp[id] = {
+          sourceHash: entry.sourceHash,
+          provenance: entry.provenance,
+          outputHash: entry.outputHash,
+          ...(entry.stale ? { stale: true } : {}),
+        };
+      }
+
+      localized["x-i18n"] = {
+        locale,
+        generator: "scripts/i18n/adapters/api-spec.mjs",
+        entries: stamp,
+      };
+
+      const out = yaml.dump(localized, { lineWidth: -1, noRefs: true });
+      writeFileSync(join(dir, `openapi.${locale}.yaml`), out, "utf8");
     },
-    async write(_locale, _entries) {
-      throw new Error("write() not implemented yet");
+
+    async load(locale) {
+      const file = join(dir, `openapi.${locale}.yaml`);
+      const result = new Map();
+      if (!existsSync(file)) return result;
+      const spec = yaml.load(readFileSync(file, "utf8"));
+      const stamp = spec?.["x-i18n"]?.entries ?? {};
+      for (const [id, text] of proseFields(spec)) {
+        const meta = stamp[id];
+        if (!meta) continue; // untranslated fallback field, not a stored entry
+        result.set(id, {
+          text,
+          sourceHash: meta.sourceHash,
+          provenance: meta.provenance === "human" ? "human" : "machine",
+          outputHash: meta.outputHash,
+          ...(meta.stale ? { stale: true } : {}),
+        });
+      }
+      return result;
     },
   };
 }

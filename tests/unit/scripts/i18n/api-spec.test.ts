@@ -1,10 +1,11 @@
 // tests/unit/scripts/i18n/api-spec.test.ts
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeApiSpecAdapter } from "../../../../scripts/i18n/adapters/api-spec.mjs";
+import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
 // A tiny OpenAPI 3.1 document exercising every translatable prose family:
 // info.description, a tag description, and an op summary + description.
@@ -85,5 +86,89 @@ describe("api-spec adapter extract", () => {
     for (const unit of await adapter.extract()) {
       expect(unit.kind).toBe("text");
     }
+  });
+});
+
+describe("api-spec adapter write/load round-trip", () => {
+  it("writes a locale spec that is English with only prose fields replaced", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const entries = new Map([
+      [
+        "paths./api/v1/tools/image/resize.post.summary",
+        {
+          text: "Groesse aendern",
+          sourceHash: hash("Resize"),
+          provenance: "machine" as const,
+          outputHash: hash("Groesse aendern"),
+        },
+      ],
+    ]);
+    await adapter.write("de", entries);
+
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
+    const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
+    // Translated prose replaced.
+    expect(written.paths["/api/v1/tools/image/resize"].post.summary).toBe("Groesse aendern");
+    // Untranslated prose falls back to English (we only supplied one entry).
+    expect(written.info.description).toBe("Root prose to translate.");
+    // Schemas, parameters, responses, operationId are byte-for-byte English.
+    expect(written.components.schemas.ToolResponse.properties.jobId.description).toBe(
+      "Schema prose stays English.",
+    );
+    expect(written.paths["/api/v1/tools/image/resize"].post.parameters[0].name).toBe("width");
+    expect(written.paths["/api/v1/tools/image/resize"].post.responses["200"].description).toBe(
+      "Processed image (stays English).",
+    );
+    expect(written.paths["/api/v1/tools/image/resize"].post.operationId).toBe("resizeImage");
+  });
+
+  it("stamps an x-i18n map with the source and output hashes", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const entry = {
+      text: "Groesse aendern",
+      sourceHash: hash("Resize"),
+      provenance: "machine" as const,
+      outputHash: hash("Groesse aendern"),
+    };
+    await adapter.write("de", new Map([["paths./api/v1/tools/image/resize.post.summary", entry]]));
+
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
+    const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
+    expect(written["x-i18n"].locale).toBe("de");
+    const stamped = written["x-i18n"].entries["paths./api/v1/tools/image/resize.post.summary"];
+    expect(stamped.sourceHash).toBe(hash("Resize"));
+    expect(stamped.outputHash).toBe(hash("Groesse aendern"));
+    expect(stamped.provenance).toBe("machine");
+  });
+
+  it("load() reconstructs the same StoredEntries write() persisted", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const entries = new Map([
+      [
+        "tags.Tools.description",
+        {
+          text: "Werkzeuge",
+          sourceHash: hash("Tag prose to translate."),
+          provenance: "human" as const,
+          outputHash: hash("Werkzeuge"),
+          stale: true,
+        },
+      ],
+    ]);
+    await adapter.write("de", entries);
+
+    const loaded = await adapter.load("de");
+    const got = loaded.get("tags.Tools.description");
+    expect(got?.text).toBe("Werkzeuge");
+    expect(got?.sourceHash).toBe(hash("Tag prose to translate."));
+    expect(got?.provenance).toBe("human");
+    expect(got?.outputHash).toBe(hash("Werkzeuge"));
+    expect(got?.stale).toBe(true);
+  });
+
+  it("load() returns an empty Map when the locale spec is absent", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const loaded = await adapter.load("fr");
+    expect(loaded.size).toBe(0);
   });
 });
