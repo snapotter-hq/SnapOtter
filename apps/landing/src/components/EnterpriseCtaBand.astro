@@ -1,0 +1,28 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+interface Props {
+  heading?: string;
+  body?: string;
+}
+const {
+  heading = "Deploying this across a team?",
+  body = "Audit trails, per-tool permissions, SSO, and air-gapped deployment for regulated environments. Talk to us about running SnapOtter as shared infrastructure.",
+} = Astro.props;
+---
+
+<section class="border-t border-border bg-background-alt py-16">
+  <div class="mx-auto max-w-4xl px-6 text-center">
+    <div class="reveal">
+      <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{heading}</h2>
+      <p class="mx-auto mt-4 max-w-xl text-muted">{body}</p>
+      <div class="mt-8 flex flex-wrap justify-center gap-4">
+        <a href="/contact" class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold">
+          Book a demo
+        </a>
+        <a href="/enterprise" class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt">
+          See enterprise features
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
