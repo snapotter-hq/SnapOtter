@@ -238,6 +238,7 @@ jobs:
             SNAPOTTER_ANALYTICS=on
             SNAPOTTER_POSTHOG_PROJECT_ID=${{ secrets.SNAPOTTER_POSTHOG_KEY }}
             SNAPOTTER_SENTRY_DSN=${{ secrets.SNAPOTTER_SENTRY_DSN }}
+            SNAPOTTER_SENTRY_DSN_WEB=${{ secrets.SNAPOTTER_SENTRY_DSN_WEB }}
             SENTRY_RELEASE=${{ needs.release.outputs.new_version }}
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
