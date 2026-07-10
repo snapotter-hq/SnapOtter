@@ -8,16 +8,6 @@ import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
 let dir: string;
 
-const TOOL_SEO = {
-  "jpg-to-png": {
-    searchTitle: "JPG to PNG Converter",
-    longDescription: "Convert JPG to PNG on your own instance.",
-    useCases: ["Convert a JPG file to PNG"],
-    features: ["Batch processing"],
-    faqs: [{ q: "How do I convert?", a: "Upload then download." }],
-  },
-};
-
 const ALTERNATIVES = [
   {
     slug: "smallpdf",
@@ -31,9 +21,6 @@ const ALTERNATIVES = [
   },
 ];
 
-// Tool metadata is provided by shared i18n, never translated here.
-const loadToolStrings = async () => ({ "jpg-to-png": { name: "Convert", description: "desc" } });
-
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "landing-seo-"));
 });
@@ -45,77 +32,75 @@ afterEach(async () => {
 function make() {
   return makeLandingSeoAdapter({
     dir,
-    toolSeo: TOOL_SEO,
     alternatives: ALTERNATIVES,
-    loadToolStrings,
   });
 }
 
 describe("landing-seo adapter", () => {
-  it("extracts prose units with stable indexed ids and never tool name/description", async () => {
+  it("extracts only alternatives prose units with stable indexed ids", async () => {
     const units = await make().extract();
     const ids = units.map((u) => u.id);
-    expect(ids).toContain("seo:jpg-to-png:searchTitle");
-    expect(ids).toContain("seo:jpg-to-png:useCases.0");
-    expect(ids).toContain("seo:jpg-to-png:faqs.0.q");
     expect(ids).toContain("alt:smallpdf:h1");
+    expect(ids).toContain("alt:smallpdf:metaDescription");
     expect(ids).toContain("alt:smallpdf:rows.0.snapotter");
-    // Tool name/description are reused from shared i18n, so no unit carries them.
-    expect(units.some((u) => u.sourceText === "Convert")).toBe(false);
-    expect(units.some((u) => u.sourceText === "desc")).toBe(false);
+    expect(ids).toContain("alt:smallpdf:faqs.0.q");
+    // Tool-detail pages are English-only, so no seo:* units are extracted.
+    expect(ids.some((id) => id.startsWith("seo:"))).toBe(false);
   });
 
   it("write then load round-trips StoredEntry with inline _sourceHash", async () => {
     const adapter = make();
     const entries = new Map([
       [
-        "seo:jpg-to-png:searchTitle",
+        "alt:smallpdf:h1",
         {
-          text: "JPG zu PNG Konverter",
-          sourceHash: hash("JPG to PNG Converter"),
+          text: "Die Alternative zu Smallpdf",
+          sourceHash: hash("The alternative to Smallpdf"),
           provenance: "machine",
-          outputHash: hash("JPG zu PNG Konverter"),
+          outputHash: hash("Die Alternative zu Smallpdf"),
           stale: false,
         },
       ],
     ]);
     await adapter.write("de", entries);
 
-    const file = JSON.parse(await readFile(join(dir, "tool-seo.de.json"), "utf8"));
-    expect(file["seo:jpg-to-png:searchTitle"].text).toBe("JPG zu PNG Konverter");
-    expect(file["seo:jpg-to-png:searchTitle"]._sourceHash).toBe(hash("JPG to PNG Converter"));
-    expect(file["seo:jpg-to-png:searchTitle"].provenance).toBe("machine");
+    const file = JSON.parse(await readFile(join(dir, "alternatives.de.json"), "utf8"));
+    expect(file["alt:smallpdf:h1"].text).toBe("Die Alternative zu Smallpdf");
+    expect(file["alt:smallpdf:h1"]._sourceHash).toBe(hash("The alternative to Smallpdf"));
+    expect(file["alt:smallpdf:h1"].provenance).toBe("machine");
 
     const loaded = await adapter.load("de");
-    expect(loaded.get("seo:jpg-to-png:searchTitle")).toEqual({
-      text: "JPG zu PNG Konverter",
-      sourceHash: hash("JPG to PNG Converter"),
+    expect(loaded.get("alt:smallpdf:h1")).toEqual({
+      text: "Die Alternative zu Smallpdf",
+      sourceHash: hash("The alternative to Smallpdf"),
       provenance: "machine",
-      outputHash: hash("JPG zu PNG Konverter"),
+      outputHash: hash("Die Alternative zu Smallpdf"),
       stale: false,
     });
   });
 
-  it("routes alt: ids to alternatives.<locale>.json and seo: ids to tool-seo.<locale>.json", async () => {
+  it("writes alt: ids to alternatives.<locale>.json and never a tool-seo file", async () => {
     const adapter = make();
     await adapter.write(
       "de",
       new Map([
         [
-          "alt:smallpdf:h1",
+          "alt:smallpdf:intro",
           {
-            text: "Die Alternative zu Smallpdf",
-            sourceHash: hash("The alternative to Smallpdf"),
+            text: "Smallpdf ist gehostet. SnapOtter ist selbst gehostet.",
+            sourceHash: hash("Smallpdf is hosted. SnapOtter is self-hosted."),
             provenance: "machine",
-            outputHash: hash("Die Alternative zu Smallpdf"),
+            outputHash: hash("Smallpdf ist gehostet. SnapOtter ist selbst gehostet."),
             stale: false,
           },
         ],
       ]),
     );
     const alt = JSON.parse(await readFile(join(dir, "alternatives.de.json"), "utf8"));
-    expect(alt["alt:smallpdf:h1"].text).toBe("Die Alternative zu Smallpdf");
-    // The seo file should exist but hold no alt entry.
-    await expect(readFile(join(dir, "tool-seo.de.json"), "utf8")).resolves.toBe("{}\n");
+    expect(alt["alt:smallpdf:intro"].text).toBe(
+      "Smallpdf ist gehostet. SnapOtter ist selbst gehostet.",
+    );
+    // No tool-seo file is ever written now that tool-detail pages are English-only.
+    await expect(readFile(join(dir, "tool-seo.de.json"), "utf8")).rejects.toThrow();
   });
 });

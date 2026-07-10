@@ -2,38 +2,18 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadToolStrings as sharedLoadToolStrings } from "../lib/shared-i18n.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUT_DIR = join(__dirname, "../../../apps/landing/src/data/i18n");
 
-// Prose fields translated per source. Tool name/description are intentionally absent:
-// they come from shared i18n at render time. Slugs, urls, dates, booleans stay as-is.
-const SEO_STRING_FIELDS = ["searchTitle", "h1", "longDescription"];
-const SEO_ARRAY_FIELDS = ["useCases", "features"];
+// Only the alternatives pages are localized. Tool-detail pages are English-only
+// (thin-content SEO risk), so their tool-seo prose is never rendered in a locale
+// and is intentionally not extracted here.
 const ALT_STRING_FIELDS = ["pageTitle", "h1", "metaDescription", "intro", "breadth"];
 
 function pushIfString(units, id, value) {
   if (typeof value === "string" && value.trim().length > 0) {
     units.push({ id, sourceText: value, kind: "text" });
-  }
-}
-
-function extractToolSeo(units, toolSeo) {
-  for (const [toolId, seo] of Object.entries(toolSeo)) {
-    const base = `seo:${toolId}`;
-    for (const field of SEO_STRING_FIELDS) pushIfString(units, `${base}:${field}`, seo[field]);
-    for (const field of SEO_ARRAY_FIELDS) {
-      const arr = Array.isArray(seo[field]) ? seo[field] : [];
-      arr.forEach((v, i) => {
-        pushIfString(units, `${base}:${field}.${i}`, v);
-      });
-    }
-    const faqs = Array.isArray(seo.faqs) ? seo.faqs : [];
-    faqs.forEach((faq, i) => {
-      pushIfString(units, `${base}:faqs.${i}.q`, faq.q);
-      pushIfString(units, `${base}:faqs.${i}.a`, faq.a);
-    });
   }
 }
 
@@ -64,9 +44,8 @@ async function readJson(path) {
   }
 }
 
-function fileFor(dir, source, locale) {
-  const base = source === "alt" ? "alternatives" : "tool-seo";
-  return join(dir, `${base}.${locale}.json`);
+function altFileFor(dir, locale) {
+  return join(dir, `alternatives.${locale}.json`);
 }
 
 function toStored(record) {
@@ -83,11 +62,9 @@ function toStored(record) {
   return out;
 }
 
-function toRecord(entries, wantSource) {
+function toRecord(entries) {
   const record = {};
   for (const id of [...entries.keys()].sort()) {
-    const source = id.startsWith("alt:") ? "alt" : "seo";
-    if (source !== wantSource) continue;
     const e = entries.get(id);
     record[id] = {
       text: e.text,
@@ -101,49 +78,34 @@ function toRecord(entries, wantSource) {
 }
 
 /**
- * Build the landing SEO data adapter.
+ * Build the landing SEO data adapter (alternatives pages only).
  * @param {{
  *   dir?: string,
- *   toolSeo?: Record<string, any>,
  *   alternatives?: any[],
- *   loadToolStrings?: (locale: string) => Promise<Record<string, { name: string, description: string }>>,
  * }} [opts]
  */
 export function makeLandingSeoAdapter(opts = {}) {
   const dir = opts.dir ?? DEFAULT_OUT_DIR;
-  const loadToolStrings = opts.loadToolStrings ?? sharedLoadToolStrings;
   return {
     name: "landing-seo",
 
     async extract() {
-      // Reuse app translations for tool name/description (proves they are covered,
-      // and lets a future extension surface them without translating here).
-      await loadToolStrings("en");
-      const toolSeo =
-        opts.toolSeo ?? (await import("../../../apps/landing/src/data/tool-seo.ts")).TOOL_SEO;
       const alternatives =
         opts.alternatives ??
         (await import("../../../apps/landing/src/data/alternatives.ts")).ALTERNATIVES;
       const units = [];
-      extractToolSeo(units, toolSeo);
       extractAlternatives(units, alternatives);
       return units;
     },
 
     async load(locale) {
-      const seo = await readJson(fileFor(dir, "seo", locale));
-      const alt = await readJson(fileFor(dir, "alt", locale));
-      const merged = new Map();
-      for (const [id, e] of toStored(seo)) merged.set(id, e);
-      for (const [id, e] of toStored(alt)) merged.set(id, e);
-      return merged;
+      const alt = await readJson(altFileFor(dir, locale));
+      return toStored(alt);
     },
 
     async write(locale, entries) {
-      const seoRecord = toRecord(entries, "seo");
-      const altRecord = toRecord(entries, "alt");
-      await writeFile(fileFor(dir, "seo", locale), `${JSON.stringify(seoRecord, null, 2)}\n`);
-      await writeFile(fileFor(dir, "alt", locale), `${JSON.stringify(altRecord, null, 2)}\n`);
+      const altRecord = toRecord(entries);
+      await writeFile(altFileFor(dir, locale), `${JSON.stringify(altRecord, null, 2)}\n`);
     },
   };
 }
