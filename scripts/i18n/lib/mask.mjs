@@ -4,8 +4,12 @@
 // Each pattern captures the exact substring to hide from the translator.
 const FENCE = /(^|\n)(```|~~~)[\s\S]*?\n\2/g; // fenced code blocks
 const INLINE = /`[^`\n]+`/g; // inline code spans
-const LINK_URL = /(!?\[[^\]]*\]\()([^)]+)(\))/g; // link/image: mask the URL, keep the text
-const PLACEHOLDER = /\{[^{}\n]+\}/g; // {variable} interpolation
+// Link/image URL: mask the URL, keep the [text]. The URL may itself contain a
+// single level of balanced parentheses (e.g. wikipedia .../Foo_(bar)); match
+// runs of non-paren chars and optional (balanced) groups, then the closing paren.
+const LINK_URL = /(!?\[[^\]]*\]\()((?:[^()]|\([^()]*\))*)(\))/g;
+// {{double}} first so it is captured whole, then {single} interpolation.
+const PLACEHOLDER = /\{\{[^{}\n]+\}\}|\{[^{}\n]+\}/g;
 
 const TOKEN = (i) => `⸤I18N${i}⸥`; // uncommon delimiters, restored 1:1
 const TOKEN_RE = /⸤I18N\d+⸥/g;
