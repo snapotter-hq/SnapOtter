@@ -392,7 +392,7 @@ export const USE_CASES: UseCase[] = [
       },
       {
         q: "What about redaction?",
-        a: "To remove visible content, not just metadata, from PDFs, use the redact-pdf tool, which performs verified true redaction.",
+        a: "Metadata removal strips hidden data. To remove visible content from a PDF, use the redact-pdf tool, which performs verified true redaction.",
       },
     ],
     sources: [],

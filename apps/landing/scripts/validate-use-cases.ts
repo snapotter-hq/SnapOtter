@@ -1,5 +1,5 @@
 // Build-time integrity check for use-cases.ts. Run via tsx; wired into landing prebuild.
-import { TOOLS } from "@snapotter/shared";
+import { TOOLS, toolSection } from "@snapotter/shared";
 import { ALTERNATIVES } from "../src/data/alternatives.ts";
 import { USE_CASES } from "../src/data/use-cases.ts";
 
@@ -34,12 +34,30 @@ for (const uc of USE_CASES) {
   for (const id of uc.toolIds) {
     if (!TOOL_IDS.has(id)) errors.push(`${at}: toolId "${id}" not in TOOLS`);
   }
-  for (const route of uc.toolRoutes) {
+  if (uc.toolIds.length !== uc.toolRoutes.length)
+    errors.push(
+      `${at}: toolIds (${uc.toolIds.length}) and toolRoutes (${uc.toolRoutes.length}) differ in length`,
+    );
+  uc.toolRoutes.forEach((route, i) => {
     const m = route.match(SECTION);
-    if (!m) errors.push(`${at}: toolRoute "${route}" is malformed`);
-    else if (!TOOL_IDS.has(m[2]))
+    if (!m) {
+      errors.push(`${at}: toolRoute "${route}" is malformed`);
+      return;
+    }
+    const tool = TOOLS.find((t) => t.id === m[2]);
+    if (!tool) {
       errors.push(`${at}: toolRoute "${route}" ends in unknown toolId "${m[2]}"`);
-  }
+      return;
+    }
+    // The page zips toolRoutes[i] with toolIds[i] by index and links to the route,
+    // so a wrong section (404) or a desynced pair (mislabeled link) must fail the build.
+    if (toolSection(tool) !== m[1])
+      errors.push(`${at}: toolRoute "${route}" should use section "${toolSection(tool)}"`);
+    if (uc.toolIds[i] !== m[2])
+      errors.push(
+        `${at}: toolRoutes[${i}] "${route}" does not match toolIds[${i}] "${uc.toolIds[i]}"`,
+      );
+  });
   if (uc.alternativeSlug && !ALT_SLUGS.has(uc.alternativeSlug))
     errors.push(`${at}: alternativeSlug "${uc.alternativeSlug}" not in ALTERNATIVES`);
 

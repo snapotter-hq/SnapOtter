@@ -17,7 +17,7 @@ const {
 } = Astro.props;
 
 const blocks = [
-  { label: dockerLabel, code: docker },
+  ...(docker ? [{ label: dockerLabel, code: docker }] : []),
   ...(curl ? [{ label: curlLabel, code: curl }] : []),
 ];
 ---
