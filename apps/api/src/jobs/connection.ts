@@ -4,6 +4,8 @@
  * Uses ioredis with settings compatible with BullMQ's requirements
  * (maxRetriesPerRequest: null for blocking commands).
  */
+
+import { SafeError } from "@snapotter/shared";
 import type { ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../config.js";
@@ -63,4 +65,30 @@ export async function closeRedis(): Promise<void> {
     await _shared.quit();
     _shared = null;
   }
+}
+
+/** Pure check: returns a SafeError for known-incompatible versions, else null. */
+export function checkRedisInfoCompatible(info: string): SafeError | null {
+  const m = info.match(/redis_version:(\d+)\.(\d+)/);
+  if (!m) return null; // managed Redis may hide INFO details; do not block boot
+  const major = Number(m[1]);
+  const minor = Number(m[2]);
+  if (major > 6 || (major === 6 && minor >= 2)) return null;
+  return new SafeError("Redis 6.2 or newer is required. Point REDIS_URL at Redis 8.", {
+    kind: "operational",
+    code: `redis-${major}.${minor}`,
+  });
+}
+
+/** Boot preflight: BullMQ v5 needs Redis >= 6.2. Fails fast with a clear message. */
+export async function assertRedisCompatible(): Promise<void> {
+  let info: string;
+  try {
+    info = await sharedRedis().info("server");
+  } catch {
+    console.warn("[redis] INFO not permitted; skipping version preflight");
+    return;
+  }
+  const err = checkRedisInfoCompatible(info);
+  if (err) throw err;
 }
