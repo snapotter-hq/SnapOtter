@@ -5,11 +5,18 @@ import { formatCompact, getStarCount } from "@/lib/stats";
 // Fetched at build time; refreshed by the scheduled landing rebuild.
 const starCount = formatCompact(await getStarCount());
 
+const productLinks = [
+  {
+    label: "Developers",
+    href: "/self-hosted/file-conversion-api",
+    desc: "REST API, pipelines, headless",
+  },
+  { label: "Self-hosted tools", href: "/self-hosted", desc: "Private, on your own infrastructure" },
+  { label: "Alternatives", href: "/alternatives", desc: "vs CloudConvert, TinyPNG, Otter.ai" },
+];
 const links = [
   { label: "Enterprise", href: "/#enterprise" },
   { label: "Pricing", href: "/#pricing" },
-  { label: "Alternatives", href: "/alternatives" },
-  { label: "Developers", href: "/self-hosted/file-conversion-api" },
   { label: "Docs", href: "https://docs.snapotter.com", external: true },
   { label: "Talk to a human", href: "/contact" },
 ];
@@ -24,7 +31,31 @@ const links = [
     </a>
 
     <!-- Desktop nav links -->
-    <div class="hidden items-center gap-6 min-[1120px]:flex">
+    <div class="hidden items-center gap-6 lg:flex">
+      <!-- Product dropdown (CSS-only: opens on hover and on keyboard focus) -->
+      <div class="group relative">
+        <button
+          type="button"
+          class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground group-focus-within:text-foreground"
+          aria-haspopup="menu"
+        >
+          Product
+          <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="absolute left-0 top-full hidden pt-3 group-hover:block group-focus-within:block">
+          <div class="w-64 rounded-xl border border-border bg-surface p-2 shadow-lg">
+            {productLinks.map((item) => (
+              <a
+                href={item.href}
+                class="block rounded-lg px-3 py-2 transition-colors hover:bg-background-alt"
+              >
+                <span class="block text-sm font-semibold text-foreground">{item.label}</span>
+                <span class="mt-0.5 block text-xs text-muted">{item.desc}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
       {links.map((item) => (
         <a
           href={item.href}
@@ -65,7 +96,7 @@ const links = [
     </div>
 
     <!-- Mobile menu toggle (CSS-only) -->
-    <label for="mobile-menu-toggle" class="cursor-pointer text-muted min-[1120px]:hidden" aria-label="Toggle menu">
+    <label for="mobile-menu-toggle" class="cursor-pointer text-muted lg:hidden" aria-label="Toggle menu">
       <svg class="menu-open h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       <svg class="menu-close hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </label>
@@ -75,8 +106,8 @@ const links = [
   <input type="checkbox" id="mobile-menu-toggle" class="peer hidden" aria-hidden="true" />
 
   <!-- Mobile menu panel -->
-  <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block min-[1120px]:hidden">
-    {links.map((item) => (
+  <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block lg:hidden">
+    {[...productLinks, ...links].map((item) => (
       <a
         href={item.href}
         class="block py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
