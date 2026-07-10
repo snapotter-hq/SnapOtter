@@ -11,7 +11,14 @@ test.describe("Landing Homepage", () => {
 
   test("navbar renders brand and navigation links", async ({ page }) => {
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
-    for (const name of ["Features", "Enterprise", "Pricing", "Docs", "Talk to a human"]) {
+    for (const name of [
+      "Enterprise",
+      "Pricing",
+      "Alternatives",
+      "Developers",
+      "Docs",
+      "Talk to a human",
+    ]) {
       await expect(page.getByRole("link", { name }).first()).toBeVisible();
     }
   });
