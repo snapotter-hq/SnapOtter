@@ -43,10 +43,14 @@ function copyCommand() {
   <div class="so-home">
     <section class="hero">
       <p class="eyebrow">Self-hosted · Open source · AGPLv3</p>
-      <h1 class="hero-title">SnapOtter Documentation</h1>
+      <h1 class="hero-title">Self-hosted file-processing infrastructure.</h1>
       <p class="hero-sub">
-        <strong>Self-hosted file processing.</strong> 200+ tools across image, video, audio, PDF &amp;
-        files, all on your own hardware. Choose your path below, or get running in one command:
+        <strong>Convert, compress, OCR, transcribe, strip metadata, and run local AI across image,
+        video, audio, PDF, and documents, through a UI, REST API, and pipelines, on infrastructure
+        you control.</strong>
+        <br />
+        200+ tools across five modalities, all on your own hardware. Choose your path below, or get
+        running in one command:
       </p>
       <div class="cmd" title="Click to copy" @click="copyCommand">
         <code>$ {{ command }}</code>
