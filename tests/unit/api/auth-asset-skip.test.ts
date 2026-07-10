@@ -9,5 +9,7 @@ describe("isStaticAssetRequest", () => {
     expect(isStaticAssetRequest("POST", "/assets/x.js")).toBe(false);
     expect(isStaticAssetRequest("GET", "/assetsish")).toBe(false);
     expect(isStaticAssetRequest("GET", "/assets/../api/v1/settings")).toBe(false);
+    expect(isStaticAssetRequest("GET", "/assets/x.js?v=abc")).toBe(true);
+    expect(isStaticAssetRequest("GET", "/assets")).toBe(false);
   });
 });

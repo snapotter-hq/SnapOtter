@@ -21,6 +21,10 @@ You will be asked to change your password on first login.
 ::: tip Anonymous Product Analytics
 SnapOtter includes anonymous product analytics by default. To turn it off, open **Settings → System → Privacy** and switch off **Anonymous Product Analytics**. It stops immediately for the whole instance.
 
+You can also set the environment variable `SNAPOTTER_TELEMETRY=0` (`false` and `off` work too) to disable all telemetry for the instance without a rebuild.
+
+Error monitoring is powered by [Sentry](https://sentry.io), which sponsors SnapOtter through its open-source program.
+
 For details about what is collected, see [What SnapOtter collects](/guide/telemetry).
 :::
 

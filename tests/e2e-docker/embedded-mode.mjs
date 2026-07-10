@@ -75,8 +75,22 @@ async function main() {
   cleanup();
 
   // 1. Bare `docker run` with no DB env boots and becomes healthy.
+  // Prod images bake real telemetry keys, so every container start in this
+  // harness sets SNAPOTTER_TELEMETRY=0 to keep test-fleet boots silent.
   console.log("\n[1] bare docker run boots healthy");
-  docker(["run", "-d", "--name", NAME, "-p", `${PORT}:1349`, "-v", `${VOL}:/data`, IMAGE]);
+  docker([
+    "run",
+    "-d",
+    "--name",
+    NAME,
+    "-p",
+    `${PORT}:1349`,
+    "-v",
+    `${VOL}:/data`,
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    IMAGE,
+  ]);
   const healthy = await waitHealthy(300000);
   healthy
     ? ok("embedded container reached healthy")
@@ -111,15 +125,23 @@ async function main() {
 
   // 4. Non-root fails fast.
   console.log("\n[4] non-root fail-fast");
-  combined(["run", "--rm", "--user", "1000:1000", IMAGE]).includes("embedded mode needs root")
+  combined(["run", "--rm", "--user", "1000:1000", "-e", "SNAPOTTER_TELEMETRY=0", IMAGE]).includes(
+    "embedded mode needs root",
+  )
     ? ok("non-root rejected with guidance")
     : bad("non-root not rejected");
 
   // 5. Partial config fails fast.
   console.log("\n[5] partial-config fail-fast");
-  combined(["run", "--rm", "-e", "REDIS_URL=redis://x:6379", IMAGE]).includes(
-    "set BOTH DATABASE_URL and REDIS_URL",
-  )
+  combined([
+    "run",
+    "--rm",
+    "-e",
+    "REDIS_URL=redis://x:6379",
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    IMAGE,
+  ]).includes("set BOTH DATABASE_URL and REDIS_URL")
     ? ok("partial config rejected")
     : bad("partial config not rejected");
 
@@ -152,7 +174,19 @@ async function main() {
     "-c",
     `apk add --no-cache sqlite >/dev/null 2>&1 && sqlite3 /data/snapotter.db "${seedSql}"`,
   ]);
-  docker(["run", "-d", "--name", NAME, "-p", `${PORT}:1349`, "-v", `${VOL}:/data`, IMAGE]);
+  docker([
+    "run",
+    "-d",
+    "--name",
+    NAME,
+    "-p",
+    `${PORT}:1349`,
+    "-v",
+    `${VOL}:/data`,
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    IMAGE,
+  ]);
   (await waitHealthy(300000))
     ? ok("healthy after upgrade boot")
     : bad("unhealthy after upgrade boot");

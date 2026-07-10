@@ -25,7 +25,7 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, getBundleForTool, isToolInputError, TOOLS } from "@snapotter/shared";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
@@ -376,7 +376,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // friendlyError(finalError)). Expected validation rejections -- bad user
       // input, not a server fault -- would otherwise flood error logs, so skip
       // them here; they still reach the OTel span recorded below.
-      const isValidationError = err instanceof Error && err.name === "InputValidationError";
+      const isValidationError =
+        err instanceof Error && (err.name === "InputValidationError" || isToolInputError(err));
       if (!isCanceled && !isTimeout && !isValidationError) {
         logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
       }
