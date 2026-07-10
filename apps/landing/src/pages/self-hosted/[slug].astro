@@ -17,7 +17,9 @@ export function getStaticPaths() {
 
 const { uc } = Astro.props;
 const canonical = `https://snapotter.com/self-hosted/${uc.slug}`;
-const alt = uc.alternativeSlug ? ALTERNATIVES.find((a) => a.slug === uc.alternativeSlug) : undefined;
+const alt = uc.alternativeSlug
+  ? ALTERNATIVES.find((a) => a.slug === uc.alternativeSlug)
+  : undefined;
 const others = USE_CASES.filter((u) => u.slug !== uc.slug);
 const reviewedOn = new Intl.DateTimeFormat("en-US", {
   month: "long",
@@ -31,7 +33,12 @@ const breadcrumbJsonLd = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
-    { "@type": "ListItem", position: 2, name: "Self-hosted", item: "https://snapotter.com/self-hosted" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Self-hosted",
+      item: "https://snapotter.com/self-hosted",
+    },
     { "@type": "ListItem", position: 3, name: uc.h1, item: canonical },
   ],
 };
