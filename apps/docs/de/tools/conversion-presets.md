@@ -1,5 +1,5 @@
 ---
-description: Dedizierte Konvertierungs-Preset-Endpunkte, generiert aus dem SnapOtter-Tool-Katalog.
+description: "Dedizierte Konvertierungs-Preset-Endpunkte, generiert aus dem SnapOtter-Tool-Katalog."
 i18n_source_hash: faad6efcb9a9
 i18n_provenance: machine
 i18n_output_hash: 28080b85604b

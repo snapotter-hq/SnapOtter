@@ -1,5 +1,5 @@
 ---
-description: 将 EPUB 转换为 PDF、DOCX、HTML 或 Markdown。
+description: "将 EPUB 转换为 PDF、DOCX、HTML 或 Markdown。"
 i18n_source_hash: 7d94fc18ca97
 i18n_provenance: human
 i18n_output_hash: 977c0caf49df

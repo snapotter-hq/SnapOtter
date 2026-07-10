@@ -1,5 +1,5 @@
 ---
-description: Sich wiederholende Elemente aus XML in eine CSV-Tabelle extrahieren.
+description: "Sich wiederholende Elemente aus XML in eine CSV-Tabelle extrahieren."
 i18n_source_hash: 3ab1019bff8a
 i18n_provenance: machine
 i18n_output_hash: 492d543e1a85

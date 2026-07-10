@@ -1,5 +1,5 @@
 ---
-description: Simulez la façon dont les images apparaissent aux personnes atteintes de différents types de déficience de la vision des couleurs.
+description: "Simulez la façon dont les images apparaissent aux personnes atteintes de différents types de déficience de la vision des couleurs."
 i18n_source_hash: 0b537628ba79
 i18n_provenance: human
 i18n_output_hash: 52b619669212

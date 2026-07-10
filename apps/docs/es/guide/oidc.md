@@ -1,5 +1,5 @@
 ---
-description: Configura el inicio de sesión único con OpenID Connect. Guías paso a paso para Keycloak, Authentik, Google y otros proveedores OIDC.
+description: "Configura el inicio de sesión único con OpenID Connect. Guías paso a paso para Keycloak, Authentik, Google y otros proveedores OIDC."
 i18n_source_hash: 4296343b3cc5
 i18n_provenance: human
 i18n_output_hash: ed919192ab76

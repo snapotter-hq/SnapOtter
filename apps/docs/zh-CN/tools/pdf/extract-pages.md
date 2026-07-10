@@ -1,5 +1,5 @@
 ---
-description: 从 PDF 中提取选定页面到一个新文档。
+description: "从 PDF 中提取选定页面到一个新文档。"
 i18n_source_hash: e4a8fad31e0f
 i18n_provenance: human
 i18n_output_hash: a70ca59cae62

@@ -1,5 +1,5 @@
 ---
-description: Convertit un fichier Markdown en une page HTML autonome.
+description: "Convertit un fichier Markdown en une page HTML autonome."
 i18n_source_hash: 3ef805e8fc8c
 i18n_provenance: human
 i18n_output_hash: ff851dcc58e0

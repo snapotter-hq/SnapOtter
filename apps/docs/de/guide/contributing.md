@@ -1,5 +1,5 @@
 ---
-description: Wie man zu SnapOtter beiträgt. Fehlerberichte, Feature-Anfragen, Pull Requests und CLA-Anforderungen.
+description: "Wie man zu SnapOtter beiträgt. Fehlerberichte, Feature-Anfragen, Pull Requests und CLA-Anforderungen."
 i18n_source_hash: 528802503035
 i18n_provenance: machine
 i18n_output_hash: dad4aeee07c4

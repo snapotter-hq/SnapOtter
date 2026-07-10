@@ -1,5 +1,5 @@
 ---
-description: Elimina objetos no deseados de imágenes con inpainting por IA (LaMa), guiado por una máscara de la región que se va a borrar.
+description: "Elimina objetos no deseados de imágenes con inpainting por IA (LaMa), guiado por una máscara de la región que se va a borrar."
 i18n_source_hash: 8e2e42a5e4f9
 i18n_provenance: human
 i18n_output_hash: 250500e08685

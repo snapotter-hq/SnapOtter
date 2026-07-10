@@ -1,5 +1,5 @@
 ---
-description: 動画を早送りまたはスロー再生します。
+description: "動画を早送りまたはスロー再生します。"
 i18n_source_hash: 98dfc75c0507
 i18n_provenance: human
 i18n_output_hash: 7c7d0e810878

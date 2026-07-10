@@ -1,5 +1,5 @@
 ---
-description: Superpone imágenes con posición, opacidad y modos de fusión para composición.
+description: "Superpone imágenes con posición, opacidad y modos de fusión para composición."
 i18n_source_hash: c5d09eb13fde
 i18n_provenance: human
 i18n_output_hash: 26d252315cf0

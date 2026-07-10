@@ -1,5 +1,5 @@
 ---
-description: Añade un efecto de viñeta con intensidad, color y posición ajustables.
+description: "Añade un efecto de viñeta con intensidad, color y posición ajustables."
 i18n_source_hash: 0b9795fea2eb
 i18n_provenance: human
 i18n_output_hash: 9bb2db4b168f

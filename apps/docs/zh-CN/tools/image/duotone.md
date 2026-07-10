@@ -1,5 +1,5 @@
 ---
-description: 应用双色调效果，可自定义阴影色和高光色。
+description: "应用双色调效果，可自定义阴影色和高光色。"
 i18n_source_hash: ab99c4f0152c
 i18n_provenance: human
 i18n_output_hash: 26094fc96843

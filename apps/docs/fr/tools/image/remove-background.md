@@ -1,5 +1,5 @@
 ---
-description: Suppression de l'arrière-plan assistée par IA avec effets optionnels (flou, ombre, dégradé, arrière-plan personnalisé).
+description: "Suppression de l'arrière-plan assistée par IA avec effets optionnels (flou, ombre, dégradé, arrière-plan personnalisé)."
 i18n_source_hash: 326a91284529
 i18n_provenance: human
 i18n_output_hash: 58cb08d8414c

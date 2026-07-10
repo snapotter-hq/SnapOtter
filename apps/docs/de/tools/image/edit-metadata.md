@@ -1,5 +1,5 @@
 ---
-description: Bearbeitet EXIF-, IPTC-, GPS- und XMP-Metadatenfelder in Bildern, ohne die Pixel neu zu kodieren.
+description: "Bearbeitet EXIF-, IPTC-, GPS- und XMP-Metadatenfelder in Bildern, ohne die Pixel neu zu kodieren."
 i18n_source_hash: a37746db11c3
 i18n_provenance: machine
 i18n_output_hash: e0f8d58bc6c3

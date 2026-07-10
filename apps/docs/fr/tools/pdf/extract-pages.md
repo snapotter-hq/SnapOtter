@@ -1,5 +1,5 @@
 ---
-description: Extraire des pages sélectionnées d'un PDF vers un nouveau document.
+description: "Extraire des pages sélectionnées d'un PDF vers un nouveau document."
 i18n_source_hash: e4a8fad31e0f
 i18n_provenance: human
 i18n_output_hash: 2d4f7d483f7e

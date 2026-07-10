@@ -1,5 +1,5 @@
 ---
-description: Reduce el tamaño de archivo del vídeo con control de calidad.
+description: "Reduce el tamaño de archivo del vídeo con control de calidad."
 i18n_source_hash: 9cc1f1acf74e
 i18n_provenance: human
 i18n_output_hash: b6eaae204589

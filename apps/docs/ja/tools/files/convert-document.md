@@ -1,5 +1,5 @@
 ---
-description: Word、OpenDocument、RTF、プレーンテキストの各形式間で変換します。
+description: "Word、OpenDocument、RTF、プレーンテキストの各形式間で変換します。"
 i18n_source_hash: 89771292569d
 i18n_provenance: human
 i18n_output_hash: 2826c28b6daa

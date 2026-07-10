@@ -1,5 +1,5 @@
 ---
-description: 複数の動画クリップを1つのファイルに結合します。
+description: "複数の動画クリップを1つのファイルに結合します。"
 i18n_source_hash: 90463dfbb580
 i18n_provenance: human
 i18n_output_hash: 3280dff80b5e

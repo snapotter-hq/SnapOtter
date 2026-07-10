@@ -1,5 +1,5 @@
 ---
-description: 将动画 GIF 转换为 MP4、WebM 或 MOV 视频。
+description: "将动画 GIF 转换为 MP4、WebM 或 MOV 视频。"
 i18n_source_hash: c3737b31146d
 i18n_provenance: human
 i18n_output_hash: 6ca9b1d058c3

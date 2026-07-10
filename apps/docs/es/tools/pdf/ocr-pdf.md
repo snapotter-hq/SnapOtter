@@ -1,5 +1,5 @@
 ---
-description: Extrae texto de documentos PDF mediante OCR con inteligencia artificial.
+description: "Extrae texto de documentos PDF mediante OCR con inteligencia artificial."
 i18n_source_hash: 1431fcba180b
 i18n_provenance: human
 i18n_output_hash: bddf4136c82a

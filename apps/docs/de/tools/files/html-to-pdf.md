@@ -1,5 +1,5 @@
 ---
-description: Konvertiert eine HTML-Datei in PDF.
+description: "Konvertiert eine HTML-Datei in PDF."
 i18n_source_hash: 20b9ae147db5
 i18n_provenance: machine
 i18n_output_hash: 3c147738d773

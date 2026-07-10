@@ -1,5 +1,5 @@
 ---
-description: Générateur de photos d'identité et de passeport assisté par IA avec détection des visages, suppression de l'arrière-plan et disposition en planche d'impression.
+description: "Générateur de photos d'identité et de passeport assisté par IA avec détection des visages, suppression de l'arrière-plan et disposition en planche d'impression."
 i18n_source_hash: d4b4f4ced988
 i18n_provenance: human
 i18n_output_hash: d2f355d715f7

@@ -1,5 +1,5 @@
 ---
-description: SnapOtter Docker-Image-Tags, GPU-Benchmarks, Versionsfixierung und Multi-Plattform-Unterstützung für AMD64 und ARM64.
+description: "SnapOtter Docker-Image-Tags, GPU-Benchmarks, Versionsfixierung und Multi-Plattform-Unterstützung für AMD64 und ARM64."
 i18n_source_hash: 148b3608e11a
 i18n_provenance: machine
 i18n_output_hash: bf7df15424fd

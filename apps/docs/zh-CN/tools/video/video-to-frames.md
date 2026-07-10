@@ -1,5 +1,5 @@
 ---
-description: 将视频中的帧提取为图像 ZIP 包。
+description: "将视频中的帧提取为图像 ZIP 包。"
 i18n_source_hash: b06f038dafb3
 i18n_provenance: human
 i18n_output_hash: 940e8089bda5

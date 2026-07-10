@@ -1,5 +1,5 @@
 ---
-description: Eine Reihe von Bildern in ein Diashow-Video verwandeln.
+description: "Eine Reihe von Bildern in ein Diashow-Video verwandeln."
 i18n_source_hash: 2c6f183feb6d
 i18n_provenance: machine
 i18n_output_hash: 63bf82273377

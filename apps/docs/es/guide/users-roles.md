@@ -1,5 +1,5 @@
 ---
-description: Gestiona usuarios, roles integrados y personalizados, permisos, claves de API, equipos, sesiones y el registro de auditoría en SnapOtter.
+description: "Gestiona usuarios, roles integrados y personalizados, permisos, claves de API, equipos, sesiones y el registro de auditoría en SnapOtter."
 i18n_source_hash: 5e28af686c96
 i18n_provenance: human
 i18n_output_hash: a2ceae4b73a7

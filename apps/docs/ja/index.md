@@ -1,6 +1,6 @@
 ---
 layout: page
-title: SnapOtter Docs
+title: "SnapOtter Docs"
 description: "セルフホスト型のファイル処理。画像、動画、音声、PDF、ファイルに対応した 200+ のツールに加え、無料のレイヤーベース画像エディター。ローカル AI、パイプライン、REST API。あなたのファイルがサーバーの外に出ることはありません。"
 sidebar: false
 i18n_source_hash: fe3c28c2c90e

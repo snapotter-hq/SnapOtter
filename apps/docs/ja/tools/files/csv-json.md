@@ -1,5 +1,5 @@
 ---
-description: CSV と JSON を双方向に変換します。
+description: "CSV と JSON を双方向に変換します。"
 i18n_source_hash: 978c08ad46d3
 i18n_provenance: human
 i18n_output_hash: cf405d7e54d1

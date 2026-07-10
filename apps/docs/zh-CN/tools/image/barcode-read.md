@@ -1,5 +1,5 @@
 ---
-description: 扫描图像中的二维码、条形码和 2D 码，并输出带标注的结果。
+description: "扫描图像中的二维码、条形码和 2D 码，并输出带标注的结果。"
 i18n_source_hash: 97c9d395c257
 i18n_provenance: human
 i18n_output_hash: bd849112663a

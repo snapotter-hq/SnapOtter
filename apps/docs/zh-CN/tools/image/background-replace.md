@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 将图像背景替换为纯色或渐变。
+description: "使用 AI 将图像背景替换为纯色或渐变。"
 i18n_source_hash: 930fe8890e55
 i18n_provenance: human
 i18n_output_hash: cab14964451d

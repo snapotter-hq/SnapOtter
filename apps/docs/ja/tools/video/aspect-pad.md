@@ -1,5 +1,5 @@
 ---
-description: 目標のアスペクト比に合わせるため単色のバーを追加します。
+description: "目標のアスペクト比に合わせるため単色のバーを追加します。"
 i18n_source_hash: b8e17dffc341
 i18n_provenance: human
 i18n_output_hash: 67f9b193962e

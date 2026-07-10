@@ -1,5 +1,5 @@
 ---
-description: Ajuste la luminosité, le contraste, la saturation, la température, la teinte, les canaux et applique des effets de couleur.
+description: "Ajuste la luminosité, le contraste, la saturation, la température, la teinte, les canaux et applique des effets de couleur."
 i18n_source_hash: 41b35fe5c2ba
 i18n_provenance: human
 i18n_output_hash: ef7ea26bbba7

@@ -1,5 +1,5 @@
 ---
-description: Die Bildrate eines Videos ändern.
+description: "Die Bildrate eines Videos ändern."
 i18n_source_hash: 2bffbd04a1cb
 i18n_provenance: machine
 i18n_output_hash: 88be64f5cda9

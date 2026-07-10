@@ -1,5 +1,5 @@
 ---
-description: カメラのフラッシュによる赤目を AI で検出・補正します。
+description: "カメラのフラッシュによる赤目を AI で検出・補正します。"
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: human
 i18n_output_hash: 87d613a0e743

@@ -1,5 +1,5 @@
 ---
-description: Bilder mit adaptiven, Unschärfemaskierungs- oder Hochpass-Verfahren schärfen, optional mit Rauschreduzierung.
+description: "Bilder mit adaptiven, Unschärfemaskierungs- oder Hochpass-Verfahren schärfen, optional mit Rauschreduzierung."
 i18n_source_hash: ccb60af9faae
 i18n_provenance: machine
 i18n_output_hash: 0d7818436c69

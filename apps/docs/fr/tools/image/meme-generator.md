@@ -1,5 +1,5 @@
 ---
-description: Créez des mèmes à partir de modèles ou d'images personnalisées, avec des zones de texte stylisées et des choix de police.
+description: "Créez des mèmes à partir de modèles ou d'images personnalisées, avec des zones de texte stylisées et des choix de police."
 i18n_source_hash: 0a4970112ca6
 i18n_provenance: human
 i18n_output_hash: cd8d1d013765

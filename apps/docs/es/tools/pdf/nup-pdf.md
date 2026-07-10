@@ -1,5 +1,5 @@
 ---
-description: Organiza varias páginas de PDF por hoja (2 por hoja, 4 por hoja, etc.).
+description: "Organiza varias páginas de PDF por hoja (2 por hoja, 4 por hoja, etc.)."
 i18n_source_hash: 9dd82737cb72
 i18n_provenance: human
 i18n_output_hash: b48b0f902104

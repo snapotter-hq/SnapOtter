@@ -1,5 +1,5 @@
 ---
-description: Añade superposiciones de texto con estilo, con sombras paralelas y cajas de fondo.
+description: "Añade superposiciones de texto con estilo, con sombras paralelas y cajas de fondo."
 i18n_source_hash: 9f8e697188fc
 i18n_provenance: human
 i18n_output_hash: 7f04839c8ee5

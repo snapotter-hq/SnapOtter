@@ -1,5 +1,5 @@
 ---
-description: Wende einen Verpixelungseffekt auf das gesamte Bild oder einen bestimmten Bereich an.
+description: "Wende einen Verpixelungseffekt auf das gesamte Bild oder einen bestimmten Bereich an."
 i18n_source_hash: a3ad29841f7b
 i18n_provenance: machine
 i18n_output_hash: 5ad97ca152ba

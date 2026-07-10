@@ -1,5 +1,5 @@
 ---
-description: 使用 DDColor AI 模型自动为黑白或灰度照片上色。
+description: "使用 DDColor AI 模型自动为黑白或灰度照片上色。"
 i18n_source_hash: 688aa3abbdae
 i18n_provenance: human
 i18n_output_hash: 2a1f7ac8236f

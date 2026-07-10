@@ -1,5 +1,5 @@
 ---
-description: Despliega SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare.
+description: "Despliega SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare."
 i18n_source_hash: ecc1b528bc4b
 i18n_provenance: human
 i18n_output_hash: 14eafc7e0596

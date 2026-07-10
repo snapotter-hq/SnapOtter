@@ -1,5 +1,5 @@
 ---
-description: 将 PDF 中的页面旋转 90、180 或 270 度。
+description: "将 PDF 中的页面旋转 90、180 或 270 度。"
 i18n_source_hash: cc2acd091427
 i18n_provenance: human
 i18n_output_hash: 87beaf484a08

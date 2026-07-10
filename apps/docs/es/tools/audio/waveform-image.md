@@ -1,5 +1,5 @@
 ---
-description: Genera una visualización de la forma de onda como imagen PNG a partir de un archivo de audio.
+description: "Genera una visualización de la forma de onda como imagen PNG a partir de un archivo de audio."
 i18n_source_hash: 5480106dfe48
 i18n_provenance: human
 i18n_output_hash: 7e306027290b

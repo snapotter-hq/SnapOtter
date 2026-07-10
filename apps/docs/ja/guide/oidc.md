@@ -1,5 +1,5 @@
 ---
-description: OpenID Connect でシングルサインオンをセットアップします。Keycloak、Authentik、Google、その他の OIDC プロバイダー向けのステップバイステップガイド。
+description: "OpenID Connect でシングルサインオンをセットアップします。Keycloak、Authentik、Google、その他の OIDC プロバイダー向けのステップバイステップガイド。"
 i18n_source_hash: 4296343b3cc5
 i18n_provenance: human
 i18n_output_hash: dc7b9859ab34

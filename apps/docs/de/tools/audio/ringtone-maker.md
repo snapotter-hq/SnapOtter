@@ -1,5 +1,5 @@
 ---
-description: Einen Klingeltonclip aus einer beliebigen Audiodatei erstellen.
+description: "Einen Klingeltonclip aus einer beliebigen Audiodatei erstellen."
 i18n_source_hash: 8fcdcc545fbc
 i18n_provenance: machine
 i18n_output_hash: 01dc137604bf

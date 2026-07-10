@@ -1,5 +1,5 @@
 ---
-description: Elimina páginas específicas de un PDF.
+description: "Elimina páginas específicas de un PDF."
 i18n_source_hash: 003e460a047c
 i18n_provenance: human
 i18n_output_hash: 02e4c8b71d7a

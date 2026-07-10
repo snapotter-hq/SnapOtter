@@ -1,5 +1,5 @@
 ---
-description: 消去したい領域のマスクに従い、AIインペインティング（LaMa）で画像から不要なオブジェクトを削除します。
+description: "消去したい領域のマスクに従い、AIインペインティング（LaMa）で画像から不要なオブジェクトを削除します。"
 i18n_source_hash: 8e2e42a5e4f9
 i18n_provenance: human
 i18n_output_hash: c8fd8664cb28

@@ -1,5 +1,5 @@
 ---
-description: Erstellt Balken-, Linien- oder Kreisdiagramme aus CSV- oder JSON-Daten.
+description: "Erstellt Balken-, Linien- oder Kreisdiagramme aus CSV- oder JSON-Daten."
 i18n_source_hash: d3c39384457b
 i18n_provenance: machine
 i18n_output_hash: abda7f7fbe89

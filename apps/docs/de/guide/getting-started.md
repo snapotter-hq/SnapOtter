@@ -1,5 +1,5 @@
 ---
-description: Installieren Sie SnapOtter mit Docker in einem einzigen Befehl. Enthält Docker-Compose-Einrichtung, Bauen aus dem Quellcode und einen vollständigen Funktionsüberblick.
+description: "Installieren Sie SnapOtter mit Docker in einem einzigen Befehl. Enthält Docker-Compose-Einrichtung, Bauen aus dem Quellcode und einen vollständigen Funktionsüberblick."
 i18n_source_hash: d2366a2e051c
 i18n_provenance: machine
 i18n_output_hash: c4100bd7782b

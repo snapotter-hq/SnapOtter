@@ -1,5 +1,5 @@
 ---
-description: Acelera o ralentiza un vídeo.
+description: "Acelera o ralentiza un vídeo."
 i18n_source_hash: 98dfc75c0507
 i18n_provenance: human
 i18n_output_hash: 9455e0f99776

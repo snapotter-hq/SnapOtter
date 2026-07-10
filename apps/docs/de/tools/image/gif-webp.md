@@ -1,5 +1,5 @@
 ---
-description: Konvertiert animierte GIFs in WebP und umgekehrt und behält dabei alle Frames bei.
+description: "Konvertiert animierte GIFs in WebP und umgekehrt und behält dabei alle Frames bei."
 i18n_source_hash: 20946e5001cb
 i18n_provenance: machine
 i18n_output_hash: 82112c90f500

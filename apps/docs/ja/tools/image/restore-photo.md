@@ -1,5 +1,5 @@
 ---
-description: 復元、顔の補正、着色のための AI パイプラインで、古い写真の傷、破れ、損傷を修復します。
+description: "復元、顔の補正、着色のための AI パイプラインで、古い写真の傷、破れ、損傷を修復します。"
 i18n_source_hash: 3de13284216c
 i18n_provenance: human
 i18n_output_hash: bf379afff59d

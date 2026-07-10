@@ -1,5 +1,5 @@
 ---
-description: Añade efectos de fundido de entrada y de salida al audio.
+description: "Añade efectos de fundido de entrada y de salida al audio."
 i18n_source_hash: 86856451ecb8
 i18n_provenance: human
 i18n_output_hash: b388d2677de3

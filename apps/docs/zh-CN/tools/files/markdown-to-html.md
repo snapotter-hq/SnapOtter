@@ -1,5 +1,5 @@
 ---
-description: 将 Markdown 文件转换为独立的 HTML 页面。
+description: "将 Markdown 文件转换为独立的 HTML 页面。"
 i18n_source_hash: 3ef805e8fc8c
 i18n_provenance: human
 i18n_output_hash: cc97c8a1c089

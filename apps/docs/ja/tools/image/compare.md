@@ -1,5 +1,5 @@
 ---
-description: 2つの画像を並べて比較し、ピクセルレベルの差分の可視化と類似度スコアを表示します。
+description: "2つの画像を並べて比較し、ピクセルレベルの差分の可視化と類似度スコアを表示します。"
 i18n_source_hash: cc0a02bd75c6
 i18n_provenance: human
 i18n_output_hash: 9d731a155cb3

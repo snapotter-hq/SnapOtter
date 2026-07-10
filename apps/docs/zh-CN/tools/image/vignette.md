@@ -1,5 +1,5 @@
 ---
-description: 添加暗角效果，可调整强度、颜色和位置。
+description: "添加暗角效果，可调整强度、颜色和位置。"
 i18n_source_hash: 0b9795fea2eb
 i18n_provenance: human
 i18n_output_hash: 3006e6b25805

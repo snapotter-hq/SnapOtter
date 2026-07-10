@@ -1,5 +1,5 @@
 ---
-description: Extrae elementos repetidos de un XML a una tabla CSV.
+description: "Extrae elementos repetidos de un XML a una tabla CSV."
 i18n_source_hash: 3ab1019bff8a
 i18n_provenance: human
 i18n_output_hash: fa044966477c

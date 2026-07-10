@@ -1,5 +1,5 @@
 ---
-description: Superpose un logo ou une image comme filigrane avec une position, une opacité et une échelle configurables.
+description: "Superpose un logo ou une image comme filigrane avec une position, une opacité et une échelle configurables."
 i18n_source_hash: c73ab0ef8ab9
 i18n_provenance: human
 i18n_output_hash: d1aa84c44012

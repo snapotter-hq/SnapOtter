@@ -1,5 +1,5 @@
 ---
-description: 模拟不同类型色觉障碍者眼中图片的呈现效果。
+description: "模拟不同类型色觉障碍者眼中图片的呈现效果。"
 i18n_source_hash: 0b537628ba79
 i18n_provenance: human
 i18n_output_hash: 20d2cb319160

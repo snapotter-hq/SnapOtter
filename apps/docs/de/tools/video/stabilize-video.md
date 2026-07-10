@@ -1,5 +1,5 @@
 ---
-description: Verwacklungen mit Zwei-Pass-Stabilisierung reduzieren.
+description: "Verwacklungen mit Zwei-Pass-Stabilisierung reduzieren."
 i18n_source_hash: ec908e91a752
 i18n_provenance: machine
 i18n_output_hash: f27b80786d66

@@ -1,5 +1,5 @@
 ---
-description: AI アウトペインティングで画像キャンバスを拡張し、任意の方向に広げて新しい領域を元の画像に合わせて埋めます。
+description: "AI アウトペインティングで画像キャンバスを拡張し、任意の方向に広げて新しい領域を元の画像に合わせて埋めます。"
 i18n_source_hash: 1b00db4ed40d
 i18n_provenance: human
 i18n_output_hash: 1d19a538f275

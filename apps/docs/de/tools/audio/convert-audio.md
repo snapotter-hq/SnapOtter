@@ -1,5 +1,5 @@
 ---
-description: Audio zwischen den Formaten MP3, WAV, OGG, FLAC und M4A konvertieren.
+description: "Audio zwischen den Formaten MP3, WAV, OGG, FLAC und M4A konvertieren."
 i18n_source_hash: fd02c059e6a9
 i18n_provenance: machine
 i18n_output_hash: bacd9e312553

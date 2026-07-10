@@ -1,5 +1,5 @@
 ---
-description: Assemble plusieurs clips vidéo en un seul fichier.
+description: "Assemble plusieurs clips vidéo en un seul fichier."
 i18n_source_hash: 90463dfbb580
 i18n_provenance: human
 i18n_output_hash: 711b7daad579

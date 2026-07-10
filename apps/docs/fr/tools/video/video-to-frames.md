@@ -1,5 +1,5 @@
 ---
-description: Extrait les images d'une vidéo sous forme de ZIP d'images.
+description: "Extrait les images d'une vidéo sous forme de ZIP d'images."
 i18n_source_hash: b06f038dafb3
 i18n_provenance: human
 i18n_output_hash: df502a36e5c0

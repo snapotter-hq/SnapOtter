@@ -1,5 +1,5 @@
 ---
-description: Ein Textwasserzeichen zu jeder Seite einer PDF hinzufügen.
+description: "Ein Textwasserzeichen zu jeder Seite einer PDF hinzufügen."
 i18n_source_hash: f1f7d8912fbd
 i18n_provenance: machine
 i18n_output_hash: f67c4ace106e

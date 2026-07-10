@@ -1,5 +1,5 @@
 ---
-description: Generiert alle gängigen Favicon- und App-Icon-Größen aus einem Ausgangsbild.
+description: "Generiert alle gängigen Favicon- und App-Icon-Größen aus einem Ausgangsbild."
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: machine
 i18n_output_hash: 2e7d1f546008

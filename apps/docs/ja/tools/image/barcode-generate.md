@@ -1,5 +1,5 @@
 ---
-description: Code 128、EAN-13、UPC-A、Code 39、ITF-14、Data Matrix 形式のバーコードを生成します。
+description: "Code 128、EAN-13、UPC-A、Code 39、ITF-14、Data Matrix 形式のバーコードを生成します。"
 i18n_source_hash: e84b1df40c7e
 i18n_provenance: human
 i18n_output_hash: 8c99b0662912

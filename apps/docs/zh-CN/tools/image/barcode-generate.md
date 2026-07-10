@@ -1,5 +1,5 @@
 ---
-description: 生成 Code 128、EAN-13、UPC-A、Code 39、ITF-14 和 Data Matrix 格式的条形码。
+description: "生成 Code 128、EAN-13、UPC-A、Code 39、ITF-14 和 Data Matrix 格式的条形码。"
 i18n_source_hash: e84b1df40c7e
 i18n_provenance: human
 i18n_output_hash: 7106840d576a

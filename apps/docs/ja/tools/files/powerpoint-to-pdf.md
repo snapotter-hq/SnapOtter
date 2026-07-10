@@ -1,5 +1,5 @@
 ---
-description: プレゼンテーションを PDF に変換します。
+description: "プレゼンテーションを PDF に変換します。"
 i18n_source_hash: 49bd71c46bed
 i18n_provenance: human
 i18n_output_hash: c57d81319497

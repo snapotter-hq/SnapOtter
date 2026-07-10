@@ -1,5 +1,5 @@
 ---
-description: Ajuste la luminosité, le contraste, la saturation et le gamma d'une vidéo.
+description: "Ajuste la luminosité, le contraste, la saturation et le gamma d'une vidéo."
 i18n_source_hash: 40483b79d44b
 i18n_provenance: human
 i18n_output_hash: ef0c85417fbf

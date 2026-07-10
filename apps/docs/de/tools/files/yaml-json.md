@@ -1,5 +1,5 @@
 ---
-description: In beide Richtungen zwischen YAML und JSON umwandeln.
+description: "In beide Richtungen zwischen YAML und JSON umwandeln."
 i18n_source_hash: acf8ca21ee99
 i18n_provenance: machine
 i18n_output_hash: 90e892bde21b

@@ -1,5 +1,5 @@
 ---
-description: 21 idiomas admitidos y cómo crear o mejorar traducciones de SnapOtter usando el sistema i18n con validación de TypeScript.
+description: "21 idiomas admitidos y cómo crear o mejorar traducciones de SnapOtter usando el sistema i18n con validación de TypeScript."
 i18n_source_hash: 0fdac8be0c98
 i18n_provenance: human
 i18n_output_hash: 89b068e77738

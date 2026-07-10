@@ -1,5 +1,5 @@
 ---
-description: Redimensionnez, optimisez, changez la vitesse, inversez, faites pivoter et extrayez des images de GIF animés dans un seul outil.
+description: "Redimensionnez, optimisez, changez la vitesse, inversez, faites pivoter et extrayez des images de GIF animés dans un seul outil."
 i18n_source_hash: 5e525e80db92
 i18n_provenance: human
 i18n_output_hash: c8004453c737

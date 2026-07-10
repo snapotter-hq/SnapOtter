@@ -1,5 +1,5 @@
 ---
-description: 在 PowerPoint 和 OpenDocument 演示文稿格式之间转换。
+description: "在 PowerPoint 和 OpenDocument 演示文稿格式之间转换。"
 i18n_source_hash: 08ba415d39ac
 i18n_provenance: human
 i18n_output_hash: 395ff35f7db7

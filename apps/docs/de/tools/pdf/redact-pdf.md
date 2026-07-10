@@ -1,5 +1,5 @@
 ---
-description: Textvorkommen dauerhaft aus einer PDF entfernen (verifizierte echte Schwärzung).
+description: "Textvorkommen dauerhaft aus einer PDF entfernen (verifizierte echte Schwärzung)."
 i18n_source_hash: 296ad2a701b2
 i18n_provenance: machine
 i18n_output_hash: 26ac03f05029

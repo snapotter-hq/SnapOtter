@@ -1,5 +1,5 @@
 ---
-description: Acelera o ralentiza la reproducción de audio con un multiplicador.
+description: "Acelera o ralentiza la reproducción de audio con un multiplicador."
 i18n_source_hash: e39ba662e594
 i18n_provenance: human
 i18n_output_hash: baa6db77e49d

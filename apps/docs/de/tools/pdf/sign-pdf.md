@@ -1,5 +1,5 @@
 ---
-description: Hochgeladene Signaturbilder mit normalisierten Seitenplatzierungen auf eine PDF stempeln.
+description: "Hochgeladene Signaturbilder mit normalisierten Seitenplatzierungen auf eine PDF stempeln."
 i18n_source_hash: c28f78c2e7fd
 i18n_provenance: machine
 i18n_output_hash: ed372ab0c6a8

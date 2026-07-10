@@ -1,5 +1,5 @@
 ---
-description: Einen Clip aus einem Video durch Angabe von Start- und Endzeiten ausschneiden.
+description: "Einen Clip aus einem Video durch Angabe von Start- und Endzeiten ausschneiden."
 i18n_source_hash: c84481641979
 i18n_provenance: machine
 i18n_output_hash: 13a9b877e396

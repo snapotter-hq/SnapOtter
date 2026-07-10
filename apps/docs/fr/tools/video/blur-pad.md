@@ -1,5 +1,5 @@
 ---
-description: Remplir les bandes avec une copie floue de la vidéo.
+description: "Remplir les bandes avec une copie floue de la vidéo."
 i18n_source_hash: 0c72aaefc6de
 i18n_provenance: human
 i18n_output_hash: c8728e6d484f

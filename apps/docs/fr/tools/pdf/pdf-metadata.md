@@ -1,5 +1,5 @@
 ---
-description: Lire et écrire les métadonnées d'un document PDF.
+description: "Lire et écrire les métadonnées d'un document PDF."
 i18n_source_hash: b2eaebf7467f
 i18n_provenance: human
 i18n_output_hash: 13f782479ba2

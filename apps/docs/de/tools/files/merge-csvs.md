@@ -1,5 +1,5 @@
 ---
-description: Mehrere CSV- oder TSV-Dateien mit übereinstimmenden Spalten zu einer einzigen zusammenführen.
+description: "Mehrere CSV- oder TSV-Dateien mit übereinstimmenden Spalten zu einer einzigen zusammenführen."
 i18n_source_hash: 109b5f399ac8
 i18n_provenance: machine
 i18n_output_hash: 33951aeb8d6c

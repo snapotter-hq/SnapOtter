@@ -1,5 +1,5 @@
 ---
-description: 在单声道和立体声之间转换，或交换左右声道。
+description: "在单声道和立体声之间转换，或交换左右声道。"
 i18n_source_hash: 4f5cd6b38c83
 i18n_provenance: human
 i18n_output_hash: e59e20ee2873

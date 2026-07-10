@@ -1,5 +1,5 @@
 ---
-description: 从图像中移除 EXIF、GPS、ICC 和 XMP 元数据，以保护隐私并减小文件大小。
+description: "从图像中移除 EXIF、GPS、ICC 和 XMP 元数据，以保护隐私并减小文件大小。"
 i18n_source_hash: e89147734fd0
 i18n_provenance: human
 i18n_output_hash: 0beed818cd0e

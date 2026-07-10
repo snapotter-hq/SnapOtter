@@ -1,5 +1,5 @@
 ---
-description: Convierte archivos SVG a PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF o JXL con resolución y DPI personalizados, con soporte por lotes.
+description: "Convierte archivos SVG a PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF o JXL con resolución y DPI personalizados, con soporte por lotes."
 i18n_source_hash: cf36830f8797
 i18n_provenance: human
 i18n_output_hash: 51f4009930de

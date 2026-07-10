@@ -1,5 +1,5 @@
 ---
-description: Präsentationen in PDF umwandeln.
+description: "Präsentationen in PDF umwandeln."
 i18n_source_hash: 49bd71c46bed
 i18n_provenance: machine
 i18n_output_hash: eff48ebbd486

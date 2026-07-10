@@ -1,5 +1,5 @@
 ---
-description: 動画から音声トラックを抽出します。
+description: "動画から音声トラックを抽出します。"
 i18n_source_hash: f5b8330a5f89
 i18n_provenance: human
 i18n_output_hash: 9983a995ec76

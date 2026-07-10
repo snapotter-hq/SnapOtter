@@ -1,5 +1,5 @@
 ---
-description: 在 MP3、WAV、OGG、FLAC 和 M4A 格式之间转换音频。
+description: "在 MP3、WAV、OGG、FLAC 和 M4A 格式之间转换音频。"
 i18n_source_hash: fd02c059e6a9
 i18n_provenance: human
 i18n_output_hash: b158d5872091

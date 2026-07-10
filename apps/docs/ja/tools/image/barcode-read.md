@@ -1,5 +1,5 @@
 ---
-description: 画像内の QR コード、バーコード、2D コードをスキャンし、注釈付きの出力を生成します。
+description: "画像内の QR コード、バーコード、2D コードをスキャンし、注釈付きの出力を生成します。"
 i18n_source_hash: 97c9d395c257
 i18n_provenance: human
 i18n_output_hash: 58678814c98b

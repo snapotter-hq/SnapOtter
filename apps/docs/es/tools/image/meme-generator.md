@@ -1,5 +1,5 @@
 ---
-description: Crea memes con plantillas o imágenes personalizadas, cuadros de texto con estilo y opciones de fuente.
+description: "Crea memes con plantillas o imágenes personalizadas, cuadros de texto con estilo y opciones de fuente."
 i18n_source_hash: 0a4970112ca6
 i18n_provenance: human
 i18n_output_hash: 9b59ca094e7f

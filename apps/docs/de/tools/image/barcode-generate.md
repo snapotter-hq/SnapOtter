@@ -1,5 +1,5 @@
 ---
-description: Barcodes in den Formaten Code 128, EAN-13, UPC-A, Code 39, ITF-14 und Data Matrix erzeugen.
+description: "Barcodes in den Formaten Code 128, EAN-13, UPC-A, Code 39, ITF-14 und Data Matrix erzeugen."
 i18n_source_hash: e84b1df40c7e
 i18n_provenance: machine
 i18n_output_hash: 175106f249fc

@@ -1,5 +1,5 @@
 ---
-description: Die Audiospur aus einem Video herausziehen.
+description: "Die Audiospur aus einem Video herausziehen."
 i18n_source_hash: f5b8330a5f89
 i18n_provenance: machine
 i18n_output_hash: b28c019d8900

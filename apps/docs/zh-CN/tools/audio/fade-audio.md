@@ -1,5 +1,5 @@
 ---
-description: 为音频添加淡入和淡出效果。
+description: "为音频添加淡入和淡出效果。"
 i18n_source_hash: 86856451ecb8
 i18n_provenance: human
 i18n_output_hash: 4ab7d398cde2

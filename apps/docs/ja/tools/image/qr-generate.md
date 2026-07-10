@@ -1,5 +1,5 @@
 ---
-description: カスタムカラーと誤り訂正レベルを指定して QR コードを生成します。
+description: "カスタムカラーと誤り訂正レベルを指定して QR コードを生成します。"
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: human
 i18n_output_hash: e827c186510a

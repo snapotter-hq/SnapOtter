@@ -1,5 +1,5 @@
 ---
-description: 从视频中裁剪出一个区域。
+description: "从视频中裁剪出一个区域。"
 i18n_source_hash: fab11f71a202
 i18n_provenance: human
 i18n_output_hash: 5c0d802b3666

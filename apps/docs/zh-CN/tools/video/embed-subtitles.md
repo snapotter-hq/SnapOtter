@@ -1,5 +1,5 @@
 ---
-description: 将字幕轨道复用（mux）进视频容器。
+description: "将字幕轨道复用（mux）进视频容器。"
 i18n_source_hash: be272730fff5
 i18n_provenance: human
 i18n_output_hash: 9d1245067173

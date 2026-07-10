@@ -1,5 +1,5 @@
 ---
-description: Extrahiere Text aus Bildern mit KI-gestützter optischer Zeichenerkennung.
+description: "Extrahiere Text aus Bildern mit KI-gestützter optischer Zeichenerkennung."
 i18n_source_hash: 3d85d423b82c
 i18n_provenance: machine
 i18n_output_hash: b3aac06f2306

@@ -1,5 +1,5 @@
 ---
-description: 音声ファイルから無音区間を取り除きます。
+description: "音声ファイルから無音区間を取り除きます。"
 i18n_source_hash: a7624fc99b50
 i18n_provenance: human
 i18n_output_hash: 1f44089600e6

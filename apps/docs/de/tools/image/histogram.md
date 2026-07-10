@@ -1,5 +1,5 @@
 ---
-description: Erzeugt ein RGB-Histogramm-Diagramm mit Statistiken pro Kanal aus einem Bild.
+description: "Erzeugt ein RGB-Histogramm-Diagramm mit Statistiken pro Kanal aus einem Bild."
 i18n_source_hash: 57aa610206a5
 i18n_provenance: machine
 i18n_output_hash: b703965f8a11

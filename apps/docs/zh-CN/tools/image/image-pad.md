@@ -1,5 +1,5 @@
 ---
-description: 使用纯色、透明或模糊背景将图像填充到目标宽高比。
+description: "使用纯色、透明或模糊背景将图像填充到目标宽高比。"
 i18n_source_hash: 796122da3dae
 i18n_provenance: human
 i18n_output_hash: 63814b238de5

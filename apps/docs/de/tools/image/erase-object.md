@@ -1,5 +1,5 @@
 ---
-description: Entfernt unerwünschte Objekte aus Bildern mit KI-Inpainting (LaMa), geführt durch eine Maske des zu löschenden Bereichs.
+description: "Entfernt unerwünschte Objekte aus Bildern mit KI-Inpainting (LaMa), geführt durch eine Maske des zu löschenden Bereichs."
 i18n_source_hash: 8e2e42a5e4f9
 i18n_provenance: machine
 i18n_output_hash: ce26cf5d6b89

@@ -1,5 +1,5 @@
 ---
-description: Formatos de archivo admitidos en todas las modalidades: más de 55 formatos de entrada de imagen, vídeo, audio, PDF y archivos.
+description: "Formatos de archivo admitidos en todas las modalidades: más de 55 formatos de entrada de imagen, vídeo, audio, PDF y archivos."
 i18n_source_hash: e53ecf65be25
 i18n_provenance: human
 i18n_output_hash: 05d34254d25e

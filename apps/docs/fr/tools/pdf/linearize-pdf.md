@@ -1,5 +1,5 @@
 ---
-description: Linéariser un PDF pour un affichage web rapide (téléchargement progressif).
+description: "Linéariser un PDF pour un affichage web rapide (téléchargement progressif)."
 i18n_source_hash: 36280b478161
 i18n_provenance: human
 i18n_output_hash: 0b3a5cad2635

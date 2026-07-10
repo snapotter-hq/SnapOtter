@@ -1,5 +1,5 @@
 ---
-description: Wendet einen zweifarbigen Duotone-Effekt mit individuellen Schatten- und Lichterfarben an.
+description: "Wendet einen zweifarbigen Duotone-Effekt mit individuellen Schatten- und Lichterfarben an."
 i18n_source_hash: ab99c4f0152c
 i18n_provenance: machine
 i18n_output_hash: a0baf955972e

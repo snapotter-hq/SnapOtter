@@ -1,5 +1,5 @@
 ---
-description: Intégrer les formulaires et annotations dans le contenu des pages.
+description: "Intégrer les formulaires et annotations dans le contenu des pages."
 i18n_source_hash: b25c2a2b6f40
 i18n_provenance: human
 i18n_output_hash: 52e3912267a3

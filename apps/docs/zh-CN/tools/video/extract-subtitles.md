@@ -1,5 +1,5 @@
 ---
-description: 将视频中的字幕轨道提取为 SRT 文件。
+description: "将视频中的字幕轨道提取为 SRT 文件。"
 i18n_source_hash: 48db860f6676
 i18n_provenance: human
 i18n_output_hash: 53e76c0a839c

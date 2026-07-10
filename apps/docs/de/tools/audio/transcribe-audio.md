@@ -1,5 +1,5 @@
 ---
-description: Wandelt Sprache mit KI-gestützter Transkription in Text um.
+description: "Wandelt Sprache mit KI-gestützter Transkription in Text um."
 i18n_source_hash: ae98c4c0aed2
 i18n_provenance: machine
 i18n_output_hash: 794ba28482f6

@@ -1,5 +1,5 @@
 ---
-description: Convertit un fichier Markdown en PDF mis en forme.
+description: "Convertit un fichier Markdown en PDF mis en forme."
 i18n_source_hash: 18474dc8772a
 i18n_provenance: human
 i18n_output_hash: 2c55755e6870

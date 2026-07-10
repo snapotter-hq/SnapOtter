@@ -1,5 +1,5 @@
 ---
-description: Convierte un archivo Markdown en un PDF con estilos.
+description: "Convierte un archivo Markdown en un PDF con estilos."
 i18n_source_hash: 18474dc8772a
 i18n_provenance: human
 i18n_output_hash: 10deb21c3fb7

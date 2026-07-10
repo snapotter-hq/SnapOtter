@@ -1,5 +1,5 @@
 ---
-description: Koloriert Schwarzweiß- oder Graustufenfotos automatisch mit dem KI-Modell DDColor.
+description: "Koloriert Schwarzweiß- oder Graustufenfotos automatisch mit dem KI-Modell DDColor."
 i18n_source_hash: 688aa3abbdae
 i18n_provenance: machine
 i18n_output_hash: bf0737dde699

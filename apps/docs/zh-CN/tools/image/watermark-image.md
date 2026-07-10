@@ -1,5 +1,5 @@
 ---
-description: 将徽标或图像作为水印叠加，可配置位置、不透明度和缩放。
+description: "将徽标或图像作为水印叠加，可配置位置、不透明度和缩放。"
 i18n_source_hash: c73ab0ef8ab9
 i18n_provenance: human
 i18n_output_hash: fcce0a92b138

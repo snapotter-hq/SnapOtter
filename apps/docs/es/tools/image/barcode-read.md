@@ -1,5 +1,5 @@
 ---
-description: Escanea imágenes en busca de códigos QR, códigos de barras y códigos 2D con salida anotada.
+description: "Escanea imágenes en busca de códigos QR, códigos de barras y códigos 2D con salida anotada."
 i18n_source_hash: 97c9d395c257
 i18n_provenance: human
 i18n_output_hash: 439dff4bfa27

@@ -1,5 +1,5 @@
 ---
-description: 查看详细的图像元数据、属性和各通道直方图统计信息。
+description: "查看详细的图像元数据、属性和各通道直方图统计信息。"
 i18n_source_hash: 8a0f7a0b0153
 i18n_provenance: human
 i18n_output_hash: 7948831b5f0b

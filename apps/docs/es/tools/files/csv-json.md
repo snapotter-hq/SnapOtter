@@ -1,5 +1,5 @@
 ---
-description: Convierte entre CSV y JSON, en ambas direcciones.
+description: "Convierte entre CSV y JSON, en ambas direcciones."
 i18n_source_hash: 978c08ad46d3
 i18n_provenance: human
 i18n_output_hash: 2047c669976f

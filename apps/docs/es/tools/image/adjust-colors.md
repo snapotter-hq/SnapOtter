@@ -1,5 +1,5 @@
 ---
-description: Ajusta el brillo, el contraste, la saturación, la temperatura, el tono y los canales, y aplica efectos de color.
+description: "Ajusta el brillo, el contraste, la saturación, la temperatura, el tono y los canales, y aplica efectos de color."
 i18n_source_hash: 41b35fe5c2ba
 i18n_provenance: human
 i18n_output_hash: 44819c8d0152

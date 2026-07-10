@@ -1,5 +1,5 @@
 ---
-description: 動画から音声トラックを削除します。
+description: "動画から音声トラックを削除します。"
 i18n_source_hash: 9a0c60bbcaa3
 i18n_provenance: human
 i18n_output_hash: 24a44b0406da

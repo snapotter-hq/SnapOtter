@@ -1,5 +1,5 @@
 ---
-description: Konvertiert Tabellenkalkulationen in PDF.
+description: "Konvertiert Tabellenkalkulationen in PDF."
 i18n_source_hash: 4dbe2a810ea6
 i18n_provenance: machine
 i18n_output_hash: faf8c85d9895

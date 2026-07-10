@@ -1,5 +1,5 @@
 ---
-description: Convertit des fichiers Word, Markdown, HTML ou texte brut en EPUB.
+description: "Convertit des fichiers Word, Markdown, HTML ou texte brut en EPUB."
 i18n_source_hash: 63e1afa91c52
 i18n_provenance: human
 i18n_output_hash: 188bb143bd5c

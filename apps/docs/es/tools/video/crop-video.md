@@ -1,5 +1,5 @@
 ---
-description: Recorta una región de un vídeo.
+description: "Recorta una región de un vídeo."
 i18n_source_hash: fab11f71a202
 i18n_provenance: human
 i18n_output_hash: 0219539edb04

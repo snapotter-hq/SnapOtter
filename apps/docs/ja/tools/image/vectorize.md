@@ -1,5 +1,5 @@
 ---
-description: ラスター画像をSVGに変換します。白黒（potrace）とフルカラーのマルチレイヤーベクター化に対応します。
+description: "ラスター画像をSVGに変換します。白黒（potrace）とフルカラーのマルチレイヤーベクター化に対応します。"
 i18n_source_hash: f3e4777188ad
 i18n_provenance: human
 i18n_output_hash: 7284f323c58a

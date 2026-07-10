@@ -1,5 +1,5 @@
 ---
-description: Referenz zu den Operationen der Image-Engine. Alle Sharp-basierten Bildverarbeitungsoperationen und ihre Parameter.
+description: "Referenz zu den Operationen der Image-Engine. Alle Sharp-basierten Bildverarbeitungsoperationen und ihre Parameter."
 i18n_source_hash: 42febdf85fa8
 i18n_provenance: machine
 i18n_output_hash: 360d6021118d

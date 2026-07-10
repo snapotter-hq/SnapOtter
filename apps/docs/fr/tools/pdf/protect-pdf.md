@@ -1,5 +1,5 @@
 ---
-description: Ajouter une protection par mot de passe avec chiffrement AES-256 à un PDF.
+description: "Ajouter une protection par mot de passe avec chiffrement AES-256 à un PDF."
 i18n_source_hash: 869cfbc739ef
 i18n_provenance: human
 i18n_output_hash: afb16e6dbc20

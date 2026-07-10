@@ -1,5 +1,5 @@
 ---
-description: Excel、OpenDocument、CSV の各形式間で変換します。
+description: "Excel、OpenDocument、CSV の各形式間で変換します。"
 i18n_source_hash: b813b1b06962
 i18n_provenance: human
 i18n_output_hash: da76438c661c

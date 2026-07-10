@@ -1,5 +1,5 @@
 ---
-description: Incruste un filigrane texte sur les images de la vidéo.
+description: "Incruste un filigrane texte sur les images de la vidéo."
 i18n_source_hash: 937bb075b894
 i18n_provenance: human
 i18n_output_hash: 0a8884b28a29

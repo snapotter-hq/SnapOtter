@@ -1,5 +1,5 @@
 ---
-description: スプレッドシートを PDF に変換します。
+description: "スプレッドシートを PDF に変換します。"
 i18n_source_hash: 4dbe2a810ea6
 i18n_provenance: human
 i18n_output_hash: 38b310ffa62a

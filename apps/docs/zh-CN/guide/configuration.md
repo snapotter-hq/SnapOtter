@@ -1,5 +1,5 @@
 ---
-description: 所有 SnapOtter 环境变量及其默认值。配置认证、存储、AI 模型、分析等。
+description: "所有 SnapOtter 环境变量及其默认值。配置认证、存储、AI 模型、分析等。"
 i18n_source_hash: 8e9e9ca2840c
 i18n_provenance: human
 i18n_output_hash: 2d14d29daa92

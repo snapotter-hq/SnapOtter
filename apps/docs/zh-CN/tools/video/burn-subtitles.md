@@ -1,5 +1,5 @@
 ---
-description: 将字幕永久渲染到视频画面上。
+description: "将字幕永久渲染到视频画面上。"
 i18n_source_hash: 2d3111589db0
 i18n_provenance: human
 i18n_output_hash: 55fe2195ffc4

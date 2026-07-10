@@ -1,5 +1,5 @@
 ---
-description: Detecta imágenes duplicadas y casi duplicadas mediante hashing perceptual.
+description: "Detecta imágenes duplicadas y casi duplicadas mediante hashing perceptual."
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: human
 i18n_output_hash: 9b7273b42cee

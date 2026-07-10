@@ -1,5 +1,5 @@
 ---
-description: Extrae fotogramas de un vídeo como un ZIP de imágenes.
+description: "Extrae fotogramas de un vídeo como un ZIP de imágenes."
 i18n_source_hash: b06f038dafb3
 i18n_provenance: human
 i18n_output_hash: 96639415435f

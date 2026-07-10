@@ -1,5 +1,5 @@
 ---
-description: 顔検出、背景除去、印刷シートの並べ配置を備えた AI パスポート・証明写真ジェネレーター。
+description: "顔検出、背景除去、印刷シートの並べ配置を備えた AI パスポート・証明写真ジェネレーター。"
 i18n_source_hash: d4b4f4ced988
 i18n_provenance: human
 i18n_output_hash: 2b0c1ea5ec9f

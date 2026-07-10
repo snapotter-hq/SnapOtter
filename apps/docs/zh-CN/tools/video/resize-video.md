@@ -1,5 +1,5 @@
 ---
-description: 将视频缩放到新的分辨率或预设尺寸。
+description: "将视频缩放到新的分辨率或预设尺寸。"
 i18n_source_hash: bb1f67871fea
 i18n_provenance: human
 i18n_output_hash: 686f8a6eaf6c

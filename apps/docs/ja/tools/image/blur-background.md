@@ -1,5 +1,5 @@
 ---
-description: AI を使用して、被写体をシャープに保ちながら背景をぼかします。
+description: "AI を使用して、被写体をシャープに保ちながら背景をぼかします。"
 i18n_source_hash: 9073f10e6e9d
 i18n_provenance: human
 i18n_output_hash: 4539ec15578d

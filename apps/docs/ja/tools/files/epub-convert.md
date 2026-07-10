@@ -1,5 +1,5 @@
 ---
-description: EPUB を PDF、DOCX、HTML、または Markdown に変換します。
+description: "EPUB を PDF、DOCX、HTML、または Markdown に変換します。"
 i18n_source_hash: 7d94fc18ca97
 i18n_provenance: human
 i18n_output_hash: daf3628358aa

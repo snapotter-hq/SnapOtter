@@ -1,5 +1,5 @@
 ---
-description: 予測可能で制御しやすい順序で、画像にボーダー、パディング、角丸、ドロップシャドウを追加します。
+description: "予測可能で制御しやすい順序で、画像にボーダー、パディング、角丸、ドロップシャドウを追加します。"
 i18n_source_hash: 8845150736a9
 i18n_provenance: human
 i18n_output_hash: 5356b70a6b09

@@ -1,5 +1,5 @@
 ---
-description: Ajouter des bandes de couleur unie pour s'adapter à un format d'image cible.
+description: "Ajouter des bandes de couleur unie pour s'adapter à un format d'image cible."
 i18n_source_hash: b8e17dffc341
 i18n_provenance: human
 i18n_output_hash: 0611a491555c

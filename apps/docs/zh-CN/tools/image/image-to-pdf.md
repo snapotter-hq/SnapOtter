@@ -1,5 +1,5 @@
 ---
-description: 将一个或多个图像合并为 PDF 文档，可选择页面大小、方向和目标文件大小。
+description: "将一个或多个图像合并为 PDF 文档，可选择页面大小、方向和目标文件大小。"
 i18n_source_hash: f659c7e7f56b
 i18n_provenance: human
 i18n_output_hash: 6cfa1b2ea8b1

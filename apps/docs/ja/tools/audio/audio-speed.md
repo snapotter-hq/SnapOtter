@@ -1,5 +1,5 @@
 ---
-description: 倍率を指定して音声の再生速度を上げたり下げたりします。
+description: "倍率を指定して音声の再生速度を上げたり下げたりします。"
 i18n_source_hash: e39ba662e594
 i18n_provenance: human
 i18n_output_hash: fec1f5513985

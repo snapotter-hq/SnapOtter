@@ -1,5 +1,5 @@
 ---
-description: Untertitel dauerhaft in Videoframes einbrennen.
+description: "Untertitel dauerhaft in Videoframes einbrennen."
 i18n_source_hash: 2d3111589db0
 i18n_provenance: machine
 i18n_output_hash: bd82fdfa0130

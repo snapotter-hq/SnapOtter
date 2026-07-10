@@ -1,5 +1,5 @@
 ---
-description: Supprime les sections silencieuses d'un fichier audio.
+description: "Supprime les sections silencieuses d'un fichier audio."
 i18n_source_hash: a7624fc99b50
 i18n_provenance: human
 i18n_output_hash: acb9cae0a9f2

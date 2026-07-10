@@ -1,5 +1,5 @@
 ---
-description: 使用位置、不透明度和混合模式对图片进行分层合成。
+description: "使用位置、不透明度和混合模式对图片进行分层合成。"
 i18n_source_hash: c5d09eb13fde
 i18n_provenance: human
 i18n_output_hash: e8457c20e348

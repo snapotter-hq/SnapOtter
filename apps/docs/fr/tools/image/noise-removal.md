@@ -1,5 +1,5 @@
 ---
-description: Suppression du bruit et du grain assistée par IA, avec plusieurs niveaux de qualité.
+description: "Suppression du bruit et du grain assistée par IA, avec plusieurs niveaux de qualité."
 i18n_source_hash: f0dfc876e0e0
 i18n_provenance: human
 i18n_output_hash: e112d720d227

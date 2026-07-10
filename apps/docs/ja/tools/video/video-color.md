@@ -1,5 +1,5 @@
 ---
-description: 動画の明るさ、コントラスト、彩度、ガンマを調整します。
+description: "動画の明るさ、コントラスト、彩度、ガンマを調整します。"
 i18n_source_hash: 40483b79d44b
 i18n_provenance: human
 i18n_output_hash: abe3d6452ec2

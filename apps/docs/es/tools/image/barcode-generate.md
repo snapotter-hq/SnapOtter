@@ -1,5 +1,5 @@
 ---
-description: Genera códigos de barras en los formatos Code 128, EAN-13, UPC-A, Code 39, ITF-14 y Data Matrix.
+description: "Genera códigos de barras en los formatos Code 128, EAN-13, UPC-A, Code 39, ITF-14 y Data Matrix."
 i18n_source_hash: e84b1df40c7e
 i18n_provenance: human
 i18n_output_hash: c6f58796c11d

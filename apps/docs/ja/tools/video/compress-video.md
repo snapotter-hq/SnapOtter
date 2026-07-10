@@ -1,5 +1,5 @@
 ---
-description: 品質を制御しながら動画ファイルサイズを縮小します。
+description: "品質を制御しながら動画ファイルサイズを縮小します。"
 i18n_source_hash: 9cc1f1acf74e
 i18n_provenance: human
 i18n_output_hash: b34f153fd508

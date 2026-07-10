@@ -1,5 +1,5 @@
 ---
-description: 将图像并排、堆叠或以网格方式拼接，可控制对齐、间距、边框和调整模式。
+description: "将图像并排、堆叠或以网格方式拼接，可控制对齐、间距、边框和调整模式。"
 i18n_source_hash: 39333210505a
 i18n_provenance: human
 i18n_output_hash: 87525c98302e

@@ -1,5 +1,5 @@
 ---
-description: Mehrere Bilder zu einem einzigen Sprite-Sheet-Raster mit Frame-Metadaten kombinieren.
+description: "Mehrere Bilder zu einem einzigen Sprite-Sheet-Raster mit Frame-Metadaten kombinieren."
 i18n_source_hash: 1938d7fb100d
 i18n_provenance: machine
 i18n_output_hash: 52bd054d3541

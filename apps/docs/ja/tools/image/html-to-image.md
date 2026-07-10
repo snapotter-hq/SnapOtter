@@ -1,5 +1,5 @@
 ---
-description: Web ページや HTML スニペットを、デバイスエミュレーションを使用して高品質の画像としてキャプチャします。
+description: "Web ページや HTML スニペットを、デバイスエミュレーションを使用して高品質の画像としてキャプチャします。"
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: human
 i18n_output_hash: df5d130bb1ff

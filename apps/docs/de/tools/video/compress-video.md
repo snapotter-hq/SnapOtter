@@ -1,5 +1,5 @@
 ---
-description: Videodateigröße mit Qualitätssteuerung verringern.
+description: "Videodateigröße mit Qualitätssteuerung verringern."
 i18n_source_hash: 9cc1f1acf74e
 i18n_provenance: machine
 i18n_output_hash: c8799ddd34d5

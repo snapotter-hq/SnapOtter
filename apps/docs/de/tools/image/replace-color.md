@@ -1,5 +1,5 @@
 ---
-description: Ersetze eine bestimmte Farbe in einem Bild durch eine andere Farbe oder mache sie transparent.
+description: "Ersetze eine bestimmte Farbe in einem Bild durch eine andere Farbe oder mache sie transparent."
 i18n_source_hash: df55ac451ecb
 i18n_provenance: machine
 i18n_output_hash: 280398f11bb5

@@ -1,5 +1,5 @@
 ---
-description: 通过设备模拟将网页或 HTML 片段捕获为高质量图像。
+description: "通过设备模拟将网页或 HTML 片段捕获为高质量图像。"
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: human
 i18n_output_hash: 895080b5e602

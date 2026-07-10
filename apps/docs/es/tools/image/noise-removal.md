@@ -1,5 +1,5 @@
 ---
-description: Eliminación de ruido y grano con IA y opciones de calidad de varios niveles.
+description: "Eliminación de ruido y grano con IA y opciones de calidad de varios niveles."
 i18n_source_hash: f0dfc876e0e0
 i18n_provenance: human
 i18n_output_hash: 4b655b9abb69

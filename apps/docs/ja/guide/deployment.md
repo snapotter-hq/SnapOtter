@@ -1,5 +1,5 @@
 ---
-description: Docker で SnapOtter を本番環境にデプロイする方法。ハードウェア要件、GPU セットアップ、Nginx・Traefik・Cloudflare 向けのリバースプロキシ設定。
+description: "Docker で SnapOtter を本番環境にデプロイする方法。ハードウェア要件、GPU セットアップ、Nginx・Traefik・Cloudflare 向けのリバースプロキシ設定。"
 i18n_source_hash: ecc1b528bc4b
 i18n_provenance: human
 i18n_output_hash: 2691efb3acc4

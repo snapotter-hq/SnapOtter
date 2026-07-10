@@ -1,5 +1,5 @@
 ---
-description: Convertir toutes les couleurs d'un PDF en niveaux de gris.
+description: "Convertir toutes les couleurs d'un PDF en niveaux de gris."
 i18n_source_hash: f327addb32d6
 i18n_provenance: human
 i18n_output_hash: 769e588e51e6

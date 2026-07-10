@@ -1,5 +1,5 @@
 ---
-description: Richten Sie Single Sign-On mit OpenID Connect ein. Schritt-für-Schritt-Anleitungen für Keycloak, Authentik, Google und andere OIDC-Anbieter.
+description: "Richten Sie Single Sign-On mit OpenID Connect ein. Schritt-für-Schritt-Anleitungen für Keycloak, Authentik, Google und andere OIDC-Anbieter."
 i18n_source_hash: 4296343b3cc5
 i18n_provenance: machine
 i18n_output_hash: 8f5a0caeda80

@@ -1,5 +1,5 @@
 ---
-description: Divide el audio por intervalos de tiempo, partes iguales o detección de silencios.
+description: "Divide el audio por intervalos de tiempo, partes iguales o detección de silencios."
 i18n_source_hash: c062a395dbac
 i18n_provenance: human
 i18n_output_hash: 513bc508c04a

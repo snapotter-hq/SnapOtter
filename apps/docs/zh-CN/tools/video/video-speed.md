@@ -1,5 +1,5 @@
 ---
-description: 加快或放慢视频速度。
+description: "加快或放慢视频速度。"
 i18n_source_hash: 98dfc75c0507
 i18n_provenance: human
 i18n_output_hash: dbdc2ed96092

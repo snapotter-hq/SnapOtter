@@ -1,5 +1,5 @@
 ---
-description: Mehrere PDF-Seiten pro Blatt anordnen (2-fach, 4-fach usw.).
+description: "Mehrere PDF-Seiten pro Blatt anordnen (2-fach, 4-fach usw.)."
 i18n_source_hash: 9dd82737cb72
 i18n_provenance: machine
 i18n_output_hash: 6a57859bbdc9

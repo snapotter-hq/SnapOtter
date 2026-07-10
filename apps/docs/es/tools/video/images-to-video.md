@@ -1,5 +1,5 @@
 ---
-description: Convierte un conjunto de imágenes en un vídeo de presentación.
+description: "Convierte un conjunto de imágenes en un vídeo de presentación."
 i18n_source_hash: 2c6f183feb6d
 i18n_provenance: human
 i18n_output_hash: 54303c23defe

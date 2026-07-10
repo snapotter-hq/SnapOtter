@@ -1,5 +1,5 @@
 ---
-description: Reinen Text aus einer PDF extrahieren.
+description: "Reinen Text aus einer PDF extrahieren."
 i18n_source_hash: 15a7bc1cdf8f
 i18n_provenance: machine
 i18n_output_hash: 9610e022db2c

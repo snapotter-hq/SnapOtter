@@ -1,5 +1,5 @@
 ---
-description: Elimina de forma permanente apariciones de texto de un PDF (redacción verdadera verificada).
+description: "Elimina de forma permanente apariciones de texto de un PDF (redacción verdadera verificada)."
 i18n_source_hash: 296ad2a701b2
 i18n_provenance: human
 i18n_output_hash: 35213abcef88

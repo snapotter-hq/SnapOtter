@@ -1,5 +1,5 @@
 ---
-description: 并排比较两张图片，进行像素级差异可视化并给出相似度评分。
+description: "并排比较两张图片，进行像素级差异可视化并给出相似度评分。"
 i18n_source_hash: cc0a02bd75c6
 i18n_provenance: human
 i18n_output_hash: e5ea400c8d8b

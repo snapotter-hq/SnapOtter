@@ -1,5 +1,5 @@
 ---
-description: 一連の画像をスライドショー動画に変換します。
+description: "一連の画像をスライドショー動画に変換します。"
 i18n_source_hash: 2c6f183feb6d
 i18n_provenance: human
 i18n_output_hash: c5a3597dcd66

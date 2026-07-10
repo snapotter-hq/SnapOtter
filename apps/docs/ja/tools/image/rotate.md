@@ -1,5 +1,5 @@
 ---
-description: 任意の角度で画像を回転し、水平方向または垂直方向に反転します。
+description: "任意の角度で画像を回転し、水平方向または垂直方向に反転します。"
 i18n_source_hash: af2581d7cd8d
 i18n_provenance: human
 i18n_output_hash: f4f347d12e10

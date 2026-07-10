@@ -1,5 +1,5 @@
 ---
-description: Corrige les faux PNG transparents grâce au détourage par IA (BiRefNet) pour produire une véritable transparence alpha, avec un nettoyage des contours par défrangeage.
+description: "Corrige les faux PNG transparents grâce au détourage par IA (BiRefNet) pour produire une véritable transparence alpha, avec un nettoyage des contours par défrangeage."
 i18n_source_hash: 7eb748b80f93
 i18n_provenance: human
 i18n_output_hash: a679aa24c8dd

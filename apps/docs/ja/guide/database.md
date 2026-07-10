@@ -1,5 +1,5 @@
 ---
-description: SnapOtter の PostgreSQL データベーススキーマ、テーブル、マイグレーション、バックアップ手順。
+description: "SnapOtter の PostgreSQL データベーススキーマ、テーブル、マイグレーション、バックアップ手順。"
 i18n_source_hash: b37398ae91a3
 i18n_provenance: human
 i18n_output_hash: 1113cd0160d9

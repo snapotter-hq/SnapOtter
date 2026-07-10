@@ -1,5 +1,5 @@
 ---
-description: 使用模式模板重命名多个文件并以 ZIP 下载。
+description: "使用模式模板重命名多个文件并以 ZIP 下载。"
 i18n_source_hash: 2776dcc2f71c
 i18n_provenance: human
 i18n_output_hash: 4b35a9b3af6b

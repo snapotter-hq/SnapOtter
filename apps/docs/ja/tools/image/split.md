@@ -1,5 +1,5 @@
 ---
-description: 1枚の画像を行と列またはピクセルサイズでグリッドタイルに分割し、ZIPアーカイブとして返します。
+description: "1枚の画像を行と列またはピクセルサイズでグリッドタイルに分割し、ZIPアーカイブとして返します。"
 i18n_source_hash: 57a2e11e7cce
 i18n_provenance: human
 i18n_output_hash: ed25c8d33ed5

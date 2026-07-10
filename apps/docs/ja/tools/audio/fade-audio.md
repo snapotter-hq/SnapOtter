@@ -1,5 +1,5 @@
 ---
-description: 音声にフェードインとフェードアウトの効果を加えます。
+description: "音声にフェードインとフェードアウトの効果を加えます。"
 i18n_source_hash: 86856451ecb8
 i18n_provenance: human
 i18n_output_hash: a506e108365e

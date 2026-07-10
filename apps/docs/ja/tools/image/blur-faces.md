@@ -1,5 +1,5 @@
 ---
-description: AI 顔検出で画像内の顔を自動検出してぼかし、プライバシー保護と GDPR に準拠した匿名化を行います。
+description: "AI 顔検出で画像内の顔を自動検出してぼかし、プライバシー保護と GDPR に準拠した匿名化を行います。"
 i18n_source_hash: fb861c12aea5
 i18n_provenance: human
 i18n_output_hash: a863b71fd7e4

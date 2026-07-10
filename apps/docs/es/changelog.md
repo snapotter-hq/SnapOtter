@@ -1,5 +1,5 @@
 ---
-description: Notas de la versión e historial de versiones de SnapOtter. Descubre las novedades, mejoras y correcciones de cada versión.
+description: "Notas de la versión e historial de versiones de SnapOtter. Descubre las novedades, mejoras y correcciones de cada versión."
 i18n_source_hash: 9020073f127e
 i18n_provenance: human
 i18n_output_hash: 16c08a97941e

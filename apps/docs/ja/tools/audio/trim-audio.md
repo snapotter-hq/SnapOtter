@@ -1,5 +1,5 @@
 ---
-description: 開始時刻と終了時刻を指定して、音声ファイルの一部を切り出します。
+description: "開始時刻と終了時刻を指定して、音声ファイルの一部を切り出します。"
 i18n_source_hash: 8b80c5c8a711
 i18n_provenance: human
 i18n_output_hash: 8d726f232cb7

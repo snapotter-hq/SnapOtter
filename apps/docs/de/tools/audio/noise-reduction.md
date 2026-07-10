@@ -1,5 +1,5 @@
 ---
-description: Hintergrundgeräusche in Audio mit FFT-basierter Rauschunterdrückung reduzieren.
+description: "Hintergrundgeräusche in Audio mit FFT-basierter Rauschunterdrückung reduzieren."
 i18n_source_hash: 57cbdbd449aa
 i18n_provenance: machine
 i18n_output_hash: 63361532a98f

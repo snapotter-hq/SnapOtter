@@ -1,5 +1,5 @@
 ---
-description: Convertit des documents Word en PDF.
+description: "Convertit des documents Word en PDF."
 i18n_source_hash: f814ba1a1a53
 i18n_provenance: human
 i18n_output_hash: 911e578a57de

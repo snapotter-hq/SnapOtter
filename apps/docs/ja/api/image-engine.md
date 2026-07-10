@@ -1,5 +1,5 @@
 ---
-description: 画像エンジン処理リファレンス。Sharp ベースのすべての画像処理と、そのパラメータ。
+description: "画像エンジン処理リファレンス。Sharp ベースのすべての画像処理と、そのパラメータ。"
 i18n_source_hash: 42febdf85fa8
 i18n_provenance: human
 i18n_output_hash: 3ee05b506af7

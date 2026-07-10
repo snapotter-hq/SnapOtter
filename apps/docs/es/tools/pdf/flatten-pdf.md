@@ -1,5 +1,5 @@
 ---
-description: Incorpora formularios y anotaciones al contenido de la página.
+description: "Incorpora formularios y anotaciones al contenido de la página."
 i18n_source_hash: b25c2a2b6f40
 i18n_provenance: human
 i18n_output_hash: 4956584cd062

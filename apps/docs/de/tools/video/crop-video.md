@@ -1,5 +1,5 @@
 ---
-description: Einen Bereich aus einem Video ausschneiden.
+description: "Einen Bereich aus einem Video ausschneiden."
 i18n_source_hash: fab11f71a202
 i18n_provenance: machine
 i18n_output_hash: 0f90623074bc

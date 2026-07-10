@@ -1,5 +1,5 @@
 ---
-description: 動画を回転または反転します。
+description: "動画を回転または反転します。"
 i18n_source_hash: cf9620ca62c7
 i18n_provenance: human
 i18n_output_hash: 363f01839a6f

@@ -1,5 +1,5 @@
 ---
-description: Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter.
+description: "Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter."
 i18n_source_hash: cb03724d2829
 i18n_provenance: human
 i18n_output_hash: 572206416dc1

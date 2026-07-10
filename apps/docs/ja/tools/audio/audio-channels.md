@@ -1,5 +1,5 @@
 ---
-description: モノラルとステレオを相互変換したり、左右のチャンネルを入れ替えたりします。
+description: "モノラルとステレオを相互変換したり、左右のチャンネルを入れ替えたりします。"
 i18n_source_hash: 4f5cd6b38c83
 i18n_provenance: human
 i18n_output_hash: f5d814fbc0e7

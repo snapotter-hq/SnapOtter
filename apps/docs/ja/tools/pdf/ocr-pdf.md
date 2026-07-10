@@ -1,5 +1,5 @@
 ---
-description: AI 搭載の OCR を使って PDF ドキュメントからテキストを抽出します。
+description: "AI 搭載の OCR を使って PDF ドキュメントからテキストを抽出します。"
 i18n_source_hash: 1431fcba180b
 i18n_provenance: human
 i18n_output_hash: d39e66166498

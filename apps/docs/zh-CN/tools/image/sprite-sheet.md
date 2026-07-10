@@ -1,5 +1,5 @@
 ---
-description: 将多张图像合并为单个精灵表网格，并附带帧元数据。
+description: "将多张图像合并为单个精灵表网格，并附带帧元数据。"
 i18n_source_hash: 1938d7fb100d
 i18n_provenance: human
 i18n_output_hash: d9d3dc08d26a

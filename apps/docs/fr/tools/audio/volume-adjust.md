@@ -1,5 +1,5 @@
 ---
-description: Augmente ou diminue le volume audio d'un gain fixe en décibels.
+description: "Augmente ou diminue le volume audio d'un gain fixe en décibels."
 i18n_source_hash: b9bc1de2c9ef
 i18n_provenance: human
 i18n_output_hash: d9ac750b5475

@@ -1,5 +1,5 @@
 ---
-description: 動画から字幕トラックを SRT ファイルとして抽出します。
+description: "動画から字幕トラックを SRT ファイルとして抽出します。"
 i18n_source_hash: 48db860f6676
 i18n_provenance: human
 i18n_output_hash: e294ca50de11

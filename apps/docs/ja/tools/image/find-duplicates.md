@@ -1,5 +1,5 @@
 ---
-description: 知覚ハッシュを使用して重複画像および類似画像を検出します。
+description: "知覚ハッシュを使用して重複画像および類似画像を検出します。"
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: human
 i18n_output_hash: e3471d471961

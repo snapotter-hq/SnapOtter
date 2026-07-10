@@ -1,5 +1,5 @@
 ---
-description: 破損した PDF の修復を試みます。
+description: "破損した PDF の修復を試みます。"
 i18n_source_hash: 864073a2f09f
 i18n_provenance: human
 i18n_output_hash: 53e16551ecdb

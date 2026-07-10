@@ -1,5 +1,5 @@
 ---
-description: 将多个音频文件合并为一条顺序轨道。
+description: "将多个音频文件合并为一条顺序轨道。"
 i18n_source_hash: defa993d3f87
 i18n_provenance: human
 i18n_output_hash: dec36c80bc5a

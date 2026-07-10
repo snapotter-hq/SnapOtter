@@ -1,5 +1,5 @@
 ---
-description: PDF ドキュメントのメタデータを読み書きします。
+description: "PDF ドキュメントのメタデータを読み書きします。"
 i18n_source_hash: b2eaebf7467f
 i18n_provenance: human
 i18n_output_hash: bf803fc8eb1c

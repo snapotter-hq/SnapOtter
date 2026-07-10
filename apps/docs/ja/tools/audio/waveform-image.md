@@ -1,5 +1,5 @@
 ---
-description: 音声ファイルから波形の可視化を PNG 画像として生成します。
+description: "音声ファイルから波形の可視化を PNG 画像として生成します。"
 i18n_source_hash: 5480106dfe48
 i18n_provenance: human
 i18n_output_hash: dbadcf883796

@@ -1,5 +1,5 @@
 ---
-description: 从视频中剥离元数据并报告发现的内容。
+description: "从视频中剥离元数据并报告发现的内容。"
 i18n_source_hash: 69621bfb98ca
 i18n_provenance: human
 i18n_output_hash: c93ff604aaa7

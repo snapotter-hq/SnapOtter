@@ -1,5 +1,5 @@
 ---
-description: 動画クリップをアニメーション WebP 画像に変換します。
+description: "動画クリップをアニメーション WebP 画像に変換します。"
 i18n_source_hash: 7b1a22459bd1
 i18n_provenance: human
 i18n_output_hash: 456da871ddd6

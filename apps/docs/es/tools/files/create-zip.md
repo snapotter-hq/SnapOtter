@@ -1,5 +1,5 @@
 ---
-description: Agrupa varios archivos en un único archivo ZIP.
+description: "Agrupa varios archivos en un único archivo ZIP."
 i18n_source_hash: 9ff1250dbd36
 i18n_provenance: human
 i18n_output_hash: ede5ca205156

@@ -1,5 +1,5 @@
 ---
-description: Agrandit le canevas d'une image par outpainting IA, en l'étendant dans n'importe quelle direction et en remplissant les nouvelles zones pour qu'elles correspondent à l'original.
+description: "Agrandit le canevas d'une image par outpainting IA, en l'étendant dans n'importe quelle direction et en remplissant les nouvelles zones pour qu'elles correspondent à l'original."
 i18n_source_hash: 1b00db4ed40d
 i18n_provenance: human
 i18n_output_hash: ae4b5a0d8556

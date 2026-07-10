@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 在保持主体清晰的同时模糊背景。
+description: "使用 AI 在保持主体清晰的同时模糊背景。"
 i18n_source_hash: 9073f10e6e9d
 i18n_provenance: human
 i18n_output_hash: 9e168c490af4

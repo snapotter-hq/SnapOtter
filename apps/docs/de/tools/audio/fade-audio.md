@@ -1,5 +1,5 @@
 ---
-description: Ein- und Ausblendeffekte zu Audio hinzufügen.
+description: "Ein- und Ausblendeffekte zu Audio hinzufügen."
 i18n_source_hash: 86856451ecb8
 i18n_provenance: machine
 i18n_output_hash: 5e10628738aa

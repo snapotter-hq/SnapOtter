@@ -1,5 +1,5 @@
 ---
-description: 使用自适应、USM 锐化或高通方法锐化图像，并可选降噪。
+description: "使用自适应、USM 锐化或高通方法锐化图像，并可选降噪。"
 i18n_source_hash: ccb60af9faae
 i18n_provenance: human
 i18n_output_hash: 8096d6bf1ecd

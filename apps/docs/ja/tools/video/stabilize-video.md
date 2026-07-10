@@ -1,5 +1,5 @@
 ---
-description: 2パスの手ブレ補正でカメラの揺れを低減します。
+description: "2パスの手ブレ補正でカメラの揺れを低減します。"
 i18n_source_hash: ec908e91a752
 i18n_provenance: human
 i18n_output_hash: 1ec1838c9e4c

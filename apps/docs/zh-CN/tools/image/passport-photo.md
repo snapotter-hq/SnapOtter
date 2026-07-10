@@ -1,5 +1,5 @@
 ---
-description: 基于 AI 的护照和证件照生成器，具备人脸检测、背景去除和打印排版拼贴功能。
+description: "基于 AI 的护照和证件照生成器，具备人脸检测、背景去除和打印排版拼贴功能。"
 i18n_source_hash: d4b4f4ced988
 i18n_provenance: human
 i18n_output_hash: 8f1a76094628

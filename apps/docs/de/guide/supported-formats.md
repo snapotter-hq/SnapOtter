@@ -1,5 +1,5 @@
 ---
-description: Unterstützte Dateiformate über alle Modalitäten hinweg - 55+ Bild-Eingabeformate, Video, Audio, PDF und Dateiformate.
+description: "Unterstützte Dateiformate über alle Modalitäten hinweg - 55+ Bild-Eingabeformate, Video, Audio, PDF und Dateiformate."
 i18n_source_hash: e53ecf65be25
 i18n_provenance: machine
 i18n_output_hash: 3b6d27434067

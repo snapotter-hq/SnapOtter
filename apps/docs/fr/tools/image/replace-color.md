@@ -1,5 +1,5 @@
 ---
-description: Remplacez une couleur spécifique d'une image par une autre couleur ou rendez-la transparente.
+description: "Remplacez une couleur spécifique d'une image par une autre couleur ou rendez-la transparente."
 i18n_source_hash: df55ac451ecb
 i18n_provenance: human
 i18n_output_hash: f50180e18e82

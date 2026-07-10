@@ -1,5 +1,5 @@
 ---
-description: Mehrere Dateien mit einer Muster-Vorlage umbenennen und als ZIP herunterladen.
+description: "Mehrere Dateien mit einer Muster-Vorlage umbenennen und als ZIP herunterladen."
 i18n_source_hash: 2776dcc2f71c
 i18n_provenance: machine
 i18n_output_hash: 482df91186ca

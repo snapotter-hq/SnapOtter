@@ -1,5 +1,5 @@
 ---
-description: 将一组图像制作成幻灯片视频。
+description: "将一组图像制作成幻灯片视频。"
 i18n_source_hash: 2c6f183feb6d
 i18n_provenance: human
 i18n_output_hash: 19a2be9d6a78

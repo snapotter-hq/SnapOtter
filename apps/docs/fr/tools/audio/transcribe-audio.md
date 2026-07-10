@@ -1,5 +1,5 @@
 ---
-description: Convertit la parole en texte grâce à une transcription assistée par IA.
+description: "Convertit la parole en texte grâce à une transcription assistée par IA."
 i18n_source_hash: ae98c4c0aed2
 i18n_provenance: human
 i18n_output_hash: 1d7bfa5a8cf3

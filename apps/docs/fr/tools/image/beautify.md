@@ -1,5 +1,5 @@
 ---
-description: Transforme de simples captures d'écran en images soignées avec arrière-plans en dégradé, cadres d'appareils, ombres et formats pour réseaux sociaux.
+description: "Transforme de simples captures d'écran en images soignées avec arrière-plans en dégradé, cadres d'appareils, ombres et formats pour réseaux sociaux."
 i18n_source_hash: 8fd8a930a45e
 i18n_provenance: human
 i18n_output_hash: 06a0128238ad

@@ -1,5 +1,5 @@
 ---
-description: 冊子に折るためにPDFのページを面付けします。
+description: "冊子に折るためにPDFのページを面付けします。"
 i18n_source_hash: 8844b6d4fe96
 i18n_provenance: human
 i18n_output_hash: 462700920ef6

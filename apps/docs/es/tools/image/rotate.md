@@ -1,5 +1,5 @@
 ---
-description: Rota imágenes en cualquier ángulo y voltéalas horizontal o verticalmente.
+description: "Rota imágenes en cualquier ángulo y voltéalas horizontal o verticalmente."
 i18n_source_hash: af2581d7cd8d
 i18n_provenance: human
 i18n_output_hash: e8b33640b0cc

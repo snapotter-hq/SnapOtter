@@ -1,5 +1,5 @@
 ---
-description: Repara arañazos, roturas y daños en fotos antiguas con una canalización de IA para restauración, mejora de rostros y color.
+description: "Repara arañazos, roturas y daños en fotos antiguas con una canalización de IA para restauración, mejora de rostros y color."
 i18n_source_hash: 3de13284216c
 i18n_provenance: human
 i18n_output_hash: c888cfd7f62b

@@ -1,5 +1,5 @@
 ---
-description: 使用 25 多种模板将多张图片合成为网格拼贴，可调整间距与圆角，并支持逐单元格平移与缩放。
+description: "使用 25 多种模板将多张图片合成为网格拼贴，可调整间距与圆角，并支持逐单元格平移与缩放。"
 i18n_source_hash: 96f2055717df
 i18n_provenance: human
 i18n_output_hash: a4e5c1913881

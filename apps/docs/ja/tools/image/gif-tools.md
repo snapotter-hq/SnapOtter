@@ -1,5 +1,5 @@
 ---
-description: アニメーション GIF のリサイズ、最適化、速度変更、逆再生、回転、フレーム抽出を 1 つのツールで行います。
+description: "アニメーション GIF のリサイズ、最適化、速度変更、逆再生、回転、フレーム抽出を 1 つのツールで行います。"
 i18n_source_hash: 5e525e80db92
 i18n_provenance: human
 i18n_output_hash: 2f1d49287380

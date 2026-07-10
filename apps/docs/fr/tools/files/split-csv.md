@@ -1,5 +1,5 @@
 ---
-description: Découpe un CSV en fichiers plus petits selon le nombre de lignes.
+description: "Découpe un CSV en fichiers plus petits selon le nombre de lignes."
 i18n_source_hash: a35dce4a99a3
 i18n_provenance: human
 i18n_output_hash: b5942d5159af

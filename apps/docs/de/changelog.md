@@ -1,5 +1,5 @@
 ---
-description: Release Notes und Versionsverlauf für SnapOtter. Sieh dir an, was in jedem Release neu ist, verbessert und behoben wurde.
+description: "Release Notes und Versionsverlauf für SnapOtter. Sieh dir an, was in jedem Release neu ist, verbessert und behoben wurde."
 i18n_source_hash: 9020073f127e
 i18n_provenance: machine
 i18n_output_hash: 0143a28c7896

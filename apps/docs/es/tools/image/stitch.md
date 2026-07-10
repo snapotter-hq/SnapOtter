@@ -1,5 +1,5 @@
 ---
-description: Une imágenes en horizontal, apiladas o en cuadrícula, con control sobre la alineación, los espacios, los bordes y el modo de redimensionado.
+description: "Une imágenes en horizontal, apiladas o en cuadrícula, con control sobre la alineación, los espacios, los bordes y el modo de redimensionado."
 i18n_source_hash: 39333210505a
 i18n_provenance: human
 i18n_output_hash: 1679f36e5612

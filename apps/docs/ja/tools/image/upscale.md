@@ -1,5 +1,5 @@
 ---
-description: Real-ESRGANのAI超解像で細部を保ちながら画像を2〜4倍に拡大します。
+description: "Real-ESRGANのAI超解像で細部を保ちながら画像を2〜4倍に拡大します。"
 i18n_source_hash: 150032e99476
 i18n_provenance: human
 i18n_output_hash: 98f9f12f031b

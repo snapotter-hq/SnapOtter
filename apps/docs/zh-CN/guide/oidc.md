@@ -1,5 +1,5 @@
 ---
-description: 使用 OpenID Connect 设置单点登录。提供 Keycloak、Authentik、Google 及其他 OIDC 提供商的分步指南。
+description: "使用 OpenID Connect 设置单点登录。提供 Keycloak、Authentik、Google 及其他 OIDC 提供商的分步指南。"
 i18n_source_hash: 4296343b3cc5
 i18n_provenance: human
 i18n_output_hash: 57678911503c

@@ -1,5 +1,5 @@
 ---
-description: 将多个文件打包成单个 ZIP 压缩包。
+description: "将多个文件打包成单个 ZIP 压缩包。"
 i18n_source_hash: 9ff1250dbd36
 i18n_provenance: human
 i18n_output_hash: ebd3678d3230

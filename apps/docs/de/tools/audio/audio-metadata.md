@@ -1,5 +1,5 @@
 ---
-description: Audio-Metadaten-Tags (ID3) ansehen, bearbeiten oder entfernen.
+description: "Audio-Metadaten-Tags (ID3) ansehen, bearbeiten oder entfernen."
 i18n_source_hash: 0717018e11cb
 i18n_provenance: machine
 i18n_output_hash: 0b5b38fb228d

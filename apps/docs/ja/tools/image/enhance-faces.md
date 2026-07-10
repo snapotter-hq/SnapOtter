@@ -1,5 +1,5 @@
 ---
-description: GFPGAN と CodeFormer のAIモデルで、画像内のぼやけた低品質な顔を復元・シャープ化します。
+description: "GFPGAN と CodeFormer のAIモデルで、画像内のぼやけた低品質な顔を復元・シャープ化します。"
 i18n_source_hash: 7f9f6af8ebda
 i18n_provenance: human
 i18n_output_hash: ce5c9ffb5210

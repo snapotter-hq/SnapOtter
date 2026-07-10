@@ -1,5 +1,5 @@
 ---
-description: CSV を行数で分割して小さなファイルにします。
+description: "CSV を行数で分割して小さなファイルにします。"
 i18n_source_hash: a35dce4a99a3
 i18n_provenance: human
 i18n_output_hash: 097ab6d5414b

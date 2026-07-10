@@ -1,5 +1,5 @@
 ---
-description: Eliminación de fondo con IA con efectos opcionales (desenfoque, sombra, degradado, fondo personalizado).
+description: "Eliminación de fondo con IA con efectos opcionales (desenfoque, sombra, degradado, fondo personalizado)."
 i18n_source_hash: 326a91284529
 i18n_provenance: human
 i18n_output_hash: e355ac762afd

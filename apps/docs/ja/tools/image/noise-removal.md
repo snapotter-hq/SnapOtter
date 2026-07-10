@@ -1,5 +1,5 @@
 ---
-description: 複数の品質ティアオプションを備えた AI ノイズ・粒状感除去。
+description: "複数の品質ティアオプションを備えた AI ノイズ・粒状感除去。"
 i18n_source_hash: f0dfc876e0e0
 i18n_provenance: human
 i18n_output_hash: d50068ef71e8

@@ -1,5 +1,5 @@
 ---
-description: Guía de refuerzo de seguridad para SnapOtter. Seguridad de contenedores, aislamiento de red, secretos de Docker, despliegue en Kubernetes y artefactos de cumplimiento.
+description: "Guía de refuerzo de seguridad para SnapOtter. Seguridad de contenedores, aislamiento de red, secretos de Docker, despliegue en Kubernetes y artefactos de cumplimiento."
 i18n_source_hash: c682d19a84ce
 i18n_provenance: human
 i18n_output_hash: 7e22bc458c06

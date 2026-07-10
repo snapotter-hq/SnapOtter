@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Documentación de SnapOtter
+title: "Documentación de SnapOtter"
 description: "Procesamiento de archivos autoalojado. Más de 200 herramientas para imagen, video, audio, PDF y archivos, además de un editor de imágenes por capas gratuito. IA local, pipelines, API REST. Tus archivos nunca salen de tu servidor."
 sidebar: false
 i18n_source_hash: fe3c28c2c90e

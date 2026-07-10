@@ -1,5 +1,5 @@
 ---
-description: 将多个 PDF 合并成一个文档。
+description: "将多个 PDF 合并成一个文档。"
 i18n_source_hash: e82e389cb8b6
 i18n_provenance: human
 i18n_output_hash: b509a58c4264

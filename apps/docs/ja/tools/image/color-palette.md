@@ -1,5 +1,5 @@
 ---
-description: 画像から主要な色をカラーパレットとして抽出します。
+description: "画像から主要な色をカラーパレットとして抽出します。"
 i18n_source_hash: 65ab22dd75a9
 i18n_provenance: human
 i18n_output_hash: dbe78e52bdf9

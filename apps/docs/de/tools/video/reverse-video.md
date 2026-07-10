@@ -1,5 +1,5 @@
 ---
-description: Einen Videoclip rückwärts abspielen.
+description: "Einen Videoclip rückwärts abspielen."
 i18n_source_hash: 98226f4e092d
 i18n_provenance: machine
 i18n_output_hash: b787a0c53f93

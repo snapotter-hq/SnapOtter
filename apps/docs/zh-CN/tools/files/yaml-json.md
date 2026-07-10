@@ -1,5 +1,5 @@
 ---
-description: 在 YAML 与 JSON 之间双向转换。
+description: "在 YAML 与 JSON 之间双向转换。"
 i18n_source_hash: acf8ca21ee99
 i18n_provenance: human
 i18n_output_hash: 6a8b52e9fe79

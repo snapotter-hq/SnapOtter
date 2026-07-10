@@ -1,5 +1,5 @@
 ---
-description: Bilder nebeneinander, gestapelt oder in einem Raster zusammenfügen, mit Kontrolle über Ausrichtung, Abstände, Ränder und Skalierungsmodus.
+description: "Bilder nebeneinander, gestapelt oder in einem Raster zusammenfügen, mit Kontrolle über Ausrichtung, Abstände, Ränder und Skalierungsmodus."
 i18n_source_hash: 39333210505a
 i18n_provenance: machine
 i18n_output_hash: c197046add93

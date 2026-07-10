@@ -1,5 +1,5 @@
 ---
-description: Multiplexe une piste de sous-titres dans le conteneur vidéo.
+description: "Multiplexe une piste de sous-titres dans le conteneur vidéo."
 i18n_source_hash: be272730fff5
 i18n_provenance: human
 i18n_output_hash: 7eecafb0406d

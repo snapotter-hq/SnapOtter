@@ -1,5 +1,5 @@
 ---
-description: Fait pivoter ou retourne une vidéo.
+description: "Fait pivoter ou retourne une vidéo."
 i18n_source_hash: cf9620ca62c7
 i18n_provenance: human
 i18n_output_hash: eaa3996d8a2d

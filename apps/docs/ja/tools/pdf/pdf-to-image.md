@@ -1,5 +1,5 @@
 ---
-description: PDF のページを高品質な画像に変換します。
+description: "PDF のページを高品質な画像に変換します。"
 i18n_source_hash: 1c36be5dadb8
 i18n_provenance: human
 i18n_output_hash: 2eedea784657

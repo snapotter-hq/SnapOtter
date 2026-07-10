@@ -1,5 +1,5 @@
 ---
-description: Alle SnapOtter-Umgebungsvariablen mit Standardwerten. Konfiguriere Auth, Storage, KI-Modelle, Analyse und mehr.
+description: "Alle SnapOtter-Umgebungsvariablen mit Standardwerten. Konfiguriere Auth, Storage, KI-Modelle, Analyse und mehr."
 i18n_source_hash: 8e9e9ca2840c
 i18n_provenance: machine
 i18n_output_hash: 874b73f5ab4e

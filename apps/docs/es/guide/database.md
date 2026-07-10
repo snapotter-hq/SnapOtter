@@ -1,5 +1,5 @@
 ---
-description: Esquema de la base de datos PostgreSQL, tablas, migraciones y procedimientos de copia de seguridad de SnapOtter.
+description: "Esquema de la base de datos PostgreSQL, tablas, migraciones y procedimientos de copia de seguridad de SnapOtter."
 i18n_source_hash: b37398ae91a3
 i18n_provenance: human
 i18n_output_hash: 70b4aa5ae152

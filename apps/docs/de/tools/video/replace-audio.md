@@ -1,5 +1,5 @@
 ---
-description: Die Audiospur eines Videos durch eine andere Datei ersetzen.
+description: "Die Audiospur eines Videos durch eine andere Datei ersetzen."
 i18n_source_hash: fabc2a953103
 i18n_provenance: machine
 i18n_output_hash: a166fd66890e

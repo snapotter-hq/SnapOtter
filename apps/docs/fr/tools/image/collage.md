@@ -1,5 +1,5 @@
 ---
-description: Combinez plusieurs images en collages en grille avec plus de 25 modèles, des espacements et coins réglables, ainsi qu'un panoramique et un zoom par cellule.
+description: "Combinez plusieurs images en collages en grille avec plus de 25 modèles, des espacements et coins réglables, ainsi qu'un panoramique et un zoom par cellule."
 i18n_source_hash: 96f2055717df
 i18n_provenance: human
 i18n_output_hash: d23b0c41aa81

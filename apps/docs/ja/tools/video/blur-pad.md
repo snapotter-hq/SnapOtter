@@ -1,5 +1,5 @@
 ---
-description: 動画のぼかしたコピーでバーを埋めます。
+description: "動画のぼかしたコピーでバーを埋めます。"
 i18n_source_hash: 0c72aaefc6de
 i18n_provenance: human
 i18n_output_hash: c8ddd78019fa

@@ -1,5 +1,5 @@
 ---
-description: Bildern in einer vorhersehbaren, steuerbaren Reihenfolge Rahmen, Abstände, abgerundete Ecken und Schlagschatten hinzufügen.
+description: "Bildern in einer vorhersehbaren, steuerbaren Reihenfolge Rahmen, Abstände, abgerundete Ecken und Schlagschatten hinzufügen."
 i18n_source_hash: 8845150736a9
 i18n_provenance: machine
 i18n_output_hash: d78cfae90fa8

@@ -1,5 +1,5 @@
 ---
-description: Erfasst Webseiten oder HTML-Snippets als hochwertige Bilder mit Geräteemulation.
+description: "Erfasst Webseiten oder HTML-Snippets als hochwertige Bilder mit Geräteemulation."
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: machine
 i18n_output_hash: b6deed9bc22c

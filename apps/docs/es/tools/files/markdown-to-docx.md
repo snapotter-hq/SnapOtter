@@ -1,5 +1,5 @@
 ---
-description: Convierte un archivo Markdown en un documento de Word (DOCX).
+description: "Convierte un archivo Markdown en un documento de Word (DOCX)."
 i18n_source_hash: 979cb8ee13f2
 i18n_provenance: human
 i18n_output_hash: d5d9e8c43f7a

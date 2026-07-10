@@ -1,5 +1,5 @@
 ---
-description: Supprimer définitivement des occurrences de texte d'un PDF (censure véritable et vérifiée).
+description: "Supprimer définitivement des occurrences de texte d'un PDF (censure véritable et vérifiée)."
 i18n_source_hash: 296ad2a701b2
 i18n_provenance: human
 i18n_output_hash: dd04fc28ae22

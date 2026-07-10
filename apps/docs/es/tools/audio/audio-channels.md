@@ -1,5 +1,5 @@
 ---
-description: Convierte entre mono y estéreo o intercambia los canales izquierdo y derecho.
+description: "Convierte entre mono y estéreo o intercambia los canales izquierdo y derecho."
 i18n_source_hash: 4f5cd6b38c83
 i18n_provenance: human
 i18n_output_hash: dbd971db7fc5

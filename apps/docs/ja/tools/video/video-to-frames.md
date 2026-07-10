@@ -1,5 +1,5 @@
 ---
-description: 動画からフレームを画像の ZIP として抽出します。
+description: "動画からフレームを画像の ZIP として抽出します。"
 i18n_source_hash: b06f038dafb3
 i18n_provenance: human
 i18n_output_hash: 4e4146e412ef

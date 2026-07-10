@@ -1,5 +1,5 @@
 ---
-description: Transforme un ensemble d'images en une vidéo diaporama.
+description: "Transforme un ensemble d'images en une vidéo diaporama."
 i18n_source_hash: 2c6f183feb6d
 i18n_provenance: human
 i18n_output_hash: d9c51a1bf4d8

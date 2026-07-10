@@ -1,5 +1,5 @@
 ---
-description: Eine Markdown-Datei in ein formatiertes PDF umwandeln.
+description: "Eine Markdown-Datei in ein formatiertes PDF umwandeln."
 i18n_source_hash: 18474dc8772a
 i18n_provenance: machine
 i18n_output_hash: 2c4c1e256e6a

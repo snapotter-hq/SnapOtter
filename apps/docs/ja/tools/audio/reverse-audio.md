@@ -1,5 +1,5 @@
 ---
-description: 音声ファイルを逆再生されるように反転します。
+description: "音声ファイルを逆再生されるように反転します。"
 i18n_source_hash: 5c2017661803
 i18n_provenance: human
 i18n_output_hash: 250b9e08d872

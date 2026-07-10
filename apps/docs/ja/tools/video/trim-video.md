@@ -1,5 +1,5 @@
 ---
-description: 開始時刻と終了時刻を指定して動画からクリップを切り出します。
+description: "開始時刻と終了時刻を指定して動画からクリップを切り出します。"
 i18n_source_hash: c84481641979
 i18n_provenance: human
 i18n_output_hash: 14640a0c1434

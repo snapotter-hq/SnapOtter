@@ -1,5 +1,5 @@
 ---
-description: DDColor AIモデルで、白黒またはグレースケール写真を自動でカラー化します。
+description: "DDColor AIモデルで、白黒またはグレースケール写真を自動でカラー化します。"
 i18n_source_hash: 688aa3abbdae
 i18n_provenance: human
 i18n_output_hash: c1439688f3be

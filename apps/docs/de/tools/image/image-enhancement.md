@@ -1,5 +1,5 @@
 ---
-description: Automatische Verbesserung mit einem Klick, die ein Bild analysiert und Belichtung, Kontrast, Weißabgleich, Sättigung und Schärfe korrigiert.
+description: "Automatische Verbesserung mit einem Klick, die ein Bild analysiert und Belichtung, Kontrast, Weißabgleich, Sättigung und Schärfe korrigiert."
 i18n_source_hash: 42b6ab956f91
 i18n_provenance: machine
 i18n_output_hash: 4d168bb20b56

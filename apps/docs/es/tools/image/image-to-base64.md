@@ -1,5 +1,5 @@
 ---
-description: Convierte imágenes a URI de datos en base64 para incrustarlas en HTML, CSS y más.
+description: "Convierte imágenes a URI de datos en base64 para incrustarlas en HTML, CSS y más."
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
 i18n_output_hash: 8122441aadf3

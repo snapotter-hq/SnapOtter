@@ -1,5 +1,5 @@
 ---
-description: Elimina los metadatos de un vídeo e informa de lo que se encontró.
+description: "Elimina los metadatos de un vídeo e informa de lo que se encontró."
 i18n_source_hash: 69621bfb98ca
 i18n_provenance: human
 i18n_output_hash: 494ab59d19a6

@@ -1,5 +1,5 @@
 ---
-description: Génère des codes-barres aux formats Code 128, EAN-13, UPC-A, Code 39, ITF-14 et Data Matrix.
+description: "Génère des codes-barres aux formats Code 128, EAN-13, UPC-A, Code 39, ITF-14 et Data Matrix."
 i18n_source_hash: e84b1df40c7e
 i18n_provenance: human
 i18n_output_hash: 24b390066428

@@ -1,5 +1,5 @@
 ---
-description: Convertissez les images entre formats, y compris les formats modernes comme AVIF, JXL et HEIC.
+description: "Convertissez les images entre formats, y compris les formats modernes comme AVIF, JXL et HEIC."
 i18n_source_hash: 562f8270e8c3
 i18n_provenance: human
 i18n_output_hash: c2f8ce1ebb6a

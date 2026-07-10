@@ -1,5 +1,5 @@
 ---
-description: Frames aus einem Video als ZIP mit Bildern extrahieren.
+description: "Frames aus einem Video als ZIP mit Bildern extrahieren."
 i18n_source_hash: b06f038dafb3
 i18n_provenance: machine
 i18n_output_hash: fcb97abe8b99

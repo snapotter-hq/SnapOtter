@@ -1,5 +1,5 @@
 ---
-description: PowerPoint と OpenDocument プレゼンテーション形式間で変換します。
+description: "PowerPoint と OpenDocument プレゼンテーション形式間で変換します。"
 i18n_source_hash: 08ba415d39ac
 i18n_provenance: human
 i18n_output_hash: 042e80a39e0b

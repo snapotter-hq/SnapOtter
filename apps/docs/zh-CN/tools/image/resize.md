@@ -1,5 +1,5 @@
 ---
-description: 按像素、百分比或使用适配模式调整图片尺寸。
+description: "按像素、百分比或使用适配模式调整图片尺寸。"
 i18n_source_hash: 00d1bffa4d38
 i18n_provenance: human
 i18n_output_hash: 0a8f45ef34da

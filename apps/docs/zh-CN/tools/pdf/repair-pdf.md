@@ -1,5 +1,5 @@
 ---
-description: 尝试修复受损或损坏的 PDF。
+description: "尝试修复受损或损坏的 PDF。"
 i18n_source_hash: 864073a2f09f
 i18n_provenance: human
 i18n_output_hash: d4fdbfdb8ca1

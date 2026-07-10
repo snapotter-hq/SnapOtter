@@ -1,5 +1,5 @@
 ---
-description: すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。
+description: "すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。"
 i18n_source_hash: 8e9e9ca2840c
 i18n_provenance: human
 i18n_output_hash: 4070dc47c212

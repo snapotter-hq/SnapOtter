@@ -1,5 +1,5 @@
 ---
-description: Stellt unscharfe oder minderwertige Gesichter in Bildern mit den KI-Modellen GFPGAN und CodeFormer wieder her und schärft sie nach.
+description: "Stellt unscharfe oder minderwertige Gesichter in Bildern mit den KI-Modellen GFPGAN und CodeFormer wieder her und schärft sie nach."
 i18n_source_hash: 7f9f6af8ebda
 i18n_provenance: machine
 i18n_output_hash: 449d718385d6

@@ -1,5 +1,5 @@
 ---
-description: SnapOtterのセキュリティ強化ガイド。コンテナセキュリティ、ネットワーク分離、Dockerシークレット、Kubernetesデプロイ、コンプライアンス成果物。
+description: "SnapOtterのセキュリティ強化ガイド。コンテナセキュリティ、ネットワーク分離、Dockerシークレット、Kubernetesデプロイ、コンプライアンス成果物。"
 i18n_source_hash: c682d19a84ce
 i18n_provenance: human
 i18n_output_hash: e71d62cc0f53

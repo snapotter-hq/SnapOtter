@@ -1,5 +1,5 @@
 ---
-description: Helligkeit, Kontrast, Sättigung, Temperatur, Farbton und Kanäle anpassen sowie Farbeffekte anwenden.
+description: "Helligkeit, Kontrast, Sättigung, Temperatur, Farbton und Kanäle anpassen sowie Farbeffekte anwenden."
 i18n_source_hash: 41b35fe5c2ba
 i18n_provenance: machine
 i18n_output_hash: 3e38e2150286

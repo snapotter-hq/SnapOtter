@@ -1,5 +1,5 @@
 ---
-description: SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。
+description: "SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。"
 i18n_source_hash: b37398ae91a3
 i18n_provenance: human
 i18n_output_hash: 3289d2d06514

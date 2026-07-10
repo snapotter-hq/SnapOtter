@@ -1,5 +1,5 @@
 ---
-description: Convierte las páginas de un PDF en imágenes de alta calidad.
+description: "Convierte las páginas de un PDF en imágenes de alta calidad."
 i18n_source_hash: 1c36be5dadb8
 i18n_provenance: human
 i18n_output_hash: 769618c3235a

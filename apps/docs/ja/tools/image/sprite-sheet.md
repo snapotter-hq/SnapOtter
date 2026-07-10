@@ -1,5 +1,5 @@
 ---
-description: 複数の画像を1枚のスプライトシートグリッドに結合し、フレームのメタデータを付与します。
+description: "複数の画像を1枚のスプライトシートグリッドに結合し、フレームのメタデータを付与します。"
 i18n_source_hash: 1938d7fb100d
 i18n_provenance: human
 i18n_output_hash: febba953c6c4

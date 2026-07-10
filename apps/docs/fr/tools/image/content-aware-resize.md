@@ -1,5 +1,5 @@
 ---
-description: Redimensionnement par découpe de coutures qui ajoute ou retire des pixels le long des chemins de faible importance afin de préserver le contenu clé et les visages.
+description: "Redimensionnement par découpe de coutures qui ajoute ou retire des pixels le long des chemins de faible importance afin de préserver le contenu clé et les visages."
 i18n_source_hash: f383b28ab62a
 i18n_provenance: human
 i18n_output_hash: 827ec41ceed7

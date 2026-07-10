@@ -1,5 +1,5 @@
 ---
-description: PDF のすべてのページにページ番号を追加します。
+description: "PDF のすべてのページにページ番号を追加します。"
 i18n_source_hash: 58342d6ac8d2
 i18n_provenance: human
 i18n_output_hash: cda54868c793

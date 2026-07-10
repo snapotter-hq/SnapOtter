@@ -1,5 +1,5 @@
 ---
-description: Découpe un clip d'une vidéo en spécifiant les temps de début et de fin.
+description: "Découpe un clip d'une vidéo en spécifiant les temps de début et de fin."
 i18n_source_hash: c84481641979
 i18n_provenance: human
 i18n_output_hash: 4d4de37910ca

@@ -1,5 +1,5 @@
 ---
-description: Balken mit einer unscharfen Kopie des Videos füllen.
+description: "Balken mit einer unscharfen Kopie des Videos füllen."
 i18n_source_hash: 0c72aaefc6de
 i18n_provenance: machine
 i18n_output_hash: ab60a31f1681

@@ -1,5 +1,5 @@
 ---
-description: 在 Word、OpenDocument、RTF 和纯文本格式之间转换。
+description: "在 Word、OpenDocument、RTF 和纯文本格式之间转换。"
 i18n_source_hash: 89771292569d
 i18n_provenance: human
 i18n_output_hash: 3c8b42693a30

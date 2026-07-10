@@ -1,5 +1,5 @@
 ---
-description: Ajouter un filigrane textuel à chaque page d'un PDF.
+description: "Ajouter un filigrane textuel à chaque page d'un PDF."
 i18n_source_hash: f1f7d8912fbd
 i18n_provenance: human
 i18n_output_hash: b2024fb0f76a

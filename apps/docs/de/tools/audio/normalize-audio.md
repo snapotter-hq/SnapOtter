@@ -1,5 +1,5 @@
 ---
-description: Lautheit auf Broadcast-Standardpegel angleichen (EBU R128).
+description: "Lautheit auf Broadcast-Standardpegel angleichen (EBU R128)."
 i18n_source_hash: 794d8cfa5ad8
 i18n_provenance: machine
 i18n_output_hash: 9ebc3620a286

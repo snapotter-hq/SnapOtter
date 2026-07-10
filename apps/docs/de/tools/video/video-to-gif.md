@@ -1,5 +1,5 @@
 ---
-description: Einen Videoclip in ein animiertes GIF verwandeln.
+description: "Einen Videoclip in ein animiertes GIF verwandeln."
 i18n_source_hash: f729dde8cd55
 i18n_provenance: machine
 i18n_output_hash: 8de2f0e20107

@@ -1,5 +1,5 @@
 ---
-description: Ein Text-Wasserzeichen in Videoframes einbrennen.
+description: "Ein Text-Wasserzeichen in Videoframes einbrennen."
 i18n_source_hash: 937bb075b894
 i18n_provenance: machine
 i18n_output_hash: 10ed166a9871

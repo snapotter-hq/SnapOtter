@@ -1,5 +1,5 @@
 ---
-description: 動画から特定の領域を切り出します。
+description: "動画から特定の領域を切り出します。"
 i18n_source_hash: fab11f71a202
 i18n_provenance: human
 i18n_output_hash: 7139ab9ebe0d

@@ -1,5 +1,5 @@
 ---
-description: 動画の音声音量を放送規格に正規化します。
+description: "動画の音声音量を放送規格に正規化します。"
 i18n_source_hash: 078f1e819c9a
 i18n_provenance: human
 i18n_output_hash: 38db801bdebb

@@ -1,5 +1,5 @@
 ---
-description: Reduce el temblor de la cámara con estabilización de dos pasadas.
+description: "Reduce el temblor de la cámara con estabilización de dos pasadas."
 i18n_source_hash: ec908e91a752
 i18n_provenance: human
 i18n_output_hash: 18bcf6accb55

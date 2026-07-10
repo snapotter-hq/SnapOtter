@@ -1,5 +1,5 @@
 ---
-description: Simuliert, wie Bilder für Menschen mit verschiedenen Arten von Farbfehlsichtigkeit erscheinen.
+description: "Simuliert, wie Bilder für Menschen mit verschiedenen Arten von Farbfehlsichtigkeit erscheinen."
 i18n_source_hash: 0b537628ba79
 i18n_provenance: machine
 i18n_output_hash: 61af5943cc81

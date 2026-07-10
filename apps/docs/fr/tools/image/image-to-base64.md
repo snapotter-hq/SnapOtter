@@ -1,5 +1,5 @@
 ---
-description: Convertissez des images en URI de données base64 pour les intégrer dans du HTML, du CSS, et plus.
+description: "Convertissez des images en URI de données base64 pour les intégrer dans du HTML, du CSS, et plus."
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
 i18n_output_hash: 7b916b14cc67

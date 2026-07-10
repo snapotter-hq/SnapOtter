@@ -1,5 +1,5 @@
 ---
-description: Kombiniert ein oder mehrere Bilder zu einem PDF-Dokument mit Optionen für Seitengröße, Ausrichtung und Zieldateigröße.
+description: "Kombiniert ein oder mehrere Bilder zu einem PDF-Dokument mit Optionen für Seitengröße, Ausrichtung und Zieldateigröße."
 i18n_source_hash: f659c7e7f56b
 i18n_provenance: machine
 i18n_output_hash: 5850e7c97016

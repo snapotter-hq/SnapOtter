@@ -1,5 +1,5 @@
 ---
-description: Crée des graphiques en barres, en courbes ou en camembert à partir de données CSV ou JSON.
+description: "Crée des graphiques en barres, en courbes ou en camembert à partir de données CSV ou JSON."
 i18n_source_hash: d3c39384457b
 i18n_provenance: human
 i18n_output_hash: 2f40ee78e330

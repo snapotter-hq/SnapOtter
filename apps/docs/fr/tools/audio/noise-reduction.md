@@ -1,5 +1,5 @@
 ---
-description: Réduire le bruit de fond de l'audio avec un débruitage basé sur la FFT.
+description: "Réduire le bruit de fond de l'audio avec un débruitage basé sur la FFT."
 i18n_source_hash: 57cbdbd449aa
 i18n_provenance: human
 i18n_output_hash: 2c2cc019e55d

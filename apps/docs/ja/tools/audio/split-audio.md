@@ -1,5 +1,5 @@
 ---
-description: 音声を時間間隔、等分、または無音検出で分割します。
+description: "音声を時間間隔、等分、または無音検出で分割します。"
 i18n_source_hash: c062a395dbac
 i18n_provenance: human
 i18n_output_hash: 841d869c14d4

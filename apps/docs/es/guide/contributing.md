@@ -1,5 +1,5 @@
 ---
-description: Cómo contribuir a SnapOtter. Informes de errores, solicitudes de funciones, pull requests y requisitos del CLA.
+description: "Cómo contribuir a SnapOtter. Informes de errores, solicitudes de funciones, pull requests y requisitos del CLA."
 i18n_source_hash: 528802503035
 i18n_provenance: human
 i18n_output_hash: 27b5c04c8d90

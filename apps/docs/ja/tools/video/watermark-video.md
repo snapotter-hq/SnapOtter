@@ -1,5 +1,5 @@
 ---
-description: 動画のフレームにテキストの透かしを焼き込みます。
+description: "動画のフレームにテキストの透かしを焼き込みます。"
 i18n_source_hash: 937bb075b894
 i18n_provenance: human
 i18n_output_hash: 86d023861820

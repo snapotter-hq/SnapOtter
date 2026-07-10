@@ -1,5 +1,5 @@
 ---
-description: Eine CSV nach Zeilenanzahl in kleinere Dateien aufteilen.
+description: "Eine CSV nach Zeilenanzahl in kleinere Dateien aufteilen."
 i18n_source_hash: a35dce4a99a3
 i18n_provenance: machine
 i18n_output_hash: 6d9c3a382794

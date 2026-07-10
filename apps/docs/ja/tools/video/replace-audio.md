@@ -1,5 +1,5 @@
 ---
-description: 動画の音声トラックを別のファイルに差し替えます。
+description: "動画の音声トラックを別のファイルに差し替えます。"
 i18n_source_hash: fabc2a953103
 i18n_provenance: human
 i18n_output_hash: b81d7d533585

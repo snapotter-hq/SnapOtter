@@ -1,5 +1,5 @@
 ---
-description: Referencia de operaciones del motor de imágenes. Todas las operaciones de procesamiento de imágenes basadas en Sharp y sus parámetros.
+description: "Referencia de operaciones del motor de imágenes. Todas las operaciones de procesamiento de imágenes basadas en Sharp y sus parámetros."
 i18n_source_hash: 42febdf85fa8
 i18n_provenance: human
 i18n_output_hash: fbd5ae93bf8b

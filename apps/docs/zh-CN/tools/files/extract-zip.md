@@ -1,5 +1,5 @@
 ---
-description: 安全地从 ZIP 压缩包中提取文件，并防范压缩炸弹。
+description: "安全地从 ZIP 压缩包中提取文件，并防范压缩炸弹。"
 i18n_source_hash: 484a1f1051b8
 i18n_provenance: human
 i18n_output_hash: 5098f0bdd631

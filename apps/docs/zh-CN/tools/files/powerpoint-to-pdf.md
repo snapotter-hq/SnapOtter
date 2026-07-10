@@ -1,5 +1,5 @@
 ---
-description: 将演示文稿转换为 PDF。
+description: "将演示文稿转换为 PDF。"
 i18n_source_hash: 49bd71c46bed
 i18n_provenance: human
 i18n_output_hash: 9572e185cb4a

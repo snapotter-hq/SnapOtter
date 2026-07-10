@@ -1,5 +1,5 @@
 ---
-description: YAML と JSON を双方向で変換します。
+description: "YAML と JSON を双方向で変換します。"
 i18n_source_hash: acf8ca21ee99
 i18n_provenance: human
 i18n_output_hash: e39453464e79

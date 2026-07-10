@@ -1,5 +1,5 @@
 ---
-description: Verringert die Dateigröße eines Bildes über eine Qualitätsstufe oder auf eine Zieldateigröße.
+description: "Verringert die Dateigröße eines Bildes über eine Qualitätsstufe oder auf eine Zieldateigröße."
 i18n_source_hash: af4685da7e64
 i18n_provenance: machine
 i18n_output_hash: f52fc9641e64

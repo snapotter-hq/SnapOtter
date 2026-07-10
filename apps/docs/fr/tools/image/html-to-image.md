@@ -1,5 +1,5 @@
 ---
-description: Capturez des pages web ou des extraits HTML en images haute qualité avec émulation d'appareil.
+description: "Capturez des pages web ou des extraits HTML en images haute qualité avec émulation d'appareil."
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: human
 i18n_output_hash: 8eea95f108ae

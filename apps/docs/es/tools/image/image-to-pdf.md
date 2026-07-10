@@ -1,5 +1,5 @@
 ---
-description: Combina una o varias imágenes en un documento PDF con opciones de tamaño de página, orientación y tamaño de archivo objetivo.
+description: "Combina una o varias imágenes en un documento PDF con opciones de tamaño de página, orientación y tamaño de archivo objetivo."
 i18n_source_hash: f659c7e7f56b
 i18n_provenance: human
 i18n_output_hash: 8e62eb907ecd

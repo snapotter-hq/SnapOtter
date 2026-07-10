@@ -1,5 +1,5 @@
 ---
-description: Transforme un clip vidéo en GIF animé.
+description: "Transforme un clip vidéo en GIF animé."
 i18n_source_hash: f729dde8cd55
 i18n_provenance: human
 i18n_output_hash: 6853015c7c15

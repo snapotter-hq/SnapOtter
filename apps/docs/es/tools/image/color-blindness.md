@@ -1,5 +1,5 @@
 ---
-description: Simula cómo aparecen las imágenes para personas con distintos tipos de deficiencia de la visión del color.
+description: "Simula cómo aparecen las imágenes para personas con distintos tipos de deficiencia de la visión del color."
 i18n_source_hash: 0b537628ba79
 i18n_provenance: human
 i18n_output_hash: cd9c55d02dbc

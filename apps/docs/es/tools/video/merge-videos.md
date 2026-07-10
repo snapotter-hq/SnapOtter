@@ -1,5 +1,5 @@
 ---
-description: Une varios clips de vídeo en un solo archivo.
+description: "Une varios clips de vídeo en un solo archivo."
 i18n_source_hash: 90463dfbb580
 i18n_provenance: human
 i18n_output_hash: aa06dee1a9bd

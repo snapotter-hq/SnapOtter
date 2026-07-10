@@ -1,5 +1,5 @@
 ---
-description: Gérez les utilisateurs, les rôles intégrés et personnalisés, les permissions, les clés API, les équipes, les sessions et le journal d'audit dans SnapOtter.
+description: "Gérez les utilisateurs, les rôles intégrés et personnalisés, les permissions, les clés API, les équipes, les sessions et le journal d'audit dans SnapOtter."
 i18n_source_hash: 5e28af686c96
 i18n_provenance: human
 i18n_output_hash: 0ef660e3c9b1

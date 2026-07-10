@@ -1,5 +1,5 @@
 ---
-description: Ajoute un effet de vignettage avec une force, une couleur et une position réglables.
+description: "Ajoute un effet de vignettage avec une force, une couleur et une position réglables."
 i18n_source_hash: 0b9795fea2eb
 i18n_provenance: human
 i18n_output_hash: 1b6d502016c9

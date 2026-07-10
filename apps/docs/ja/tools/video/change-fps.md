@@ -1,5 +1,5 @@
 ---
-description: 動画のフレームレートを変更します。
+description: "動画のフレームレートを変更します。"
 i18n_source_hash: 2bffbd04a1cb
 i18n_provenance: human
 i18n_output_hash: 38862d201bc1

@@ -1,5 +1,5 @@
 ---
-description: Zwischen Mono und Stereo konvertieren oder linken und rechten Kanal tauschen.
+description: "Zwischen Mono und Stereo konvertieren oder linken und rechten Kanal tauschen."
 i18n_source_hash: 4f5cd6b38c83
 i18n_provenance: machine
 i18n_output_hash: e3a194397009

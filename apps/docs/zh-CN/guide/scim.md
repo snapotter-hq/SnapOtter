@@ -1,5 +1,5 @@
 ---
-description: 设置 SCIM 2.0 预配以将用户和组从你的身份提供商同步到 SnapOtter。涵盖 Okta、Azure AD / Entra ID 以及自定义集成。
+description: "设置 SCIM 2.0 预配以将用户和组从你的身份提供商同步到 SnapOtter。涵盖 Okta、Azure AD / Entra ID 以及自定义集成。"
 i18n_source_hash: bbd50119ec12
 i18n_provenance: human
 i18n_output_hash: 70121241a9af

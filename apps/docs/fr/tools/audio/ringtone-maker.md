@@ -1,5 +1,5 @@
 ---
-description: Créer un extrait de sonnerie à partir de n'importe quel fichier audio.
+description: "Créer un extrait de sonnerie à partir de n'importe quel fichier audio."
 i18n_source_hash: 8fcdcc545fbc
 i18n_provenance: human
 i18n_output_hash: f54876511b98

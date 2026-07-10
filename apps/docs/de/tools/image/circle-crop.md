@@ -1,5 +1,5 @@
 ---
-description: Ein Bild auf einen zentrierten Kreis mit transparenten Ecken zuschneiden.
+description: "Ein Bild auf einen zentrierten Kreis mit transparenten Ecken zuschneiden."
 i18n_source_hash: 06c50ccd96b2
 i18n_provenance: machine
 i18n_output_hash: 55ade771d4d8

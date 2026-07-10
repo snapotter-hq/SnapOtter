@@ -1,5 +1,5 @@
 ---
-description: 从图像生成带有各通道统计信息的 RGB 直方图图表。
+description: "从图像生成带有各通道统计信息的 RGB 直方图图表。"
 i18n_source_hash: 57aa610206a5
 i18n_provenance: human
 i18n_output_hash: 58229d59986f

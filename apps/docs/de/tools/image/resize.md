@@ -1,5 +1,5 @@
 ---
-description: Ändere die Größe von Bildern nach Pixeln, Prozent oder mit Anpassungsmodi.
+description: "Ändere die Größe von Bildern nach Pixeln, Prozent oder mit Anpassungsmodi."
 i18n_source_hash: 00d1bffa4d38
 i18n_provenance: machine
 i18n_output_hash: b6058533f4c2

@@ -1,5 +1,5 @@
 ---
-description: KI-gestützte Erkennung und Korrektur von roten Augen durch Kamerablitz.
+description: "KI-gestützte Erkennung und Korrektur von roten Augen durch Kamerablitz."
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: machine
 i18n_output_hash: 42014e0da50b

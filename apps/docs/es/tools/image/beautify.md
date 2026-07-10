@@ -1,5 +1,5 @@
 ---
-description: Convierte capturas de pantalla sencillas en imágenes pulidas con fondos degradados, marcos de dispositivo, sombras y tamaños para redes sociales.
+description: "Convierte capturas de pantalla sencillas en imágenes pulidas con fondos degradados, marcos de dispositivo, sombras y tamaños para redes sociales."
 i18n_source_hash: 8fd8a930a45e
 i18n_provenance: human
 i18n_output_hash: 9a835280cd58

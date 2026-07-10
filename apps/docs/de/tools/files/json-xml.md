@@ -1,5 +1,5 @@
 ---
-description: Konvertiert zwischen JSON und XML, in beide Richtungen.
+description: "Konvertiert zwischen JSON und XML, in beide Richtungen."
 i18n_source_hash: b3a6ded0c64a
 i18n_provenance: machine
 i18n_output_hash: a13754d9a95d

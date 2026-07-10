@@ -1,5 +1,5 @@
 ---
-description: Découpe l'audio par intervalles de temps, parts égales ou détection de silence.
+description: "Découpe l'audio par intervalles de temps, parts égales ou détection de silence."
 i18n_source_hash: c062a395dbac
 i18n_provenance: human
 i18n_output_hash: 7303c75d930d

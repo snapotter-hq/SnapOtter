@@ -1,5 +1,5 @@
 ---
-description: 将响度调整到广播标准电平（EBU R128）。
+description: "将响度调整到广播标准电平（EBU R128）。"
 i18n_source_hash: 794d8cfa5ad8
 i18n_provenance: human
 i18n_output_hash: 07e2719028af

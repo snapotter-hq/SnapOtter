@@ -1,5 +1,5 @@
 ---
-description: Aplica un efecto de pixelado a toda la imagen o a una región específica.
+description: "Aplica un efecto de pixelado a toda la imagen o a una región específica."
 i18n_source_hash: a3ad29841f7b
 i18n_provenance: human
 i18n_output_hash: 1bfe0eacc368

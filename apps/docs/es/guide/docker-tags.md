@@ -1,5 +1,5 @@
 ---
-description: Etiquetas de la imagen Docker de SnapOtter, benchmarks de GPU, fijado de versiones y compatibilidad multiplataforma para AMD64 y ARM64.
+description: "Etiquetas de la imagen Docker de SnapOtter, benchmarks de GPU, fijado de versiones y compatibilidad multiplataforma para AMD64 y ARM64."
 i18n_source_hash: 148b3608e11a
 i18n_provenance: human
 i18n_output_hash: d1aeb361b929

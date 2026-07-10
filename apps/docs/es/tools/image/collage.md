@@ -1,5 +1,5 @@
 ---
-description: Combina varias imágenes en collages de cuadrícula con más de 25 plantillas, espacios y esquinas ajustables, y desplazamiento y zoom por celda.
+description: "Combina varias imágenes en collages de cuadrícula con más de 25 plantillas, espacios y esquinas ajustables, y desplazamiento y zoom por celda."
 i18n_source_hash: 96f2055717df
 i18n_provenance: human
 i18n_output_hash: 76d7bdb22d30

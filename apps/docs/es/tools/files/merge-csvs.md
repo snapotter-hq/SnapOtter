@@ -1,5 +1,5 @@
 ---
-description: Combina varios archivos CSV o TSV con columnas coincidentes en uno solo.
+description: "Combina varios archivos CSV o TSV con columnas coincidentes en uno solo."
 i18n_source_hash: 109b5f399ac8
 i18n_provenance: human
 i18n_output_hash: 3e8348a37bf3

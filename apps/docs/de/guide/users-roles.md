@@ -1,5 +1,5 @@
 ---
-description: Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter.
+description: "Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter."
 i18n_source_hash: 5e28af686c96
 i18n_provenance: machine
 i18n_output_hash: 5794e14e4e84

@@ -1,5 +1,5 @@
 ---
-description: Extrae la pista de audio de un vídeo.
+description: "Extrae la pista de audio de un vídeo."
 i18n_source_hash: f5b8330a5f89
 i18n_provenance: human
 i18n_output_hash: 03048201c823

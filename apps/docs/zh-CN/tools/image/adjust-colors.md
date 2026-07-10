@@ -1,5 +1,5 @@
 ---
-description: 调整亮度、对比度、饱和度、色温、色相、通道，并应用色彩效果。
+description: "调整亮度、对比度、饱和度、色温、色相、通道，并应用色彩效果。"
 i18n_source_hash: 41b35fe5c2ba
 i18n_provenance: human
 i18n_output_hash: 9ced0c9b42f2

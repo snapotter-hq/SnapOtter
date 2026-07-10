@@ -1,5 +1,5 @@
 ---
-description: Versuchen, eine beschädigte oder defekte PDF zu reparieren.
+description: "Versuchen, eine beschädigte oder defekte PDF zu reparieren."
 i18n_source_hash: 864073a2f09f
 i18n_provenance: machine
 i18n_output_hash: c96a53dff4c2

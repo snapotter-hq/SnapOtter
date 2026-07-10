@@ -1,5 +1,5 @@
 ---
-description: Combine plusieurs images en une seule grille de feuille de sprites avec des métadonnées d'images.
+description: "Combine plusieurs images en une seule grille de feuille de sprites avec des métadonnées d'images."
 i18n_source_hash: 1938d7fb100d
 i18n_provenance: human
 i18n_output_hash: a29e105baeec

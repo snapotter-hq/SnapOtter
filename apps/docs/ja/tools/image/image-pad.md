@@ -1,5 +1,5 @@
 ---
-description: 単色、透明、またはぼかし背景で、画像を目標のアスペクト比までパディングします。
+description: "単色、透明、またはぼかし背景で、画像を目標のアスペクト比までパディングします。"
 i18n_source_hash: 796122da3dae
 i18n_provenance: human
 i18n_output_hash: a2f14a3c006b

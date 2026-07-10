@@ -1,5 +1,5 @@
 ---
-description: Combiner plusieurs PDF en un seul document.
+description: "Combiner plusieurs PDF en un seul document."
 i18n_source_hash: e82e389cb8b6
 i18n_provenance: human
 i18n_output_hash: c599ce7c8acb

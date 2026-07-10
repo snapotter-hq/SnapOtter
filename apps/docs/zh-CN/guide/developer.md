@@ -1,5 +1,5 @@
 ---
-description: 本地开发环境搭建、命令、代码约定，以及如何为 SnapOtter 添加新工具。
+description: "本地开发环境搭建、命令、代码约定，以及如何为 SnapOtter 添加新工具。"
 i18n_source_hash: cb03724d2829
 i18n_provenance: human
 i18n_output_hash: c9c7c992d6d7

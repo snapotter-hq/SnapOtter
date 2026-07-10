@@ -1,5 +1,5 @@
 ---
-description: SnapOtter mit Docker in der Produktion bereitstellen. Hardware-Anforderungen, GPU-Setup und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare.
+description: "SnapOtter mit Docker in der Produktion bereitstellen. Hardware-Anforderungen, GPU-Setup und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare."
 i18n_source_hash: ecc1b528bc4b
 i18n_provenance: machine
 i18n_output_hash: dbaf06fb06b8

@@ -1,5 +1,5 @@
 ---
-description: Lineariza un PDF para una visualización web rápida (descarga progresiva).
+description: "Lineariza un PDF para una visualización web rápida (descarga progresiva)."
 i18n_source_hash: 36280b478161
 i18n_provenance: human
 i18n_output_hash: ff913c2044cf

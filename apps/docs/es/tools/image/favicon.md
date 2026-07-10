@@ -1,5 +1,5 @@
 ---
-description: Genera todos los tamaños estándar de favicon e iconos de aplicación a partir de una imagen de origen.
+description: "Genera todos los tamaños estándar de favicon e iconos de aplicación a partir de una imagen de origen."
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: human
 i18n_output_hash: 93ef1c938433

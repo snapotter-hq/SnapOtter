@@ -1,5 +1,5 @@
 ---
-description: SnapOtter 的 monorepo 结构、应用与包架构、请求生命周期以及资源占用。
+description: "SnapOtter 的 monorepo 结构、应用与包架构、请求生命周期以及资源占用。"
 i18n_source_hash: 9e8f80499a37
 i18n_provenance: human
 i18n_output_hash: bc9e6a754251

@@ -1,5 +1,5 @@
 ---
-description: ピクセル、パーセンテージ、またはフィットモードで画像をリサイズします。
+description: "ピクセル、パーセンテージ、またはフィットモードで画像をリサイズします。"
 i18n_source_hash: 00d1bffa4d38
 i18n_provenance: human
 i18n_output_hash: 73a139cca480

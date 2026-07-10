@@ -1,5 +1,5 @@
 ---
-description: Configurez l'authentification unique avec OpenID Connect. Guides étape par étape pour Keycloak, Authentik, Google et d'autres fournisseurs OIDC.
+description: "Configurez l'authentification unique avec OpenID Connect. Guides étape par étape pour Keycloak, Authentik, Google et d'autres fournisseurs OIDC."
 i18n_source_hash: 4296343b3cc5
 i18n_provenance: human
 i18n_output_hash: 6a7d713e4701

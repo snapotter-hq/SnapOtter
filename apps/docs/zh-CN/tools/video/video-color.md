@@ -1,5 +1,5 @@
 ---
-description: 调整视频的亮度、对比度、饱和度和伽马。
+description: "调整视频的亮度、对比度、饱和度和伽马。"
 i18n_source_hash: 40483b79d44b
 i18n_provenance: human
 i18n_output_hash: 3adaee4befd8

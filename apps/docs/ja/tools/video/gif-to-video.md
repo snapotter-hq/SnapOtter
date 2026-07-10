@@ -1,5 +1,5 @@
 ---
-description: アニメーション GIF を MP4、WebM、または MOV 動画に変換します。
+description: "アニメーション GIF を MP4、WebM、または MOV 動画に変換します。"
 i18n_source_hash: c3737b31146d
 i18n_provenance: human
 i18n_output_hash: 0e7c6b047506

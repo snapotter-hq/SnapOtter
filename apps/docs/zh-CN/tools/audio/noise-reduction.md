@@ -1,5 +1,5 @@
 ---
-description: 使用基于 FFT 的降噪从音频中减少背景噪声。
+description: "使用基于 FFT 的降噪从音频中减少背景噪声。"
 i18n_source_hash: 57cbdbd449aa
 i18n_provenance: human
 i18n_output_hash: 97072baf3d73

@@ -1,5 +1,5 @@
 ---
-description: 将视频片段转换为动画 GIF。
+description: "将视频片段转换为动画 GIF。"
 i18n_source_hash: f729dde8cd55
 i18n_provenance: human
 i18n_output_hash: 1f4d73d93ecc

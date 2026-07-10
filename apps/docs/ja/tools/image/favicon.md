@@ -1,5 +1,5 @@
 ---
-description: ソース画像から標準的なファビコンとアプリアイコンのすべてのサイズを生成します。
+description: "ソース画像から標準的なファビコンとアプリアイコンのすべてのサイズを生成します。"
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: human
 i18n_output_hash: 86a3fc706791

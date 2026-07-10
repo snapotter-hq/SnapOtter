@@ -1,5 +1,5 @@
 ---
-description: Rasterbilder mit Schwarz-Weiß-Vektorisierung (potrace) und vollfarbiger mehrschichtiger Vektorisierung in SVG umwandeln.
+description: "Rasterbilder mit Schwarz-Weiß-Vektorisierung (potrace) und vollfarbiger mehrschichtiger Vektorisierung in SVG umwandeln."
 i18n_source_hash: f3e4777188ad
 i18n_provenance: machine
 i18n_output_hash: b18b6c32c25e

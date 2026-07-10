@@ -1,5 +1,5 @@
 ---
-description: Añade números de página a todas las páginas de un PDF.
+description: "Añade números de página a todas las páginas de un PDF."
 i18n_source_hash: 58342d6ac8d2
 i18n_provenance: human
 i18n_output_hash: 8b27258ccd52

@@ -1,5 +1,5 @@
 ---
-description: Añade marcas de agua de texto con posición, opacidad, rotación y mosaico configurables.
+description: "Añade marcas de agua de texto con posición, opacidad, rotación y mosaico configurables."
 i18n_source_hash: b80f12f410e4
 i18n_provenance: human
 i18n_output_hash: 8e4c47f60543

@@ -1,5 +1,5 @@
 ---
-description: 将 Word 文档转换为 PDF。
+description: "将 Word 文档转换为 PDF。"
 i18n_source_hash: f814ba1a1a53
 i18n_provenance: human
 i18n_output_hash: 0e3f59d96990

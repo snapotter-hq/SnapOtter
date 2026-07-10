@@ -1,5 +1,5 @@
 ---
-description: AI を使って動画の音声トラックから字幕ファイルを生成します。
+description: "AI を使って動画の音声トラックから字幕ファイルを生成します。"
 i18n_source_hash: 35b1e78501ad
 i18n_provenance: human
 i18n_output_hash: adbdc14ddb8a

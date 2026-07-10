@@ -1,5 +1,5 @@
 ---
-description: Générez un graphique d'histogramme RVB avec des statistiques par canal à partir d'une image.
+description: "Générez un graphique d'histogramme RVB avec des statistiques par canal à partir d'une image."
 i18n_source_hash: 57aa610206a5
 i18n_provenance: human
 i18n_output_hash: 20ba174678a7

@@ -1,5 +1,5 @@
 ---
-description: 偽の透過PNGをAIマッティング（BiRefNet）で修正して本物のアルファを生成し、エッジのフリンジ除去も行います。
+description: "偽の透過PNGをAIマッティング（BiRefNet）で修正して本物のアルファを生成し、エッジのフリンジ除去も行います。"
 i18n_source_hash: 7eb748b80f93
 i18n_provenance: human
 i18n_output_hash: 88c95b97a32d

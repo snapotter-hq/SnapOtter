@@ -1,5 +1,5 @@
 ---
-description: ページサイズ、向き、目標ファイルサイズオプションを指定して、1 つ以上の画像を PDF ドキュメントに結合します。
+description: "ページサイズ、向き、目標ファイルサイズオプションを指定して、1 つ以上の画像を PDF ドキュメントに結合します。"
 i18n_source_hash: f659c7e7f56b
 i18n_provenance: human
 i18n_output_hash: 535213c32470

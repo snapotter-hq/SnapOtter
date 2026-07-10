@@ -1,5 +1,5 @@
 ---
-description: Détection et correction assistées par IA des yeux rouges causés par le flash de l'appareil photo.
+description: "Détection et correction assistées par IA des yeux rouges causés par le flash de l'appareil photo."
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: human
 i18n_output_hash: cea6069635e3

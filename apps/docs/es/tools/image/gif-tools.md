@@ -1,5 +1,5 @@
 ---
-description: Redimensiona, optimiza, cambia la velocidad, invierte, gira y extrae fotogramas de GIF animados en una sola herramienta.
+description: "Redimensiona, optimiza, cambia la velocidad, invierte, gira y extrae fotogramas de GIF animados en una sola herramienta."
 i18n_source_hash: 5e525e80db92
 i18n_provenance: human
 i18n_output_hash: ace1fecc82eb

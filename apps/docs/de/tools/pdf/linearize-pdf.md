@@ -1,5 +1,5 @@
 ---
-description: Eine PDF für schnelle Webanzeige linearisieren (progressiver Download).
+description: "Eine PDF für schnelle Webanzeige linearisieren (progressiver Download)."
 i18n_source_hash: 36280b478161
 i18n_provenance: machine
 i18n_output_hash: 751439e372ea

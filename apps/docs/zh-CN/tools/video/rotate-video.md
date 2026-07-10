@@ -1,5 +1,5 @@
 ---
-description: 旋转或翻转视频。
+description: "旋转或翻转视频。"
 i18n_source_hash: cf9620ca62c7
 i18n_provenance: human
 i18n_output_hash: 13f01d85fafe

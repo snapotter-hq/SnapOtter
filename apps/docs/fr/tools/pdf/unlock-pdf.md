@@ -1,5 +1,5 @@
 ---
-description: Supprimer la protection par mot de passe d'un PDF.
+description: "Supprimer la protection par mot de passe d'un PDF."
 i18n_source_hash: 14f5165d185c
 i18n_provenance: human
 i18n_output_hash: 2d6702e0a6b5

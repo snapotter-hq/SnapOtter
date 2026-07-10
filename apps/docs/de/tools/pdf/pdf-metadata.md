@@ -1,5 +1,5 @@
 ---
-description: PDF-Dokumentmetadaten lesen und schreiben.
+description: "PDF-Dokumentmetadaten lesen und schreiben."
 i18n_source_hash: b2eaebf7467f
 i18n_provenance: machine
 i18n_output_hash: f41408411285

@@ -1,5 +1,5 @@
 ---
-description: KI-gestützte Hintergrundentfernung mit optionalen Effekten (Weichzeichnen, Schatten, Verlauf, eigener Hintergrund).
+description: "KI-gestützte Hintergrundentfernung mit optionalen Effekten (Weichzeichnen, Schatten, Verlauf, eigener Hintergrund)."
 i18n_source_hash: 326a91284529
 i18n_provenance: machine
 i18n_output_hash: 4d349feb23a9

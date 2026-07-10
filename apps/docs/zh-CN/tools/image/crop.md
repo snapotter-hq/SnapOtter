@@ -1,5 +1,5 @@
 ---
-description: 通过指定位置和尺寸的区域裁剪图片。
+description: "通过指定位置和尺寸的区域裁剪图片。"
 i18n_source_hash: aab38ccd7c53
 i18n_provenance: human
 i18n_output_hash: 6d45b3b09301

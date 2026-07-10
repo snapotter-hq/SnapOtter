@@ -1,5 +1,5 @@
 ---
-description: Gesichter in Bildern per KI-Gesichtserkennung automatisch erkennen und weichzeichnen, für Datenschutz und DSGVO-konforme Anonymisierung.
+description: "Gesichter in Bildern per KI-Gesichtserkennung automatisch erkennen und weichzeichnen, für Datenschutz und DSGVO-konforme Anonymisierung."
 i18n_source_hash: fb861c12aea5
 i18n_provenance: machine
 i18n_output_hash: b1283a5f8b45

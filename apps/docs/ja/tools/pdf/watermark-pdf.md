@@ -1,5 +1,5 @@
 ---
-description: PDF のすべてのページにテキスト透かしを追加します。
+description: "PDF のすべてのページにテキスト透かしを追加します。"
 i18n_source_hash: f1f7d8912fbd
 i18n_provenance: human
 i18n_output_hash: 66d33a80de5a

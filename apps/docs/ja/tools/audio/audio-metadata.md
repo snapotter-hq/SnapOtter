@@ -1,5 +1,5 @@
 ---
-description: 音声のメタデータタグ（ID3）を表示、編集、または削除します。
+description: "音声のメタデータタグ（ID3）を表示、編集、または削除します。"
 i18n_source_hash: 0717018e11cb
 i18n_provenance: human
 i18n_output_hash: 2662e9e871bb

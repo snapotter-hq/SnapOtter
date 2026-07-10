@@ -1,5 +1,5 @@
 ---
-description: 動画クリップをアニメーション GIF に変換します。
+description: "動画クリップをアニメーション GIF に変換します。"
 i18n_source_hash: f729dde8cd55
 i18n_provenance: human
 i18n_output_hash: da1c75fa9071

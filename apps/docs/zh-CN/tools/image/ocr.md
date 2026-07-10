@@ -1,5 +1,5 @@
 ---
-description: 使用基于 AI 的光学字符识别从图片中提取文本。
+description: "使用基于 AI 的光学字符识别从图片中提取文本。"
 i18n_source_hash: 3d85d423b82c
 i18n_provenance: human
 i18n_output_hash: ae14f7fe10d3

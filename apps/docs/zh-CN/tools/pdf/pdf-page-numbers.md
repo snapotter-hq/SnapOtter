@@ -1,5 +1,5 @@
 ---
-description: 为 PDF 的每一页添加页码。
+description: "为 PDF 的每一页添加页码。"
 i18n_source_hash: 58342d6ac8d2
 i18n_provenance: human
 i18n_output_hash: c41c0a34a46d

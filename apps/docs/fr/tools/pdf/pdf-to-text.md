@@ -1,5 +1,5 @@
 ---
-description: Extraire le texte brut d'un PDF.
+description: "Extraire le texte brut d'un PDF."
 i18n_source_hash: 15a7bc1cdf8f
 i18n_provenance: human
 i18n_output_hash: 6420be9c79b2

@@ -1,5 +1,5 @@
 ---
-description: 添加文字水印，可配置位置、不透明度、旋转和平铺。
+description: "添加文字水印，可配置位置、不透明度、旋转和平铺。"
 i18n_source_hash: b80f12f410e4
 i18n_provenance: human
 i18n_output_hash: 471457a79ffa

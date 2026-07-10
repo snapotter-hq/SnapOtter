@@ -1,5 +1,5 @@
 ---
-description: Añade protección con contraseña mediante cifrado AES-256 a un PDF.
+description: "Añade protección con contraseña mediante cifrado AES-256 a un PDF."
 i18n_source_hash: 869cfbc739ef
 i18n_provenance: human
 i18n_output_hash: 0850252ddf52

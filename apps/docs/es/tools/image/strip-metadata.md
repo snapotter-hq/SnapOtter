@@ -1,5 +1,5 @@
 ---
-description: Elimina metadatos EXIF, GPS, ICC y XMP de las imágenes para mayor privacidad y menor tamaño de archivo.
+description: "Elimina metadatos EXIF, GPS, ICC y XMP de las imágenes para mayor privacidad y menor tamaño de archivo."
 i18n_source_hash: e89147734fd0
 i18n_provenance: human
 i18n_output_hash: a5c840a8408d

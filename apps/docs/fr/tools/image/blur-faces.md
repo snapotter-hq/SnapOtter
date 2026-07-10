@@ -1,5 +1,5 @@
 ---
-description: Détecte et floute automatiquement les visages dans les images grâce à la détection de visages par IA, pour la confidentialité et une anonymisation conforme au RGPD.
+description: "Détecte et floute automatiquement les visages dans les images grâce à la détection de visages par IA, pour la confidentialité et une anonymisation conforme au RGPD."
 i18n_source_hash: fb861c12aea5
 i18n_provenance: human
 i18n_output_hash: db97c8556891

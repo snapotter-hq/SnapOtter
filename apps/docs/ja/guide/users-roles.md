@@ -1,5 +1,5 @@
 ---
-description: SnapOtter でユーザー、組み込みおよびカスタムロール、権限、API キー、チーム、セッション、監査ログを管理します。
+description: "SnapOtter でユーザー、組み込みおよびカスタムロール、権限、API キー、チーム、セッション、監査ログを管理します。"
 i18n_source_hash: 5e28af686c96
 i18n_provenance: human
 i18n_output_hash: 4917b71a173c

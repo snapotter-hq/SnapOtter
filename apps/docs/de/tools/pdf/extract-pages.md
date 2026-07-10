@@ -1,5 +1,5 @@
 ---
-description: Ausgewählte Seiten aus einer PDF in ein neues Dokument übernehmen.
+description: "Ausgewählte Seiten aus einer PDF in ein neues Dokument übernehmen."
 i18n_source_hash: e4a8fad31e0f
 i18n_provenance: machine
 i18n_output_hash: 61ad05b44b44

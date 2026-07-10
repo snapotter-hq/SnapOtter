@@ -1,5 +1,5 @@
 ---
-description: Alle Farben in einer PDF in Graustufen umwandeln.
+description: "Alle Farben in einer PDF in Graustufen umwandeln."
 i18n_source_hash: f327addb32d6
 i18n_provenance: machine
 i18n_output_hash: 5945ef5df97e

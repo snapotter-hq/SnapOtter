@@ -1,5 +1,5 @@
 ---
-description: Detecta y desenfoca caras automáticamente en imágenes con detección facial por IA para privacidad y anonimización conforme al RGPD.
+description: "Detecta y desenfoca caras automáticamente en imágenes con detección facial por IA para privacidad y anonimización conforme al RGPD."
 i18n_source_hash: fb861c12aea5
 i18n_provenance: human
 i18n_output_hash: 83a6acb36226

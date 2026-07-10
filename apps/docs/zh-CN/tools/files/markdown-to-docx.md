@@ -1,5 +1,5 @@
 ---
-description: 将 Markdown 文件转换为 Word 文档（DOCX）。
+description: "将 Markdown 文件转换为 Word 文档（DOCX）。"
 i18n_source_hash: 979cb8ee13f2
 i18n_provenance: human
 i18n_output_hash: 7fdfdb0b0c80

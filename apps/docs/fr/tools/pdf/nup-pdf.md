@@ -1,5 +1,5 @@
 ---
-description: Disposer plusieurs pages PDF par feuille (2-up, 4-up, etc.).
+description: "Disposer plusieurs pages PDF par feuille (2-up, 4-up, etc.)."
 i18n_source_hash: 9dd82737cb72
 i18n_provenance: human
 i18n_output_hash: 4f094c78685e

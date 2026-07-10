@@ -1,5 +1,5 @@
 ---
-description: Zeigt detaillierte Bildmetadaten, Eigenschaften und Histogrammstatistiken pro Kanal an.
+description: "Zeigt detaillierte Bildmetadaten, Eigenschaften und Histogrammstatistiken pro Kanal an."
 i18n_source_hash: 8a0f7a0b0153
 i18n_provenance: machine
 i18n_output_hash: bd976d2a6f65

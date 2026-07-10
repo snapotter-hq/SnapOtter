@@ -1,5 +1,5 @@
 ---
-description: XML から繰り返し要素を抽出して CSV テーブルにします。
+description: "XML から繰り返し要素を抽出して CSV テーブルにします。"
 i18n_source_hash: 3ab1019bff8a
 i18n_provenance: human
 i18n_output_hash: a0112376720f

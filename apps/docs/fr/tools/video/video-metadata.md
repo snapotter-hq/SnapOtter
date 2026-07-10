@@ -1,5 +1,5 @@
 ---
-description: Supprime les métadonnées d'une vidéo et signale ce qui a été trouvé.
+description: "Supprime les métadonnées d'une vidéo et signale ce qui a été trouvé."
 i18n_source_hash: 69621bfb98ca
 i18n_provenance: human
 i18n_output_hash: 6dc127077d64

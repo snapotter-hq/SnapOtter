@@ -1,5 +1,5 @@
 ---
-description: 用倍率加快或减慢音频播放速度。
+description: "用倍率加快或减慢音频播放速度。"
 i18n_source_hash: e39ba662e594
 i18n_provenance: human
 i18n_output_hash: d92378e7556a

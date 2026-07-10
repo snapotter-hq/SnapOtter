@@ -1,5 +1,5 @@
 ---
-description: Faites pivoter les images de n'importe quel angle et retournez-les horizontalement ou verticalement.
+description: "Faites pivoter les images de n'importe quel angle et retournez-les horizontalement ou verticalement."
 i18n_source_hash: af2581d7cd8d
 i18n_provenance: human
 i18n_output_hash: 05069a24e70c

@@ -1,5 +1,5 @@
 ---
-description: Seiten in einer PDF um 90, 180 oder 270 Grad drehen.
+description: "Seiten in einer PDF um 90, 180 oder 270 Grad drehen."
 i18n_source_hash: cc2acd091427
 i18n_provenance: machine
 i18n_output_hash: 02533edb972c

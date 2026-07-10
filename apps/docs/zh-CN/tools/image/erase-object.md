@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 图像修复（LaMa）从图片中移除不需要的对象，由标注要擦除区域的蒙版引导。
+description: "使用 AI 图像修复（LaMa）从图片中移除不需要的对象，由标注要擦除区域的蒙版引导。"
 i18n_source_hash: 8e2e42a5e4f9
 i18n_provenance: human
 i18n_output_hash: 15f31fd8bd25

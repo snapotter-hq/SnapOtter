@@ -1,5 +1,5 @@
 ---
-description: Apposer des images de signature téléversées sur un PDF à l'aide de placements de page normalisés.
+description: "Apposer des images de signature téléversées sur un PDF à l'aide de placements de page normalisés."
 i18n_source_hash: c28f78c2e7fd
 i18n_provenance: human
 i18n_output_hash: e72288f186c4

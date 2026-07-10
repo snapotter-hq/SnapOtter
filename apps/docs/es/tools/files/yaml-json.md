@@ -1,5 +1,5 @@
 ---
-description: Convierte entre YAML y JSON en ambos sentidos.
+description: "Convierte entre YAML y JSON en ambos sentidos."
 i18n_source_hash: acf8ca21ee99
 i18n_provenance: human
 i18n_output_hash: 052c4635f8ba

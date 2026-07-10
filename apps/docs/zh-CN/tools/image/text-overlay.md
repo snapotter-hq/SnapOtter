@@ -1,5 +1,5 @@
 ---
-description: 添加带投影和背景框的样式化文字叠加。
+description: "添加带投影和背景框的样式化文字叠加。"
 i18n_source_hash: 9f8e697188fc
 i18n_provenance: human
 i18n_output_hash: d0640359fbc4

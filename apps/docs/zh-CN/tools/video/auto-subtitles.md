@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 从视频音轨生成字幕文件。
+description: "使用 AI 从视频音轨生成字幕文件。"
 i18n_source_hash: 35b1e78501ad
 i18n_provenance: human
 i18n_output_hash: 7487846234fe

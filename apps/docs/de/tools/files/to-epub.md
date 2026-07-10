@@ -1,5 +1,5 @@
 ---
-description: Word-, Markdown-, HTML- oder Klartextdateien in EPUB umwandeln.
+description: "Word-, Markdown-, HTML- oder Klartextdateien in EPUB umwandeln."
 i18n_source_hash: 63e1afa91c52
 i18n_provenance: machine
 i18n_output_hash: c06baec84ade

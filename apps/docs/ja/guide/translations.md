@@ -1,5 +1,5 @@
 ---
-description: SnapOtter がサポートする 21 言語と、TypeScript による完全性が保証された i18n システムを使って翻訳を作成・改善する方法。
+description: "SnapOtter がサポートする 21 言語と、TypeScript による完全性が保証された i18n システムを使って翻訳を作成・改善する方法。"
 i18n_source_hash: 0fdac8be0c98
 i18n_provenance: human
 i18n_output_hash: 152781cc9add

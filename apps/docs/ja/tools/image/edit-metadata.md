@@ -1,5 +1,5 @@
 ---
-description: ピクセルを再エンコードせずに、画像のEXIF、IPTC、GPS、XMP メタデータフィールドを編集します。
+description: "ピクセルを再エンコードせずに、画像のEXIF、IPTC、GPS、XMP メタデータフィールドを編集します。"
 i18n_source_hash: a37746db11c3
 i18n_provenance: human
 i18n_output_hash: cc4a554a90d8

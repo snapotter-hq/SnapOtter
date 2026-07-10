@@ -1,5 +1,5 @@
 ---
-description: 字幕を動画のフレームに恒久的に焼き込みます。
+description: "字幕を動画のフレームに恒久的に焼き込みます。"
 i18n_source_hash: 2d3111589db0
 i18n_provenance: human
 i18n_output_hash: 98591ed91dd9

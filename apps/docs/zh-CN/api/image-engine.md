@@ -1,5 +1,5 @@
 ---
-description: 图像引擎操作参考。所有基于 Sharp 的图像处理操作及其参数。
+description: "图像引擎操作参考。所有基于 Sharp 的图像处理操作及其参数。"
 i18n_source_hash: 42febdf85fa8
 i18n_provenance: human
 i18n_output_hash: 76ddc27cca10

@@ -1,5 +1,5 @@
 ---
-description: Text aus PDF-Dokumenten mit KI-gestützter OCR extrahieren.
+description: "Text aus PDF-Dokumenten mit KI-gestützter OCR extrahieren."
 i18n_source_hash: 1431fcba180b
 i18n_provenance: machine
 i18n_output_hash: b09a98f42048

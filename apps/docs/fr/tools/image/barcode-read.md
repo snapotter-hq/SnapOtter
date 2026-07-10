@@ -1,5 +1,5 @@
 ---
-description: Analyse les images à la recherche de QR codes, de codes-barres et de codes 2D, avec une sortie annotée.
+description: "Analyse les images à la recherche de QR codes, de codes-barres et de codes 2D, avec une sortie annotée."
 i18n_source_hash: 97c9d395c257
 i18n_provenance: human
 i18n_output_hash: bee76c077f68

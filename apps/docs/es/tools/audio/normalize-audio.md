@@ -1,5 +1,5 @@
 ---
-description: Uniformiza el volumen a niveles estándar de radiodifusión (EBU R128).
+description: "Uniformiza el volumen a niveles estándar de radiodifusión (EBU R128)."
 i18n_source_hash: 794d8cfa5ad8
 i18n_provenance: human
 i18n_output_hash: c1703a8b038f

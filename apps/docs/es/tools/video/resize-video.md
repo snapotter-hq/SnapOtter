@@ -1,5 +1,5 @@
 ---
-description: Escala un vídeo a una nueva resolución o tamaño preajustado.
+description: "Escala un vídeo a una nueva resolución o tamaño preajustado."
 i18n_source_hash: bb1f67871fea
 i18n_provenance: human
 i18n_output_hash: 263be96e85c6

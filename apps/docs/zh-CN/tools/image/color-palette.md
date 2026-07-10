@@ -1,5 +1,5 @@
 ---
-description: 从图片中提取主色，作为调色板输出。
+description: "从图片中提取主色，作为调色板输出。"
 i18n_source_hash: 65ab22dd75a9
 i18n_provenance: human
 i18n_output_hash: 6fbe48cf4d59

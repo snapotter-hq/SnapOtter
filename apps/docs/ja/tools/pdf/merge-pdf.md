@@ -1,5 +1,5 @@
 ---
-description: 複数の PDF を 1 つのドキュメントに結合します。
+description: "複数の PDF を 1 つのドキュメントに結合します。"
 i18n_source_hash: e82e389cb8b6
 i18n_provenance: human
 i18n_output_hash: de798f2aafbe

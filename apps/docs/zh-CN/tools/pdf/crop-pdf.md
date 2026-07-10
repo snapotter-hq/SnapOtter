@@ -1,5 +1,5 @@
 ---
-description: 以统一的边距裁剪 PDF 的所有页面。
+description: "以统一的边距裁剪 PDF 的所有页面。"
 i18n_source_hash: ffa1a2cee08d
 i18n_provenance: human
 i18n_output_hash: 98c1a64a36fd

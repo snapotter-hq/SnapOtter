@@ -1,5 +1,5 @@
 ---
-description: Erhöht oder verringert die Audiolautstärke um eine feste Verstärkung in Dezibel.
+description: "Erhöht oder verringert die Audiolautstärke um eine feste Verstärkung in Dezibel."
 i18n_source_hash: b9bc1de2c9ef
 i18n_provenance: machine
 i18n_output_hash: 6857a2f0c216

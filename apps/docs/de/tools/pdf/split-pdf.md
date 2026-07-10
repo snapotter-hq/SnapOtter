@@ -1,5 +1,5 @@
 ---
-description: Seiten extrahieren oder eine PDF in Teile aufteilen.
+description: "Seiten extrahieren oder eine PDF in Teile aufteilen."
 i18n_source_hash: 5c8d8041d219
 i18n_provenance: machine
 i18n_output_hash: dd583d11a330

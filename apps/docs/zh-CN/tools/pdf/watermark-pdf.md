@@ -1,5 +1,5 @@
 ---
-description: 为 PDF 的每一页添加文本水印。
+description: "为 PDF 的每一页添加文本水印。"
 i18n_source_hash: f1f7d8912fbd
 i18n_provenance: human
 i18n_output_hash: 8e4059b14f27

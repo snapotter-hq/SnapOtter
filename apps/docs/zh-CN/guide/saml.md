@@ -1,5 +1,5 @@
 ---
-description: 为 SnapOtter 设置 SAML 2.0 单点登录。提供 Okta、Azure AD / Entra ID、Google Workspace 及其他 SAML 身份提供商的分步指南。
+description: "为 SnapOtter 设置 SAML 2.0 单点登录。提供 Okta、Azure AD / Entra ID、Google Workspace 及其他 SAML 身份提供商的分步指南。"
 i18n_source_hash: 33dfb8b02a22
 i18n_provenance: human
 i18n_output_hash: 75d4acf29255

@@ -1,5 +1,5 @@
 ---
-description: Word-Dokumente in PDF umwandeln.
+description: "Word-Dokumente in PDF umwandeln."
 i18n_source_hash: f814ba1a1a53
 i18n_provenance: machine
 i18n_output_hash: 9bd1eed251de

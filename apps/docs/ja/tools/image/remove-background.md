@@ -1,5 +1,5 @@
 ---
-description: 任意のエフェクト（ぼかし、影、グラデーション、カスタム背景）を備えた AI 背景除去。
+description: "任意のエフェクト（ぼかし、影、グラデーション、カスタム背景）を備えた AI 背景除去。"
 i18n_source_hash: 326a91284529
 i18n_provenance: human
 i18n_output_hash: 7c5bacf509f7

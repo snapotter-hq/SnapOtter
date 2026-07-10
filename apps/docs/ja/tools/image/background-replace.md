@@ -1,5 +1,5 @@
 ---
-description: AI を使用して画像の背景を単色またはグラデーションに置き換えます。
+description: "AI を使用して画像の背景を単色またはグラデーションに置き換えます。"
 i18n_source_hash: 930fe8890e55
 i18n_provenance: human
 i18n_output_hash: a72b7f9033a8

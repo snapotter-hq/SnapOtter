@@ -1,5 +1,5 @@
 ---
-description: Todas las variables de entorno de SnapOtter con sus valores predeterminados. Configura autenticación, almacenamiento, modelos de IA, analítica y más.
+description: "Todas las variables de entorno de SnapOtter con sus valores predeterminados. Configura autenticación, almacenamiento, modelos de IA, analítica y más."
 i18n_source_hash: 8e9e9ca2840c
 i18n_provenance: human
 i18n_output_hash: e405b8a429bd

@@ -1,5 +1,5 @@
 ---
-description: Ein animiertes GIF in ein MP4-, WebM- oder MOV-Video konvertieren.
+description: "Ein animiertes GIF in ein MP4-, WebM- oder MOV-Video konvertieren."
 i18n_source_hash: c3737b31146d
 i18n_provenance: machine
 i18n_output_hash: fa3b89f36e19

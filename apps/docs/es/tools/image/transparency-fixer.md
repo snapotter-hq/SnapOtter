@@ -1,5 +1,5 @@
 ---
-description: Corrige PNG con falsa transparencia mediante matting por IA (BiRefNet) para producir un alfa real, además de limpieza de bordes con defringe.
+description: "Corrige PNG con falsa transparencia mediante matting por IA (BiRefNet) para producir un alfa real, además de limpieza de bordes con defringe."
 i18n_source_hash: 7eb748b80f93
 i18n_provenance: human
 i18n_output_hash: dd81a9469007

@@ -1,5 +1,5 @@
 ---
-description: Recorta una sección de un archivo de audio especificando los tiempos de inicio y fin.
+description: "Recorta una sección de un archivo de audio especificando los tiempos de inicio y fin."
 i18n_source_hash: 8b80c5c8a711
 i18n_provenance: human
 i18n_output_hash: 576433461bd2

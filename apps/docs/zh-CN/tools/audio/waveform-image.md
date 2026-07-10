@@ -1,5 +1,5 @@
 ---
-description: 从音频文件生成波形可视化的 PNG 图片。
+description: "从音频文件生成波形可视化的 PNG 图片。"
 i18n_source_hash: 5480106dfe48
 i18n_provenance: human
 i18n_output_hash: bab1cdd0c8ea

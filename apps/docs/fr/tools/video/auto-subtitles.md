@@ -1,5 +1,5 @@
 ---
-description: Générer des fichiers de sous-titres à partir des pistes audio d'une vidéo à l'aide de l'IA.
+description: "Générer des fichiers de sous-titres à partir des pistes audio d'une vidéo à l'aide de l'IA."
 i18n_source_hash: 35b1e78501ad
 i18n_provenance: human
 i18n_output_hash: 979fd7cb561a

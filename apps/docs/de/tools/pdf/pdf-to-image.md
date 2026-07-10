@@ -1,5 +1,5 @@
 ---
-description: PDF-Seiten in hochwertige Bilder umwandeln.
+description: "PDF-Seiten in hochwertige Bilder umwandeln."
 i18n_source_hash: 1c36be5dadb8
 i18n_provenance: machine
 i18n_output_hash: de98acf7742f

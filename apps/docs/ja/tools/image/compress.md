@@ -1,5 +1,5 @@
 ---
-description: 品質レベル、または目標ファイルサイズによって画像のファイルサイズを削減します。
+description: "品質レベル、または目標ファイルサイズによって画像のファイルサイズを削減します。"
 i18n_source_hash: af4685da7e64
 i18n_provenance: human
 i18n_output_hash: 2aa6e052c339

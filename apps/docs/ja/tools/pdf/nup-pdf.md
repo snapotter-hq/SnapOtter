@@ -1,5 +1,5 @@
 ---
-description: 1 枚のシートに複数の PDF ページを配置します（2-up、4-up など）。
+description: "1 枚のシートに複数の PDF ページを配置します（2-up、4-up など）。"
 i18n_source_hash: 9dd82737cb72
 i18n_provenance: human
 i18n_output_hash: ae5be144f5e9

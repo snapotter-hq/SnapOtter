@@ -1,5 +1,5 @@
 ---
-description: Monorepo-Struktur, App- und Paketarchitektur, Request-Lebenszyklus und Ressourcen-Footprint von SnapOtter.
+description: "Monorepo-Struktur, App- und Paketarchitektur, Request-Lebenszyklus und Ressourcen-Footprint von SnapOtter."
 i18n_source_hash: 9e8f80499a37
 i18n_provenance: machine
 i18n_output_hash: af8ecb20c86e

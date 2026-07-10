@@ -1,5 +1,5 @@
 ---
-description: Eine Audiodatei umkehren, sodass sie rückwärts abgespielt wird.
+description: "Eine Audiodatei umkehren, sodass sie rückwärts abgespielt wird."
 i18n_source_hash: 5c2017661803
 i18n_provenance: machine
 i18n_output_hash: 5a5121e03333

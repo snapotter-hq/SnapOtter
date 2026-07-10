@@ -1,5 +1,5 @@
 ---
-description: Compara dos imágenes lado a lado con visualización de diferencias a nivel de píxel y puntuación de similitud.
+description: "Compara dos imágenes lado a lado con visualización de diferencias a nivel de píxel y puntuación de similitud."
 i18n_source_hash: cc0a02bd75c6
 i18n_provenance: human
 i18n_output_hash: e74ad295a52e

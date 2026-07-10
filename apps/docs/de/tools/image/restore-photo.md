@@ -1,5 +1,5 @@
 ---
-description: Repariere Kratzer, Risse und Schäden an alten Fotos mit einer KI-Pipeline für Restaurierung, Gesichtsverbesserung und Farbe.
+description: "Repariere Kratzer, Risse und Schäden an alten Fotos mit einer KI-Pipeline für Restaurierung, Gesichtsverbesserung und Farbe."
 i18n_source_hash: 3de13284216c
 i18n_provenance: machine
 i18n_output_hash: 68fa41b02608

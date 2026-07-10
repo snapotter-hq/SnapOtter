@@ -1,5 +1,5 @@
 ---
-description: Schneidet einen Abschnitt aus einer Audiodatei heraus, indem Start- und Endzeit angegeben werden.
+description: "Schneidet einen Abschnitt aus einer Audiodatei heraus, indem Start- und Endzeit angegeben werden."
 i18n_source_hash: 8b80c5c8a711
 i18n_provenance: machine
 i18n_output_hash: 2f6908c8f9cf

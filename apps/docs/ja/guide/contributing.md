@@ -1,5 +1,5 @@
 ---
-description: SnapOtter への貢献方法。バグ報告、機能リクエスト、プルリクエスト、CLA の要件について。
+description: "SnapOtter への貢献方法。バグ報告、機能リクエスト、プルリクエスト、CLA の要件について。"
 i18n_source_hash: 528802503035
 i18n_provenance: human
 i18n_output_hash: f22f41277ff7

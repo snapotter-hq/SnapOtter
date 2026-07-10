@@ -1,5 +1,5 @@
 ---
-description: Regroupe plusieurs fichiers dans une seule archive ZIP.
+description: "Regroupe plusieurs fichiers dans une seule archive ZIP."
 i18n_source_hash: 9ff1250dbd36
 i18n_provenance: human
 i18n_output_hash: eb644dc4819e

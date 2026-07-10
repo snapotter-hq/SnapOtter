@@ -1,5 +1,5 @@
 ---
-description: 複数のファイルを 1 つの ZIP アーカイブにまとめます。
+description: "複数のファイルを 1 つの ZIP アーカイブにまとめます。"
 i18n_source_hash: 9ff1250dbd36
 i18n_provenance: human
 i18n_output_hash: a465f59b0912

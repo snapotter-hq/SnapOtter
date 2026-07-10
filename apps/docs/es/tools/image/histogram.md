@@ -1,5 +1,5 @@
 ---
-description: Genera un gráfico de histograma RGB con estadísticas por canal a partir de una imagen.
+description: "Genera un gráfico de histograma RGB con estadísticas por canal a partir de una imagen."
 i18n_source_hash: 57aa610206a5
 i18n_provenance: human
 i18n_output_hash: 6fd63913f7b7

@@ -1,5 +1,5 @@
 ---
-description: 使用 Docker 将 SnapOtter 部署到生产环境。硬件要求、GPU 配置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。
+description: "使用 Docker 将 SnapOtter 部署到生产环境。硬件要求、GPU 配置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
 i18n_source_hash: ecc1b528bc4b
 i18n_provenance: human
 i18n_output_hash: 1e9e7ad38219

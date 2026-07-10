@@ -1,5 +1,5 @@
 ---
-description: Supprimer des pages spécifiques d'un PDF.
+description: "Supprimer des pages spécifiques d'un PDF."
 i18n_source_hash: 003e460a047c
 i18n_provenance: human
 i18n_output_hash: dd7ef2cd7ee1

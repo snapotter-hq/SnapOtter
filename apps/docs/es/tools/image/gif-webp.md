@@ -1,5 +1,5 @@
 ---
-description: Convierte GIF animados a WebP y viceversa, conservando todos los fotogramas.
+description: "Convierte GIF animados a WebP y viceversa, conservando todos los fotogramas."
 i18n_source_hash: 20946e5001cb
 i18n_provenance: human
 i18n_output_hash: 797bdb127ac0

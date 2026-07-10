@@ -1,5 +1,5 @@
 ---
-description: AVIF、JXL、HEIC などのモダンな形式を含め、画像を各形式間で変換します。
+description: "AVIF、JXL、HEIC などのモダンな形式を含め、画像を各形式間で変換します。"
 i18n_source_hash: 562f8270e8c3
 i18n_provenance: human
 i18n_output_hash: 7676d19fa60d

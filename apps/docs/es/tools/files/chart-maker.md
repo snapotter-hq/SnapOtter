@@ -1,5 +1,5 @@
 ---
-description: Crea gráficos de barras, líneas o circulares a partir de datos CSV o JSON.
+description: "Crea gráficos de barras, líneas o circulares a partir de datos CSV o JSON."
 i18n_source_hash: d3c39384457b
 i18n_provenance: human
 i18n_output_hash: c9c82b6a033f

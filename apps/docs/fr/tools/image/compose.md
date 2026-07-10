@@ -1,5 +1,5 @@
 ---
-description: Superposez des images avec position, opacité et modes de fusion pour la composition.
+description: "Superposez des images avec position, opacité et modes de fusion pour la composition."
 i18n_source_hash: c5d09eb13fde
 i18n_provenance: human
 i18n_output_hash: 922e2da126f7

@@ -1,5 +1,5 @@
 ---
-description: Word、Markdown、HTML、またはプレーンテキストファイルを EPUB に変換します。
+description: "Word、Markdown、HTML、またはプレーンテキストファイルを EPUB に変換します。"
 i18n_source_hash: 63e1afa91c52
 i18n_provenance: human
 i18n_output_hash: aa0fde2c528f

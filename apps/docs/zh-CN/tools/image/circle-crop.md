@@ -1,5 +1,5 @@
 ---
-description: 将图像裁剪为居中的圆形，四角透明。
+description: "将图像裁剪为居中的圆形，四角透明。"
 i18n_source_hash: 06c50ccd96b2
 i18n_provenance: human
 i18n_output_hash: 5cbadfef92bf

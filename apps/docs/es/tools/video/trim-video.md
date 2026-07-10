@@ -1,5 +1,5 @@
 ---
-description: Extrae un clip de un vídeo especificando los tiempos de inicio y fin.
+description: "Extrae un clip de un vídeo especificando los tiempos de inicio y fin."
 i18n_source_hash: c84481641979
 i18n_provenance: human
 i18n_output_hash: a6ed8f42acad

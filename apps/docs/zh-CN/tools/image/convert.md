@@ -1,5 +1,5 @@
 ---
-description: 在各种格式之间转换图片，包括 AVIF、JXL 和 HEIC 等现代格式。
+description: "在各种格式之间转换图片，包括 AVIF、JXL 和 HEIC 等现代格式。"
 i18n_source_hash: 562f8270e8c3
 i18n_provenance: human
 i18n_output_hash: 238017f07183

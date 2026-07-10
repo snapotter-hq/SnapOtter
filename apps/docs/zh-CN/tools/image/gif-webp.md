@@ -1,5 +1,5 @@
 ---
-description: 在动画 GIF 与 WebP 之间互相转换，保留所有帧。
+description: "在动画 GIF 与 WebP 之间互相转换，保留所有帧。"
 i18n_source_hash: 20946e5001cb
 i18n_provenance: human
 i18n_output_hash: 7c7af582111a

@@ -1,5 +1,5 @@
 ---
-description: AI による光学式文字認識で画像からテキストを抽出します。
+description: "AI による光学式文字認識で画像からテキストを抽出します。"
 i18n_source_hash: 3d85d423b82c
 i18n_provenance: human
 i18n_output_hash: 26f22dbdf9c3

@@ -1,5 +1,5 @@
 ---
-description: アダプティブ、アンシャープマスク、ハイパスの各手法で画像をシャープ化し、オプションでノイズ低減も行います。
+description: "アダプティブ、アンシャープマスク、ハイパスの各手法で画像をシャープ化し、オプションでノイズ低減も行います。"
 i18n_source_hash: ccb60af9faae
 i18n_provenance: human
 i18n_output_hash: d5113ae4e40c

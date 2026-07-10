@@ -213,6 +213,28 @@ function upsertFrontmatter(text, fields) {
   return `---\n${next.join("\n")}\n---\n${body}`;
 }
 
+/**
+ * Double-quote bare `description`/`title` frontmatter values so a translated
+ * value containing a colon, `#`, or other YAML-significant character does not
+ * break frontmatter parsing (VitePress loads it as YAML).
+ * @param {string} text
+ * @returns {string}
+ */
+export function quoteFrontmatterScalars(text) {
+  const { fm, body } = splitFrontmatter(text);
+  if (fm == null) return text;
+  const next = fm.split("\n").map((line) => {
+    const m = line.match(/^(description|title):[ \t]*(.*)$/);
+    if (!m) return line;
+    const val = m[2];
+    // Leave empty, already-quoted, or block-scalar values alone.
+    if (val === "" || /^["'|>]/.test(val)) return line;
+    const escaped = val.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `${m[1]}: "${escaped}"`;
+  });
+  return `---\n${next.join("\n")}\n---\n${body}`;
+}
+
 /** Recursively list markdown under a locale dir, relative + POSIX. */
 async function listLocaleMarkdown(dir) {
   const out = [];
@@ -289,7 +311,7 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
         await mkdir(dirname(abs), { recursive: true });
         const table = tokenTables.get(id) ?? [];
         const undone = restoreDocs(entry.text, table);
-        const linked = rewriteLinks(undone, locale);
+        const linked = quoteFrontmatterScalars(rewriteLinks(undone, locale));
         const withMeta = upsertFrontmatter(linked, {
           i18n_source_hash: entry.sourceHash,
           i18n_provenance: entry.provenance,

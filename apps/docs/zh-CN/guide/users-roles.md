@@ -1,5 +1,5 @@
 ---
-description: 在 SnapOtter 中管理用户、内置角色与自定义角色、权限、API 密钥、团队、会话以及审计日志。
+description: "在 SnapOtter 中管理用户、内置角色与自定义角色、权限、API 密钥、团队、会话以及审计日志。"
 i18n_source_hash: 5e28af686c96
 i18n_provenance: human
 i18n_output_hash: db9aecb6141c

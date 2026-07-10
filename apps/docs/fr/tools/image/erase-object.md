@@ -1,5 +1,5 @@
 ---
-description: Retirez les objets indésirables des images avec l'inpainting par IA (LaMa), guidé par un masque de la région à effacer.
+description: "Retirez les objets indésirables des images avec l'inpainting par IA (LaMa), guidé par un masque de la région à effacer."
 i18n_source_hash: 8e2e42a5e4f9
 i18n_provenance: human
 i18n_output_hash: ab0ab3426de6

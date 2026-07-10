@@ -1,5 +1,5 @@
 ---
-description: Aplica un efecto duotono de dos colores con colores personalizados de sombra y luz.
+description: "Aplica un efecto duotono de dos colores con colores personalizados de sombra y luz."
 i18n_source_hash: ab99c4f0152c
 i18n_provenance: human
 i18n_output_hash: 862b03827908

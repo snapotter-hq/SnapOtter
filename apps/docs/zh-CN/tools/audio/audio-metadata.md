@@ -1,5 +1,5 @@
 ---
-description: 查看、编辑或剥除音频元数据标签（ID3）。
+description: "查看、编辑或剥除音频元数据标签（ID3）。"
 i18n_source_hash: 0717018e11cb
 i18n_provenance: human
 i18n_output_hash: d5d75b73e81f

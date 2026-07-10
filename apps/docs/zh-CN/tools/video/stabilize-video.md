@@ -1,5 +1,5 @@
 ---
-description: 通过双通道稳定处理减少画面抖动。
+description: "通过双通道稳定处理减少画面抖动。"
 i18n_source_hash: ec908e91a752
 i18n_provenance: human
 i18n_output_hash: 546a198fbb78

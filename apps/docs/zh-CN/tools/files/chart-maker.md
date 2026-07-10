@@ -1,5 +1,5 @@
 ---
-description: 根据 CSV 或 JSON 数据创建柱状图、折线图或饼图。
+description: "根据 CSV 或 JSON 数据创建柱状图、折线图或饼图。"
 i18n_source_hash: d3c39384457b
 i18n_provenance: human
 i18n_output_hash: f386d98f072b

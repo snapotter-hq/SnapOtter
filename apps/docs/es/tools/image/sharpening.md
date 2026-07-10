@@ -1,5 +1,5 @@
 ---
-description: Enfoca imágenes mediante métodos adaptativos, de máscara de enfoque o de paso alto, con reducción de ruido opcional.
+description: "Enfoca imágenes mediante métodos adaptativos, de máscara de enfoque o de paso alto, con reducción de ruido opcional."
 i18n_source_hash: ccb60af9faae
 i18n_provenance: human
 i18n_output_hash: 1be8c72c3aa0

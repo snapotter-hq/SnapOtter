@@ -1,5 +1,5 @@
 ---
-description: Größe ändern, optimieren, Geschwindigkeit anpassen, umkehren, drehen und Frames aus animierten GIFs extrahieren, alles in einem Werkzeug.
+description: "Größe ändern, optimieren, Geschwindigkeit anpassen, umkehren, drehen und Frames aus animierten GIFs extrahieren, alles in einem Werkzeug."
 i18n_source_hash: 5e525e80db92
 i18n_provenance: machine
 i18n_output_hash: 2c1a8704cbd1

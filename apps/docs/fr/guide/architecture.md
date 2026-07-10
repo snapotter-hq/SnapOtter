@@ -1,5 +1,5 @@
 ---
-description: Structure du monorepo, architecture des applications et des packages, cycle de vie des requêtes et empreinte de ressources de SnapOtter.
+description: "Structure du monorepo, architecture des applications et des packages, cycle de vie des requêtes et empreinte de ressources de SnapOtter."
 i18n_source_hash: 9e8f80499a37
 i18n_provenance: human
 i18n_output_hash: 31c734145cf5

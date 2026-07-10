@@ -1,5 +1,5 @@
 ---
-description: Ein Video beschleunigen oder verlangsamen.
+description: "Ein Video beschleunigen oder verlangsamen."
 i18n_source_hash: 98dfc75c0507
 i18n_provenance: machine
 i18n_output_hash: 832795c6b5d1

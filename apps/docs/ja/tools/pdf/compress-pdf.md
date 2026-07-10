@@ -1,5 +1,5 @@
 ---
-description: 埋め込み画像を圧縮して PDF のファイルサイズを縮小します。
+description: "埋め込み画像を圧縮して PDF のファイルサイズを縮小します。"
 i18n_source_hash: a8bb0baaca25
 i18n_provenance: human
 i18n_output_hash: 8d439dd1e107

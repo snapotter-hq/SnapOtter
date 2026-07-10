@@ -1,5 +1,5 @@
 ---
-description: Recorta una imagen a un círculo centrado con esquinas transparentes.
+description: "Recorta una imagen a un círculo centrado con esquinas transparentes."
 i18n_source_hash: 06c50ccd96b2
 i18n_provenance: human
 i18n_output_hash: 2278500ec38e

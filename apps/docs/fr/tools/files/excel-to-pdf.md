@@ -1,5 +1,5 @@
 ---
-description: Convertit des feuilles de calcul en PDF.
+description: "Convertit des feuilles de calcul en PDF."
 i18n_source_hash: 4dbe2a810ea6
 i18n_provenance: human
 i18n_output_hash: 91307fe17421

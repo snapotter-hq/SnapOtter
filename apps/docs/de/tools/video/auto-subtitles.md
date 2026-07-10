@@ -1,5 +1,5 @@
 ---
-description: Untertiteldateien aus Video-Audiospuren mit KI erzeugen.
+description: "Untertiteldateien aus Video-Audiospuren mit KI erzeugen."
 i18n_source_hash: 35b1e78501ad
 i18n_provenance: machine
 i18n_output_hash: 0ded5e0b7ef1

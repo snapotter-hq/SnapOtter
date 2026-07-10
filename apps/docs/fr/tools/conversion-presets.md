@@ -1,5 +1,5 @@
 ---
-description: Points de terminaison de préréglages de conversion dédiés, générés à partir du catalogue d'outils SnapOtter.
+description: "Points de terminaison de préréglages de conversion dédiés, générés à partir du catalogue d'outils SnapOtter."
 i18n_source_hash: faad6efcb9a9
 i18n_provenance: human
 i18n_output_hash: a1b69a78341d

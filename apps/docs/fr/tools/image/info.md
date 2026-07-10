@@ -1,5 +1,5 @@
 ---
-description: Consultez les métadonnées détaillées d'une image, ses propriétés et les statistiques d'histogramme par canal.
+description: "Consultez les métadonnées détaillées d'une image, ses propriétés et les statistiques d'histogramme par canal."
 i18n_source_hash: 8a0f7a0b0153
 i18n_provenance: human
 i18n_output_hash: 42de10b6c38d

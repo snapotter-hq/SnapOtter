@@ -1,5 +1,5 @@
 ---
-description: Genera archivos de subtítulos a partir de las pistas de audio de un vídeo mediante IA.
+description: "Genera archivos de subtítulos a partir de las pistas de audio de un vídeo mediante IA."
 i18n_source_hash: 35b1e78501ad
 i18n_provenance: human
 i18n_output_hash: b9f08b6dd120

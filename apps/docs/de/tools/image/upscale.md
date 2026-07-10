@@ -1,5 +1,5 @@
 ---
-description: Bilder mit Real-ESRGAN-KI-Superauflösung 2x bis 4x hochskalieren und dabei feine Details bewahren.
+description: "Bilder mit Real-ESRGAN-KI-Superauflösung 2x bis 4x hochskalieren und dabei feine Details bewahren."
 i18n_source_hash: 150032e99476
 i18n_provenance: machine
 i18n_output_hash: b951e30a9313

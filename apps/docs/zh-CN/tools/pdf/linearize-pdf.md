@@ -1,5 +1,5 @@
 ---
-description: 线性化 PDF 以实现快速网页查看（渐进式下载）。
+description: "线性化 PDF 以实现快速网页查看（渐进式下载）。"
 i18n_source_hash: 36280b478161
 i18n_provenance: human
 i18n_output_hash: 03079e663052

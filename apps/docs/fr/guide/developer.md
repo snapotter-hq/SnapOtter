@@ -1,5 +1,5 @@
 ---
-description: Configuration de l'environnement de développement local, commandes, conventions de code et comment ajouter un nouvel outil à SnapOtter.
+description: "Configuration de l'environnement de développement local, commandes, conventions de code et comment ajouter un nouvel outil à SnapOtter."
 i18n_source_hash: cb03724d2829
 i18n_provenance: human
 i18n_output_hash: c1deca322def

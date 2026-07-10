@@ -1,5 +1,5 @@
 ---
-description: Añade barras de color sólido para ajustarse a una relación de aspecto objetivo.
+description: "Añade barras de color sólido para ajustarse a una relación de aspecto objetivo."
 i18n_source_hash: b8e17dffc341
 i18n_provenance: human
 i18n_output_hash: 8cec883253e1

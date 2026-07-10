@@ -1,5 +1,5 @@
 ---
-description: 動画を MP4、MOV、WebM、AVI、MKV 間で変換します。
+description: "動画を MP4、MOV、WebM、AVI、MKV 間で変換します。"
 i18n_source_hash: 8f9e6418b1c6
 i18n_provenance: human
 i18n_output_hash: dcac29f235f7

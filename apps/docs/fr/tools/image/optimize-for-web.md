@@ -1,5 +1,5 @@
 ---
-description: Optimisez les images pour le web avec conversion de format, contrôle de la qualité, redimensionnement et suppression des métadonnées.
+description: "Optimisez les images pour le web avec conversion de format, contrôle de la qualité, redimensionnement et suppression des métadonnées."
 i18n_source_hash: c327bbbce768
 i18n_provenance: human
 i18n_output_hash: 9a95297b2977

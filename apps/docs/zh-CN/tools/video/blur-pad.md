@@ -1,5 +1,5 @@
 ---
-description: 用视频的模糊副本填充条框。
+description: "用视频的模糊副本填充条框。"
 i18n_source_hash: 0c72aaefc6de
 i18n_provenance: human
 i18n_output_hash: 6ecab728c928

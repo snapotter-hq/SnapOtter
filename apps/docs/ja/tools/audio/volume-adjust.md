@@ -1,5 +1,5 @@
 ---
-description: 固定のゲイン（デシベル）で音声の音量を上げ下げします。
+description: "固定のゲイン（デシベル）で音声の音量を上げ下げします。"
 i18n_source_hash: b9bc1de2c9ef
 i18n_provenance: human
 i18n_output_hash: 6d3dabd3cb22

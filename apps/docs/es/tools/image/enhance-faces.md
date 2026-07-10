@@ -1,5 +1,5 @@
 ---
-description: Restaura y enfoca caras borrosas o de baja calidad en imágenes con los modelos de IA GFPGAN y CodeFormer.
+description: "Restaura y enfoca caras borrosas o de baja calidad en imágenes con los modelos de IA GFPGAN y CodeFormer."
 i18n_source_hash: 7f9f6af8ebda
 i18n_provenance: human
 i18n_output_hash: a657abedb55e

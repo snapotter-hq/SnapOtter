@@ -1,5 +1,5 @@
 ---
-description: Réduit les tremblements de caméra grâce à une stabilisation en deux passes.
+description: "Réduit les tremblements de caméra grâce à une stabilisation en deux passes."
 i18n_source_hash: ec908e91a752
 i18n_provenance: human
 i18n_output_hash: daa1f7d1791e

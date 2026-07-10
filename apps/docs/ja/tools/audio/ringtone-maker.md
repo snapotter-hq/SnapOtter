@@ -1,5 +1,5 @@
 ---
-description: 任意の音声ファイルから着信音クリップを作成します。
+description: "任意の音声ファイルから着信音クリップを作成します。"
 i18n_source_hash: 8fcdcc545fbc
 i18n_provenance: human
 i18n_output_hash: b3159e74efe2

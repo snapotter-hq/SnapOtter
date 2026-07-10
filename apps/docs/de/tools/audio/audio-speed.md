@@ -1,5 +1,5 @@
 ---
-description: Audiowiedergabe mit einem Multiplikator beschleunigen oder verlangsamen.
+description: "Audiowiedergabe mit einem Multiplikator beschleunigen oder verlangsamen."
 i18n_source_hash: e39ba662e594
 i18n_provenance: machine
 i18n_output_hash: 1099720bed90

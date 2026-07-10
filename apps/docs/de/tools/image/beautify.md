@@ -1,5 +1,5 @@
 ---
-description: Schlichte Screenshots mit Farbverlaufshintergründen, Geräterahmen, Schatten und Social-Media-Formaten in ansprechende Bilder verwandeln.
+description: "Schlichte Screenshots mit Farbverlaufshintergründen, Geräterahmen, Schatten und Social-Media-Formaten in ansprechende Bilder verwandeln."
 i18n_source_hash: 8fd8a930a45e
 i18n_provenance: machine
 i18n_output_hash: 380ece5d9674

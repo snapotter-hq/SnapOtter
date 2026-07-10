@@ -1,5 +1,5 @@
 ---
-description: 位置と寸法で領域を指定して画像を切り抜きます。
+description: "位置と寸法で領域を指定して画像を切り抜きます。"
 i18n_source_hash: aab38ccd7c53
 i18n_provenance: human
 i18n_output_hash: fd35830e0f75

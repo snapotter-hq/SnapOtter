@@ -1,5 +1,5 @@
 ---
-description: Genera códigos QR con colores personalizados y niveles de corrección de errores.
+description: "Genera códigos QR con colores personalizados y niveles de corrección de errores."
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: human
 i18n_output_hash: 869cddfea161

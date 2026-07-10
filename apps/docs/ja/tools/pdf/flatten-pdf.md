@@ -1,5 +1,5 @@
 ---
-description: フォームと注釈をページコンテンツに焼き込みます。
+description: "フォームと注釈をページコンテンツに焼き込みます。"
 i18n_source_hash: b25c2a2b6f40
 i18n_provenance: human
 i18n_output_hash: 3553408332ad

@@ -1,5 +1,5 @@
 ---
-description: Kombiniert mehrere Bilder zu Rastercollagen mit über 25 Vorlagen, einstellbaren Abständen und Ecken sowie Schwenken und Zoomen pro Zelle.
+description: "Kombiniert mehrere Bilder zu Rastercollagen mit über 25 Vorlagen, einstellbaren Abständen und Ecken sowie Schwenken und Zoomen pro Zelle."
 i18n_source_hash: 96f2055717df
 i18n_provenance: machine
 i18n_output_hash: 480169ab7be2

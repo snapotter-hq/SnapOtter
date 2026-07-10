@@ -1,5 +1,5 @@
 ---
-description: テンプレートやカスタム画像、スタイル付きテキストボックス、フォントオプションでミームを作成します。
+description: "テンプレートやカスタム画像、スタイル付きテキストボックス、フォントオプションでミームを作成します。"
 i18n_source_hash: 0a4970112ca6
 i18n_provenance: human
 i18n_output_hash: 52e455e46257

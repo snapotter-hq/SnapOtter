@@ -1,5 +1,5 @@
 ---
-description: Helligkeit, Kontrast, Sättigung und Gamma eines Videos anpassen.
+description: "Helligkeit, Kontrast, Sättigung und Gamma eines Videos anpassen."
 i18n_source_hash: 40483b79d44b
 i18n_provenance: machine
 i18n_output_hash: 4e97fb1510e0

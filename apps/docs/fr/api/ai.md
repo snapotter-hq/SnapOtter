@@ -1,5 +1,5 @@
 ---
-description: Référence du moteur d'IA avec tous les outils de ML locaux. Suppression d'arrière-plan, agrandissement, OCR, détection de visages, restauration de photos, et plus encore.
+description: "Référence du moteur d'IA avec tous les outils de ML locaux. Suppression d'arrière-plan, agrandissement, OCR, détection de visages, restauration de photos, et plus encore."
 i18n_source_hash: dd135f2e9fdb
 i18n_provenance: human
 i18n_output_hash: 37b6a6e17124

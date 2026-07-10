@@ -1,5 +1,5 @@
 ---
-description: Comparez deux images côte à côte avec une visualisation des différences au niveau du pixel et un score de similarité.
+description: "Comparez deux images côte à côte avec une visualisation des différences au niveau du pixel et un score de similarité."
 i18n_source_hash: cc0a02bd75c6
 i18n_provenance: human
 i18n_output_hash: fc7fc59014a7

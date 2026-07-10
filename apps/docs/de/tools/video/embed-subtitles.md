@@ -1,5 +1,5 @@
 ---
-description: Eine Untertitelspur in den Videocontainer muxen.
+description: "Eine Untertitelspur in den Videocontainer muxen."
 i18n_source_hash: be272730fff5
 i18n_provenance: machine
 i18n_output_hash: bf8b16e90b55

@@ -1,5 +1,5 @@
 ---
-description: Extrae texto sin formato de un PDF.
+description: "Extrae texto sin formato de un PDF."
 i18n_source_hash: 15a7bc1cdf8f
 i18n_provenance: human
 i18n_output_hash: 89988dd528d7

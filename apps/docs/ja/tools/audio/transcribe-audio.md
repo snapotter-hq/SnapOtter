@@ -1,5 +1,5 @@
 ---
-description: AI を活用した文字起こしで音声をテキストに変換します。
+description: "AI を活用した文字起こしで音声をテキストに変換します。"
 i18n_source_hash: ae98c4c0aed2
 i18n_provenance: human
 i18n_output_hash: b75787b6745a

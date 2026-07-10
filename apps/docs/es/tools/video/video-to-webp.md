@@ -1,5 +1,5 @@
 ---
-description: Convierte un clip de vídeo en una imagen WebP animada.
+description: "Convierte un clip de vídeo en una imagen WebP animada."
 i18n_source_hash: 7b1a22459bd1
 i18n_provenance: human
 i18n_output_hash: 9a8a0a4ffb44

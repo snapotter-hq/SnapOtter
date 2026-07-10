@@ -1,5 +1,5 @@
 ---
-description: 字幕トラックを動画コンテナに多重化します。
+description: "字幕トラックを動画コンテナに多重化します。"
 i18n_source_hash: be272730fff5
 i18n_provenance: human
 i18n_output_hash: 4e80ed3f3add

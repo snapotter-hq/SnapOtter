@@ -1,5 +1,5 @@
 ---
-description: Formulare und Anmerkungen in den Seiteninhalt einbrennen.
+description: "Formulare und Anmerkungen in den Seiteninhalt einbrennen."
 i18n_source_hash: b25c2a2b6f40
 i18n_provenance: machine
 i18n_output_hash: bfba997fdf8a

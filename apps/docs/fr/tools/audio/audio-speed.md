@@ -1,5 +1,5 @@
 ---
-description: Accélérer ou ralentir la lecture audio à l'aide d'un multiplicateur.
+description: "Accélérer ou ralentir la lecture audio à l'aide d'un multiplicateur."
 i18n_source_hash: e39ba662e594
 i18n_provenance: human
 i18n_output_hash: 0f2f8d4b8b67

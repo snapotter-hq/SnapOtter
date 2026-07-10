@@ -1,5 +1,5 @@
 ---
-description: フォーマット変換、品質制御、リサイズ、メタデータ除去で画像を Web 配信向けに最適化します。
+description: "フォーマット変換、品質制御、リサイズ、メタデータ除去で画像を Web 配信向けに最適化します。"
 i18n_source_hash: c327bbbce768
 i18n_provenance: human
 i18n_output_hash: 320e91cbde2f

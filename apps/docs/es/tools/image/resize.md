@@ -1,5 +1,5 @@
 ---
-description: Redimensiona imágenes por píxeles, porcentaje o con modos de ajuste.
+description: "Redimensiona imágenes por píxeles, porcentaje o con modos de ajuste."
 i18n_source_hash: 00d1bffa4d38
 i18n_provenance: human
 i18n_output_hash: 3b1491e69697

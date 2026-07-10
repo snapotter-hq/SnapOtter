@@ -1,5 +1,5 @@
 ---
-description: Coloriza fotos en blanco y negro o en escala de grises automáticamente con el modelo de IA DDColor.
+description: "Coloriza fotos en blanco y negro o en escala de grises automáticamente con el modelo de IA DDColor."
 i18n_source_hash: 688aa3abbdae
 i18n_provenance: human
 i18n_output_hash: 4660da685ab0

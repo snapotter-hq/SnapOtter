@@ -1,5 +1,5 @@
 ---
-description: Markdown ファイルを Word ドキュメント（DOCX）に変換します。
+description: "Markdown ファイルを Word ドキュメント（DOCX）に変換します。"
 i18n_source_hash: 979cb8ee13f2
 i18n_provenance: human
 i18n_output_hash: e2676e8a04df

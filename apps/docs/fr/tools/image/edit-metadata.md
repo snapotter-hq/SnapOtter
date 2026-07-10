@@ -1,5 +1,5 @@
 ---
-description: Modifiez les champs de métadonnées EXIF, IPTC, GPS et XMP des images sans réencoder les pixels.
+description: "Modifiez les champs de métadonnées EXIF, IPTC, GPS et XMP des images sans réencoder les pixels."
 i18n_source_hash: a37746db11c3
 i18n_provenance: human
 i18n_output_hash: 8b7e70a7ac08

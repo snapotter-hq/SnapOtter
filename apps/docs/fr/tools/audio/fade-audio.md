@@ -1,5 +1,5 @@
 ---
-description: Ajouter des effets de fondu en ouverture et en fermeture à l'audio.
+description: "Ajouter des effets de fondu en ouverture et en fermeture à l'audio."
 i18n_source_hash: 86856451ecb8
 i18n_provenance: human
 i18n_output_hash: 7afeec52bfee

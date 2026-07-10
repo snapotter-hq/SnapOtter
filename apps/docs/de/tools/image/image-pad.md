@@ -1,5 +1,5 @@
 ---
-description: Füllt ein Bild auf ein Zielseitenverhältnis mit einer Volltonfarbe, transparentem oder unscharfem Hintergrund auf.
+description: "Füllt ein Bild auf ein Zielseitenverhältnis mit einer Volltonfarbe, transparentem oder unscharfem Hintergrund auf."
 i18n_source_hash: 796122da3dae
 i18n_provenance: machine
 i18n_output_hash: b15bb1ba9e66

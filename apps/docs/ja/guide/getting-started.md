@@ -1,5 +1,5 @@
 ---
-description: 1 つのコマンドで Docker を使って SnapOtter をインストールします。Docker Compose のセットアップ、ソースからのビルド、および全機能の概要を含みます。
+description: "1 つのコマンドで Docker を使って SnapOtter をインストールします。Docker Compose のセットアップ、ソースからのビルド、および全機能の概要を含みます。"
 i18n_source_hash: d2366a2e051c
 i18n_provenance: human
 i18n_output_hash: ac1ea8a8ceba

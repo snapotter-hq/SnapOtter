@@ -1,5 +1,5 @@
 ---
-description: 按质量级别或目标文件大小减小图片文件体积。
+description: "按质量级别或目标文件大小减小图片文件体积。"
 i18n_source_hash: af4685da7e64
 i18n_provenance: human
 i18n_output_hash: e50a856e4af0

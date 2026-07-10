@@ -1,5 +1,5 @@
 ---
-description: AES-256 暗号化によるパスワード保護を PDF に追加します。
+description: "AES-256 暗号化によるパスワード保護を PDF に追加します。"
 i18n_source_hash: 869cfbc739ef
 i18n_provenance: human
 i18n_output_hash: a8f0cb674661

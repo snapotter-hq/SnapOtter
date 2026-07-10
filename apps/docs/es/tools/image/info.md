@@ -1,5 +1,5 @@
 ---
-description: Consulta metadatos, propiedades y estadísticas de histograma por canal detallados de una imagen.
+description: "Consulta metadatos, propiedades y estadísticas de histograma por canal detallados de una imagen."
 i18n_source_hash: 8a0f7a0b0153
 i18n_provenance: human
 i18n_output_hash: c1e00b8a5016

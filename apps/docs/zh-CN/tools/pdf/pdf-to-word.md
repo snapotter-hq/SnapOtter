@@ -1,5 +1,5 @@
 ---
-description: 将 PDF 转换为 Word 文档（DOCX）。
+description: "将 PDF 转换为 Word 文档（DOCX）。"
 i18n_source_hash: be41b6b49f84
 i18n_provenance: human
 i18n_output_hash: 2fc4c695a99e

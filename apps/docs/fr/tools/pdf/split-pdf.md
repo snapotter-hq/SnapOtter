@@ -1,5 +1,5 @@
 ---
-description: Extraire des pages ou diviser un PDF en plusieurs parties.
+description: "Extraire des pages ou diviser un PDF en plusieurs parties."
 i18n_source_hash: 5c8d8041d219
 i18n_provenance: human
 i18n_output_hash: b6b3e592a9c3

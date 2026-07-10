@@ -1,5 +1,5 @@
 ---
-description: 強度、色、位置を調整できるビネット効果を追加します。
+description: "強度、色、位置を調整できるビネット効果を追加します。"
 i18n_source_hash: 0b9795fea2eb
 i18n_provenance: human
 i18n_output_hash: a094923210a6

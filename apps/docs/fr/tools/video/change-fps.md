@@ -1,5 +1,5 @@
 ---
-description: Change la fréquence d'images d'une vidéo.
+description: "Change la fréquence d'images d'une vidéo."
 i18n_source_hash: 2bffbd04a1cb
 i18n_provenance: human
 i18n_output_hash: 7c6588a891b0

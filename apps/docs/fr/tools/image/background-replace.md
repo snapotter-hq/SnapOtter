@@ -1,5 +1,5 @@
 ---
-description: Remplace l'arrière-plan d'une image par une couleur unie ou un dégradé grâce à l'IA.
+description: "Remplace l'arrière-plan d'une image par une couleur unie ou un dégradé grâce à l'IA."
 i18n_source_hash: 930fe8890e55
 i18n_provenance: human
 i18n_output_hash: bebdb66a0221

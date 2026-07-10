@@ -1,5 +1,5 @@
 ---
-description: SnapOtter のリリースノートとバージョン履歴。各リリースでの新機能、改善点、修正内容をご確認ください。
+description: "SnapOtter のリリースノートとバージョン履歴。各リリースでの新機能、改善点、修正内容をご確認ください。"
 i18n_source_hash: 9020073f127e
 i18n_provenance: human
 i18n_output_hash: 3a21d9288b70

@@ -1,5 +1,5 @@
 ---
-description: SVGファイルをカスタム解像度とDPIでPNG、JPEG、WebP、AVIF、TIFF、GIF、HEIF、JXLに変換します。バッチ対応。
+description: "SVGファイルをカスタム解像度とDPIでPNG、JPEG、WebP、AVIF、TIFF、GIF、HEIF、JXLに変換します。バッチ対応。"
 i18n_source_hash: cf36830f8797
 i18n_provenance: human
 i18n_output_hash: 43e1f6049aa4

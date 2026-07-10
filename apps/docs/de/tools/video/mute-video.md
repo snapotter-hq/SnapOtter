@@ -1,5 +1,5 @@
 ---
-description: Die Audiospur aus einem Video entfernen.
+description: "Die Audiospur aus einem Video entfernen."
 i18n_source_hash: 9a0c60bbcaa3
 i18n_provenance: machine
 i18n_output_hash: fecf07ecb196

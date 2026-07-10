@@ -1,5 +1,5 @@
 ---
-description: Extrae páginas o divide un PDF en partes.
+description: "Extrae páginas o divide un PDF en partes."
 i18n_source_hash: 5c8d8041d219
 i18n_provenance: human
 i18n_output_hash: c0ffa44dbe7b

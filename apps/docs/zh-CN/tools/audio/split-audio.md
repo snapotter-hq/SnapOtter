@@ -1,5 +1,5 @@
 ---
-description: 按时间间隔、等份或静音检测分割音频。
+description: "按时间间隔、等份或静音检测分割音频。"
 i18n_source_hash: c062a395dbac
 i18n_provenance: human
 i18n_output_hash: 3fd40ad03990

@@ -1,5 +1,5 @@
 ---
-description: 基于 AI 的降噪和去颗粒处理，提供多档质量选项。
+description: "基于 AI 的降噪和去颗粒处理，提供多档质量选项。"
 i18n_source_hash: f0dfc876e0e0
 i18n_provenance: human
 i18n_output_hash: 43d042c4f560

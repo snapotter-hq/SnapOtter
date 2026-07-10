@@ -1,5 +1,5 @@
 ---
-description: Reduce el ruido de fondo del audio con eliminación de ruido basada en FFT.
+description: "Reduce el ruido de fondo del audio con eliminación de ruido basada en FFT."
 i18n_source_hash: 57cbdbd449aa
 i18n_provenance: human
 i18n_output_hash: 50c5eafed157

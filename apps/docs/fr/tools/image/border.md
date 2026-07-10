@@ -1,5 +1,5 @@
 ---
-description: Ajoute des bordures, des marges, des coins arrondis et des ombres portées aux images dans un ordre prévisible et contrôlable.
+description: "Ajoute des bordures, des marges, des coins arrondis et des ombres portées aux images dans un ordre prévisible et contrôlable."
 i18n_source_hash: 8845150736a9
 i18n_provenance: human
 i18n_output_hash: ac03317786ec

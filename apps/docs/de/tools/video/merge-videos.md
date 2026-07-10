@@ -1,5 +1,5 @@
 ---
-description: Mehrere Videoclips zu einer Datei zusammenfügen.
+description: "Mehrere Videoclips zu einer Datei zusammenfügen."
 i18n_source_hash: 90463dfbb580
 i18n_provenance: machine
 i18n_output_hash: 342f5ae0ad32

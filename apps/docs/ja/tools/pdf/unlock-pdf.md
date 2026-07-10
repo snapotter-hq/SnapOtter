@@ -1,5 +1,5 @@
 ---
-description: PDF からパスワード保護を解除します。
+description: "PDF からパスワード保護を解除します。"
 i18n_source_hash: 14f5165d185c
 i18n_provenance: human
 i18n_output_hash: 2432be5c41e9

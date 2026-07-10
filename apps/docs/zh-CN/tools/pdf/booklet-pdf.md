@@ -1,5 +1,5 @@
 ---
-description: 排列 PDF 页面以便折叠成小册子。
+description: "排列 PDF 页面以便折叠成小册子。"
 i18n_source_hash: 8844b6d4fe96
 i18n_provenance: human
 i18n_output_hash: c8fcdb985453

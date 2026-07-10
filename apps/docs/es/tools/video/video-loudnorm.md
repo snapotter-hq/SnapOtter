@@ -1,5 +1,5 @@
 ---
-description: Normaliza el volumen de audio del vídeo al estándar de emisión.
+description: "Normaliza el volumen de audio del vídeo al estándar de emisión."
 i18n_source_hash: 078f1e819c9a
 i18n_provenance: human
 i18n_output_hash: 17d9fefa34bc

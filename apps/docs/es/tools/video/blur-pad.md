@@ -1,5 +1,5 @@
 ---
-description: Rellena las barras con una copia difuminada del vídeo.
+description: "Rellena las barras con una copia difuminada del vídeo."
 i18n_source_hash: 0c72aaefc6de
 i18n_provenance: human
 i18n_output_hash: 2f7c0cc38941

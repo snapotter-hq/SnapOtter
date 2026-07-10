@@ -1,5 +1,5 @@
 ---
-description: 重要度の低い経路に沿ってピクセルを追加または削除するシーム彫刻リサイズで、重要なコンテンツと顔を保持します。
+description: "重要度の低い経路に沿ってピクセルを追加または削除するシーム彫刻リサイズで、重要なコンテンツと顔を保持します。"
 i18n_source_hash: f383b28ab62a
 i18n_provenance: human
 i18n_output_hash: 9d8d75503812

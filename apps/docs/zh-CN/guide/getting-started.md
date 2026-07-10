@@ -1,5 +1,5 @@
 ---
-description: 用一条 Docker 命令安装 SnapOtter。包含 Docker Compose 设置、从源码构建，以及完整的功能概览。
+description: "用一条 Docker 命令安装 SnapOtter。包含 Docker Compose 设置、从源码构建，以及完整的功能概览。"
 i18n_source_hash: d2366a2e051c
 i18n_provenance: human
 i18n_output_hash: 2b77b3ccb8d8

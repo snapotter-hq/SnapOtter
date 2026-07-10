@@ -1,5 +1,5 @@
 ---
-description: PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter.
+description: "PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter."
 i18n_source_hash: b37398ae91a3
 i18n_provenance: machine
 i18n_output_hash: dd3579a83805

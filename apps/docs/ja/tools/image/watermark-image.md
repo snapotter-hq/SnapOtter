@@ -1,5 +1,5 @@
 ---
-description: ロゴや画像を、位置・不透明度・スケールを設定できるウォーターマークとして重ねます。
+description: "ロゴや画像を、位置・不透明度・スケールを設定できるウォーターマークとして重ねます。"
 i18n_source_hash: c73ab0ef8ab9
 i18n_provenance: human
 i18n_output_hash: 8f6fc69bb054

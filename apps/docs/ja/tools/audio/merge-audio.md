@@ -1,5 +1,5 @@
 ---
-description: 複数の音声ファイルを 1 つの連続したトラックに結合します。
+description: "複数の音声ファイルを 1 つの連続したトラックに結合します。"
 i18n_source_hash: defa993d3f87
 i18n_provenance: human
 i18n_output_hash: 1f52fbf69f94

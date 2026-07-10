@@ -1,5 +1,5 @@
 ---
-description: Detección y corrección con IA de los ojos rojos causados por el flash de la cámara.
+description: "Detección y corrección con IA de los ojos rojos causados por el flash de la cámara."
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: human
 i18n_output_hash: 200bc64cd839

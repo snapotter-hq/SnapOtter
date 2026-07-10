@@ -1,5 +1,5 @@
 ---
-description: Ajoute des filigranes de texte avec une position, une opacité, une rotation et un motif en mosaïque configurables.
+description: "Ajoute des filigranes de texte avec une position, une opacité, une rotation et un motif en mosaïque configurables."
 i18n_source_hash: b80f12f410e4
 i18n_provenance: human
 i18n_output_hash: 7ff94835c0c3

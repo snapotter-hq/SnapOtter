@@ -1,5 +1,5 @@
 ---
-description: Tonhöhe um Halbtöne anheben oder senken, ohne die Geschwindigkeit zu ändern.
+description: "Tonhöhe um Halbtöne anheben oder senken, ohne die Geschwindigkeit zu ändern."
 i18n_source_hash: 2804d0eeecc8
 i18n_provenance: machine
 i18n_output_hash: 00e10fd76abb

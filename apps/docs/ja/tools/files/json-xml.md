@@ -1,5 +1,5 @@
 ---
-description: JSON と XML を双方向に変換します。
+description: "JSON と XML を双方向に変換します。"
 i18n_source_hash: b3a6ded0c64a
 i18n_provenance: human
 i18n_output_hash: 356a33468b17

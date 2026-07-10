@@ -1,5 +1,5 @@
 ---
-description: Convertit un fichier HTML en PDF.
+description: "Convertit un fichier HTML en PDF."
 i18n_source_hash: 20b9ae147db5
 i18n_provenance: human
 i18n_output_hash: 47fbe044ba88

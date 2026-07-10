@@ -1,5 +1,5 @@
 ---
-description: 将位图图像转换为 SVG，支持黑白（potrace）和全彩多层矢量化。
+description: "将位图图像转换为 SVG，支持黑白（potrace）和全彩多层矢量化。"
 i18n_source_hash: f3e4777188ad
 i18n_provenance: human
 i18n_output_hash: 9bd31316b327

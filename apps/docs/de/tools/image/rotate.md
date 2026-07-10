@@ -1,5 +1,5 @@
 ---
-description: Drehe Bilder um jeden beliebigen Winkel und spiegle sie horizontal oder vertikal.
+description: "Drehe Bilder um jeden beliebigen Winkel und spiegle sie horizontal oder vertikal."
 i18n_source_hash: af2581d7cd8d
 i18n_provenance: machine
 i18n_output_hash: b73dc2e4ca1c

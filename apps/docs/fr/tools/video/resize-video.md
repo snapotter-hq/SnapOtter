@@ -1,5 +1,5 @@
 ---
-description: Met à l'échelle une vidéo vers une nouvelle résolution ou une taille prédéfinie.
+description: "Met à l'échelle une vidéo vers une nouvelle résolution ou une taille prédéfinie."
 i18n_source_hash: bb1f67871fea
 i18n_provenance: human
 i18n_output_hash: c8ec5b3a3d79

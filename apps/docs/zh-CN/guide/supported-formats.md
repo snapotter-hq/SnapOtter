@@ -1,5 +1,5 @@
 ---
-description: 跨所有模态支持的文件格式 - 55+ 种图像输入格式、视频、音频、PDF 和文件格式。
+description: "跨所有模态支持的文件格式 - 55+ 种图像输入格式、视频、音频、PDF 和文件格式。"
 i18n_source_hash: e53ecf65be25
 i18n_provenance: human
 i18n_output_hash: 9836bacf1cd8

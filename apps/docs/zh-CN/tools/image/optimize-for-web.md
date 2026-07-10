@@ -1,5 +1,5 @@
 ---
-description: 通过格式转换、质量控制、调整尺寸和剥离元数据来为网页交付优化图片。
+description: "通过格式转换、质量控制、调整尺寸和剥离元数据来为网页交付优化图片。"
 i18n_source_hash: c327bbbce768
 i18n_provenance: human
 i18n_output_hash: ae856b5bebbe

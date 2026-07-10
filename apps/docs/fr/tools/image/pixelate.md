@@ -1,5 +1,5 @@
 ---
-description: Appliquez un effet de pixellisation à l'image entière ou à une région spécifique.
+description: "Appliquez un effet de pixellisation à l'image entière ou à une région spécifique."
 i18n_source_hash: a3ad29841f7b
 i18n_provenance: human
 i18n_output_hash: 320a82696179

@@ -1,5 +1,5 @@
 ---
-description: Convertit entre les formats Word, OpenDocument, RTF et texte brut.
+description: "Convertit entre les formats Word, OpenDocument, RTF et texte brut."
 i18n_source_hash: 89771292569d
 i18n_provenance: human
 i18n_output_hash: 37d5884d6c87

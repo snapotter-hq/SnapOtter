@@ -1,5 +1,5 @@
 ---
-description: Entfernt stille Abschnitte aus einer Audiodatei.
+description: "Entfernt stille Abschnitte aus einer Audiodatei."
 i18n_source_hash: a7624fc99b50
 i18n_provenance: machine
 i18n_output_hash: 82d84597cc95

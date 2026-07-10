@@ -1,5 +1,5 @@
 ---
-description: Ajusta el brillo, el contraste, la saturación y la gamma de un vídeo.
+description: "Ajusta el brillo, el contraste, la saturación y la gamma de un vídeo."
 i18n_source_hash: 40483b79d44b
 i18n_provenance: human
 i18n_output_hash: a1440b59a23a

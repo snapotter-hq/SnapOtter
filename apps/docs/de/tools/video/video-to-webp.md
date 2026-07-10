@@ -1,5 +1,5 @@
 ---
-description: Einen Videoclip in ein animiertes WebP-Bild konvertieren.
+description: "Einen Videoclip in ein animiertes WebP-Bild konvertieren."
 i18n_source_hash: 7b1a22459bd1
 i18n_provenance: machine
 i18n_output_hash: 650faf06b8aa

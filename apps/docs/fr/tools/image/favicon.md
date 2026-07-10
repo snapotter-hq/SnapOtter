@@ -1,5 +1,5 @@
 ---
-description: Générez toutes les tailles standard de favicon et d'icônes d'application à partir d'une image source.
+description: "Générez toutes les tailles standard de favicon et d'icônes d'application à partir d'une image source."
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: human
 i18n_output_hash: 078b8dc93c22

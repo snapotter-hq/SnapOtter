@@ -1,5 +1,5 @@
 ---
-description: MP3、WAV、OGG、FLAC、M4A 形式の間で音声を変換します。
+description: "MP3、WAV、OGG、FLAC、M4A 形式の間で音声を変換します。"
 i18n_source_hash: fd02c059e6a9
 i18n_provenance: human
 i18n_output_hash: 76c462fa171c

@@ -1,5 +1,5 @@
 ---
-description: Seam-Carving-Skalierung, die Pixel entlang wenig wichtiger Pfade hinzufügt oder entfernt, um Schlüsselinhalte und Gesichter zu bewahren.
+description: "Seam-Carving-Skalierung, die Pixel entlang wenig wichtiger Pfade hinzufügt oder entfernt, um Schlüsselinhalte und Gesichter zu bewahren."
 i18n_source_hash: f383b28ab62a
 i18n_provenance: machine
 i18n_output_hash: f93b84234ca9

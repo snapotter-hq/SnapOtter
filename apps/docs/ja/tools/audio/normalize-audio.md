@@ -1,5 +1,5 @@
 ---
-description: 放送標準レベル（EBU R128）にラウドネスを均一化します。
+description: "放送標準レベル（EBU R128）にラウドネスを均一化します。"
 i18n_source_hash: 794d8cfa5ad8
 i18n_provenance: human
 i18n_output_hash: cd34720ac25b

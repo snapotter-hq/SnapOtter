@@ -1,5 +1,5 @@
 ---
-description: Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées et comment désactiver les analyses produit à l'échelle de l'instance.
+description: "Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées et comment désactiver les analyses produit à l'échelle de l'instance."
 i18n_source_hash: 5d72dedaeb23
 i18n_provenance: human
 i18n_output_hash: 96e1a679512b

@@ -1,5 +1,5 @@
 ---
-description: Découpe une section d'un fichier audio en spécifiant les temps de début et de fin.
+description: "Découpe une section d'un fichier audio en spécifiant les temps de début et de fin."
 i18n_source_hash: 8b80c5c8a711
 i18n_provenance: human
 i18n_output_hash: d2a8af2e0e7f

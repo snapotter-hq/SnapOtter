@@ -1,5 +1,5 @@
 ---
-description: PDF-Seiten so anordnen, dass sie zu einer Broschüre gefaltet werden können.
+description: "PDF-Seiten so anordnen, dass sie zu einer Broschüre gefaltet werden können."
 i18n_source_hash: 8844b6d4fe96
 i18n_provenance: machine
 i18n_output_hash: 5b9588a49f4b

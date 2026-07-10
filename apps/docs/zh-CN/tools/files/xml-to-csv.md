@@ -1,5 +1,5 @@
 ---
-description: 从 XML 中提取重复元素并生成 CSV 表格。
+description: "从 XML 中提取重复元素并生成 CSV 表格。"
 i18n_source_hash: 3ab1019bff8a
 i18n_provenance: human
 i18n_output_hash: 2df6bee653a3

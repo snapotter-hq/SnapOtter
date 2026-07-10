@@ -1,5 +1,5 @@
 ---
-description: Die Untertitelspur als SRT-Datei aus einem Video herausziehen.
+description: "Die Untertitelspur als SRT-Datei aus einem Video herausziehen."
 i18n_source_hash: 48db860f6676
 i18n_provenance: machine
 i18n_output_hash: 36b98926e9e1

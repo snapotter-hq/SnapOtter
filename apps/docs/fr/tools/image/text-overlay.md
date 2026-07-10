@@ -1,5 +1,5 @@
 ---
-description: Ajoute des superpositions de texte stylisées avec ombres portées et boîtes d'arrière-plan.
+description: "Ajoute des superpositions de texte stylisées avec ombres portées et boîtes d'arrière-plan."
 i18n_source_hash: 9f8e697188fc
 i18n_provenance: human
 i18n_output_hash: fee7b26f2182

@@ -1,5 +1,5 @@
 ---
-description: 将 PDF 页面转换为高质量图像。
+description: "将 PDF 页面转换为高质量图像。"
 i18n_source_hash: 1c36be5dadb8
 i18n_provenance: human
 i18n_output_hash: 72d79f12822f

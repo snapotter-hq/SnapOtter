@@ -1,5 +1,5 @@
 ---
-description: FFT ベースのノイズ除去で音声の背景ノイズを低減します。
+description: "FFT ベースのノイズ除去で音声の背景ノイズを低減します。"
 i18n_source_hash: 57cbdbd449aa
 i18n_provenance: human
 i18n_output_hash: 4c44e1ec3502

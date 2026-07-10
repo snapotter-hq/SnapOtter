@@ -1,5 +1,5 @@
 ---
-description: Lokales Entwicklungs-Setup, Befehle, Code-Konventionen und wie man ein neues Tool zu SnapOtter hinzufügt.
+description: "Lokales Entwicklungs-Setup, Befehle, Code-Konventionen und wie man ein neues Tool zu SnapOtter hinzufügt."
 i18n_source_hash: cb03724d2829
 i18n_provenance: machine
 i18n_output_hash: 175a711c72f7

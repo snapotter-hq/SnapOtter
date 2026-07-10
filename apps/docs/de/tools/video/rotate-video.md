@@ -1,5 +1,5 @@
 ---
-description: Ein Video drehen oder spiegeln.
+description: "Ein Video drehen oder spiegeln."
 i18n_source_hash: cf9620ca62c7
 i18n_provenance: machine
 i18n_output_hash: e2166bb11365

@@ -1,5 +1,5 @@
 ---
-description: PDF から特定のテキストを完全に削除します（検証済みの真の墨消し）。
+description: "PDF から特定のテキストを完全に削除します（検証済みの真の墨消し）。"
 i18n_source_hash: 296ad2a701b2
 i18n_provenance: human
 i18n_output_hash: de420eb1a9da

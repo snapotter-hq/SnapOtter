@@ -1,5 +1,5 @@
 ---
-description: SnapOtter 的发行说明与版本历史。查看每个版本中的新增、改进和修复内容。
+description: "SnapOtter 的发行说明与版本历史。查看每个版本中的新增、改进和修复内容。"
 i18n_source_hash: 9020073f127e
 i18n_provenance: human
 i18n_output_hash: 84699e495397

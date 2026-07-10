@@ -1,5 +1,5 @@
 ---
-description: Formatierte Textüberlagerungen mit Schlagschatten und Hintergrundflächen hinzufügen.
+description: "Formatierte Textüberlagerungen mit Schlagschatten und Hintergrundflächen hinzufügen."
 i18n_source_hash: 9f8e697188fc
 i18n_provenance: machine
 i18n_output_hash: ba2b534496b5

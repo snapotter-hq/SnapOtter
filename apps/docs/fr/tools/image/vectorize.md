@@ -1,5 +1,5 @@
 ---
-description: Convertit des images matricielles en SVG avec une vectorisation en noir et blanc (potrace) et une vectorisation multicalque en couleur.
+description: "Convertit des images matricielles en SVG avec une vectorisation en noir et blanc (potrace) et une vectorisation multicalque en couleur."
 i18n_source_hash: f3e4777188ad
 i18n_provenance: human
 i18n_output_hash: ccc108d8abc5

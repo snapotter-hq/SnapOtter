@@ -1,5 +1,5 @@
 ---
-description: 使用 GFPGAN 和 CodeFormer AI 模型修复并锐化图片中模糊或低质量的人脸。
+description: "使用 GFPGAN 和 CodeFormer AI 模型修复并锐化图片中模糊或低质量的人脸。"
 i18n_source_hash: 7f9f6af8ebda
 i18n_provenance: human
 i18n_output_hash: e599fd8468f7

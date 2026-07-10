@@ -1,5 +1,5 @@
 ---
-description: ボム保護付きで ZIP アーカイブから安全にファイルを展開します。
+description: "ボム保護付きで ZIP アーカイブから安全にファイルを展開します。"
 i18n_source_hash: 484a1f1051b8
 i18n_provenance: human
 i18n_output_hash: 04e2a826e325

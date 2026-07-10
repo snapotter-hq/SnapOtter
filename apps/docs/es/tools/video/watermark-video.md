@@ -1,5 +1,5 @@
 ---
-description: Incrusta una marca de agua de texto en los fotogramas del vídeo.
+description: "Incrusta una marca de agua de texto en los fotogramas del vídeo."
 i18n_source_hash: 937bb075b894
 i18n_provenance: human
 i18n_output_hash: 95035d60ba89

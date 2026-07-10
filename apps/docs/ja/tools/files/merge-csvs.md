@@ -1,5 +1,5 @@
 ---
-description: 一致する列を持つ複数の CSV または TSV ファイルを 1 つに結合します。
+description: "一致する列を持つ複数の CSV または TSV ファイルを 1 つに結合します。"
 i18n_source_hash: 109b5f399ac8
 i18n_provenance: human
 i18n_output_hash: fdaf2335d43a

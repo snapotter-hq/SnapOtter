@@ -1,5 +1,5 @@
 ---
-description: Découpe une image en tuiles de grille selon des lignes et des colonnes ou selon une taille en pixels, renvoyées sous forme d'archive ZIP.
+description: "Découpe une image en tuiles de grille selon des lignes et des colonnes ou selon une taille en pixels, renvoyées sous forme d'archive ZIP."
 i18n_source_hash: 57a2e11e7cce
 i18n_provenance: human
 i18n_output_hash: bc8f0812ff9f

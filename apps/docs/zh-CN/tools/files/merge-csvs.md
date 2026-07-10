@@ -1,5 +1,5 @@
 ---
-description: 将多个列一致的 CSV 或 TSV 文件合并为一个。
+description: "将多个列一致的 CSV 或 TSV 文件合并为一个。"
 i18n_source_hash: 109b5f399ac8
 i18n_provenance: human
 i18n_output_hash: 474eeae6471f

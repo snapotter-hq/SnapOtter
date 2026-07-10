@@ -1,5 +1,5 @@
 ---
-description: Réorganiser les pages d'un PDF selon un ordre de pages explicite.
+description: "Réorganiser les pages d'un PDF selon un ordre de pages explicite."
 i18n_source_hash: e961fc895b4b
 i18n_provenance: human
 i18n_output_hash: 78062d1a0bc6

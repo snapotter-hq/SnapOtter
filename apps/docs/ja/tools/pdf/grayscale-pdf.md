@@ -1,5 +1,5 @@
 ---
-description: PDF 内のすべての色をグレースケールに変換します。
+description: "PDF 内のすべての色をグレースケールに変換します。"
 i18n_source_hash: f327addb32d6
 i18n_provenance: human
 i18n_output_hash: 0466287cba05

@@ -1,5 +1,5 @@
 ---
-description: Extraire le texte de documents PDF à l'aide d'une OCR assistée par IA.
+description: "Extraire le texte de documents PDF à l'aide d'une OCR assistée par IA."
 i18n_source_hash: 1431fcba180b
 i18n_provenance: human
 i18n_output_hash: 76a0a8e20bc9

@@ -1,5 +1,5 @@
 ---
-description: Redimensionado por seam carving que añade o elimina píxeles a lo largo de rutas de baja importancia para preservar el contenido clave y las caras.
+description: "Redimensionado por seam carving que añade o elimina píxeles a lo largo de rutas de baja importancia para preservar el contenido clave y las caras."
 i18n_source_hash: f383b28ab62a
 i18n_provenance: human
 i18n_output_hash: c0ac6ce09b69

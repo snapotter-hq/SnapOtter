@@ -1,5 +1,5 @@
 ---
-description: PDF を Word ドキュメント（DOCX）に変換します。
+description: "PDF を Word ドキュメント（DOCX）に変換します。"
 i18n_source_hash: be41b6b49f84
 i18n_provenance: human
 i18n_output_hash: ae6b0ba83e16

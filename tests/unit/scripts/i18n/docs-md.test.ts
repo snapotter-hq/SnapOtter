@@ -142,3 +142,26 @@ describe("docs-md adapter", () => {
     expect(src).toContain("Try before installing"); // title label stays for the model
   });
 });
+
+import { quoteFrontmatterScalars } from "../../../../scripts/i18n/adapters/docs-md.mjs";
+
+describe("quoteFrontmatterScalars", () => {
+  it("quotes a bare description containing a colon", () => {
+    const out = quoteFrontmatterScalars(
+      "---\ndescription: Formats: over 55 inputs\ni18n_source_hash: abc\n---\nBody",
+    );
+    expect(out).toContain('description: "Formats: over 55 inputs"');
+    expect(out).toContain("i18n_source_hash: abc");
+    expect(out).toContain("Body");
+  });
+
+  it("leaves already-quoted and non-target values untouched", () => {
+    const src = '---\ntitle: "Already quoted: x"\ni18n_source_hash: abc\n---\nBody';
+    expect(quoteFrontmatterScalars(src)).toBe(src);
+  });
+
+  it("escapes embedded double quotes", () => {
+    const out = quoteFrontmatterScalars('---\ndescription: say "hi" now\n---\nB');
+    expect(out).toContain('description: "say \\"hi\\" now"');
+  });
+});

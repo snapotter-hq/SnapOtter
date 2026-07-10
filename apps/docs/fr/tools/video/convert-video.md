@@ -1,5 +1,5 @@
 ---
-description: Convertit des vidéos entre MP4, MOV, WebM, AVI et MKV.
+description: "Convertit des vidéos entre MP4, MOV, WebM, AVI et MKV."
 i18n_source_hash: 8f9e6418b1c6
 i18n_provenance: human
 i18n_output_hash: c01c65915056

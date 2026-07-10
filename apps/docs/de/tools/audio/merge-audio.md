@@ -1,5 +1,5 @@
 ---
-description: Mehrere Audiodateien zu einer sequenziellen Spur zusammenführen.
+description: "Mehrere Audiodateien zu einer sequenziellen Spur zusammenführen."
 i18n_source_hash: defa993d3f87
 i18n_provenance: machine
 i18n_output_hash: cb76ca1100aa

@@ -1,5 +1,5 @@
 ---
-description: Tenter de réparer un PDF endommagé ou corrompu.
+description: "Tenter de réparer un PDF endommagé ou corrompu."
 i18n_source_hash: 864073a2f09f
 i18n_provenance: human
 i18n_output_hash: f27bf08f0819

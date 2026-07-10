@@ -1,5 +1,5 @@
 ---
-description: SnapOtter 支持的 21 种语言，以及如何使用 TypeScript 强制约束的 i18n 系统创建或改进翻译。
+description: "SnapOtter 支持的 21 种语言，以及如何使用 TypeScript 强制约束的 i18n 系统创建或改进翻译。"
 i18n_source_hash: 0fdac8be0c98
 i18n_provenance: human
 i18n_output_hash: be2027b68f1d

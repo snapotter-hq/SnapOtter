@@ -1,5 +1,5 @@
 ---
-description: Elimina la protección con contraseña de un PDF.
+description: "Elimina la protección con contraseña de un PDF."
 i18n_source_hash: 14f5165d185c
 i18n_provenance: human
 i18n_output_hash: c7840a025b61

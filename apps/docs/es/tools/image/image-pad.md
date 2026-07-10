@@ -1,5 +1,5 @@
 ---
-description: Rellena una imagen hasta una relación de aspecto objetivo con un fondo de color sólido, transparente o difuminado.
+description: "Rellena una imagen hasta una relación de aspecto objetivo con un fondo de color sólido, transparente o difuminado."
 i18n_source_hash: 796122da3dae
 i18n_provenance: human
 i18n_output_hash: da3d8c4f9c0a

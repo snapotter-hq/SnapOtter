@@ -1,5 +1,5 @@
 ---
-description: 为 PDF 添加带 AES-256 加密的密码保护。
+description: "为 PDF 添加带 AES-256 加密的密码保护。"
 i18n_source_hash: 869cfbc739ef
 i18n_provenance: human
 i18n_output_hash: a3a9f913be85

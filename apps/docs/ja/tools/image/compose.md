@@ -1,5 +1,5 @@
 ---
-description: 位置、不透明度、ブレンドモードを指定して画像を重ね合わせ、合成します。
+description: "位置、不透明度、ブレンドモードを指定して画像を重ね合わせ、合成します。"
 i18n_source_hash: c5d09eb13fde
 i18n_provenance: human
 i18n_output_hash: 4d3d075ee04b

@@ -1,5 +1,5 @@
 ---
-description: ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。
+description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
 i18n_source_hash: cb03724d2829
 i18n_provenance: human
 i18n_output_hash: 8034bc92f69d

@@ -1,5 +1,5 @@
 ---
-description: Video-Audiolautstärke auf den Broadcast-Standard normalisieren.
+description: "Video-Audiolautstärke auf den Broadcast-Standard normalisieren."
 i18n_source_hash: 078f1e819c9a
 i18n_provenance: machine
 i18n_output_hash: e019971d4c7a

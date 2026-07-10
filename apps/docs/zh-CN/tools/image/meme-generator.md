@@ -1,5 +1,5 @@
 ---
-description: 使用模板或自定义图片、带样式的文本框以及字体选项创建表情包。
+description: "使用模板或自定义图片、带样式的文本框以及字体选项创建表情包。"
 i18n_source_hash: 0a4970112ca6
 i18n_provenance: human
 i18n_output_hash: 8f47b4401894

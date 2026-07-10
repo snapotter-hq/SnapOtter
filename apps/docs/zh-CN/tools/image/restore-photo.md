@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 流水线修复旧照片上的划痕、破损和损伤，进行修复、人脸增强和上色。
+description: "使用 AI 流水线修复旧照片上的划痕、破损和损伤，进行修复、人脸增强和上色。"
 i18n_source_hash: 3de13284216c
 i18n_provenance: human
 i18n_output_hash: af039536e891

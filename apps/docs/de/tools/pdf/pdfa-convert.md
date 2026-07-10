@@ -1,5 +1,5 @@
 ---
-description: Eine PDF in das Archivformat PDF/A-2 zur Langzeitarchivierung umwandeln.
+description: "Eine PDF in das Archivformat PDF/A-2 zur Langzeitarchivierung umwandeln."
 i18n_source_hash: 4c6bf7a12e84
 i18n_provenance: machine
 i18n_output_hash: c8a1faebbab8

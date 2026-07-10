@@ -1,5 +1,5 @@
 ---
-description: Lee y escribe los metadatos de un documento PDF.
+description: "Lee y escribe los metadatos de un documento PDF."
 i18n_source_hash: b2eaebf7467f
 i18n_provenance: human
 i18n_output_hash: efe7229a5ae8

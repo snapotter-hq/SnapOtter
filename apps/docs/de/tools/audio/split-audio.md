@@ -1,5 +1,5 @@
 ---
-description: Teilt Audio nach Zeitintervallen, gleichen Teilen oder Stille-Erkennung.
+description: "Teilt Audio nach Zeitintervallen, gleichen Teilen oder Stille-Erkennung."
 i18n_source_hash: c062a395dbac
 i18n_provenance: machine
 i18n_output_hash: 4f92916f9eab

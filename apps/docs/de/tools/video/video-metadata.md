@@ -1,5 +1,5 @@
 ---
-description: Metadaten aus einem Video entfernen und melden, was gefunden wurde.
+description: "Metadaten aus einem Video entfernen und melden, was gefunden wurde."
 i18n_source_hash: 69621bfb98ca
 i18n_provenance: machine
 i18n_output_hash: 1656eeff847e

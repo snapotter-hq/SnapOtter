@@ -1,5 +1,5 @@
 ---
-description: 使用显式的页面顺序重新排列 PDF 中的页面。
+description: "使用显式的页面顺序重新排列 PDF 中的页面。"
 i18n_source_hash: e961fc895b4b
 i18n_provenance: human
 i18n_output_hash: 716a5fd688bb

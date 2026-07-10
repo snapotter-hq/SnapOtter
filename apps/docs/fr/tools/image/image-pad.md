@@ -1,5 +1,5 @@
 ---
-description: Ajoutez une marge à une image jusqu'à un rapport d'aspect cible avec un fond de couleur unie, transparent ou flouté.
+description: "Ajoutez une marge à une image jusqu'à un rapport d'aspect cible avec un fond de couleur unie, transparent ou flouté."
 i18n_source_hash: 796122da3dae
 i18n_provenance: human
 i18n_output_hash: 7d866a30e05c

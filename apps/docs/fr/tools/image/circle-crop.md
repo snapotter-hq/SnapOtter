@@ -1,5 +1,5 @@
 ---
-description: Recadre une image en un cercle centré avec des coins transparents.
+description: "Recadre une image en un cercle centré avec des coins transparents."
 i18n_source_hash: 06c50ccd96b2
 i18n_provenance: human
 i18n_output_hash: 2b7d2698264d

@@ -1,5 +1,5 @@
 ---
-description: Edita campos de metadatos EXIF, IPTC, GPS y XMP en imágenes sin recodificar los píxeles.
+description: "Edita campos de metadatos EXIF, IPTC, GPS y XMP en imágenes sin recodificar los píxeles."
 i18n_source_hash: a37746db11c3
 i18n_provenance: human
 i18n_output_hash: 9ee294905c8a

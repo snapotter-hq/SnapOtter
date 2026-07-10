@@ -1,5 +1,5 @@
 ---
-description: Faire pivoter les pages d'un PDF de 90, 180 ou 270 degrés.
+description: "Faire pivoter les pages d'un PDF de 90, 180 ou 270 degrés."
 i18n_source_hash: cc2acd091427
 i18n_provenance: human
 i18n_output_hash: d9d6423b1e2f

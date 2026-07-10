@@ -1,5 +1,5 @@
 ---
-description: Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration.
+description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
 i18n_source_hash: eb73a14533a1
 i18n_provenance: human
 i18n_output_hash: 0c9458172177

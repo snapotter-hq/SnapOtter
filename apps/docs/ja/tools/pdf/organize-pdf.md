@@ -1,5 +1,5 @@
 ---
-description: 明示的なページ順を指定して PDF のページを並べ替えます。
+description: "明示的なページ順を指定して PDF のページを並べ替えます。"
 i18n_source_hash: e961fc895b4b
 i18n_provenance: human
 i18n_output_hash: 7cbb59efd2d9

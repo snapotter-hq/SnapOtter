@@ -1,5 +1,5 @@
 ---
-description: SnapOtter のツールカタログから生成された専用の変換プリセットエンドポイント。
+description: "SnapOtter のツールカタログから生成された専用の変換プリセットエンドポイント。"
 i18n_source_hash: faad6efcb9a9
 i18n_provenance: human
 i18n_output_hash: 98a7c473a8d1

@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 驱动的转写将语音转换为文本。
+description: "使用 AI 驱动的转写将语音转换为文本。"
 i18n_source_hash: ae98c4c0aed2
 i18n_provenance: human
 i18n_output_hash: 85e9922f3b8c

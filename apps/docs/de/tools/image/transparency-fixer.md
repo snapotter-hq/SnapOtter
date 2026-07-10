@@ -1,5 +1,5 @@
 ---
-description: Fälschlich transparente PNGs mit KI-Freistellung (BiRefNet) korrigieren, um echtes Alpha zu erzeugen, plus Randbereinigung durch Defringe.
+description: "Fälschlich transparente PNGs mit KI-Freistellung (BiRefNet) korrigieren, um echtes Alpha zu erzeugen, plus Randbereinigung durch Defringe."
 i18n_source_hash: 7eb748b80f93
 i18n_provenance: machine
 i18n_output_hash: dffe02a1271f

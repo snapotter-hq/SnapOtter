@@ -1,5 +1,5 @@
 ---
-description: 基于 AI 检测并修正相机闪光灯造成的红眼。
+description: "基于 AI 检测并修正相机闪光灯造成的红眼。"
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: human
 i18n_output_hash: 4c47e6dbe7e2

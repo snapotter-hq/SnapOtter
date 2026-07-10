@@ -1,5 +1,5 @@
 ---
-description: Divide una imagen en teselas de cuadrícula por filas y columnas o por tamaño en píxeles, devueltas como archivo ZIP.
+description: "Divide una imagen en teselas de cuadrícula por filas y columnas o por tamaño en píxeles, devueltas como archivo ZIP."
 i18n_source_hash: 57a2e11e7cce
 i18n_provenance: human
 i18n_output_hash: 2fb6a84c24e9

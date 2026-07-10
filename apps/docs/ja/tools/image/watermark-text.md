@@ -1,5 +1,5 @@
 ---
-description: 位置、不透明度、回転、タイリングを設定できるテキストウォーターマークを追加します。
+description: "位置、不透明度、回転、タイリングを設定できるテキストウォーターマークを追加します。"
 i18n_source_hash: b80f12f410e4
 i18n_provenance: human
 i18n_output_hash: 472dcfef6f9f

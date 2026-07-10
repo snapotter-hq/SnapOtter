@@ -1,5 +1,5 @@
 ---
-description: 動画クリップを逆再生します。
+description: "動画クリップを逆再生します。"
 i18n_source_hash: 98226f4e092d
 i18n_provenance: human
 i18n_output_hash: d5ef42697d20

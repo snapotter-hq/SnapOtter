@@ -1,5 +1,5 @@
 ---
-description: Markdown ファイルをスタイル付きの PDF に変換します。
+description: "Markdown ファイルをスタイル付きの PDF に変換します。"
 i18n_source_hash: 18474dc8772a
 i18n_provenance: human
 i18n_output_hash: e6d142ee6e12

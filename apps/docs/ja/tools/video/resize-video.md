@@ -1,5 +1,5 @@
 ---
-description: 動画を新しい解像度またはプリセットサイズにスケーリングします。
+description: "動画を新しい解像度またはプリセットサイズにスケーリングします。"
 i18n_source_hash: bb1f67871fea
 i18n_provenance: human
 i18n_output_hash: 26494a9cbb1f

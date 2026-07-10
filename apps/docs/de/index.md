@@ -1,6 +1,6 @@
 ---
 layout: page
-title: SnapOtter Docs
+title: "SnapOtter Docs"
 description: "Selbstgehostete Dateiverarbeitung. 200+ Werkzeuge für Bild, Video, Audio, PDF und Dateien, plus ein kostenloser ebenenbasierter Bildeditor. Lokale KI, Pipelines, REST-API. Deine Dateien verlassen niemals deinen Server."
 sidebar: false
 i18n_source_hash: fe3c28c2c90e

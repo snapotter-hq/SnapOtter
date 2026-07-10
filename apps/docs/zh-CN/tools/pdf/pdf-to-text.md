@@ -1,5 +1,5 @@
 ---
-description: 从 PDF 中提取纯文本。
+description: "从 PDF 中提取纯文本。"
 i18n_source_hash: 15a7bc1cdf8f
 i18n_provenance: human
 i18n_output_hash: 5d3bd018e6d3

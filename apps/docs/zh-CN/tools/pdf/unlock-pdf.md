@@ -1,5 +1,5 @@
 ---
-description: 移除 PDF 的密码保护。
+description: "移除 PDF 的密码保护。"
 i18n_source_hash: 14f5165d185c
 i18n_provenance: human
 i18n_output_hash: 9252b9dbc9fd

@@ -1,5 +1,5 @@
 ---
-description: Invierte un archivo de audio para que se reproduzca al revés.
+description: "Invierte un archivo de audio para que se reproduzca al revés."
 i18n_source_hash: 5c2017661803
 i18n_provenance: human
 i18n_output_hash: 7d981bdfc304

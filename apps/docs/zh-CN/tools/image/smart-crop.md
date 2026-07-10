@@ -1,5 +1,5 @@
 ---
-description: 基于主体、人脸和熵的裁剪，使用 Sharp 和 AI 人脸检测智能地为图像取景。
+description: "基于主体、人脸和熵的裁剪，使用 Sharp 和 AI 人脸检测智能地为图像取景。"
 i18n_source_hash: acbe1439c6d8
 i18n_provenance: human
 i18n_output_hash: f0dcbc7bcece

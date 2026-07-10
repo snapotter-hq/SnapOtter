@@ -1,5 +1,5 @@
 ---
-description: Markdown ファイルをスタンドアロンの HTML ページに変換します。
+description: "Markdown ファイルをスタンドアロンの HTML ページに変換します。"
 i18n_source_hash: 3ef805e8fc8c
 i18n_provenance: human
 i18n_output_hash: 87daa2f75bab

@@ -1,5 +1,5 @@
 ---
-description: Appliquez un effet duotone à deux couleurs avec des couleurs d'ombre et de haute lumière personnalisées.
+description: "Appliquez un effet duotone à deux couleurs avec des couleurs d'ombre et de haute lumière personnalisées."
 i18n_source_hash: ab99c4f0152c
 i18n_provenance: human
 i18n_output_hash: 64565f77870a

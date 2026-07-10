@@ -1,5 +1,5 @@
 ---
-description: Genera un marcador de posición de imagen de baja calidad diminuto con URI de datos en base64.
+description: "Genera un marcador de posición de imagen de baja calidad diminuto con URI de datos en base64."
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: human
 i18n_output_hash: 91cc8380aa64

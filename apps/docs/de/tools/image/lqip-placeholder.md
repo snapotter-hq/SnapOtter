@@ -1,5 +1,5 @@
 ---
-description: Erzeugt einen winzigen Platzhalter in niedriger Qualität mit Base64-Data-URI.
+description: "Erzeugt einen winzigen Platzhalter in niedriger Qualität mit Base64-Data-URI."
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: machine
 i18n_output_hash: a18e4151550b

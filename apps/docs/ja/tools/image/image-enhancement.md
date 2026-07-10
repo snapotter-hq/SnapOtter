@@ -1,5 +1,5 @@
 ---
-description: 画像を分析し、露出、コントラスト、ホワイトバランス、彩度、シャープネスを補正するワンクリック自動補正。
+description: "画像を分析し、露出、コントラスト、ホワイトバランス、彩度、シャープネスを補正するワンクリック自動補正。"
 i18n_source_hash: 42b6ab956f91
 i18n_provenance: human
 i18n_output_hash: 77f7a77601f0

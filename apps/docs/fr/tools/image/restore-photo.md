@@ -1,5 +1,5 @@
 ---
-description: Réparez les rayures, déchirures et dommages des vieilles photos grâce à un pipeline IA de restauration, d'amélioration des visages et de mise en couleur.
+description: "Réparez les rayures, déchirures et dommages des vieilles photos grâce à un pipeline IA de restauration, d'amélioration des visages et de mise en couleur."
 i18n_source_hash: 3de13284216c
 i18n_provenance: human
 i18n_output_hash: 2801f852a8f7

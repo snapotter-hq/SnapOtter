@@ -1,5 +1,5 @@
 ---
-description: 明るさ、コントラスト、彩度、色温度、色相、チャンネルを調整し、カラーエフェクトを適用します。
+description: "明るさ、コントラスト、彩度、色温度、色相、チャンネルを調整し、カラーエフェクトを適用します。"
 i18n_source_hash: 41b35fe5c2ba
 i18n_provenance: human
 i18n_output_hash: 6d1d3100b874

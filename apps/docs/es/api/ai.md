@@ -1,5 +1,5 @@
 ---
-description: Referencia del motor de IA con todas las herramientas de ML locales. Eliminación de fondo, escalado, OCR, detección de rostros, restauración de fotos y más.
+description: "Referencia del motor de IA con todas las herramientas de ML locales. Eliminación de fondo, escalado, OCR, detección de rostros, restauración de fotos y más."
 i18n_source_hash: dd135f2e9fdb
 i18n_provenance: human
 i18n_output_hash: 3e3b675f9a7e

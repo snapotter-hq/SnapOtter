@@ -1,5 +1,5 @@
 ---
-description: Ein Logo oder Bild als Wasserzeichen mit konfigurierbarer Position, Deckkraft und Skalierung überlagern.
+description: "Ein Logo oder Bild als Wasserzeichen mit konfigurierbarer Position, Deckkraft und Skalierung überlagern."
 i18n_source_hash: c73ab0ef8ab9
 i18n_provenance: machine
 i18n_output_hash: 83d4a51e2169

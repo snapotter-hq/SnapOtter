@@ -1,5 +1,5 @@
 ---
-description: Vergleicht zwei Bilder nebeneinander mit pixelgenauer Diff-Visualisierung und Ähnlichkeitswert.
+description: "Vergleicht zwei Bilder nebeneinander mit pixelgenauer Diff-Visualisierung und Ähnlichkeitswert."
 i18n_source_hash: cc0a02bd75c6
 i18n_provenance: machine
 i18n_output_hash: d546843e33e8

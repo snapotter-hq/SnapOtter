@@ -1,5 +1,5 @@
 ---
-description: 21 langues prises en charge et comment créer ou améliorer des traductions pour SnapOtter à l'aide du système i18n renforcé par TypeScript.
+description: "21 langues prises en charge et comment créer ou améliorer des traductions pour SnapOtter à l'aide du système i18n renforcé par TypeScript."
 i18n_source_hash: 0fdac8be0c98
 i18n_provenance: human
 i18n_output_hash: be6377fac0aa

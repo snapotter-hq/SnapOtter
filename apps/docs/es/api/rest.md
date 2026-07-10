@@ -1,5 +1,5 @@
 ---
-description: Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, canalizaciones, biblioteca de archivos, autenticación, equipos y operaciones de administración.
+description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, canalizaciones, biblioteca de archivos, autenticación, equipos y operaciones de administración."
 i18n_source_hash: eb73a14533a1
 i18n_provenance: human
 i18n_output_hash: 25e61e554254

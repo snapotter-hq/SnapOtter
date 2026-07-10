@@ -1,5 +1,5 @@
 ---
-description: Accentue la netteté des images avec des méthodes adaptative, masque flou ou passe-haut, avec réduction du bruit facultative.
+description: "Accentue la netteté des images avec des méthodes adaptative, masque flou ou passe-haut, avec réduction du bruit facultative."
 i18n_source_hash: ccb60af9faae
 i18n_provenance: human
 i18n_output_hash: a502bbfe8589

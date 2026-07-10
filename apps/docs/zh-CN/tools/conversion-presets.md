@@ -1,5 +1,5 @@
 ---
-description: 由 SnapOtter 工具目录生成的专用转换预设端点。
+description: "由 SnapOtter 工具目录生成的专用转换预设端点。"
 i18n_source_hash: faad6efcb9a9
 i18n_provenance: human
 i18n_output_hash: 79839a307027

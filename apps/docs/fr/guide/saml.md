@@ -1,5 +1,5 @@
 ---
-description: Configurez l'authentification unique SAML 2.0 pour SnapOtter. Guides étape par étape pour Okta, Azure AD / Entra ID, Google Workspace et d'autres fournisseurs d'identité SAML.
+description: "Configurez l'authentification unique SAML 2.0 pour SnapOtter. Guides étape par étape pour Okta, Azure AD / Entra ID, Google Workspace et d'autres fournisseurs d'identité SAML."
 i18n_source_hash: 33dfb8b02a22
 i18n_provenance: human
 i18n_output_hash: f6164bc8d2bb

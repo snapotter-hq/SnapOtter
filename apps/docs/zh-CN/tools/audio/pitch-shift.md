@@ -1,5 +1,5 @@
 ---
-description: 以半音为单位升高或降低音频音高，而不改变速度。
+description: "以半音为单位升高或降低音频音高，而不改变速度。"
 i18n_source_hash: 2804d0eeecc8
 i18n_provenance: human
 i18n_output_hash: 0e04a5b3b2e8

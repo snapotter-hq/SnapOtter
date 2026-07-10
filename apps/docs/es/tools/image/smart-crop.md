@@ -1,5 +1,5 @@
 ---
-description: Recorte sensible al sujeto, a las caras y a la entropía que encuadra las imágenes de forma inteligente con Sharp y detección de caras por IA.
+description: "Recorte sensible al sujeto, a las caras y a la entropía que encuadra las imágenes de forma inteligente con Sharp y detección de caras por IA."
 i18n_source_hash: acbe1439c6d8
 i18n_provenance: human
 i18n_output_hash: 6c96a761c039

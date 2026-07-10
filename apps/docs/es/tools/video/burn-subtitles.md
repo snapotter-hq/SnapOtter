@@ -1,5 +1,5 @@
 ---
-description: Renderiza subtítulos de forma permanente sobre los fotogramas del vídeo.
+description: "Renderiza subtítulos de forma permanente sobre los fotogramas del vídeo."
 i18n_source_hash: 2d3111589db0
 i18n_provenance: human
 i18n_output_hash: 68b34abe14bd

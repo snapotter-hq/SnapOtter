@@ -1,5 +1,5 @@
 ---
-description: PDF から特定のページを削除します。
+description: "PDF から特定のページを削除します。"
 i18n_source_hash: 003e460a047c
 i18n_provenance: human
 i18n_output_hash: 4ac0e482ec3d

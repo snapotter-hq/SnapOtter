@@ -1,5 +1,5 @@
 ---
-description: 21 unterstützte Sprachen und wie man Übersetzungen für SnapOtter mit dem TypeScript-erzwungenen i18n-System erstellt oder verbessert.
+description: "21 unterstützte Sprachen und wie man Übersetzungen für SnapOtter mit dem TypeScript-erzwungenen i18n-System erstellt oder verbessert."
 i18n_source_hash: 0fdac8be0c98
 i18n_provenance: machine
 i18n_output_hash: 74e39371fe09

@@ -1,5 +1,5 @@
 ---
-description: Renombra varios archivos usando una plantilla de patrón y descárgalos como ZIP.
+description: "Renombra varios archivos usando una plantilla de patrón y descárgalos como ZIP."
 i18n_source_hash: 2776dcc2f71c
 i18n_provenance: human
 i18n_output_hash: 0b1606c2fba1

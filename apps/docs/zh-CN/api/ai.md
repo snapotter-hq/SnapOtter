@@ -1,5 +1,5 @@
 ---
-description: AI 引擎参考，涵盖所有本地 ML 工具。背景移除、放大、OCR、人脸检测、老照片修复等。
+description: "AI 引擎参考，涵盖所有本地 ML 工具。背景移除、放大、OCR、人脸检测、老照片修复等。"
 i18n_source_hash: dd135f2e9fdb
 i18n_provenance: human
 i18n_output_hash: 8baa8aef6455

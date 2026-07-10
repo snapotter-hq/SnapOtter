@@ -1,5 +1,5 @@
 ---
-description: 将 Markdown 文件转换为带样式的 PDF。
+description: "将 Markdown 文件转换为带样式的 PDF。"
 i18n_source_hash: 18474dc8772a
 i18n_provenance: human
 i18n_output_hash: 2864ac73375f

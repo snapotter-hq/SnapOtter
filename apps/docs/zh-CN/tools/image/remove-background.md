@@ -1,5 +1,5 @@
 ---
-description: 基于 AI 的背景去除，可选特效（模糊、阴影、渐变、自定义背景）。
+description: "基于 AI 的背景去除，可选特效（模糊、阴影、渐变、自定义背景）。"
 i18n_source_hash: 326a91284529
 i18n_provenance: human
 i18n_output_hash: fdb2d2307e44

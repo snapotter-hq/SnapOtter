@@ -1,5 +1,5 @@
 ---
-description: アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。
+description: "アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。"
 i18n_source_hash: bbd50119ec12
 i18n_provenance: human
 i18n_output_hash: 0918605decee

@@ -1,5 +1,5 @@
 ---
-description: KI-Engine-Referenz mit allen lokalen ML-Tools. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr.
+description: "KI-Engine-Referenz mit allen lokalen ML-Tools. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr."
 i18n_source_hash: dd135f2e9fdb
 i18n_provenance: machine
 i18n_output_hash: 61f462299dc5

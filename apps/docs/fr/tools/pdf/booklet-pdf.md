@@ -1,5 +1,5 @@
 ---
-description: Réorganise les pages d'un PDF pour les plier en livret.
+description: "Réorganise les pages d'un PDF pour les plier en livret."
 i18n_source_hash: 8844b6d4fe96
 i18n_provenance: human
 i18n_output_hash: 73fe7122c427

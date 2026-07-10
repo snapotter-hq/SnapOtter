@@ -1,5 +1,5 @@
 ---
-description: Bilder nach QR-Codes, Barcodes und 2D-Codes durchsuchen und eine annotierte Ausgabe erhalten.
+description: "Bilder nach QR-Codes, Barcodes und 2D-Codes durchsuchen und eine annotierte Ausgabe erhalten."
 i18n_source_hash: 97c9d395c257
 i18n_provenance: machine
 i18n_output_hash: 58f0952b6950

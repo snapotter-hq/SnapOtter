@@ -1,5 +1,5 @@
 ---
-description: Inverser un fichier audio pour qu'il soit lu à l'envers.
+description: "Inverser un fichier audio pour qu'il soit lu à l'envers."
 i18n_source_hash: 5c2017661803
 i18n_provenance: human
 i18n_output_hash: 0233725da70e

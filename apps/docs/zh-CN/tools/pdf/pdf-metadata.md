@@ -1,5 +1,5 @@
 ---
-description: 读取和写入 PDF 文档元数据。
+description: "读取和写入 PDF 文档元数据。"
 i18n_source_hash: b2eaebf7467f
 i18n_provenance: human
 i18n_output_hash: 32460477a093

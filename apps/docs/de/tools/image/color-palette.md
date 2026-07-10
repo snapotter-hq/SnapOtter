@@ -1,5 +1,5 @@
 ---
-description: Extrahiert die dominierenden Farben eines Bildes als Farbpalette.
+description: "Extrahiert die dominierenden Farben eines Bildes als Farbpalette."
 i18n_source_hash: 65ab22dd75a9
 i18n_provenance: machine
 i18n_output_hash: a7b510b51e96

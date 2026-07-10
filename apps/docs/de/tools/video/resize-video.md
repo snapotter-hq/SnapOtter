@@ -1,5 +1,5 @@
 ---
-description: Ein Video auf eine neue Auflösung oder voreingestellte Größe skalieren.
+description: "Ein Video auf eine neue Auflösung oder voreingestellte Größe skalieren."
 i18n_source_hash: bb1f67871fea
 i18n_provenance: machine
 i18n_output_hash: 93d1f5cb2e90

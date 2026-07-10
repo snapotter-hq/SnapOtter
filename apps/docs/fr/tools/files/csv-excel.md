@@ -1,5 +1,5 @@
 ---
-description: Convertit entre CSV et Excel (XLSX), dans les deux sens.
+description: "Convertit entre CSV et Excel (XLSX), dans les deux sens."
 i18n_source_hash: 213297311e36
 i18n_provenance: human
 i18n_output_hash: 34ca3514ed7d

@@ -1,5 +1,5 @@
 ---
-description: Mejora automática con un solo clic que analiza una imagen y corrige la exposición, el contraste, el balance de blancos, la saturación y la nitidez.
+description: "Mejora automática con un solo clic que analiza una imagen y corrige la exposición, el contraste, el balance de blancos, la saturación y la nitidez."
 i18n_source_hash: 42b6ab956f91
 i18n_provenance: human
 i18n_output_hash: 03e703fd5c5e

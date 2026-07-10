@@ -1,5 +1,5 @@
 ---
-description: CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成します。
+description: "CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成します。"
 i18n_source_hash: d3c39384457b
 i18n_provenance: human
 i18n_output_hash: b6354341fb47

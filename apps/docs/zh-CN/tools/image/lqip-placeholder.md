@@ -1,5 +1,5 @@
 ---
-description: 生成带 base64 data URI 的微型低质量图像占位符。
+description: "生成带 base64 data URI 的微型低质量图像占位符。"
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: human
 i18n_output_hash: 5f5934959b5e

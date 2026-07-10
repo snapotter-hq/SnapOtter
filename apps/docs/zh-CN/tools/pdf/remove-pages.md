@@ -1,5 +1,5 @@
 ---
-description: 从 PDF 中删除特定页面。
+description: "从 PDF 中删除特定页面。"
 i18n_source_hash: 003e460a047c
 i18n_provenance: human
 i18n_output_hash: 57d65f5278fd

@@ -1,5 +1,5 @@
 ---
-description: Configura el inicio de sesión único SAML 2.0 para SnapOtter. Guías paso a paso para Okta, Azure AD / Entra ID, Google Workspace y otros proveedores de identidad SAML.
+description: "Configura el inicio de sesión único SAML 2.0 para SnapOtter. Guías paso a paso para Okta, Azure AD / Entra ID, Google Workspace y otros proveedores de identidad SAML."
 i18n_source_hash: 33dfb8b02a22
 i18n_provenance: human
 i18n_output_hash: 7df44433f34c

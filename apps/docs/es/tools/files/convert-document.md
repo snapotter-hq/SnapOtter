@@ -1,5 +1,5 @@
 ---
-description: Convierte entre formatos Word, OpenDocument, RTF y texto plano.
+description: "Convierte entre formatos Word, OpenDocument, RTF y texto plano."
 i18n_source_hash: 89771292569d
 i18n_provenance: human
 i18n_output_hash: 7346a3e9898b

@@ -1,5 +1,5 @@
 ---
-description: Richten Sie SAML-2.0-Single-Sign-On für SnapOtter ein. Schritt-für-Schritt-Anleitungen für Okta, Azure AD / Entra ID, Google Workspace und andere SAML-Identitätsanbieter.
+description: "Richten Sie SAML-2.0-Single-Sign-On für SnapOtter ein. Schritt-für-Schritt-Anleitungen für Okta, Azure AD / Entra ID, Google Workspace und andere SAML-Identitätsanbieter."
 i18n_source_hash: 33dfb8b02a22
 i18n_provenance: machine
 i18n_output_hash: 29cf0d9ed663

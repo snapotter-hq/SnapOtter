@@ -1,5 +1,5 @@
 ---
-description: 将多个视频片段合并为一个文件。
+description: "将多个视频片段合并为一个文件。"
 i18n_source_hash: 90463dfbb580
 i18n_provenance: human
 i18n_output_hash: 3ee706e3e2c9

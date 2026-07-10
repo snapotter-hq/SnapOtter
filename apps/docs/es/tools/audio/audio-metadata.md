@@ -1,5 +1,5 @@
 ---
-description: Consulta, edita o elimina las etiquetas de metadatos de audio (ID3).
+description: "Consulta, edita o elimina las etiquetas de metadatos de audio (ID3)."
 i18n_source_hash: 0717018e11cb
 i18n_provenance: human
 i18n_output_hash: 0045ce4e1a17

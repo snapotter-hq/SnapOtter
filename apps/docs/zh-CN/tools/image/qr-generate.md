@@ -1,5 +1,5 @@
 ---
-description: 生成带有自定义颜色和纠错级别的二维码。
+description: "生成带有自定义颜色和纠错级别的二维码。"
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: human
 i18n_output_hash: 84f7e9af1df8

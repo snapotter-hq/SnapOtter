@@ -1,5 +1,5 @@
 ---
-description: Legt Bilder mit Position, Deckkraft und Mischmodi für die Komposition übereinander.
+description: "Legt Bilder mit Position, Deckkraft und Mischmodi für die Komposition übereinander."
 i18n_source_hash: c5d09eb13fde
 i18n_provenance: machine
 i18n_output_hash: 1b6ea6385e27

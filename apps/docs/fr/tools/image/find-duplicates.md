@@ -1,5 +1,5 @@
 ---
-description: Détectez les images en double et quasi-doublons à l'aide du hachage perceptuel.
+description: "Détectez les images en double et quasi-doublons à l'aide du hachage perceptuel."
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: human
 i18n_output_hash: a6b93b7c5eeb

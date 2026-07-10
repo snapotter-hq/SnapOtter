@@ -1,5 +1,5 @@
 ---
-description: Desenfoca el fondo manteniendo el sujeto nítido usando IA.
+description: "Desenfoca el fondo manteniendo el sujeto nítido usando IA."
 i18n_source_hash: 9073f10e6e9d
 i18n_provenance: human
 i18n_output_hash: 7be502479467

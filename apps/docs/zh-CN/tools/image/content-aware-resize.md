@@ -1,5 +1,5 @@
 ---
-description: 基于接缝裁剪的缩放，沿低重要性路径增删像素，以保留关键内容和人脸。
+description: "基于接缝裁剪的缩放，沿低重要性路径增删像素，以保留关键内容和人脸。"
 i18n_source_hash: f383b28ab62a
 i18n_provenance: human
 i18n_output_hash: 94de49a9eacf

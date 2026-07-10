@@ -1,5 +1,5 @@
 ---
-description: Amplía el lienzo de una imagen con outpainting por IA, extendiéndola en cualquier dirección y rellenando las nuevas áreas para que coincidan con la original.
+description: "Amplía el lienzo de una imagen con outpainting por IA, extendiéndola en cualquier dirección y rellenando las nuevas áreas para que coincidan con la original."
 i18n_source_hash: 1b00db4ed40d
 i18n_provenance: human
 i18n_output_hash: 9f207e3c862d

@@ -1,5 +1,5 @@
 ---
-description: 将视频片段转换为动画 WebP 图像。
+description: "将视频片段转换为动画 WebP 图像。"
 i18n_source_hash: 7b1a22459bd1
 i18n_provenance: human
 i18n_output_hash: 94fe44796987

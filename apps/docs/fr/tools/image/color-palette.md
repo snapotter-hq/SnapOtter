@@ -1,5 +1,5 @@
 ---
-description: Extrayez les couleurs dominantes d'une image sous forme de palette de couleurs.
+description: "Extrayez les couleurs dominantes d'une image sous forme de palette de couleurs."
 i18n_source_hash: 65ab22dd75a9
 i18n_provenance: human
 i18n_output_hash: f67352cb8882

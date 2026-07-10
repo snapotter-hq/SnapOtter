@@ -1,5 +1,5 @@
 ---
-description: Renomme plusieurs fichiers à l'aide d'un modèle de motif et les télécharge sous forme de ZIP.
+description: "Renomme plusieurs fichiers à l'aide d'un modèle de motif et les télécharge sous forme de ZIP."
 i18n_source_hash: 2776dcc2f71c
 i18n_provenance: human
 i18n_output_hash: ec51a289e6cb

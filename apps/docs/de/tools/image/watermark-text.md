@@ -1,5 +1,5 @@
 ---
-description: Text-Wasserzeichen mit konfigurierbarer Position, Deckkraft, Rotation und Kachelung hinzufügen.
+description: "Text-Wasserzeichen mit konfigurierbarer Position, Deckkraft, Rotation und Kachelung hinzufügen."
 i18n_source_hash: b80f12f410e4
 i18n_provenance: machine
 i18n_output_hash: 5ceba5ba09eb

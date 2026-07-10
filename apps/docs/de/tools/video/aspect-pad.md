@@ -1,5 +1,5 @@
 ---
-description: Einfarbige Balken hinzufügen, um ein Zielseitenverhältnis zu erreichen.
+description: "Einfarbige Balken hinzufügen, um ein Zielseitenverhältnis zu erreichen."
 i18n_source_hash: b8e17dffc341
 i18n_provenance: machine
 i18n_output_hash: 2c586be0fd20

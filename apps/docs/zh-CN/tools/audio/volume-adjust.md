@@ -1,5 +1,5 @@
 ---
-description: 按固定的分贝增益增大或减小音频音量。
+description: "按固定的分贝增益增大或减小音频音量。"
 i18n_source_hash: b9bc1de2c9ef
 i18n_provenance: human
 i18n_output_hash: da87d398b6f3

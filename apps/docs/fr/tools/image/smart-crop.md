@@ -1,5 +1,5 @@
 ---
-description: Recadrage intelligent tenant compte du sujet, des visages et de l'entropie, qui cadre les images de manière pertinente grâce à Sharp et à la détection de visages par IA.
+description: "Recadrage intelligent tenant compte du sujet, des visages et de l'entropie, qui cadre les images de manière pertinente grâce à Sharp et à la détection de visages par IA."
 i18n_source_hash: acbe1439c6d8
 i18n_provenance: human
 i18n_output_hash: 89915ca6b9a5

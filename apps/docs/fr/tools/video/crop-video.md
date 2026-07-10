@@ -1,5 +1,5 @@
 ---
-description: Recadre une région d'une vidéo.
+description: "Recadre une région d'une vidéo."
 i18n_source_hash: fab11f71a202
 i18n_provenance: human
 i18n_output_hash: 2094f1b77eb2

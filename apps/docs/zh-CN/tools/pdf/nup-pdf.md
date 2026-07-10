@@ -1,5 +1,5 @@
 ---
-description: 在每张纸上排布多个 PDF 页面（2 合 1、4 合 1 等）。
+description: "在每张纸上排布多个 PDF 页面（2 合 1、4 合 1 等）。"
 i18n_source_hash: 9dd82737cb72
 i18n_provenance: human
 i18n_output_hash: f7c9899d22b1

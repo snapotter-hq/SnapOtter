@@ -1,5 +1,5 @@
 ---
-description: すべてのローカル ML ツールを網羅した AI エンジンリファレンス。背景除去、アップスケーリング、OCR、顔検出、写真復元など。
+description: "すべてのローカル ML ツールを網羅した AI エンジンリファレンス。背景除去、アップスケーリング、OCR、顔検出、写真復元など。"
 i18n_source_hash: dd135f2e9fdb
 i18n_provenance: human
 i18n_output_hash: 94b694e32110

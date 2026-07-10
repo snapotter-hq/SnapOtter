@@ -1,5 +1,5 @@
 ---
-description: Extrae archivos de forma segura de un archivo ZIP con protección contra bombas.
+description: "Extrae archivos de forma segura de un archivo ZIP con protección contra bombas."
 i18n_source_hash: 484a1f1051b8
 i18n_provenance: human
 i18n_output_hash: 6cfbbb30b401

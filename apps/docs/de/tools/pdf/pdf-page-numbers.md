@@ -1,5 +1,5 @@
 ---
-description: Seitenzahlen zu jeder Seite einer PDF hinzufügen.
+description: "Seitenzahlen zu jeder Seite einer PDF hinzufügen."
 i18n_source_hash: 58342d6ac8d2
 i18n_provenance: machine
 i18n_output_hash: 193814878a02

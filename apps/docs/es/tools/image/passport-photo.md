@@ -1,5 +1,5 @@
 ---
-description: Generador de fotos de pasaporte y de identificación con IA, con detección de rostros, eliminación de fondo y composición para hojas de impresión.
+description: "Generador de fotos de pasaporte y de identificación con IA, con detección de rostros, eliminación de fondo y composición para hojas de impresión."
 i18n_source_hash: d4b4f4ced988
 i18n_provenance: human
 i18n_output_hash: c88f536e67f0

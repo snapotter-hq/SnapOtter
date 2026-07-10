@@ -1,5 +1,5 @@
 ---
-description: Recorta imágenes especificando una región con posición y dimensiones.
+description: "Recorta imágenes especificando una región con posición y dimensiones."
 i18n_source_hash: aab38ccd7c53
 i18n_provenance: human
 i18n_output_hash: ac5e5e050598

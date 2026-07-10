@@ -1,5 +1,5 @@
 ---
-description: Estampa imágenes de firma subidas en un PDF mediante ubicaciones de página normalizadas.
+description: "Estampa imágenes de firma subidas en un PDF mediante ubicaciones de página normalizadas."
 i18n_source_hash: c28f78c2e7fd
 i18n_provenance: human
 i18n_output_hash: d08f122592a0

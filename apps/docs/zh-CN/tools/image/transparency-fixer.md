@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 抠图（BiRefNet）修复伪透明 PNG，生成真正的 alpha 通道，并进行去边缘杂色清理。
+description: "使用 AI 抠图（BiRefNet）修复伪透明 PNG，生成真正的 alpha 通道，并进行去边缘杂色清理。"
 i18n_source_hash: 7eb748b80f93
 i18n_provenance: human
 i18n_output_hash: bf179732f8ea

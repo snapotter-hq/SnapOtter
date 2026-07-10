@@ -1,5 +1,5 @@
 ---
-description: Mehrere PDFs zu einem einzigen Dokument zusammenführen.
+description: "Mehrere PDFs zu einem einzigen Dokument zusammenführen."
 i18n_source_hash: e82e389cb8b6
 i18n_provenance: machine
 i18n_output_hash: ed5e5472f3a5

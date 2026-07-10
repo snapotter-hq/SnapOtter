@@ -1,5 +1,5 @@
 ---
-description: Captura páginas web o fragmentos de HTML como imágenes de alta calidad con emulación de dispositivos.
+description: "Captura páginas web o fragmentos de HTML como imágenes de alta calidad con emulación de dispositivos."
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: human
 i18n_output_hash: 7767c9e196ce

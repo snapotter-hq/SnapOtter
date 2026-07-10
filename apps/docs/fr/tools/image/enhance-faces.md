@@ -1,5 +1,5 @@
 ---
-description: Restaurez et affinez les visages flous ou de faible qualité dans les images avec les modèles d'IA GFPGAN et CodeFormer.
+description: "Restaurez et affinez les visages flous ou de faible qualité dans les images avec les modèles d'IA GFPGAN et CodeFormer."
 i18n_source_hash: 7f9f6af8ebda
 i18n_provenance: human
 i18n_output_hash: b1e13e3878c2

@@ -1,5 +1,5 @@
 ---
-description: Eine Bildleinwand mit KI-Outpainting erweitern, sie in jede Richtung ausdehnen und die neuen Bereiche passend zum Original füllen.
+description: "Eine Bildleinwand mit KI-Outpainting erweitern, sie in jede Richtung ausdehnen und die neuen Bereiche passend zum Original füllen."
 i18n_source_hash: 1b00db4ed40d
 i18n_provenance: machine
 i18n_output_hash: 03d5eb6cf636

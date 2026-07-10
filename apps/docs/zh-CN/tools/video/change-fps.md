@@ -1,5 +1,5 @@
 ---
-description: 更改视频的帧率。
+description: "更改视频的帧率。"
 i18n_source_hash: 2bffbd04a1cb
 i18n_provenance: human
 i18n_output_hash: 6b4462cd3b90

@@ -1,5 +1,5 @@
 ---
-description: 画像からチャンネルごとの統計を含む RGB ヒストグラムチャートを生成します。
+description: "画像からチャンネルごとの統計を含む RGB ヒストグラムチャートを生成します。"
 i18n_source_hash: 57aa610206a5
 i18n_provenance: human
 i18n_output_hash: 442857dea9f1

@@ -1,5 +1,5 @@
 ---
-description: Superpone un logotipo o imagen como marca de agua con posición, opacidad y escala configurables.
+description: "Superpone un logotipo o imagen como marca de agua con posición, opacidad y escala configurables."
 i18n_source_hash: c73ab0ef8ab9
 i18n_provenance: human
 i18n_output_hash: 916139c54b71

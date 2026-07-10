@@ -1,5 +1,5 @@
 ---
-description: Bestimmte Seiten aus einer PDF löschen.
+description: "Bestimmte Seiten aus einer PDF löschen."
 i18n_source_hash: 003e460a047c
 i18n_provenance: machine
 i18n_output_hash: a3b5162e1c18

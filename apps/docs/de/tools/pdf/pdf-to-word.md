@@ -1,5 +1,5 @@
 ---
-description: Eine PDF in ein Word-Dokument (DOCX) umwandeln.
+description: "Eine PDF in ein Word-Dokument (DOCX) umwandeln."
 i18n_source_hash: be41b6b49f84
 i18n_provenance: machine
 i18n_output_hash: 6f471b081fe5

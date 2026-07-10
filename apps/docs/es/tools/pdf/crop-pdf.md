@@ -1,5 +1,5 @@
 ---
-description: Recorta todas las páginas de un PDF con un margen uniforme.
+description: "Recorta todas las páginas de un PDF con un margen uniforme."
 i18n_source_hash: ffa1a2cee08d
 i18n_provenance: human
 i18n_output_hash: 0139ec3de2b1

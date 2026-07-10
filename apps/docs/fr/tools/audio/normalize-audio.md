@@ -1,5 +1,5 @@
 ---
-description: Uniformiser le volume aux niveaux standard de diffusion (EBU R128).
+description: "Uniformiser le volume aux niveaux standard de diffusion (EBU R128)."
 i18n_source_hash: 794d8cfa5ad8
 i18n_provenance: human
 i18n_output_hash: 44d1e25c0c86

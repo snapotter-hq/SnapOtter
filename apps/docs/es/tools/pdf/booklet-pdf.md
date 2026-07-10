@@ -1,5 +1,5 @@
 ---
-description: Ordena las páginas de un PDF para plegarlas y formar un folleto.
+description: "Ordena las páginas de un PDF para plegarlas y formar un folleto."
 i18n_source_hash: 8844b6d4fe96
 i18n_provenance: human
 i18n_output_hash: 2afc377fa975

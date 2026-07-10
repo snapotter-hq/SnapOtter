@@ -1,5 +1,5 @@
 ---
-description: Remplace la piste audio d'une vidéo par un autre fichier.
+description: "Remplace la piste audio d'une vidéo par un autre fichier."
 i18n_source_hash: fabc2a953103
 i18n_provenance: human
 i18n_output_hash: 0903f78deec1

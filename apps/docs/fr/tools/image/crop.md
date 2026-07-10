@@ -1,5 +1,5 @@
 ---
-description: Recadrez les images en spécifiant une région avec position et dimensions.
+description: "Recadrez les images en spécifiant une région avec position et dimensions."
 i18n_source_hash: aab38ccd7c53
 i18n_provenance: human
 i18n_output_hash: e9310ed8f439

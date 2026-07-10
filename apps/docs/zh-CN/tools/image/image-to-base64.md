@@ -1,5 +1,5 @@
 ---
-description: 将图像转换为 base64 data URI，以便嵌入 HTML、CSS 等。
+description: "将图像转换为 base64 data URI，以便嵌入 HTML、CSS 等。"
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
 i18n_output_hash: 0af37698b3a1

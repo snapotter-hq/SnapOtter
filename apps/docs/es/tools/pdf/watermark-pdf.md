@@ -1,5 +1,5 @@
 ---
-description: Añade una marca de agua de texto a todas las páginas de un PDF.
+description: "Añade una marca de agua de texto a todas las páginas de un PDF."
 i18n_source_hash: f1f7d8912fbd
 i18n_provenance: human
 i18n_output_hash: 74862b9bda1c

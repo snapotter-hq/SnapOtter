@@ -1,5 +1,5 @@
 ---
-description: Convertir entre mono et stéréo ou intervertir les canaux gauche et droit.
+description: "Convertir entre mono et stéréo ou intervertir les canaux gauche et droit."
 i18n_source_hash: 4f5cd6b38c83
 i18n_provenance: human
 i18n_output_hash: 52a4d4eafb6c

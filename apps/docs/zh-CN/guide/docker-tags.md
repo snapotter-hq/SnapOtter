@@ -1,5 +1,5 @@
 ---
-description: SnapOtter Docker 镜像标签、GPU 基准测试、版本锁定，以及对 AMD64 和 ARM64 的多平台支持。
+description: "SnapOtter Docker 镜像标签、GPU 基准测试、版本锁定，以及对 AMD64 和 ARM64 的多平台支持。"
 i18n_source_hash: 148b3608e11a
 i18n_provenance: human
 i18n_output_hash: 444ed01d924d

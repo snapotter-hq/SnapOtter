@@ -1,5 +1,5 @@
 ---
-description: 画像全体または特定の領域にモザイク効果を適用します。
+description: "画像全体または特定の領域にモザイク効果を適用します。"
 i18n_source_hash: a3ad29841f7b
 i18n_provenance: human
 i18n_output_hash: 8fef788d8344

@@ -1,5 +1,5 @@
 ---
-description: 按行数将 CSV 拆分为更小的文件。
+description: "按行数将 CSV 拆分为更小的文件。"
 i18n_source_hash: a35dce4a99a3
 i18n_provenance: human
 i18n_output_hash: 16272439ccb6

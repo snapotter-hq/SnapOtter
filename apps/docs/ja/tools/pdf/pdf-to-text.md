@@ -1,5 +1,5 @@
 ---
-description: PDF からプレーンテキストを抽出します。
+description: "PDF からプレーンテキストを抽出します。"
 i18n_source_hash: 15a7bc1cdf8f
 i18n_provenance: human
 i18n_output_hash: 2609ae7e9372

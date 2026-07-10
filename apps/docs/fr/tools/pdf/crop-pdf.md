@@ -1,5 +1,5 @@
 ---
-description: Rogner toutes les pages d'un PDF avec une marge uniforme.
+description: "Rogner toutes les pages d'un PDF avec une marge uniforme."
 i18n_source_hash: ffa1a2cee08d
 i18n_provenance: human
 i18n_output_hash: 541553bea606

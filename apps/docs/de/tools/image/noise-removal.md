@@ -1,5 +1,5 @@
 ---
-description: KI-gestützte Entfernung von Rauschen und Körnung mit mehrstufigen Qualitätsoptionen.
+description: "KI-gestützte Entfernung von Rauschen und Körnung mit mehrstufigen Qualitätsoptionen."
 i18n_source_hash: f0dfc876e0e0
 i18n_provenance: machine
 i18n_output_hash: 2f7d1725b54f

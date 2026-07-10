@@ -1,5 +1,5 @@
 ---
-description: 将 PDF 转换为归档用 PDF/A-2 格式以实现长期保存。
+description: "将 PDF 转换为归档用 PDF/A-2 格式以实现长期保存。"
 i18n_source_hash: 4c6bf7a12e84
 i18n_provenance: human
 i18n_output_hash: 49f702ce85db

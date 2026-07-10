@@ -1,5 +1,5 @@
 ---
-description: Colorisez automatiquement les photos en noir et blanc ou en niveaux de gris avec le modèle d'IA DDColor.
+description: "Colorisez automatiquement les photos en noir et blanc ou en niveaux de gris avec le modèle d'IA DDColor."
 i18n_source_hash: 688aa3abbdae
 i18n_provenance: human
 i18n_output_hash: 50f583a22aff

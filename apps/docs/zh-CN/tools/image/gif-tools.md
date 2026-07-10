@@ -1,5 +1,5 @@
 ---
-description: 在单个工具中对动画 GIF 进行调整大小、优化、变速、反转、旋转和提取帧。
+description: "在单个工具中对动画 GIF 进行调整大小、优化、变速、反转、旋转和提取帧。"
 i18n_source_hash: 5e525e80db92
 i18n_provenance: human
 i18n_output_hash: 79a1cadb7164

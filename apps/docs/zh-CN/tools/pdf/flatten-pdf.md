@@ -1,5 +1,5 @@
 ---
-description: 将表单和注释固化到页面内容中。
+description: "将表单和注释固化到页面内容中。"
 i18n_source_hash: b25c2a2b6f40
 i18n_provenance: human
 i18n_output_hash: 16ebbe40d5eb

@@ -1,5 +1,5 @@
 ---
-description: Sube o baja el tono del audio en semitonos sin cambiar la velocidad.
+description: "Sube o baja el tono del audio en semitonos sin cambiar la velocidad."
 i18n_source_hash: 2804d0eeecc8
 i18n_provenance: human
 i18n_output_hash: 927685c707fa

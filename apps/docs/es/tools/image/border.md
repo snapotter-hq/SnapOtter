@@ -1,5 +1,5 @@
 ---
-description: Añade bordes, relleno, esquinas redondeadas y sombras paralelas a las imágenes en un orden predecible y controlable.
+description: "Añade bordes, relleno, esquinas redondeadas y sombras paralelas a las imágenes en un orden predecible y controlable."
 i18n_source_hash: 8845150736a9
 i18n_provenance: human
 i18n_output_hash: 2605f8c6463f

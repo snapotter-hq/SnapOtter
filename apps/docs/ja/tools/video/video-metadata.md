@@ -1,5 +1,5 @@
 ---
-description: 動画からメタデータを取り除き、見つかった内容を報告します。
+description: "動画からメタデータを取り除き、見つかった内容を報告します。"
 i18n_source_hash: 69621bfb98ca
 i18n_provenance: human
 i18n_output_hash: 73c5c75470f2

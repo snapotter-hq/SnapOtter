@@ -1,5 +1,5 @@
 ---
-description: Konvertiert zwischen Word-, OpenDocument-, RTF- und Klartextformaten.
+description: "Konvertiert zwischen Word-, OpenDocument-, RTF- und Klartextformaten."
 i18n_source_hash: 89771292569d
 i18n_provenance: machine
 i18n_output_hash: 0c73f2b617c4

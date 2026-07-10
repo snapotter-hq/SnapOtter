@@ -1,5 +1,5 @@
 ---
-description: HTML ファイルを PDF に変換します。
+description: "HTML ファイルを PDF に変換します。"
 i18n_source_hash: 20b9ae147db5
 i18n_provenance: human
 i18n_output_hash: 73feebb7571f

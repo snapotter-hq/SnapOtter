@@ -1,5 +1,5 @@
 ---
-description: Déployez SnapOtter en production avec Docker. Exigences matérielles, configuration du GPU et configurations de reverse proxy pour Nginx, Traefik et Cloudflare.
+description: "Déployez SnapOtter en production avec Docker. Exigences matérielles, configuration du GPU et configurations de reverse proxy pour Nginx, Traefik et Cloudflare."
 i18n_source_hash: ecc1b528bc4b
 i18n_provenance: human
 i18n_output_hash: c6c1eae14599

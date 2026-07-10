@@ -1,5 +1,5 @@
 ---
-description: Convierte voz en texto con transcripción impulsada por IA.
+description: "Convierte voz en texto con transcripción impulsada por IA."
 i18n_source_hash: ae98c4c0aed2
 i18n_provenance: human
 i18n_output_hash: 60aea729c253

@@ -1,5 +1,5 @@
 ---
-description: Intenta reparar un PDF dañado o corrupto.
+description: "Intenta reparar un PDF dañado o corrupto."
 i18n_source_hash: 864073a2f09f
 i18n_provenance: human
 i18n_output_hash: 5fbb898e2e48

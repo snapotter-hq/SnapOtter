@@ -1,5 +1,5 @@
 ---
-description: Convertit un EPUB en PDF, DOCX, HTML ou Markdown.
+description: "Convertit un EPUB en PDF, DOCX, HTML ou Markdown."
 i18n_source_hash: 7d94fc18ca97
 i18n_provenance: human
 i18n_output_hash: 2c403470bb3d

@@ -1,5 +1,5 @@
 ---
-description: Amplía imágenes de 2x a 4x con la superresolución por IA Real-ESRGAN conservando el detalle fino.
+description: "Amplía imágenes de 2x a 4x con la superresolución por IA Real-ESRGAN conservando el detalle fino."
 i18n_source_hash: 150032e99476
 i18n_provenance: human
 i18n_output_hash: 7b346c0caa22

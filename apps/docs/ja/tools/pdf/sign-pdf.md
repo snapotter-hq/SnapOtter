@@ -1,5 +1,5 @@
 ---
-description: 正規化されたページ配置を使って、アップロードした署名画像を PDF にスタンプします。
+description: "正規化されたページ配置を使って、アップロードした署名画像を PDF にスタンプします。"
 i18n_source_hash: c28f78c2e7fd
 i18n_provenance: human
 i18n_output_hash: 8d6a9400d5ed

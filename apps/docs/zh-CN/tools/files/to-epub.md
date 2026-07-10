@@ -1,5 +1,5 @@
 ---
-description: 将 Word、Markdown、HTML 或纯文本文件转换为 EPUB。
+description: "将 Word、Markdown、HTML 或纯文本文件转换为 EPUB。"
 i18n_source_hash: 63e1afa91c52
 i18n_provenance: human
 i18n_output_hash: 606045456618

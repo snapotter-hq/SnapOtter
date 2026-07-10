@@ -1,5 +1,5 @@
 ---
-description: Optimiza imágenes para la web con conversión de formato, control de calidad, redimensionamiento y eliminación de metadatos.
+description: "Optimiza imágenes para la web con conversión de formato, control de calidad, redimensionamiento y eliminación de metadatos."
 i18n_source_hash: c327bbbce768
 i18n_provenance: human
 i18n_output_hash: 4b8b70e5a50d

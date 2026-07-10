@@ -1,5 +1,5 @@
 ---
-description: Extrait la piste de sous-titres d'une vidéo sous forme de fichier SRT.
+description: "Extrait la piste de sous-titres d'une vidéo sous forme de fichier SRT."
 i18n_source_hash: 48db860f6676
 i18n_provenance: human
 i18n_output_hash: 4f4e04376914

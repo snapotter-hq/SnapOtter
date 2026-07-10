@@ -1,5 +1,5 @@
 ---
-description: Endpoints de preajustes de conversión dedicados generados a partir del catálogo de herramientas de SnapOtter.
+description: "Endpoints de preajustes de conversión dedicados generados a partir del catálogo de herramientas de SnapOtter."
 i18n_source_hash: faad6efcb9a9
 i18n_provenance: human
 i18n_output_hash: 3d4598d97958

@@ -1,5 +1,5 @@
 ---
-description: 通过指定开始和结束时间从音频文件中裁剪出一段。
+description: "通过指定开始和结束时间从音频文件中裁剪出一段。"
 i18n_source_hash: 8b80c5c8a711
 i18n_provenance: human
 i18n_output_hash: 3c8a6fca1ac4

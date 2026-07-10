@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 驱动的 OCR 从 PDF 文档中提取文本。
+description: "使用 AI 驱动的 OCR 从 PDF 文档中提取文本。"
 i18n_source_hash: 1431fcba180b
 i18n_provenance: human
 i18n_output_hash: 3bb9f4bd9334

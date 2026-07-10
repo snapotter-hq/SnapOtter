@@ -1,5 +1,5 @@
 ---
-description: カスタムのシャドウ色とハイライト色による2色のデュオトーン効果を適用します。
+description: "カスタムのシャドウ色とハイライト色による2色のデュオトーン効果を適用します。"
 i18n_source_hash: ab99c4f0152c
 i18n_provenance: human
 i18n_output_hash: b0ff7676e5de

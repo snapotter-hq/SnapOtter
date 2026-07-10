@@ -1,5 +1,5 @@
 ---
-description: 各種の色覚異常を持つ人に画像がどう見えるかをシミュレートします。
+description: "各種の色覚異常を持つ人に画像がどう見えるかをシミュレートします。"
 i18n_source_hash: 0b537628ba79
 i18n_provenance: human
 i18n_output_hash: cfdee097b0de

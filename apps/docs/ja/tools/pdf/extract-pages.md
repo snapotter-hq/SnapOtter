@@ -1,5 +1,5 @@
 ---
-description: PDF から選択したページを取り出して新しいドキュメントを作成します。
+description: "PDF から選択したページを取り出して新しいドキュメントを作成します。"
 i18n_source_hash: e4a8fad31e0f
 i18n_provenance: human
 i18n_output_hash: f59fc16a4b29

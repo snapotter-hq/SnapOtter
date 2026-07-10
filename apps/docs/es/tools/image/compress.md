@@ -1,5 +1,5 @@
 ---
-description: Reduce el tamaño del archivo de imagen por nivel de calidad o hasta un tamaño de archivo objetivo.
+description: "Reduce el tamaño del archivo de imagen por nivel de calidad o hasta un tamaño de archivo objetivo."
 i18n_source_hash: af4685da7e64
 i18n_provenance: human
 i18n_output_hash: 2bec513af1bd

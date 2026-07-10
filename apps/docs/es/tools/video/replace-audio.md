@@ -1,5 +1,5 @@
 ---
-description: Sustituye la pista de audio de un vídeo por otro archivo.
+description: "Sustituye la pista de audio de un vídeo por otro archivo."
 i18n_source_hash: fabc2a953103
 i18n_provenance: human
 i18n_output_hash: 0f94839041bf

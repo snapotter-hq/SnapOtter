@@ -1,5 +1,5 @@
 ---
-description: Extrayez le texte des images grâce à la reconnaissance optique de caractères assistée par IA.
+description: "Extrayez le texte des images grâce à la reconnaissance optique de caractères assistée par IA."
 i18n_source_hash: 3d85d423b82c
 i18n_provenance: human
 i18n_output_hash: a396b001a113

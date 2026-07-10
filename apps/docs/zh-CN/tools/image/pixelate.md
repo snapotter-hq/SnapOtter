@@ -1,5 +1,5 @@
 ---
-description: 对整张图片或特定区域应用像素化效果。
+description: "对整张图片或特定区域应用像素化效果。"
 i18n_source_hash: a3ad29841f7b
 i18n_provenance: human
 i18n_output_hash: e7dd5030b7ec

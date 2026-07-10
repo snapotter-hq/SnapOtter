@@ -1,5 +1,5 @@
 ---
-description: Gira las páginas de un PDF 90, 180 o 270 grados.
+description: "Gira las páginas de un PDF 90, 180 o 270 grados."
 i18n_source_hash: cc2acd091427
 i18n_provenance: human
 i18n_output_hash: 738f860fb4f7

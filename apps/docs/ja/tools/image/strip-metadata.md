@@ -1,5 +1,5 @@
 ---
-description: プライバシー保護とファイルサイズ削減のため、画像からEXIF、GPS、ICC、XMPのメタデータを削除します。
+description: "プライバシー保護とファイルサイズ削減のため、画像からEXIF、GPS、ICC、XMPのメタデータを削除します。"
 i18n_source_hash: e89147734fd0
 i18n_provenance: human
 i18n_output_hash: 5d65887b5d1c

@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 外绘扩展图像画布，向任意方向延伸并填充与原图匹配的新区域。
+description: "使用 AI 外绘扩展图像画布，向任意方向延伸并填充与原图匹配的新区域。"
 i18n_source_hash: 1b00db4ed40d
 i18n_provenance: human
 i18n_output_hash: a0402622243c

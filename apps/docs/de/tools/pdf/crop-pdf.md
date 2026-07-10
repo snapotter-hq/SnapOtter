@@ -1,5 +1,5 @@
 ---
-description: Alle Seiten einer PDF mit einem einheitlichen Rand zuschneiden.
+description: "Alle Seiten einer PDF mit einem einheitlichen Rand zuschneiden."
 i18n_source_hash: ffa1a2cee08d
 i18n_provenance: machine
 i18n_output_hash: 9f1e0b6112aa

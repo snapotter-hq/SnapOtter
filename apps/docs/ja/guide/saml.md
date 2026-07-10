@@ -1,5 +1,5 @@
 ---
-description: SnapOtter 向けに SAML 2.0 シングルサインオンをセットアップします。Okta、Azure AD / Entra ID、Google Workspace、その他の SAML ID プロバイダー向けのステップバイステップガイド。
+description: "SnapOtter 向けに SAML 2.0 シングルサインオンをセットアップします。Okta、Azure AD / Entra ID、Google Workspace、その他の SAML ID プロバイダー向けのステップバイステップガイド。"
 i18n_source_hash: 33dfb8b02a22
 i18n_provenance: human
 i18n_output_hash: 039fb6c7ee38

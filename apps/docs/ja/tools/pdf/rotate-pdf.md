@@ -1,5 +1,5 @@
 ---
-description: PDF のページを 90、180、または 270 度回転します。
+description: "PDF のページを 90、180、または 270 度回転します。"
 i18n_source_hash: cc2acd091427
 i18n_provenance: human
 i18n_output_hash: 03dac73d3c8a

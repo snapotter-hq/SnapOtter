@@ -1,5 +1,5 @@
 ---
-description: 添加纯色条以适应目标宽高比。
+description: "添加纯色条以适应目标宽高比。"
 i18n_source_hash: b8e17dffc341
 i18n_provenance: human
 i18n_output_hash: d73866ab6253

@@ -1,5 +1,5 @@
 ---
-description: Den Hintergrund weichzeichnen und dabei das Motiv per KI scharf halten.
+description: "Den Hintergrund weichzeichnen und dabei das Motiv per KI scharf halten."
 i18n_source_hash: 9073f10e6e9d
 i18n_provenance: machine
 i18n_output_hash: 5997f8c497df

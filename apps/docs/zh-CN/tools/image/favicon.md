@@ -1,5 +1,5 @@
 ---
-description: 从源图像生成所有标准的 favicon 和应用图标尺寸。
+description: "从源图像生成所有标准的 favicon 和应用图标尺寸。"
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: human
 i18n_output_hash: e05c94ba7ba2

@@ -1,5 +1,5 @@
 ---
-description: Floute l'arrière-plan tout en gardant le sujet net grâce à l'IA.
+description: "Floute l'arrière-plan tout en gardant le sujet net grâce à l'IA."
 i18n_source_hash: 9073f10e6e9d
 i18n_provenance: human
 i18n_output_hash: 042227e69a5b

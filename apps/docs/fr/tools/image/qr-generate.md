@@ -1,5 +1,5 @@
 ---
-description: Générez des QR codes avec des couleurs personnalisées et des niveaux de correction d'erreur.
+description: "Générez des QR codes avec des couleurs personnalisées et des niveaux de correction d'erreur."
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: human
 i18n_output_hash: 7d087efc30b6

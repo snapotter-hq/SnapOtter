@@ -1,5 +1,5 @@
 ---
-description: Combiner plusieurs fichiers audio en une seule piste séquentielle.
+description: "Combiner plusieurs fichiers audio en une seule piste séquentielle."
 i18n_source_hash: defa993d3f87
 i18n_provenance: human
 i18n_output_hash: 0c63bdc49bcb

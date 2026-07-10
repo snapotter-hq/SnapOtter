@@ -1,5 +1,5 @@
 ---
-description: 画像を中央揃えの円形に切り抜き、四隅を透明にします。
+description: "画像を中央揃えの円形に切り抜き、四隅を透明にします。"
 i18n_source_hash: 06c50ccd96b2
 i18n_provenance: human
 i18n_output_hash: fc42eb0f3f5b

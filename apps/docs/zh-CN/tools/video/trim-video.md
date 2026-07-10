@@ -1,5 +1,5 @@
 ---
-description: 通过指定起止时间从视频中剪出片段。
+description: "通过指定起止时间从视频中剪出片段。"
 i18n_source_hash: c84481641979
 i18n_provenance: human
 i18n_output_hash: e845514289a2

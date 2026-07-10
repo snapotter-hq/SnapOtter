@@ -1,5 +1,5 @@
 ---
-description: Passwortschutz von einer PDF entfernen.
+description: "Passwortschutz von einer PDF entfernen."
 i18n_source_hash: 14f5165d185c
 i18n_provenance: machine
 i18n_output_hash: a36f8a5bc0e0

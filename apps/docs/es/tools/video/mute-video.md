@@ -1,5 +1,5 @@
 ---
-description: Elimina la pista de audio de un vídeo.
+description: "Elimina la pista de audio de un vídeo."
 i18n_source_hash: 9a0c60bbcaa3
 i18n_provenance: human
 i18n_output_hash: e52e6a0e7fa1

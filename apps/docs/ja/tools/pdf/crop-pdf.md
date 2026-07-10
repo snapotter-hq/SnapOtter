@@ -1,5 +1,5 @@
 ---
-description: PDF の全ページを均一なマージンで切り抜きます。
+description: "PDF の全ページを均一なマージンで切り抜きます。"
 i18n_source_hash: ffa1a2cee08d
 i18n_provenance: human
 i18n_output_hash: 505c3f006e9a

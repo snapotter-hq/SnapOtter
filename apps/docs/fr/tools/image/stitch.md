@@ -1,5 +1,5 @@
 ---
-description: Assemble des images côte à côte, empilées ou en grille, avec un contrôle de l'alignement, des espacements, des bordures et du mode de redimensionnement.
+description: "Assemble des images côte à côte, empilées ou en grille, avec un contrôle de l'alignement, des espacements, des bordures et du mode de redimensionnement."
 i18n_source_hash: 39333210505a
 i18n_provenance: human
 i18n_output_hash: 313c2611aaff

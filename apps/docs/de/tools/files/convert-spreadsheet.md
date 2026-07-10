@@ -1,5 +1,5 @@
 ---
-description: Konvertiert zwischen Excel-, OpenDocument- und CSV-Formaten.
+description: "Konvertiert zwischen Excel-, OpenDocument- und CSV-Formaten."
 i18n_source_hash: b813b1b06962
 i18n_provenance: machine
 i18n_output_hash: bd9adfbc6a69

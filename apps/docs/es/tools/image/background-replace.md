@@ -1,5 +1,5 @@
 ---
-description: Reemplaza el fondo de la imagen por un color sólido o un degradado usando IA.
+description: "Reemplaza el fondo de la imagen por un color sólido o un degradado usando IA."
 i18n_source_hash: 930fe8890e55
 i18n_provenance: human
 i18n_output_hash: 9467cbbb7ddd

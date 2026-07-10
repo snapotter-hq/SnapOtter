@@ -1,5 +1,5 @@
 ---
-description: 画像内の特定の色を別の色に置き換える、または透明にします。
+description: "画像内の特定の色を別の色に置き換える、または透明にします。"
 i18n_source_hash: df55ac451ecb
 i18n_provenance: human
 i18n_output_hash: 3cee4fe81477

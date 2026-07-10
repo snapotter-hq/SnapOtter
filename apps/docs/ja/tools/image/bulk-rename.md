@@ -1,5 +1,5 @@
 ---
-description: パターンテンプレートを使用して複数のファイルをリネームし、ZIP としてダウンロードします。
+description: "パターンテンプレートを使用して複数のファイルをリネームし、ZIP としてダウンロードします。"
 i18n_source_hash: 2776dcc2f71c
 i18n_provenance: human
 i18n_output_hash: e2e6d53898eb

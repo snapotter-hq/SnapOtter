@@ -1,5 +1,5 @@
 ---
-description: 通过质量控制减小视频文件大小。
+description: "通过质量控制减小视频文件大小。"
 i18n_source_hash: 9cc1f1acf74e
 i18n_provenance: human
 i18n_output_hash: 361abadd94fa

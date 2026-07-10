@@ -1,5 +1,5 @@
 ---
-description: Consulter, modifier ou supprimer les balises de métadonnées audio (ID3).
+description: "Consulter, modifier ou supprimer les balises de métadonnées audio (ID3)."
 i18n_source_hash: 0717018e11cb
 i18n_provenance: human
 i18n_output_hash: a4a43115a499

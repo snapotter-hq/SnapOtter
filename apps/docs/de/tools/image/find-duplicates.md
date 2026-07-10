@@ -1,5 +1,5 @@
 ---
-description: Erkennt doppelte und nahezu doppelte Bilder mithilfe von perzeptuellem Hashing.
+description: "Erkennt doppelte und nahezu doppelte Bilder mithilfe von perzeptuellem Hashing."
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: machine
 i18n_output_hash: 50520e45b29d

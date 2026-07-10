@@ -1,5 +1,5 @@
 ---
-description: 以自定义分辨率和 DPI 将 SVG 文件转换为 PNG、JPEG、WebP、AVIF、TIFF、GIF、HEIF 或 JXL，并支持批量处理。
+description: "以自定义分辨率和 DPI 将 SVG 文件转换为 PNG、JPEG、WebP、AVIF、TIFF、GIF、HEIF 或 JXL，并支持批量处理。"
 i18n_source_hash: cf36830f8797
 i18n_provenance: human
 i18n_output_hash: c79bbc83c528

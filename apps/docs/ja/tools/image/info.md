@@ -1,5 +1,5 @@
 ---
-description: 詳細な画像メタデータ、プロパティ、チャンネルごとのヒストグラム統計を表示します。
+description: "詳細な画像メタデータ、プロパティ、チャンネルごとのヒストグラム統計を表示します。"
 i18n_source_hash: 8a0f7a0b0153
 i18n_provenance: human
 i18n_output_hash: c158254ef2ca

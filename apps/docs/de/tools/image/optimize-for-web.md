@@ -1,5 +1,5 @@
 ---
-description: Optimiere Bilder für die Web-Auslieferung mit Formatkonvertierung, Qualitätssteuerung, Größenänderung und Metadaten-Entfernung.
+description: "Optimiere Bilder für die Web-Auslieferung mit Formatkonvertierung, Qualitätssteuerung, Größenänderung und Metadaten-Entfernung."
 i18n_source_hash: c327bbbce768
 i18n_provenance: machine
 i18n_output_hash: 03f7d1fd4362

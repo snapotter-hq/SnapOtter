@@ -1,5 +1,5 @@
 ---
-description: 将 PDF 中的所有颜色转换为灰度。
+description: "将 PDF 中的所有颜色转换为灰度。"
 i18n_source_hash: f327addb32d6
 i18n_provenance: human
 i18n_output_hash: 42ba9d288dca

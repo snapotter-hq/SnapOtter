@@ -1,5 +1,5 @@
 ---
-description: Générez un minuscule placeholder d'image de basse qualité avec URI de données base64.
+description: "Générez un minuscule placeholder d'image de basse qualité avec URI de données base64."
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: human
 i18n_output_hash: 003299ed01d9

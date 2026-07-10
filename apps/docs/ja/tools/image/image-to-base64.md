@@ -1,5 +1,5 @@
 ---
-description: HTML、CSS などに埋め込むために、画像を base64 データ URI に変換します。
+description: "HTML、CSS などに埋め込むために、画像を base64 データ URI に変換します。"
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
 i18n_output_hash: d5ee100c5387

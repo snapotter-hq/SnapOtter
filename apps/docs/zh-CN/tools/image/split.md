@@ -1,5 +1,5 @@
 ---
-description: 按行列数或像素尺寸将一张图像分割为网格图块，以 ZIP 压缩包形式返回。
+description: "按行列数或像素尺寸将一张图像分割为网格图块，以 ZIP 压缩包形式返回。"
 i18n_source_hash: 57a2e11e7cce
 i18n_provenance: human
 i18n_output_hash: 49ea1a52dd18

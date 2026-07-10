@@ -1,5 +1,5 @@
 ---
-description: Passwortschutz mit AES-256-Verschlüsselung zu einer PDF hinzufügen.
+description: "Passwortschutz mit AES-256-Verschlüsselung zu einer PDF hinzufügen."
 i18n_source_hash: 869cfbc739ef
 i18n_provenance: machine
 i18n_output_hash: 95cf667f453e

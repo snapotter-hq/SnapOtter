@@ -1,5 +1,5 @@
 ---
-description: Konvertiert eine Markdown-Datei in eine eigenständige HTML-Seite.
+description: "Konvertiert eine Markdown-Datei in eine eigenständige HTML-Seite."
 i18n_source_hash: 3ef805e8fc8c
 i18n_provenance: machine
 i18n_output_hash: 48665f70348f

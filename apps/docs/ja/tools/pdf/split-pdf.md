@@ -1,5 +1,5 @@
 ---
-description: ページを抽出するか、PDF を分割します。
+description: "ページを抽出するか、PDF を分割します。"
 i18n_source_hash: 5c8d8041d219
 i18n_provenance: human
 i18n_output_hash: 5a3a351a4e10

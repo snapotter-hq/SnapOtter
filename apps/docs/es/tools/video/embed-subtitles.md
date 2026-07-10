@@ -1,5 +1,5 @@
 ---
-description: Multiplexa una pista de subtítulos en el contenedor del vídeo.
+description: "Multiplexa una pista de subtítulos en el contenedor del vídeo."
 i18n_source_hash: be272730fff5
 i18n_provenance: human
 i18n_output_hash: f1744ae8e1c6

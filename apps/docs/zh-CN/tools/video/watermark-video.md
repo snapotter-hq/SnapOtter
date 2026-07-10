@@ -1,5 +1,5 @@
 ---
-description: 将文本水印烧录到视频画面上。
+description: "将文本水印烧录到视频画面上。"
 i18n_source_hash: 937bb075b894
 i18n_provenance: human
 i18n_output_hash: f1708b74c3f6

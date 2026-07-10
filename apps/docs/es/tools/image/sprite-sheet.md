@@ -1,5 +1,5 @@
 ---
-description: Combina varias imágenes en una sola hoja de sprites en cuadrícula con metadatos de fotogramas.
+description: "Combina varias imágenes en una sola hoja de sprites en cuadrícula con metadatos de fotogramas."
 i18n_source_hash: 1938d7fb100d
 i18n_provenance: human
 i18n_output_hash: a648f6f028fb

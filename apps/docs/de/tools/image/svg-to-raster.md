@@ -1,5 +1,5 @@
 ---
-description: SVG-Dateien in benutzerdefinierter Auflösung und DPI nach PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF oder JXL konvertieren, mit Batch-Unterstützung.
+description: "SVG-Dateien in benutzerdefinierter Auflösung und DPI nach PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF oder JXL konvertieren, mit Batch-Unterstützung."
 i18n_source_hash: cf36830f8797
 i18n_provenance: machine
 i18n_output_hash: 905d944a709c

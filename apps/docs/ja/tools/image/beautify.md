@@ -1,5 +1,5 @@
 ---
-description: プレーンなスクリーンショットを、グラデーション背景、デバイスフレーム、シャドウ、SNS 向けサイズで洗練された画像に仕上げます。
+description: "プレーンなスクリーンショットを、グラデーション背景、デバイスフレーム、シャドウ、SNS 向けサイズで洗練された画像に仕上げます。"
 i18n_source_hash: 8fd8a930a45e
 i18n_provenance: human
 i18n_output_hash: 6b0a1b465ae7

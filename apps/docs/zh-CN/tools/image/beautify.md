@@ -1,5 +1,5 @@
 ---
-description: 将普通截图变成精致的图像，加上渐变背景、设备框架、阴影和社交媒体尺寸。
+description: "将普通截图变成精致的图像，加上渐变背景、设备框架、阴影和社交媒体尺寸。"
 i18n_source_hash: 8fd8a930a45e
 i18n_provenance: human
 i18n_output_hash: b9abf471fb21

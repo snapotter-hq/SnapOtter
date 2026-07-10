@@ -1,5 +1,5 @@
 ---
-description: Convierte entre los formatos de presentación de PowerPoint y OpenDocument.
+description: "Convierte entre los formatos de presentación de PowerPoint y OpenDocument."
 i18n_source_hash: 08ba415d39ac
 i18n_provenance: human
 i18n_output_hash: bf2d2ba53a44

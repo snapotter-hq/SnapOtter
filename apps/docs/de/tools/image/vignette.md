@@ -1,5 +1,5 @@
 ---
-description: Einen Vignetteneffekt mit einstellbarer Stärke, Farbe und Position hinzufügen.
+description: "Einen Vignetteneffekt mit einstellbarer Stärke, Farbe und Position hinzufügen."
 i18n_source_hash: 0b9795fea2eb
 i18n_provenance: machine
 i18n_output_hash: 43953b932234

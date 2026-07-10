@@ -1,5 +1,5 @@
 ---
-description: 使用 Real-ESRGAN AI 超分辨率将图像放大 2 到 4 倍，同时保留细节。
+description: "使用 Real-ESRGAN AI 超分辨率将图像放大 2 到 4 倍，同时保留细节。"
 i18n_source_hash: 150032e99476
 i18n_provenance: human
 i18n_output_hash: 464013380e6f

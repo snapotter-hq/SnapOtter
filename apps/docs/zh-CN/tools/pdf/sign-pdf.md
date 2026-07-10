@@ -1,5 +1,5 @@
 ---
-description: 使用归一化的页面放置坐标将上传的签名图像盖印到 PDF 上。
+description: "使用归一化的页面放置坐标将上传的签名图像盖印到 PDF 上。"
 i18n_source_hash: c28f78c2e7fd
 i18n_provenance: human
 i18n_output_hash: d0799de1e901

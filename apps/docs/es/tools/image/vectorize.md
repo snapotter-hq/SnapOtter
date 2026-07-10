@@ -1,5 +1,5 @@
 ---
-description: Convierte imágenes ráster a SVG con vectorización en blanco y negro (potrace) y a todo color en varias capas.
+description: "Convierte imágenes ráster a SVG con vectorización en blanco y negro (potrace) y a todo color en varias capas."
 i18n_source_hash: f3e4777188ad
 i18n_provenance: human
 i18n_output_hash: 82814e99264a

@@ -1,5 +1,5 @@
 ---
-description: Normalise le volume audio de la vidéo selon la norme de diffusion.
+description: "Normalise le volume audio de la vidéo selon la norme de diffusion."
 i18n_source_hash: 078f1e819c9a
 i18n_provenance: human
 i18n_output_hash: 0f0b60162fcf

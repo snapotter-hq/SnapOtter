@@ -1,5 +1,5 @@
 ---
-description: Monter ou baisser la hauteur de l'audio par demi-tons sans changer la vitesse.
+description: "Monter ou baisser la hauteur de l'audio par demi-tons sans changer la vitesse."
 i18n_source_hash: 2804d0eeecc8
 i18n_provenance: human
 i18n_output_hash: 724d8472c29b

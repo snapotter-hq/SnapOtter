@@ -1,5 +1,5 @@
 ---
-description: Convierte todos los colores de un PDF a escala de grises.
+description: "Convierte todos los colores de un PDF a escala de grises."
 i18n_source_hash: f327addb32d6
 i18n_provenance: human
 i18n_output_hash: af7cf81a5664

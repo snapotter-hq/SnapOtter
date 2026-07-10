@@ -1,5 +1,5 @@
 ---
-description: Generiere QR-Codes mit eigenen Farben und Fehlerkorrekturstufen.
+description: "Generiere QR-Codes mit eigenen Farben und Fehlerkorrekturstufen."
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: machine
 i18n_output_hash: 1a4049bb6caa

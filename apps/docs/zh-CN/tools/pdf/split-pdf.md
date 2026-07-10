@@ -1,5 +1,5 @@
 ---
-description: 提取页面或将 PDF 拆分为多个部分。
+description: "提取页面或将 PDF 拆分为多个部分。"
 i18n_source_hash: 5c8d8041d219
 i18n_provenance: human
 i18n_output_hash: 8ea95715d34d

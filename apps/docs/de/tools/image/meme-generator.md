@@ -1,5 +1,5 @@
 ---
-description: Erstelle Memes mit Vorlagen oder eigenen Bildern, gestylten Textfeldern und Schriftoptionen.
+description: "Erstelle Memes mit Vorlagen oder eigenen Bildern, gestylten Textfeldern und Schriftoptionen."
 i18n_source_hash: 0a4970112ca6
 i18n_provenance: machine
 i18n_output_hash: 04074c6faeaf

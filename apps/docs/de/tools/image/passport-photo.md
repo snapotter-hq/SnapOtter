@@ -1,5 +1,5 @@
 ---
-description: KI-gestützter Generator für Pass- und Ausweisfotos mit Gesichtserkennung, Hintergrundentfernung und Kachelung für Druckbögen.
+description: "KI-gestützter Generator für Pass- und Ausweisfotos mit Gesichtserkennung, Hintergrundentfernung und Kachelung für Druckbögen."
 i18n_source_hash: d4b4f4ced988
 i18n_provenance: machine
 i18n_output_hash: 4dfcdaf3b7f5

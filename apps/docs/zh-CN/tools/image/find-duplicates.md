@@ -1,5 +1,5 @@
 ---
-description: 使用感知哈希检测重复和近似重复的图像。
+description: "使用感知哈希检测重复和近似重复的图像。"
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: human
 i18n_output_hash: 2cf60b9dc81a

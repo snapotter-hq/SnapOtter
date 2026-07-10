@@ -1,5 +1,5 @@
 ---
-description: Word ドキュメントを PDF に変換します。
+description: "Word ドキュメントを PDF に変換します。"
 i18n_source_hash: f814ba1a1a53
 i18n_provenance: human
 i18n_output_hash: fa2981cd461d

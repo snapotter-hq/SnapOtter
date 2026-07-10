@@ -1,5 +1,5 @@
 ---
-description: 在 JSON 与 XML 之间双向转换。
+description: "在 JSON 与 XML 之间双向转换。"
 i18n_source_hash: b3a6ded0c64a
 i18n_provenance: human
 i18n_output_hash: 14f0fbc75e67

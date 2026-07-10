@@ -1,5 +1,5 @@
 ---
-description: 以可预测、可控的顺序为图像添加边框、内边距、圆角和投影。
+description: "以可预测、可控的顺序为图像添加边框、内边距、圆角和投影。"
 i18n_source_hash: 8845150736a9
 i18n_provenance: human
 i18n_output_hash: 55125f0d3031

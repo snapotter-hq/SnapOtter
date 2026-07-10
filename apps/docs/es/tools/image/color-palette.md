@@ -1,5 +1,5 @@
 ---
-description: Extrae los colores dominantes de una imagen como una paleta de colores.
+description: "Extrae los colores dominantes de una imagen como una paleta de colores."
 i18n_source_hash: 65ab22dd75a9
 i18n_provenance: human
 i18n_output_hash: 17971a931b62

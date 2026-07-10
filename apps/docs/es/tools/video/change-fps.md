@@ -1,5 +1,5 @@
 ---
-description: Cambia la velocidad de fotogramas de un vídeo.
+description: "Cambia la velocidad de fotogramas de un vídeo."
 i18n_source_hash: 2bffbd04a1cb
 i18n_provenance: human
 i18n_output_hash: 6f43f6bea2ab

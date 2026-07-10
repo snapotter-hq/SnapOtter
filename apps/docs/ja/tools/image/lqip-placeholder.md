@@ -1,5 +1,5 @@
 ---
-description: base64 データ URI を含む、極小の低品質画像プレースホルダーを生成します。
+description: "base64 データ URI を含む、極小の低品質画像プレースホルダーを生成します。"
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: human
 i18n_output_hash: cf7966b1c20b

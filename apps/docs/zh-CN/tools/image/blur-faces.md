@@ -1,5 +1,5 @@
 ---
-description: 使用 AI 人脸检测自动识别并模糊图像中的人脸，用于隐私保护和符合 GDPR 的匿名化。
+description: "使用 AI 人脸检测自动识别并模糊图像中的人脸，用于隐私保护和符合 GDPR 的匿名化。"
 i18n_source_hash: fb861c12aea5
 i18n_provenance: human
 i18n_output_hash: 3a0007f60b8a

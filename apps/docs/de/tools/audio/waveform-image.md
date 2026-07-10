@@ -1,5 +1,5 @@
 ---
-description: Erzeugt aus einer Audiodatei eine Wellenform-Visualisierung als PNG-Bild.
+description: "Erzeugt aus einer Audiodatei eine Wellenform-Visualisierung als PNG-Bild."
 i18n_source_hash: 5480106dfe48
 i18n_provenance: machine
 i18n_output_hash: db47e6d98839

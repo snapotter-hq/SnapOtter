@@ -1,5 +1,5 @@
 ---
-description: 从 PDF 中永久移除指定的文本（经验证的真正涂黑）。
+description: "从 PDF 中永久移除指定的文本（经验证的真正涂黑）。"
 i18n_source_hash: 296ad2a701b2
 i18n_provenance: human
 i18n_output_hash: bba620b6691d
