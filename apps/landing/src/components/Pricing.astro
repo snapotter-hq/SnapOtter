@@ -1,10 +1,8 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
-import { TOOLS } from "@snapotter/shared";
 import SectionHeading from "./SectionHeading.astro";
 
-const toolCount = TOOLS.length;
 
 const checkIcon =
   '<svg class="h-4 w-4 shrink-0 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -45,7 +43,7 @@ const checkIcon =
 
         <ul class="mt-8 space-y-3">
           {[
-            `All ${toolCount} tools across 5 modalities`,
+            "All 200+ tools across 5 modalities",
             "Unlimited usage, no rate limits",
             "Full REST API with OpenAPI docs",
             "Pipeline automation & batch processing",

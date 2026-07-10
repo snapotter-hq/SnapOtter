@@ -1,7 +1,6 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
-import { TOOLS } from "@snapotter/shared";
 import EnterpriseSection from "@/components/EnterpriseSection.astro";
 import FeatureHighlights from "@/components/FeatureHighlights.astro";
 import Footer from "@/components/Footer.astro";
@@ -13,8 +12,6 @@ import Pricing from "@/components/Pricing.astro";
 import ToolGrid from "@/components/ToolGrid.astro";
 import Base from "@/layouts/Base.astro";
 
-const toolCount = TOOLS.length;
-
 const pageTitle = "SnapOtter | Self-Hosted File-Processing Infrastructure";
 const pageDescription =
   "Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. The private, self-hosted alternative to CloudConvert, Smallpdf, and TinyPNG.";
@@ -24,7 +21,8 @@ const websiteSchema = {
   "@type": "WebSite",
   name: "SnapOtter",
   url: "https://snapotter.com",
-  description: `Self-hosted file processing suite with ${toolCount} tools across 5 modalities.`,
+  description:
+    "Open-source, self-hosted file-processing infrastructure with 200+ tools across image, video, audio, PDF, and documents.",
   publisher: {
     "@type": "Organization",
     name: "SnapOtter",
@@ -55,7 +53,7 @@ const softwareSchema = {
   license: "https://www.gnu.org/licenses/agpl-3.0.en.html",
   downloadUrl: "https://hub.docker.com/r/snapotter/snapotter",
   featureList: [
-    `${toolCount} file processing tools`,
+    "200+ file processing tools",
     "5 modalities: image, video, audio, PDF, files",
     "Free layer-based image editor with brushes, shapes, filters, curves, and keyboard shortcuts",
     "Local AI models for background removal, OCR, upscaling, transcription",

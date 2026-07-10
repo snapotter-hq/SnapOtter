@@ -6,7 +6,6 @@ import * as lucideIcons from "lucide";
 import type { ModalityFilter, ToolSearchItem } from "../lib/tool-search";
 import SectionHeading from "./SectionHeading.astro";
 
-const toolCount = TOOLS.length;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 
 type ToolModality = ToolSearchItem["modality"];
@@ -155,7 +154,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
 <section class="bg-background-alt px-6 py-20 md:py-28" id="features">
   <SectionHeading
     title="One platform. Every file workflow."
-    subtitle={`Search ${toolCount} self-hosted tools by task, format, modality, or workflow.`}
+    subtitle="Search 200+ self-hosted tools by task, format, modality, or workflow."
   />
 
   <div class="mx-auto max-w-6xl">
