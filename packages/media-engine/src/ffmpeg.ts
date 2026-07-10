@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { markToolInputError } from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 import { type FfmpegProgress, parseProgressBlock } from "./progress.js";
 
@@ -9,6 +10,23 @@ export interface RunFfmpegOptions {
 }
 
 const STDERR_RING_MAX = 16 * 1024;
+
+// stderr shapes that mean "the input media is unusable", not an ffmpeg bug.
+// Marked errors are classified expected upstream and never reach Sentry.
+const INPUT_ERROR_PATTERNS = [
+  /received no packets/i,
+  /invalid data found when processing input/i,
+  /could not find codec parameters/i,
+  /moov atom not found/i,
+];
+
+/**
+ * Applies the isToolInputError marker (see @snapotter/shared tool-errors.ts)
+ * when the captured stderr matches a known input-failure shape.
+ */
+export function markIfInputError<E extends Error>(err: E, stderr: string): E {
+  return INPUT_ERROR_PATTERNS.some((re) => re.test(stderr)) ? markToolInputError(err) : err;
+}
 
 /**
  * Runs ffmpeg with `-progress pipe:1` appended, parsing progress blocks from
@@ -76,7 +94,10 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       settled = true;
       cleanup();
       if (code === 0) resolvePromise(stderrTail);
-      else reject(new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail.slice(-2000)}`));
+      else {
+        const err = new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail.slice(-2000)}`);
+        reject(markIfInputError(err, stderrTail));
+      }
     });
   });
 }

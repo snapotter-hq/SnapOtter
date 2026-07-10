@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { resolveFfprobe } from "./binaries.js";
+import { markIfInputError } from "./ffmpeg.js";
 
 export interface MediaStreamInfo {
   type: "video" | "audio" | "other";
@@ -68,7 +69,10 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
       settled = true;
       clearTimeout(timer);
       if (code === 0) resolvePromise(out);
-      else reject(new Error(`ffprobe exited ${code ?? signal}: ${err.slice(-1000)}`));
+      else {
+        const probeErr = new Error(`ffprobe exited ${code ?? signal}: ${err.slice(-1000)}`);
+        reject(markIfInputError(probeErr, err));
+      }
     });
   });
   const parsed = JSON.parse(stdout) as {

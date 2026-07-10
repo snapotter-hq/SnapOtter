@@ -203,7 +203,11 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     mock.stderr.emit("data", Buffer.from("RuntimeError: model not found\n"));
     mock.emitEvent("close", 1, null);
 
-    await expect(promise).rejects.toThrow("RuntimeError: model not found");
+    const err = (await promise.catch((e: unknown) => e)) as Error & { isSafeMessage?: unknown };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain("RuntimeError: model not found");
+    // Variable python-derived text must stay a plain Error, never a SafeError
+    expect(err.isSafeMessage).toBeUndefined();
   });
 
   it("rejects with OOM message on exit code 137 (SIGKILL)", async () => {
@@ -214,7 +218,18 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
 
     mock.emitEvent("close", 137, "SIGKILL");
 
-    await expect(promise).rejects.toThrow("Process killed (out of memory)");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe(
+      "Process killed (out of memory) -- try a lighter model or smaller image",
+    );
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("exit-137");
   });
 
   it("rejects with segfault message on exit code 139 (SIGSEGV)", async () => {
@@ -225,7 +240,16 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
 
     mock.emitEvent("close", 139, "SIGSEGV");
 
-    await expect(promise).rejects.toThrow("Process crashed (segmentation fault)");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("Process crashed (segmentation fault)");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("exit-139");
   });
 
   it("rejects with timeout error when process exceeds timeout", async () => {
@@ -472,7 +496,14 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     // SIGKILL signal without exit code 137
     mock.emitEvent("close", null, "SIGKILL");
 
-    await expect(promise).rejects.toThrow("out of memory");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain("out of memory");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.code).toBe("exit-SIGKILL");
   });
 
   it("treats SIGSEGV signal as segfault error", async () => {
@@ -483,7 +514,14 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
 
     mock.emitEvent("close", null, "SIGSEGV");
 
-    await expect(promise).rejects.toThrow("segmentation fault");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain("segmentation fault");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.code).toBe("exit-SIGSEGV");
   });
 
   it("includes exit code in error when no signal and no stderr", async () => {
@@ -1456,7 +1494,18 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
 
     mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 137, stdout: "" })}\n`));
 
-    await expect(promise).rejects.toThrow("out of memory");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe(
+      "Process killed (out of memory) -- try a lighter model or smaller image",
+    );
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("exit-137");
   });
 
   it("rejects with segfault message when dispatcher response has exitCode 139", async () => {
@@ -1470,7 +1519,39 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
 
     mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 139, stdout: "" })}\n`));
 
-    await expect(promise).rejects.toThrow("segmentation fault");
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("Process crashed (segmentation fault)");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("exit-139");
+  });
+
+  it("keeps extracted python text as a plain Error even on dispatcher exitCode 137", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("heavy.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    // Extractable error text takes precedence over the constant signal message
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id, exitCode: 137, stdout: '{"error": "CUDA out of memory"}' })}\n`,
+      ),
+    );
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & { isSafeMessage?: unknown };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("CUDA out of memory");
+    expect(err.isSafeMessage).toBeUndefined();
   });
 
   it("ignores stdout lines that are not valid JSON", async () => {
