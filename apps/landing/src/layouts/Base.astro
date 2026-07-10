@@ -3,6 +3,9 @@
 import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import LaunchBanner from "@/components/LaunchBanner.astro";
+import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
+import { t } from "@/i18n";
+import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
 
 interface Props {
   title?: string;
@@ -11,6 +14,8 @@ interface Props {
   ogImage?: string;
   ogType?: string;
   noindex?: boolean;
+  locale?: string;
+  path?: string; // un-prefixed page path for hreflang, e.g. "/faq" or "/"
 }
 
 const toolCount = TOOLS.length;
@@ -24,11 +29,16 @@ const {
   ogImage = "/og-image.png",
   ogType = "website",
   noindex = false,
+  locale = "en",
+  path = "/",
 } = Astro.props;
+
+const alternates = altLinks(path);
+const htmlDir = dirFor(locale);
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale} dir={htmlDir}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -47,6 +57,9 @@ const {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
 
+    <!-- Reciprocal hreflang alternates + x-default (i18n) -->
+    {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
+
     {noindex && <meta name="robots" content="noindex, nofollow" />}
 
     <!-- Favicons -->
@@ -64,7 +77,10 @@ const {
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content="SnapOtter" />
     <meta property="og:type" content={ogType} />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content={ogLocale(locale)} />
+    {alternates
+      .filter((a) => a.hreflang !== "x-default" && a.hreflang !== locale)
+      .map((a) => <meta property="og:locale:alternate" content={ogLocale(a.hreflang)} />)}
     <meta property="og:image" content={`https://snapotter.com${ogImage}`} />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="640" />
@@ -94,7 +110,8 @@ const {
     <slot name="head" />
   </head>
   <body>
-    <a href="#main" class="skip-link">Skip to content</a>
+    <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
+    <MachineTranslationBanner locale={locale} />
     <LaunchBanner />
     <slot />
 
