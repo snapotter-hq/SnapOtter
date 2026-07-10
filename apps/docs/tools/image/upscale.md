@@ -2,11 +2,11 @@
 description: Upscale images 2x to 4x with Real-ESRGAN AI super-resolution while preserving fine detail.
 ---
 
-# Image Upscaling
+# Image Upscaling {#image-upscaling}
 
 AI super-resolution enhancement using Real-ESRGAN. Upscales images 2x-4x while preserving detail.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/upscale`
 
@@ -14,7 +14,7 @@ AI super-resolution enhancement using Real-ESRGAN. Upscales images 2x-4x while p
 
 **Model bundle:** `upscale-enhance` (5-6 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -26,7 +26,7 @@ AI super-resolution enhancement using Real-ESRGAN. Upscales images 2x-4x while p
 | format | string | No | `"auto"` | Output format: `auto`, `png`, `jpg`, `webp`, `tiff`, `gif`, `avif`, `heic`, `heif`, `jxl` |
 | quality | number | No | `95` | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/upscale \
@@ -34,9 +34,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/upscale \
   -F 'settings={"scale":4,"model":"auto","faceEnhance":true,"format":"png"}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -45,14 +45,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/upscale \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Upscaling...","percent":60}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -71,7 +71,7 @@ data: {"phase":"processing","stage":"Upscaling...","percent":60}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `upscale-enhance` model bundle to be installed (5-6 GB).
 - Uses Real-ESRGAN when available; falls back to Lanczos interpolation if the AI model is unavailable.

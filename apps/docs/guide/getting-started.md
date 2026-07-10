@@ -2,13 +2,13 @@
 description: Install SnapOtter with Docker in one command. Includes Docker Compose setup, building from source, and a full feature overview.
 ---
 
-# Getting Started
+# Getting Started {#getting-started}
 
 ::: tip Try before installing
 Explore the full UI at [demo.snapotter.com](https://demo.snapotter.com) - no signup or install required.
 :::
 
-## Quick Start
+## Quick Start {#quick-start}
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
@@ -42,7 +42,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Both registries publish the same image on every release.
 :::
 
-## Docker Compose
+## Docker Compose {#docker-compose}
 
 ```yaml
 services:
@@ -100,7 +100,7 @@ volumes:
 
 See [Configuration](/guide/configuration) for all environment variables.
 
-## Build from Source
+## Build from Source {#build-from-source}
 
 **Prerequisites:** Node.js 22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
 
@@ -115,9 +115,9 @@ pnpm dev
 - Frontend: [http://localhost:1349](http://localhost:1349)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
-## What You Can Do
+## What You Can Do {#what-you-can-do}
 
-### File Processing (241 Tools)
+### File Processing (241 Tools) {#file-processing-241-tools}
 
 | Modality | Count | Example Tools |
 |----------|-------|---------------|
@@ -127,7 +127,7 @@ pnpm dev
 | **PDF / Document** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
 | **Files** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
-### Pipelines
+### Pipelines {#pipelines}
 
 Chain tools into multi-step workflows and apply them to one image or a whole batch:
 
@@ -138,13 +138,13 @@ Chain tools into multi-step workflows and apply them to one image or a whole bat
 
 Pipelines allow 20 steps by default. Set `MAX_PIPELINE_STEPS=0` to make the limit unlimited.
 
-### File Library
+### File Library {#file-library}
 
 Every file you process can be saved to your **Files** library. SnapOtter tracks the full version history so you can trace every processing step from the original upload to the final output.
 
 Saving is explicit: results you save to the library are kept until you delete them, while results you process and leave unsaved are cleared automatically after 72 hours (configurable via `FILE_MAX_AGE_HOURS`).
 
-### REST API & API Keys
+### REST API & API Keys {#rest-api-api-keys}
 
 Every tool is accessible via HTTP:
 
@@ -157,7 +157,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 Generate API keys under **Settings → API Keys**. See the [REST API reference](/api/rest) for all endpoints, or visit [http://localhost:1349/api/docs](http://localhost:1349/api/docs) for the interactive reference.
 
-### Multi-User & Teams
+### Multi-User & Teams {#multi-user-teams}
 
 Enable multiple users with role-based access control:
 

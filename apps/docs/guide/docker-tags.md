@@ -2,11 +2,11 @@
 description: SnapOtter Docker image tags, GPU benchmarks, version pinning, and multi-platform support for AMD64 and ARM64.
 ---
 
-# Docker Image
+# Docker Image {#docker-image}
 
 SnapOtter ships as a single Docker image. Run it on its own and it starts an embedded PostgreSQL 17 and Redis on the loopback interface (embedded mode); for production, run it alongside separate PostgreSQL 17 and Redis 8 containers with Compose. The app image works on all platforms.
 
-## Quick start
+## Quick start {#quick-start}
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
@@ -14,7 +14,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 With no `DATABASE_URL` set, this runs in embedded mode: PostgreSQL and Redis start inside the container on loopback, with all data under the `SnapOtter-data` volume. Set `DATABASE_URL` and `REDIS_URL` (as the [Compose](#docker-compose) stack does) to use external services instead. See [Configuration](/guide/configuration#embedded-mode).
 
-## NVIDIA CUDA acceleration
+## NVIDIA CUDA acceleration {#nvidia-cuda-acceleration}
 
 The image includes NVIDIA CUDA support on amd64. If you have an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add `--gpus all`:
 
@@ -26,11 +26,11 @@ The image auto-detects CUDA at runtime. Without `--gpus all`, or when CUDA is un
 
 Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for SnapOtter AI inference today. Mapping `/dev/dri` into the container can expose the render device, but the AI runtime will still use CPU unless CUDA is available.
 
-### Benchmarks
+### Benchmarks {#benchmarks}
 
 Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 
-#### Warm performance
+#### Warm performance {#warm-performance}
 
 | Tool | CPU | GPU | Speedup |
 |------|-----|-----|---------|
@@ -41,7 +41,7 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 | OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | Face blur | 139ms | 122ms | 1.1x |
 
-#### Cold start (first request after container start)
+#### Cold start (first request after container start) {#cold-start-first-request-after-container-start}
 
 | Tool | CPU | GPU | Speedup |
 |------|-----|-----|---------|
@@ -49,7 +49,7 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 | OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
 
-### CUDA health check
+### CUDA health check {#cuda-health-check}
 
 After the first AI request, the admin health endpoint reports CUDA GPU status:
 
@@ -58,7 +58,7 @@ GET /api/v1/admin/health
 {"ai": {"gpu": true}}
 ```
 
-## Docker Compose
+## Docker Compose {#docker-compose}
 
 The full Compose stack includes the app, PostgreSQL 17, and Redis 8. See [Deployment](/guide/deployment) for the complete `docker-compose.yml`. A minimal example:
 
@@ -132,7 +132,7 @@ For NVIDIA CUDA acceleration via Docker Compose, add the deploy section to the S
               capabilities: [gpu]
 ```
 
-## Version pinning
+## Version pinning {#version-pinning}
 
 | Tag | Description |
 |-----|------------|
@@ -141,14 +141,14 @@ For NVIDIA CUDA acceleration via Docker Compose, add the deploy section to the S
 | `1.11` | Latest patch in 1.11.x |
 | `1` | Latest minor in 1.x |
 
-## Platforms
+## Platforms {#platforms}
 
 | Architecture | GPU support | Notes |
 |---|---|---|
 | linux/amd64 | NVIDIA CUDA | Full CUDA acceleration for AI tools |
 | linux/arm64 | CPU only | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
 
-## Migration from previous tags
+## Migration from previous tags {#migration-from-previous-tags}
 
 If you were using the `:cuda` tag, switch to `:latest` and keep `--gpus all`. Same GPU support, unified image.
 

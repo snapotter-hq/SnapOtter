@@ -2,24 +2,24 @@
 description: Speed up or slow down a video.
 ---
 
-# Video Speed
+# Video Speed {#video-speed}
 
 Speed up or slow down a video with an option to preserve audio pitch.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/video-speed`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | factor | number | No | `2` | Speed multiplier (0.25-4). Values above 1 speed up, below 1 slow down |
 | keepPitch | boolean | No | `true` | Preserve audio pitch when changing speed |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/video-speed \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-speed \
   -F 'settings={"factor": 0.5, "keepPitch": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-speed \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - A factor of `2` doubles playback speed (halves duration). A factor of `0.5` halves playback speed (doubles duration).
 - When `keepPitch` is `true`, the audio is time-stretched so voices sound natural. When `false`, pitch shifts proportionally with speed.

@@ -2,23 +2,23 @@
 description: Generate an RGB histogram chart with per-channel statistics from an image.
 ---
 
-# Histogram
+# Histogram {#histogram}
 
 Generate an RGB histogram chart from an image. Returns a PNG histogram image along with per-channel statistics and raw 256-bin histogram data in the response JSON.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/histogram`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | scale | string | No | `"linear"` | Y-axis scale: `linear` or `log` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/histogram \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/histogram \
   -F 'settings={"scale": "linear"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -52,7 +52,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/histogram \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The `downloadUrl` points to a rendered PNG histogram chart showing the R, G, B, and luminance distributions.
 - `bins` contains raw 256-value arrays for each channel (red, green, blue, luminance), suitable for rendering custom visualizations.

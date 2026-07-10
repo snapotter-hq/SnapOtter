@@ -2,25 +2,25 @@
 description: Remove EXIF, GPS, ICC, and XMP metadata from images for privacy and smaller file sizes.
 ---
 
-# Remove Metadata
+# Remove Metadata {#remove-metadata}
 
 Remove EXIF, GPS, ICC color profiles, and XMP metadata from images. Useful for privacy (removing GPS coordinates, camera info) and reducing file size.
 
-## API Endpoints
+## API Endpoints {#api-endpoints}
 
-### Strip Metadata
+### Strip Metadata {#strip-metadata}
 
 `POST /api/v1/tools/image/strip-metadata`
 
 Processes the image and returns a cleaned version with selected metadata removed.
 
-### Inspect Metadata
+### Inspect Metadata {#inspect-metadata}
 
 `POST /api/v1/tools/image/strip-metadata/inspect`
 
 Returns the parsed metadata as JSON without modifying the image. Useful for previewing what metadata exists before stripping.
 
-## Parameters (Strip)
+## Parameters (Strip) {#parameters-strip}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -32,7 +32,7 @@ Returns the parsed metadata as JSON without modifying the image. Useful for prev
 
 When `stripAll` is `true`, it overrides the individual flags and removes everything.
 
-## Example Request
+## Example Request {#example-request}
 
 Strip all metadata:
 
@@ -60,7 +60,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/strip-metadata/inspect \
   -F "file=@photo.jpg"
 ```
 
-## Example Response (Strip)
+## Example Response (Strip) {#example-response-strip}
 
 ```json
 {
@@ -71,7 +71,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/strip-metadata/inspect \
 }
 ```
 
-## Example Response (Inspect)
+## Example Response (Inspect) {#example-response-inspect}
 
 ```json
 {
@@ -102,7 +102,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/strip-metadata/inspect \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The image is re-encoded in its original format after stripping. JPEG uses mozjpeg at quality 90, PNG uses compression level 9, WebP uses quality 85.
 - Stripping ICC profiles may cause subtle color shifts if the image was tagged with a non-sRGB profile. Use `stripIcc: false` if color accuracy matters.

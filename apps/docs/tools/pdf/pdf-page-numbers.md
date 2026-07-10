@@ -2,29 +2,29 @@
 description: Add page numbers to every page of a PDF.
 ---
 
-# PDF Page Numbers
+# PDF Page Numbers {#pdf-page-numbers}
 
 Add "Page N of M" page numbers to every page of a PDF.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdf-page-numbers`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | position | string | No | `"bc"` | Page number placement: `bl`, `bc`, `br`, `tl`, `tc`, `tr` |
 | fontSize | integer | No | `10` | Font size in points (6-24) |
 
-### Position Values
+### Position Values {#position-values}
 
 - `tl` top-left, `tc` top-center, `tr` top-right
 - `bl` bottom-left, `bc` bottom-center, `br` bottom-right
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-page-numbers \
@@ -33,7 +33,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-page-numbers \
   -F 'settings={"position": "bc", "fontSize": 12}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-page-numbers \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Page numbers are rendered in the format "Page 1 of 10".
 - Numbers are added to every page, including any existing title or cover pages.

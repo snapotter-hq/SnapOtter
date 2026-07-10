@@ -2,17 +2,17 @@
 description: Extract text from PDF documents using AI-powered OCR.
 ---
 
-# PDF OCR
+# PDF OCR {#pdf-ocr}
 
 Extract text from PDF documents using AI-powered optical character recognition. Supports multiple quality tiers and languages. Requires the OCR feature bundle to be installed.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/ocr-pdf`
 
 Accepts multipart form data with a PDF file and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 | language | string | No | `"auto"` | Document language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
 | pages | string | No | `"all"` | Page selection, e.g. `"all"`, `"1-3"`, `"1,3,5"` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/ocr-pdf \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/ocr-pdf \
   -F 'settings={"quality": "best", "language": "en", "pages": "1-5"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -40,7 +40,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - This is an AI tool that requires the **OCR feature bundle** to be installed. If the bundle is not installed, the API returns `501 Not Implemented`.

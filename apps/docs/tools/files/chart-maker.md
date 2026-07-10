@@ -2,17 +2,17 @@
 description: Create bar, line, or pie charts from CSV or JSON data.
 ---
 
-# Chart Maker
+# Chart Maker {#chart-maker}
 
 Create bar, line, or pie charts from CSV or JSON data. Returns a PNG image of the rendered chart.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/chart-maker`
 
 Accepts multipart form data with a CSV or JSON file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with a CSV or JSON file and a JSON `settings` field.
 | width | integer | No | `960` | Chart width in pixels (320-2048) |
 | height | integer | No | `540` | Chart height in pixels (240-1536) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/chart-maker \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/chart-maker \
   -F 'settings={"kind": "line", "title": "Monthly Sales", "width": 960, "height": 540}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/chart-maker \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Input must be a `.csv` or `.json` file. CSV files should have a header row with column names.
 - The first column is used as the category label; the second column must be numeric and provides the data values. Only two columns are used.

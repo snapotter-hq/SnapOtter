@@ -2,11 +2,11 @@
 description: Repair scratches, tears, and damage on old photos with an AI pipeline for restoration, face enhancement, and color.
 ---
 
-# Photo Restoration
+# Photo Restoration {#photo-restoration}
 
 Fix scratches, tears, and damage on old photos using a multi-step AI pipeline. Combines scratch repair, face enhancement, denoising, and optional colorization.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/restore-photo`
 
@@ -14,7 +14,7 @@ Fix scratches, tears, and damage on old photos using a multi-step AI pipeline. C
 
 **Model bundle:** `photo-restoration` (4-5 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -27,7 +27,7 @@ Fix scratches, tears, and damage on old photos using a multi-step AI pipeline. C
 | colorize | boolean | No | `false` | Colorize the restored photo (for grayscale images) |
 | colorizeStrength | number | No | `85` | Colorization intensity (0-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/restore-photo \
@@ -35,9 +35,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/restore-photo \
   -F 'settings={"scratchRemoval":true,"faceEnhancement":true,"fidelity":0.6,"colorize":true}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -46,7 +46,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/restore-photo \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
@@ -58,7 +58,7 @@ event: progress
 data: {"phase":"processing","stage":"Enhancing faces...","percent":60}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -81,7 +81,7 @@ data: {"phase":"processing","stage":"Enhancing faces...","percent":60}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `photo-restoration` model bundle to be installed (4-5 GB).
 - The pipeline runs multiple AI steps sequentially: scratch repair, face enhancement (GFPGAN), denoising, and optionally colorization.

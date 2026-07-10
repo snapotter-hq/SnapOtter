@@ -2,24 +2,24 @@
 description: Fill bars with a blurred copy of the video.
 ---
 
-# Blur Pad
+# Blur Pad {#blur-pad}
 
 Fit a video into a target aspect ratio by filling the padding area with a blurred, scaled copy of the video instead of solid-color bars.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/blur-pad`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | target | string | No | `"16:9"` | Target aspect ratio: `16:9`, `9:16`, `1:1`, `4:3`, `3:4` |
 | blur | number | No | `20` | Gaussian blur sigma for the background (2-50) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/blur-pad \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/blur-pad \
   -F 'settings={"target": "16:9", "blur": 30}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/blur-pad \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Higher blur values produce a softer, more abstract background. Lower values keep more detail visible.
 - If the video already matches the target aspect ratio, the file is returned unchanged.

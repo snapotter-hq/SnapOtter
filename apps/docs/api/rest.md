@@ -2,7 +2,7 @@
 description: Complete REST API reference. Tool endpoints, batch processing, pipelines, file library, authentication, teams, and admin operations.
 ---
 
-# REST API Reference
+# REST API Reference {#rest-api-reference}
 
 Interactive API docs with request/response examples are available at [http://localhost:1349/api/docs](http://localhost:1349/api/docs).
 
@@ -11,11 +11,11 @@ Machine-readable specs:
 - `/llms.txt` - LLM-friendly summary
 - `/llms-full.txt` - Complete LLM-friendly docs
 
-## Authentication
+## Authentication {#authentication}
 
 All endpoints require authentication unless `AUTH_ENABLED=false`.
 
-### Session Token
+### Session Token {#session-token}
 
 ```bash
 # Login
@@ -31,7 +31,7 @@ curl http://localhost:1349/api/v1/tools/image/resize \
 
 Sessions expire after 7 days (configurable via `SESSION_DURATION_HOURS`).
 
-### API Keys
+### API Keys {#api-keys}
 
 ```bash
 # Create a key (returns key once - store it)
@@ -48,7 +48,7 @@ curl http://localhost:1349/api/v1/tools/image/resize \
 
 Keys are prefixed `si_` and stored as scrypt hashes - the raw key is shown once and never retrievable again.
 
-### Auth Endpoints
+### Auth Endpoints {#auth-endpoints}
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
@@ -75,7 +75,7 @@ Keys are prefixed `si_` and stored as scrypt hashes - the raw key is shown once 
 
 When MFA is enabled for a user, `POST /api/auth/login` returns `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` instead of a session token. Send that `mfaToken` plus a TOTP or recovery code to `/api/auth/mfa/complete`.
 
-### Permissions
+### Permissions {#permissions}
 
 | Permission | Admin | User |
 |-----------|:-----:|:----:|
@@ -86,7 +86,7 @@ When MFA is enabled for a user, `POST /api/auth/login` returns `{"requiresMfa":t
 | Manage users & teams | ✓ | - |
 | Manage branding | ✓ | - |
 
-## Health Check
+## Health Check {#health-check}
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
@@ -94,7 +94,7 @@ When MFA is enabled for a user, `POST /api/auth/login` returns `{"requiresMfa":t
 | `GET` | `/api/v1/readyz` | Public | Readiness probe. Checks PostgreSQL, Redis, disk space, and S3 when configured. Returns 503 when the instance should not receive traffic. |
 | `GET` | `/api/v1/admin/health` | Admin (`system:health`) | Detailed diagnostics including uptime, storage mode, database status, queue state, and GPU availability. |
 
-## Using Tools
+## Using Tools {#using-tools}
 
 Every tool follows the same pattern:
 
@@ -123,9 +123,9 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 - **Any queued tool** can return 202 JSON if it is long-running or exceeds the synchronous wait window: `{"jobId":"...","async":true}`. Connect to SSE for progress, then download when complete (see [Progress Tracking](#progress-tracking)).
 - **Batch** routes return a ZIP archive streamed directly (with `X-Job-Id` header) for tools registered in the generic batch registry.
 
-## Tools Reference
+## Tools Reference {#tools-reference}
 
-### Conversion Presets
+### Conversion Presets {#conversion-presets}
 
 The shared catalog includes 83 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
 
@@ -133,7 +133,7 @@ The shared catalog includes 83 dedicated conversion preset endpoints such as `jp
 
 Each preset locks the output format and delegates to a base tool such as `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, or `convert-spreadsheet`. See [Conversion Presets](/tools/conversion-presets) for the complete route table and optional settings.
 
-### Essentials
+### Essentials {#essentials}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -143,7 +143,7 @@ Each preset locks the output format and delegates to a base tool such as `conver
 | `convert` | Convert | `format` (jpg/png/webp/avif/tiff/gif/heic/heif), `quality` |
 | `compress` | Compress | `mode` (quality/targetSize), `quality` (1–100), `targetSizeKb` |
 
-### Optimization
+### Optimization {#optimization}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -154,7 +154,7 @@ Each preset locks the output format and delegates to a base tool such as `conver
 | `image-to-pdf` | Image to PDF | `pageSize` (A4/Letter/...), `orientation`, `margin`, `targetSize` ({value, unit}) |
 | `favicon` | Favicon Generator | `padding`, `backgroundColor`, `borderRadius` - generates all standard sizes |
 
-### Adjustments
+### Adjustments {#adjustments}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -166,7 +166,7 @@ Each preset locks the output format and delegates to a base tool such as `conver
 | `pixelate` | Pixelate | `blockSize` (2-128), `region` ({left, top, width, height} for partial pixelation) |
 | `vignette` | Vignette | `strength` (0.1-1), `color` (hex), `radius`, `softness`, `roundness`, `centerX`, `centerY` |
 
-### AI Tools
+### AI Tools {#ai-tools}
 
 All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a supported NVIDIA GPU is available. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. No internet required.
 
@@ -191,7 +191,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `blur-background` | Blur Background | rembg (BiRefNet) | `intensity` (1-100), `feather` (0-20), `format` (png/webp) |
 | `ai-canvas-expand` | AI Canvas Expand | LaMa (outpainting) | `extendTop`, `extendRight`, `extendBottom`, `extendLeft` (px), `tier` (fast/balanced/high), `format`, `quality` |
 
-### Watermark & Overlay
+### Watermark & Overlay {#watermark-overlay}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -201,7 +201,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `compose` | Image Composition | `x`, `y`, `opacity`, `blend` - second file is layered on top |
 | `meme-generator` | Meme Generator | `templateId`, `textLayout` (top-bottom/top-only/bottom-only/center/side-by-side), `textBoxes` ([{id, text}]), `fontFamily` (anton/arial-black/comic-sans/montserrat/bebas-neue/permanent-marker/roboto), `fontSize`, `textColor`, `strokeColor`, `textAlign`, `allCaps`. Supports template mode (JSON body with `templateId`) or custom image mode (multipart with file). |
 
-### Utilities
+### Utilities {#utilities}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -217,7 +217,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON body, no file upload. |
 
-### Layout & Composition
+### Layout & Composition {#layout-composition}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -230,7 +230,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `image-pad` | Image Pad | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 images) |
 
-### Format & Conversion
+### Format & Conversion {#format-conversion}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -239,7 +239,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), action-specific params |
 | `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
-### Video Tools
+### Video Tools {#video-tools}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -273,7 +273,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `auto-subtitles` | Auto Subtitles (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
 | `extract-audio` | Extract Audio | `format` (mp3/wav/m4a/ogg) |
 
-### Audio Tools
+### Audio Tools {#audio-tools}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -295,7 +295,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `audio-metadata` | Audio Metadata | `strip` (bool), `title`, `artist`, `album` |
 | `transcribe-audio` | Transcribe Audio (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `outputFormat` (txt/srt/vtt) |
 
-### Document Tools
+### Document Tools {#document-tools}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -341,7 +341,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `pdf-to-png` | PDF to PNG | `pages`, `dpi`, `quality`, `colorMode` |
 | `pdf-to-tiff` | PDF to TIFF | `pages`, `dpi`, `quality`, `colorMode` |
 
-### File Tools
+### File Tools {#file-tools}
 
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
@@ -357,7 +357,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
 | `extract-zip` | Extract ZIP | - (bomb-protected) |
 
-### HTML to Image
+### HTML to Image {#html-to-image}
 
 Capture a webpage as an image. Unlike other tools, this endpoint accepts `application/json` instead of multipart form data (no file upload needed).
 
@@ -395,7 +395,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
-### Tool Sub-Routes
+### Tool Sub-Routes {#tool-sub-routes}
 
 Some tools expose additional endpoints beyond the standard `POST /api/v1/tools/<section>/<toolId>`:
 
@@ -420,7 +420,7 @@ Some tools expose additional endpoints beyond the standard `POST /api/v1/tools/<
 | `POST` | `/api/v1/tools/image/image-enhancement/analyze` | Analyze image quality and return enhancement recommendations |
 | `POST` | `/api/v1/tools/image/optimize-for-web/preview` | Lightweight preview for live parameter tuning. Returns optimized image with size headers. |
 
-## Batch Processing
+## Batch Processing {#batch-processing}
 
 Apply a generic batch-enabled tool to multiple files at once. Returns a ZIP archive. Custom multi-file or multi-step routes, such as PDF signing, PDF OCR, and PDF-to-image preset routes, use their own endpoint contract instead of the generic `/batch` route.
 
@@ -435,9 +435,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
 
 Concurrency is controlled by `CONCURRENT_JOBS` (default: auto-detected from CPU cores). `MAX_BATCH_SIZE` limits the number of files per batch (default: 100; set 0 for unlimited).
 
-## Pipelines
+## Pipelines {#pipelines}
 
-### Execute a pipeline
+### Execute a pipeline {#execute-a-pipeline}
 
 ```bash
 # Single file
@@ -460,7 +460,7 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 Each step's output is the next step's input. Pipelines allow 20 steps by default, configurable via `MAX_PIPELINE_STEPS`. Set `MAX_PIPELINE_STEPS=0` to remove the limit.
 
-### Save and manage pipelines
+### Save and manage pipelines {#save-and-manage-pipelines}
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -469,7 +469,7 @@ Each step's output is the next step's input. Pipelines allow 20 steps by default
 | `DELETE` | `/api/v1/pipeline/:id` | Delete (owner or admin) |
 | `GET` | `/api/v1/pipeline/tools` | List tool IDs valid for pipeline steps |
 
-## Progress Tracking
+## Progress Tracking {#progress-tracking}
 
 Long-running jobs, queued tools, batch jobs, and pipelines emit real-time progress via Server-Sent Events. The progress stream is public and keyed by job ID, so clients do not need to send an Authorization header to read it.
 
@@ -487,7 +487,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 You can request cancellation for a queued or running job with `POST /api/v1/jobs/:jobId/cancel`. The response is `{"canceled":true|false}`.
 
-## File Library
+## File Library {#file-library}
 
 Persistent file storage with version history.
 
@@ -509,7 +509,7 @@ Persistent file storage with version history.
 
 To auto-save a tool result to the library, include `fileId` as a multipart form field referencing an existing library file. The processed result will be saved as a new version.
 
-## API Key Management
+## API Key Management {#api-key-management}
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
@@ -517,7 +517,7 @@ To auto-save a tool result to the library, include `fileId` as a multipart form 
 | `GET` | `/api/v1/api-keys` | Auth | List keys (name, id, lastUsedAt - not raw key) |
 | `DELETE` | `/api/v1/api-keys/:id` | Auth | Delete key |
 
-## Teams
+## Teams {#teams}
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
@@ -526,7 +526,7 @@ To auto-save a tool result to the library, include `fileId` as a multipart form 
 | `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Rename team |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Delete team (cannot delete default team or teams with members) |
 
-## Settings
+## Settings {#settings}
 
 Runtime key-value configuration (read by any authenticated user, write by admin only).
 
@@ -538,7 +538,7 @@ Runtime key-value configuration (read by any authenticated user, write by admin 
 
 Known keys: `disabledTools` (JSON array of tool IDs), `enableExperimentalTools` (bool string), `loginAttemptLimit` (number).
 
-## Preferences
+## Preferences {#preferences}
 
 Per-user preferences are separate from instance settings. Any authenticated user can read and update their own preference map.
 
@@ -547,7 +547,7 @@ Per-user preferences are separate from instance settings. Any authenticated user
 | `GET` | `/api/v1/preferences` | Get the current user's preferences as `{ "preferences": { ... } }` |
 | `PUT` | `/api/v1/preferences` | Upsert one or more preference keys for the current user |
 
-## Roles
+## Roles {#roles}
 
 Custom role management with granular permissions.
 
@@ -560,7 +560,7 @@ Custom role management with granular permissions.
 
 Available permissions (17): `tools:use`, `files:own`, `files:all`, `apikeys:own`, `apikeys:all`, `pipelines:own`, `pipelines:all`, `settings:read`, `settings:write`, `users:manage`, `teams:manage`, `features:manage`, `system:health`, `audit:read`, `compliance:manage`, `webhooks:manage`, `security:manage`.
 
-## Audit Log
+## Audit Log {#audit-log}
 
 Admin-only endpoint for reviewing security-relevant actions.
 
@@ -579,7 +579,7 @@ Query parameters:
 | `from` | Filter entries after this ISO 8601 date |
 | `to` | Filter entries before this ISO 8601 date |
 
-## Analytics
+## Analytics {#analytics}
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
@@ -587,7 +587,7 @@ Query parameters:
 | `POST` | `/api/v1/feedback` | Auth | Submit explicit user feedback to the configured PostHog project as `feedback_submitted`. The route respects the analytics gate, rate-limits submissions, strips contact fields unless `contactOk` is true, and never accepts file contents, file names, upload paths, or raw private error text. When analytics is disabled, it returns `{ "ok": true, "accepted": false }`. |
 | `PUT` | `/api/v1/settings` | Admin (`settings:write`) | Set the instance-wide opt-out. Send a JSON body `{ "analyticsEnabled": "false" }` to turn analytics off for everyone, or `"true"` to turn it back on. |
 
-## Features / AI Bundles
+## Features / AI Bundles {#features-ai-bundles}
 
 Manage AI feature bundles (install/uninstall AI model packages in the Docker environment).
 
@@ -599,7 +599,7 @@ Manage AI feature bundles (install/uninstall AI model packages in the Docker env
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Get total disk usage of AI models |
 | `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Import an offline AI bundle archive |
 
-## Admin Operations
+## Admin Operations {#admin-operations}
 
 Operational endpoints for observability, support, usage reporting, and backup status.
 
@@ -613,7 +613,7 @@ Operational endpoints for observability, support, usage reporting, and backup st
 | `GET` | `/api/v1/admin/backup-status` | Admin (`system:health`) | Read last backup metadata and freshness status |
 | `POST` | `/api/v1/admin/backup-status` | Admin (`system:health`) | Record a completed backup (`type`, optional `sizeBytes`, optional `notes`) |
 
-## Enterprise APIs
+## Enterprise APIs {#enterprise-apis}
 
 These routes are license-gated by their related enterprise feature. They still require the listed SnapOtter permission.
 
@@ -643,7 +643,7 @@ These routes are license-gated by their related enterprise feature. They still r
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Compare packaged migrations with applied migrations |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Run upgrade readiness checks |
 
-### SCIM 2.0
+### SCIM 2.0 {#scim-2-0}
 
 SCIM discovery endpoints are public. User and group endpoints require the SCIM bearer token generated above.
 
@@ -663,7 +663,7 @@ SCIM discovery endpoints are public. User and group endpoints require the SCIM b
 | `PUT` | `/api/v1/scim/v2/Groups/:id` | SCIM token | Replace a team and group membership |
 | `DELETE` | `/api/v1/scim/v2/Groups/:id` | SCIM token | Delete a team |
 
-## Meme Templates
+## Meme Templates {#meme-templates}
 
 Supporting API for the meme generator tool.
 
@@ -674,7 +674,7 @@ Supporting API for the meme generator tool.
 | `GET` | `/api/v1/meme-templates/thumbs/:filename` | Auth | Serve template thumbnail |
 | `GET` | `/api/v1/meme-templates/fonts/:filename` | Auth | Serve font file used for meme text rendering |
 
-## Error Responses
+## Error Responses {#error-responses}
 
 All errors return JSON:
 

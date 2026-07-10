@@ -2,21 +2,21 @@
 description: Convert a PDF to archival PDF/A-2 format for long-term preservation.
 ---
 
-# PDF/A Convert
+# PDF/A Convert {#pdf-a-convert}
 
 Convert a PDF to the PDF/A-2 archival format, suitable for long-term preservation and regulatory compliance.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdfa-convert`
 
 Accepts multipart form data with a PDF file. No `settings` field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Upload the PDF file directly.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdfa-convert \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdfa-convert \
   -F "file=@document.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdfa-convert \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The output conforms to the PDF/A-2 standard.
 - PDF/A embeds all fonts and disallows external references, so the output file may be larger than the original.

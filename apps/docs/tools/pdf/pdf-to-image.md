@@ -2,15 +2,15 @@
 description: Convert PDF pages to high-quality images.
 ---
 
-# PDF to Image
+# PDF to Image {#pdf-to-image}
 
 Convert PDF pages to high-quality raster images. Supports page selection, multiple output formats, DPI control, and color modes. Includes info and preview sub-routes for inspecting PDFs before conversion.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdf-to-image`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Convert PDF pages to high-quality raster images. Supports page selection, multip
 | colorMode | string | No | `"color"` | Color mode: `color`, `grayscale`, `bw` (black and white threshold) |
 | pages | string | No | `"all"` | Page selection: `all`, single page (`3`), range (`1-5`), or comma-separated (`1,3,5-8`) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image \
   -F 'settings={"format":"png","dpi":300,"pages":"1-3","colorMode":"color"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -58,20 +58,20 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image \
 }
 ```
 
-## Info Sub-Route
+## Info Sub-Route {#info-sub-route}
 
 `POST /api/v1/tools/pdf/pdf-to-image/info`
 
 Returns the page count of a PDF without rendering any pages.
 
-### Info Request
+### Info Request {#info-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image/info \
   -F "file=@document.pdf"
 ```
 
-### Info Response
+### Info Response {#info-response}
 
 ```json
 {
@@ -79,20 +79,20 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image/info \
 }
 ```
 
-## Preview Sub-Route
+## Preview Sub-Route {#preview-sub-route}
 
 `POST /api/v1/tools/pdf/pdf-to-image/preview`
 
 Returns low-resolution JPEG thumbnails of all pages as base64 data URLs. Useful for building a page selection UI.
 
-### Preview Request
+### Preview Request {#preview-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image/preview \
   -F "file=@document.pdf"
 ```
 
-### Preview Response
+### Preview Response {#preview-response}
 
 ```json
 {
@@ -114,7 +114,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-image/preview \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Uses MuPDF for PDF rendering, providing high-fidelity output with correct font rendering and vector graphics.
 - Password-protected PDFs are not supported and will return a 400 error.

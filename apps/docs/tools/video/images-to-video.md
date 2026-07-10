@@ -2,17 +2,17 @@
 description: Turn a set of images into a slideshow video.
 ---
 
-# Images to Video
+# Images to Video {#images-to-video}
 
 Turn a set of images into a slideshow video with configurable duration per image, resolution, and frame rate.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/images-to-video`
 
 Accepts multipart form data with two or more image files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with two or more image files and a JSON `settings` f
 | resolution | string | No | `"720p"` | Output resolution: `1080p`, `720p`, `square` |
 | fps | integer | No | `30` | Output frame rate (10-60) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
@@ -32,7 +32,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
   -F 'settings={"secondsPerImage": 3, "resolution": "1080p"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepts 2-60 image files per request. Images appear in the video in upload order.
 - Images are resized and padded to fit the target resolution while preserving aspect ratio.

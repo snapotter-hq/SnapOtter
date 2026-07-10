@@ -2,23 +2,23 @@
 description: Raise or lower audio pitch by semitones without changing speed.
 ---
 
-# Pitch Shift
+# Pitch Shift {#pitch-shift}
 
 Raise or lower the pitch of an audio file by a number of semitones without changing its playback speed.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/pitch-shift`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | semitones | integer | No | `3` | Semitones to shift (-12 to 12). Must be nonzero. |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/pitch-shift \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/pitch-shift \
   -F 'settings={"semitones": -5}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/pitch-shift \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Positive values raise the pitch; negative values lower it.
 - A shift of 12 semitones equals one octave up; -12 equals one octave down.

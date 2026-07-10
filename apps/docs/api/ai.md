@@ -2,7 +2,7 @@
 description: AI engine reference with all local ML tools. Background removal, upscaling, OCR, face detection, photo restoration, and more.
 ---
 
-# AI Engine Reference
+# AI Engine Reference {#ai-engine-reference}
 
 The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. NVIDIA CUDA is auto-detected at startup and used when available; otherwise AI tools run on CPU.
 
@@ -10,7 +10,7 @@ Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not support
 
 19 Python sidecar AI tools across four modalities (image, audio, video, document), plus 2 tools with optional AI capabilities. All models run locally - no internet required after initial model download.
 
-## Architecture
+## Architecture {#architecture}
 
 ```
 Node.js Tool Route
@@ -43,7 +43,7 @@ A separate "docs" dispatcher profile replaces the AI allowlist with document-pro
 
 **Timeouts:** 300 s default; OCR and BiRefNet background removal get 600 s.
 
-## Feature Bundles
+## Feature Bundles {#feature-bundles}
 
 Each AI tool requires a model bundle to be installed before use. Bundles are installed on demand via the admin UI or `install_feature.py`.
 
@@ -59,7 +59,7 @@ Each AI tool requires a model bundle to be installed before use. Bundles are ins
 
 ---
 
-## Background Removal
+## Background Removal {#background-removal}
 
 **Tool route:** `remove-background`  
 **Model:** rembg with BiRefNet (default) or U2-Net variants
@@ -80,7 +80,7 @@ Each AI tool requires a model bundle to be installed before use. Bundles are ins
 | `edgeRefine` | integer (0-3) | - | Edge refinement level |
 | `decontaminate` | boolean | - | Remove color bleed from edges |
 
-## Background Replace
+## Background Replace {#background-replace}
 
 **Tool route:** `background-replace`  
 **Model:** rembg / BiRefNet (shared with remove-background)
@@ -97,7 +97,7 @@ Removes the background and replaces it with a solid color or gradient.
 | `feather` | integer (0-20) | `0` | Edge feathering radius |
 | `format` | `"png"` \| `"webp"` | `"png"` | Output format |
 
-## Blur Background
+## Blur Background {#blur-background}
 
 **Tool route:** `blur-background`  
 **Model:** rembg / BiRefNet (shared with remove-background)
@@ -110,7 +110,7 @@ Blurs the background while keeping the subject sharp.
 | `feather` | integer (0-20) | `0` | Edge feathering radius |
 | `format` | `"png"` \| `"webp"` | `"png"` | Output format |
 
-## Image Upscaling
+## Image Upscaling {#image-upscaling}
 
 **Tool route:** `upscale`  
 **Model:** RealESRGAN (with Lanczos fallback when unavailable)
@@ -124,7 +124,7 @@ Blurs the background while keeping the subject sharp.
 | `format` | string | `"auto"` | Output format override |
 | `quality` | number | `95` | Output quality (1-100) |
 
-## OCR / Text Extraction
+## OCR / Text Extraction {#ocr-text-extraction}
 
 **Tool route:** `ocr`  
 **Models:** Tesseract (fast), PaddleOCR PP-OCRv5 (balanced), PaddleOCR-VL 1.5 (best)
@@ -138,7 +138,7 @@ Blurs the background while keeping the subject sharp.
 
 Returns structured results with bounding boxes, confidence scores, and extracted text blocks.
 
-## PDF OCR
+## PDF OCR {#pdf-ocr}
 
 **Tool route:** `ocr-pdf`  
 **Models:** Same tier system as image OCR
@@ -151,7 +151,7 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 | `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
 | `pages` | string | `"all"` | Page selection: `"all"`, `"1-3"`, `"1,3,5"` |
 
-## Face / PII Blur
+## Face / PII Blur {#face-pii-blur}
 
 **Tool route:** `blur-faces`  
 **Model:** MediaPipe face detection
@@ -161,7 +161,7 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 | `blurRadius` | number (1-100) | `30` | Gaussian blur radius |
 | `sensitivity` | number (0-1) | `0.5` | Detection confidence threshold |
 
-## Face Enhancement
+## Face Enhancement {#face-enhancement}
 
 **Tool route:** `enhance-faces`  
 **Models:** GFPGAN, CodeFormer
@@ -173,7 +173,7 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 | `sensitivity` | number (0-1) | `0.5` | Face detection threshold |
 | `onlyCenterFace` | boolean | `false` | Enhance only the most central face |
 
-## AI Colorization
+## AI Colorization {#ai-colorization}
 
 **Tool route:** `colorize`  
 **Model:** DDColor (with OpenCV DNN fallback)
@@ -185,7 +185,7 @@ Converts black-and-white or grayscale photos to full color.
 | `intensity` | number (0-1) | `1.0` | Color saturation strength |
 | `model` | `"auto"` \| `"ddcolor"` \| `"opencv"` | `"auto"` | Model variant |
 
-## Noise Removal
+## Noise Removal {#noise-removal}
 
 **Tool route:** `noise-removal`  
 **Model:** SCUNet (tiered denoising pipeline)
@@ -199,7 +199,7 @@ Converts black-and-white or grayscale photos to full color.
 | `format` | string | `"original"` | Output format: `original`, `png`, `jpeg`, `webp`, `avif`, `jxl` |
 | `quality` | number (1-100) | `90` | Output encoding quality |
 
-## Red Eye Removal
+## Red Eye Removal {#red-eye-removal}
 
 **Tool route:** `red-eye-removal`
 
@@ -212,7 +212,7 @@ Detects face landmarks, locates eye regions, and corrects red-channel oversatura
 | `format` | string | - | Output format override (optional) |
 | `quality` | number (1-100) | `90` | Output quality |
 
-## Photo Restoration
+## Photo Restoration {#photo-restoration}
 
 **Tool route:** `restore-photo`
 
@@ -228,20 +228,20 @@ Multi-step pipeline for old or damaged photos: scratch/tear detection and repair
 | `colorize` | boolean | `false` | Colorize after restoration |
 | `colorizeStrength` | number (0-100) | `85` | Colorization intensity |
 
-## Passport Photo
+## Passport Photo {#passport-photo}
 
 **Tool route:** `passport-photo`  
 **Models:** MediaPipe face landmarks + BiRefNet background removal
 
 Two-phase workflow: analyze (detect face + remove background) then generate (crop, resize, tile). Supports 37+ countries across 6 regions.
 
-### Phase 1: Analyze
+### Phase 1: Analyze {#phase-1-analyze}
 
 `POST /api/v1/tools/image/passport-photo/analyze`
 
 Accepts an image file (multipart). Returns face landmark data, a base64 preview, and image dimensions.
 
-### Phase 2: Generate
+### Phase 2: Generate {#phase-2-generate}
 
 `POST /api/v1/tools/image/passport-photo/generate`
 
@@ -266,7 +266,7 @@ Accepts a JSON body with the Phase 1 results plus generation settings:
 | `imageWidth` | number | (required) | Image width from Phase 1 |
 | `imageHeight` | number | (required) | Image height from Phase 1 |
 
-## Object Erasing (Inpainting)
+## Object Erasing (Inpainting) {#object-erasing-inpainting}
 
 **Tool route:** `erase-object`  
 **Model:** LaMa via ONNX Runtime
@@ -282,7 +282,7 @@ The mask is sent as a **second file part** (fieldname `mask`), not as base64. Wh
 
 CUDA-accelerated when an NVIDIA GPU is available.
 
-## AI Canvas Expand
+## AI Canvas Expand {#ai-canvas-expand}
 
 **Tool route:** `ai-canvas-expand`  
 **Model:** LaMa-based outpainting
@@ -301,7 +301,7 @@ Expands the canvas of an image in any direction and fills new areas with AI-gene
 
 At least one extend direction must be greater than 0.
 
-## Smart Crop
+## Smart Crop {#smart-crop}
 
 **Tool route:** `smart-crop`  
 **Model:** MediaPipe face detection (face mode only)
@@ -332,7 +332,7 @@ Legacy `mode` values `attention` and `content` are accepted and mapped to `subje
 | `upper-body` | LinkedIn / formal |
 | `half-body` | Full upper body |
 
-## Transcribe Audio
+## Transcribe Audio {#transcribe-audio}
 
 **Tool route:** `transcribe-audio`  
 **Model:** faster-whisper
@@ -344,7 +344,7 @@ Converts speech to text. Supports plain text, SRT, and VTT output formats.
 | `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `id`, `th`, `vi` |
 | `outputFormat` | `"txt"` \| `"srt"` \| `"vtt"` | `"txt"` | Output format |
 
-## Auto Subtitles
+## Auto Subtitles {#auto-subtitles}
 
 **Tool route:** `auto-subtitles`  
 **Model:** faster-whisper (extracts audio from video, then transcribes)
@@ -356,7 +356,7 @@ Generates subtitle files from a video's audio track.
 | `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `id`, `th`, `vi` |
 | `format` | `"srt"` \| `"vtt"` | `"srt"` | Output subtitle format |
 
-## PNG Transparency Fixer
+## PNG Transparency Fixer {#png-transparency-fixer}
 
 **Tool route:** `transparency-fixer`  
 **Model:** BiRefNet HR-matting (2048x2048 resolution)
@@ -380,11 +380,11 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 
 ---
 
-## Tools with Optional AI Capabilities
+## Tools with Optional AI Capabilities {#tools-with-optional-ai-capabilities}
 
 The following tools are not Python sidecar tools but use AI features when certain options are enabled.
 
-### Image Enhancement
+### Image Enhancement {#image-enhancement}
 
 **Tool route:** `image-enhancement`  
 **Engine:** Analysis-based (Sharp histogram and statistics)
@@ -405,7 +405,7 @@ Analyzes the image and applies automatic corrections for exposure, contrast, whi
 
 An additional analysis endpoint is available at `POST /api/v1/tools/image/image-enhancement/analyze` which returns the detected corrections without applying them.
 
-### Content-Aware Resize (Seam Carving)
+### Content-Aware Resize (Seam Carving) {#content-aware-resize-seam-carving}
 
 **Tool route:** `content-aware-resize`  
 **Engine:** Go `caire` binary (not Python - no GPU benefit)

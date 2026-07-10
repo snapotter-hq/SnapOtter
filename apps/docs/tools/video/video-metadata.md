@@ -2,21 +2,21 @@
 description: Strip metadata from a video and report what was found.
 ---
 
-# Clean Video Metadata
+# Clean Video Metadata {#clean-video-metadata}
 
 Strip metadata (creation date, GPS coordinates, camera model, software tags, etc.) from a video and report what was removed.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/video-metadata`
 
 Accepts multipart form data with a video file. This tool has no configurable settings.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no parameters. It strips all metadata from the video container.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
   -F "file=@clip.mp4"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Metadata stripped includes creation timestamps, GPS/location data, camera/device info, and software tags.
 - The video and audio streams are copied without re-encoding, so there is no quality loss.

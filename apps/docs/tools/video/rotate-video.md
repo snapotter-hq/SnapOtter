@@ -2,23 +2,23 @@
 description: Rotate or flip a video.
 ---
 
-# Rotate Video
+# Rotate Video {#rotate-video}
 
 Rotate a video by 90, 180, or 270 degrees, or flip it horizontally or vertically.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/rotate-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | transform | string | Yes | - | Transformation to apply: `cw90`, `ccw90`, `180`, `hflip`, `vflip` |
 
-### Transform Values
+### Transform Values {#transform-values}
 
 - **cw90** - Rotate 90 degrees clockwise
 - **ccw90** - Rotate 90 degrees counter-clockwise
@@ -26,7 +26,7 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 - **hflip** - Flip horizontally (mirror)
 - **vflip** - Flip vertically
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/rotate-video \
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/rotate-video \
   -F 'settings={"transform": "cw90"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -46,7 +46,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/rotate-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Rotations by 90 or 270 degrees swap the video's width and height.
 - Flip operations (hflip, vflip) do not change the video dimensions.

@@ -2,23 +2,23 @@
 description: Pull selected pages from a PDF into a new document.
 ---
 
-# Extract Pages
+# Extract Pages {#extract-pages}
 
 Pull selected pages from a PDF into a new, smaller document.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/extract-pages`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | range | string | Yes | - | Page range in qpdf syntax, e.g. `"1-5,8,10-z"` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/extract-pages \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/extract-pages \
   -F 'settings={"range": "1-5,8,10-z"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/extract-pages \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Page ranges use qpdf syntax: `1-5` for pages 1 through 5, `z` for the last page, and commas to combine ranges (e.g. `1-3,7,10-z`).
 - The extracted pages retain their original formatting, annotations, and links.

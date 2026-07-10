@@ -2,15 +2,15 @@
 description: Add borders, padding, rounded corners, and drop shadows to images in a predictable, controllable order.
 ---
 
-# Border & Frame
+# Border & Frame {#border-frame}
 
 Add borders, padding, rounded corners, and drop shadows to images. The tool applies effects in order: padding, border, corner radius, then shadow.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/border`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -26,7 +26,7 @@ Add borders, padding, rounded corners, and drop shadows to images. The tool appl
 | shadowColor | string | No | `"#000000"` | Shadow color as hex |
 | shadowOpacity | number | No | 40 | Shadow opacity percentage (0 to 100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/border \
@@ -34,7 +34,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/border \
   -F 'settings={"borderWidth":20,"borderColor":"#333333","cornerRadius":16,"shadow":true,"shadowBlur":25,"shadowOpacity":50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -45,7 +45,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/border \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Uses the standard `createToolRoute` factory. Accepts a single image file via multipart upload.
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded).

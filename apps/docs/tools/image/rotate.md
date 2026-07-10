@@ -2,17 +2,17 @@
 description: Rotate images by any angle and flip horizontally or vertically.
 ---
 
-# Rotate & Flip
+# Rotate & Flip {#rotate-flip}
 
 Rotate images by an arbitrary angle and/or flip them horizontally or vertically. Rotation and flip operations can be combined in a single request.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/rotate`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | horizontal | boolean | No | `false` | Flip the image horizontally (mirror) |
 | vertical | boolean | No | `false` | Flip the image vertically |
 
-## Example Request
+## Example Request {#example-request}
 
 Rotate 90 degrees clockwise:
 
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/rotate \
   -F 'settings={"angle": 45, "vertical": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -60,7 +60,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/rotate \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Rotation is applied first, then flip operations.
 - Non-90-degree rotations (e.g. 45 degrees) will enlarge the canvas to fit the rotated image, with transparent or black fill depending on the output format.

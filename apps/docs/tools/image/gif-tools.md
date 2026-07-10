@@ -2,24 +2,24 @@
 description: Resize, optimize, speed-change, reverse, rotate, and extract frames from animated GIFs in a single tool.
 ---
 
-# GIF Tools
+# GIF Tools {#gif-tools}
 
 Resize, optimize, change speed, reverse, extract frames, and rotate animated GIFs. Provides multiple operation modes in a single tool.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/gif-tools`
 
-## Parameters
+## Parameters {#parameters}
 
-### Common Parameters
+### Common Parameters {#common-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | mode | string | No | `"resize"` | Operation mode: `resize`, `optimize`, `speed`, `reverse`, `extract`, `rotate` |
 | loop | number | No | 0 | Loop count for output GIF (0 = infinite, 1-100 = finite loops) |
 
-### Resize Mode Parameters
+### Resize Mode Parameters {#resize-mode-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -27,7 +27,7 @@ Resize, optimize, change speed, reverse, extract frames, and rotate animated GIF
 | height | integer | No | - | Target height in pixels (1 to 16384) |
 | percentage | number | No | - | Scale by percentage (1 to 500). Overrides width/height if set. |
 
-### Optimize Mode Parameters
+### Optimize Mode Parameters {#optimize-mode-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -35,13 +35,13 @@ Resize, optimize, change speed, reverse, extract frames, and rotate animated GIF
 | dither | number | No | 1.0 | Dithering strength (0 to 1, where 0 disables dithering) |
 | effort | number | No | 7 | Optimization effort level (1 to 10, higher = slower but smaller) |
 
-### Speed Mode Parameters
+### Speed Mode Parameters {#speed-mode-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | speedFactor | number | No | 1.0 | Speed multiplier (0.1 to 10). Values > 1 speed up, < 1 slow down. |
 
-### Extract Mode Parameters
+### Extract Mode Parameters {#extract-mode-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -51,7 +51,7 @@ Resize, optimize, change speed, reverse, extract frames, and rotate animated GIF
 | frameEnd | number | No | - | End frame index for `range` mode (0-based, inclusive) |
 | extractFormat | string | No | `"png"` | Format for extracted frames: `png`, `webp` |
 
-### Rotate Mode Parameters
+### Rotate Mode Parameters {#rotate-mode-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -59,9 +59,9 @@ Resize, optimize, change speed, reverse, extract frames, and rotate animated GIF
 | flipH | boolean | No | `false` | Flip horizontally |
 | flipV | boolean | No | `false` | Flip vertically |
 
-## Example Requests
+## Example Requests {#example-requests}
 
-### Resize
+### Resize {#resize}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
@@ -69,7 +69,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F 'settings={"mode":"resize","percentage":50}'
 ```
 
-### Optimize
+### Optimize {#optimize}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F 'settings={"mode":"optimize","colors":128,"effort":9}'
 ```
 
-### Speed Up
+### Speed Up {#speed-up}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
@@ -85,7 +85,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F 'settings={"mode":"speed","speedFactor":2.0}'
 ```
 
-### Extract Single Frame
+### Extract Single Frame {#extract-single-frame}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
@@ -93,7 +93,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F 'settings={"mode":"extract","extractMode":"single","frameNumber":5,"extractFormat":"png"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -104,20 +104,20 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 }
 ```
 
-## Info Sub-Route
+## Info Sub-Route {#info-sub-route}
 
 `POST /api/v1/tools/image/gif-tools/info`
 
 Returns metadata about an animated GIF without processing it.
 
-### Info Request
+### Info Request {#info-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools/info \
   -F "file=@animation.gif"
 ```
 
-### Info Response
+### Info Response {#info-response}
 
 ```json
 {
@@ -131,7 +131,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools/info \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Uses the standard `createToolRoute` factory for the main processing endpoint.
 - The info endpoint only requires a file upload (no settings needed).

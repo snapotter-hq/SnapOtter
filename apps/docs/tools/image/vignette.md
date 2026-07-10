@@ -2,17 +2,17 @@
 description: Add a vignette effect with adjustable strength, color, and position.
 ---
 
-# Vignette
+# Vignette {#vignette}
 
 Add a vignette effect that darkens or tints the edges of an image. Supports adjustable strength, color, radius, softness, roundness, and center position.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/vignette`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | centerX | integer | No | `50` | Horizontal center position as percentage (0-100) |
 | centerY | integer | No | `50` | Vertical center position as percentage (0-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/vignette \
@@ -33,7 +33,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vignette \
   -F 'settings={"strength": 0.7, "radius": 60, "softness": 70}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vignette \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - A smaller `radius` darkens more of the image; a larger radius confines the vignette to the extreme edges.
 - Use a non-black `color` (e.g., white or sepia tones) for creative vignette effects.

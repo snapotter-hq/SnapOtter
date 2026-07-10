@@ -2,21 +2,21 @@
 description: Convert a Markdown file to a standalone HTML page.
 ---
 
-# Markdown to HTML
+# Markdown to HTML {#markdown-to-html}
 
 Convert a Markdown file to a standalone HTML page. Remote images referenced in the source are left as-is in the output.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/markdown-to-html`
 
 Accepts multipart form data with a Markdown file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a Markdown file and it will be converted to HTML.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-html \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-html \
   -F "file=@notes.md"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-html \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.md`, `.markdown`.
 - This is a fast (synchronous) tool that returns the result directly.

@@ -2,17 +2,17 @@
 description: Overlay a logo or image as a watermark with configurable position, opacity, and scale.
 ---
 
-# Image Watermark
+# Image Watermark {#image-watermark}
 
 Overlay a logo or secondary image as a watermark on a base image. The watermark is scaled relative to the base image width and positioned at a corner or center.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/watermark-image`
 
 Accepts multipart form data with **two** image files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,14 +20,14 @@ Accepts multipart form data with **two** image files and a JSON `settings` field
 | opacity | number | No | `50` | Watermark opacity percentage (0 to 100) |
 | scale | number | No | `25` | Watermark width as percentage of main image width (1 to 100) |
 
-### File Fields
+### File Fields {#file-fields}
 
 | Field Name | Required | Description |
 |------------|----------|-------------|
 | file | Yes | The main/base image |
 | watermark | Yes | The watermark/logo image |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/watermark-image \
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/watermark-image \
   -F 'settings={"position": "bottom-right", "opacity": 60, "scale": 20}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/watermark-image \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Both images are validated and decoded (HEIC, RAW, PSD, SVG supported).
 - The watermark is resized proportionally so its width equals `scale`% of the main image width.

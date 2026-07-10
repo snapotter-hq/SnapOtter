@@ -2,11 +2,11 @@
 description: Monorepo structure, app and package architecture, request lifecycle, and resource footprint of SnapOtter.
 ---
 
-# Architecture
+# Architecture {#architecture}
 
 SnapOtter is a monorepo managed with pnpm workspaces and Turborepo. It deploys as a 3-container Docker Compose stack: the SnapOtter app image, PostgreSQL 17, and Redis 8.
 
-## Project structure
+## Project structure {#project-structure}
 
 ```
 snapotter/
@@ -23,15 +23,15 @@ snapotter/
 └── docker/           # Dockerfile and Compose config
 ```
 
-## Packages
+## Packages {#packages}
 
-### `@snapotter/image-engine`
+### `@snapotter/image-engine` {#snapotter-image-engine}
 
 The core image processing library built on [Sharp](https://sharp.pixelplumbing.com/). It handles all non-AI operations: resize, crop, rotate, flip, convert, compress, strip metadata, and color adjustments (brightness, contrast, saturation, grayscale, sepia, invert, color channels).
 
 This package has no network dependencies and runs entirely in-process.
 
-### `@snapotter/ai`
+### `@snapotter/ai` {#snapotter-ai}
 
 A bridge layer that calls Python scripts for ML operations. On first use, the bridge starts a persistent Python dispatcher process that pre-imports heavy libraries (PIL, NumPy, MediaPipe, rembg) so subsequent AI calls skip the import overhead. If the dispatcher is not yet ready, the bridge falls back to spawning a fresh Python subprocess per request.
 
@@ -41,13 +41,13 @@ Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN
 
 Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works fully offline.
 
-### `@snapotter/shared`
+### `@snapotter/shared` {#snapotter-shared}
 
 Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), and i18n translation strings used by both the frontend and backend.
 
-## Applications
+## Applications {#applications}
 
-### API (`apps/api`)
+### API (`apps/api`) {#api-apps-api}
 
 A Fastify v5 server exposing 241 tool routes across five modalities (image, video, audio, PDF, file) that handles:
 - File uploads, temporary workspace management, and persistent file storage
@@ -66,7 +66,7 @@ Key dependencies: Fastify, Drizzle ORM (pg-core, node-postgres), Sharp, BullMQ, 
 
 The server handles graceful shutdown on SIGTERM/SIGINT: it drains HTTP connections, stops BullMQ workers, shuts down the Python dispatcher, and closes the database connection.
 
-### Web (`apps/web`)
+### Web (`apps/web`) {#web-apps-web}
 
 A React 19 single-page app built with Vite. Uses Zustand for state management, Tailwind CSS v4 for styling, and Lucide for icons. Communicates with the API over REST and SSE (for progress tracking).
 
@@ -74,11 +74,11 @@ Pages include a tool workspace, a Files page for managing persistent uploads and
 
 The built frontend gets served by the Fastify backend in production, so there is no separate web server in the Docker container.
 
-### Docs (`apps/docs`)
+### Docs (`apps/docs`) {#docs-apps-docs}
 
 This VitePress site. Deployed to Cloudflare Pages automatically on push to `main`.
 
-## How a request flows
+## How a request flows {#how-a-request-flows}
 
 1. The user picks a tool in the web UI and uploads a file.
 2. The frontend sends a multipart POST to `/api/v1/tools/:section/:toolId` with the file and settings.
@@ -92,15 +92,15 @@ For pipelines, the API feeds the output of each step as input to the next, runni
 
 For batch processing, the API uses BullMQ flows with per-step child jobs and returns a ZIP file with all processed files.
 
-## Resource footprint
+## Resource footprint {#resource-footprint}
 
 SnapOtter is designed for low idle memory use. Nothing is preloaded or kept warm at startup.
 
-### At idle
+### At idle {#at-idle}
 
 The Node.js/Fastify process, PostgreSQL, and Redis are running. Typical idle RAM is **~200-300 MB** across all three containers (Node.js process, Postgres, and Redis). No Python process, no model weights in memory.
 
-### What starts, and when
+### What starts, and when {#what-starts-and-when}
 
 | Component | Starts when | Memory while active |
 |-----------|-------------|---------------------|
@@ -109,12 +109,12 @@ The Node.js/Fastify process, PostgreSQL, and Redis are running. Typical idle RAM
 | Python dispatcher | First AI tool request | Python interpreter + pre-imported libraries (PIL, NumPy, MediaPipe, rembg) - no model weights |
 | AI model weights | During the specific tool's request | Loaded from disk, freed when the request finishes |
 
-### Model loading
+### Model loading {#model-loading}
 
 All model weight files (totalling several GB) sit on disk in `/opt/models/` at all times. Each AI tool script loads only its own model(s) into memory for the duration of a request, then releases them. Some scripts explicitly call `del model` and `torch.cuda.empty_cache()` after inference to ensure memory is returned immediately.
 
 There is no model cache between requests. Running the same AI tool back-to-back reloads the model each time. This keeps idle memory near zero at the cost of a model-load delay on every AI request.
 
-### First AI request cold start
+### First AI request cold start {#first-ai-request-cold-start}
 
 The Python dispatcher is not running when the container starts. The first AI request triggers two things in parallel: the dispatcher starts warming up in the background, and the request itself falls back to a one-off Python subprocess spawn. Once the dispatcher signals ready, all subsequent AI requests use it directly and skip the subprocess spawn cost.

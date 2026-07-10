@@ -2,11 +2,11 @@
 description: Subject-, face-, and entropy-aware cropping that frames images intelligently using Sharp and AI face detection.
 ---
 
-# Smart Crop
+# Smart Crop {#smart-crop}
 
 Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/entropy strategies and AI face detection for intelligent framing.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/smart-crop`
 
@@ -14,7 +14,7 @@ Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/
 
 **Model bundle:** `face-detection` (200-300 MB) - required only for `face` mode
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -32,7 +32,7 @@ Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/
 | targetSize | integer | No | - | Target size for padded output (pixels) |
 | quality | integer | No | - | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/smart-crop \
@@ -40,9 +40,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/smart-crop \
   -F 'settings={"mode":"face","width":1080,"height":1080,"facePreset":"head-shoulders"}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -51,14 +51,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/smart-crop \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","percent":50}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -73,18 +73,18 @@ data: {"phase":"processing","percent":50}
 }
 ```
 
-## Modes
+## Modes {#modes}
 
-### Subject Mode
+### Subject Mode {#subject-mode}
 Uses Sharp's attention or entropy strategy to find the most visually interesting region and crops around it.
 
-### Face Mode
+### Face Mode {#face-mode}
 Detects faces using AI, then frames the crop around detected faces using the specified `facePreset`. Falls back to subject mode (attention strategy) if no faces are detected.
 
-### Trim Mode
+### Trim Mode {#trim-mode}
 Removes uniform borders/background from the image. Optionally pads the result to a square with a specified background color and target size.
 
-## Notes
+## Notes {#notes}
 
 - This tool uses the `createToolRoute` factory with `executionHint: "long"`, so it returns 202 with SSE progress.
 - Face mode requires the `face-detection` model bundle (200-300 MB).

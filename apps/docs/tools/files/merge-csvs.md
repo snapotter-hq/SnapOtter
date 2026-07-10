@@ -2,21 +2,21 @@
 description: Combine multiple CSV or TSV files with matching columns into one.
 ---
 
-# Merge CSVs
+# Merge CSVs {#merge-csvs}
 
 Combine multiple CSV or TSV files with matching columns into a single merged file. All input files must have the same column headers.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/merge-csvs`
 
 Accepts multipart form data with two or more CSV files. No settings field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload 2-20 CSV or TSV files with matching column headers.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/merge-csvs \
@@ -26,7 +26,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/merge-csvs \
   -F "file=@march.csv"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/merge-csvs \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires between 2 and 20 input files.
 - All files must share the same column headers. The merge will fail if columns do not match.

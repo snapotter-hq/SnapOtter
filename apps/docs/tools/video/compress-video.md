@@ -2,24 +2,24 @@
 description: Shrink video file size with quality control.
 ---
 
-# Compress Video
+# Compress Video {#compress-video}
 
 Shrink video file size using configurable compression strength and optional resolution downscaling.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/compress-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field. This is an async endpoint - it returns `202 Accepted` immediately and progress is streamed via SSE at `GET /api/v1/jobs/{jobId}/progress`.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | quality | string | No | `"balanced"` | Compression strength: `light`, `balanced`, `strong` |
 | resolution | string | No | `"original"` | Output resolution: `original`, `1080p`, `720p`, `480p` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/compress-video \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/compress-video \
   -F 'settings={"quality": "strong", "resolution": "720p"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/compress-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The `light` preset preserves near-original quality. The `strong` preset reduces file size aggressively at the cost of visual fidelity.
 - Downscaling resolution (e.g. from 4K to 720p) compounds with compression for significant size reduction.

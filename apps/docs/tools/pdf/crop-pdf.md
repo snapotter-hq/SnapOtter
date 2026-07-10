@@ -2,23 +2,23 @@
 description: Crop all pages of a PDF with a uniform margin.
 ---
 
-# Crop PDF
+# Crop PDF {#crop-pdf}
 
 Crop all pages of a PDF by applying a uniform margin, trimming content from each edge equally.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/crop-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | margin | number | No | `20` | Uniform crop margin in points (0-2000) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
   -F 'settings={"margin": 50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The margin value is in PDF points (1 point = 1/72 inch).
 - The same margin is applied to all four edges of every page.

@@ -2,15 +2,15 @@
 description: Join images side by side, stacked, or in a grid with control over alignment, gaps, borders, and resize mode.
 ---
 
-# Stitch / Combine
+# Stitch / Combine {#stitch-combine}
 
 Join multiple images side by side, stacked vertically, or arranged in a grid. Supports alignment, gap, border, corner radius, and multiple resize modes.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/stitch`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -25,7 +25,7 @@ Join multiple images side by side, stacked vertically, or arranged in a grid. Su
 | format | string | No | `"png"` | Output format: `png`, `jpeg`, `webp`, `avif`, `jxl` |
 | quality | number | No | 90 | Output quality (1 to 100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/stitch \
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/stitch \
   -F 'settings={"direction":"horizontal","resizeMode":"fit","gap":10,"backgroundColor":"#FFFFFF","format":"png"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -46,7 +46,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/stitch \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires at least 2 images. Upload multiple image files in the multipart request.
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded).

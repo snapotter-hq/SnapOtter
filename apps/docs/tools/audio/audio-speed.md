@@ -2,23 +2,23 @@
 description: Speed up or slow down audio playback with a multiplier.
 ---
 
-# Audio Speed
+# Audio Speed {#audio-speed}
 
 Speed up or slow down audio playback by applying a speed multiplier.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/audio-speed`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | factor | number | No | `1.5` | Speed multiplier (0.25 to 4). Values below 1 slow down; above 1 speed up. |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/audio-speed \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-speed \
   -F 'settings={"factor": 2}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-speed \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - A factor of `0.25` plays at quarter speed (4x longer). A factor of `4` plays at quadruple speed (4x shorter).
 - Pitch is preserved while speed changes (time-stretch). Use pitch-shift to adjust pitch independently.

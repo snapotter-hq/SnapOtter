@@ -2,17 +2,17 @@
 description: Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix formats.
 ---
 
-# Barcode Generator
+# Barcode Generator {#barcode-generator}
 
 Generate barcode images from text input. Supports Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix formats.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/barcode-generate`
 
 Accepts an `application/json` body (not multipart). The barcode is generated from the provided text, not from an uploaded file.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts an `application/json` body (not multipart). The barcode is generated fro
 | scale | integer | No | `3` | Image scale factor (1-8) |
 | includeText | boolean | No | `true` | Whether to render the text below the barcode |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/barcode-generate \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-generate \
   -d '{"text": "5901234123457", "type": "ean13", "scale": 4}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-generate \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Unlike most tools, this endpoint accepts a JSON body, not multipart form data, since barcodes are generated from text rather than an uploaded file.
 - EAN-13 requires exactly 12 or 13 digits. UPC-A requires exactly 11 or 12 digits. If a check digit is omitted, it is calculated automatically.

@@ -2,15 +2,15 @@
 description: Split one image into grid tiles by rows and columns or by pixel size, returned as a ZIP archive.
 ---
 
-# Image Splitting
+# Image Splitting {#image-splitting}
 
 Split a single image into grid tiles by column/row count or by specific pixel dimensions. Returns a ZIP archive containing all tiles.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/split`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Split a single image into grid tiles by column/row count or by specific pixel di
 | outputFormat | string | No | `"original"` | Output format for tiles: `original`, `png`, `jpg`, `webp`, `avif`, `jxl` |
 | quality | number | No | 90 | Output quality for lossy formats (1 to 100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/split \
@@ -30,13 +30,13 @@ curl -X POST http://localhost:1349/api/v1/tools/image/split \
   --output split-tiles.zip
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 The response is streamed directly as a ZIP file with `Content-Type: application/zip`. The filename follows the pattern `split-<jobId>.zip`.
 
 Each tile inside the ZIP is named `<originalBaseName>_r<row>_c<col>.<ext>` (e.g. `photo_r1_c1.png`, `photo_r2_c3.webp`).
 
-## Notes
+## Notes {#notes}
 
 - Accepts a single image file.
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded).

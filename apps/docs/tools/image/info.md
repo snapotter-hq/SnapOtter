@@ -2,17 +2,17 @@
 description: View detailed image metadata, properties, and per-channel histogram statistics.
 ---
 
-# Image Info
+# Image Info {#image-info}
 
 Read-only analysis tool that returns comprehensive image metadata including dimensions, format, color space, EXIF/ICC/XMP presence, and per-channel histogram statistics. Does not produce a processed output file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/info`
 
 Accepts multipart form data with an image file. No settings field is needed.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Simply upload the image file.
 
@@ -20,7 +20,7 @@ This tool has no configurable parameters. Simply upload the image file.
 |-------|------|----------|-------------|
 | file | file | Yes | The image to analyze |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/info \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/info \
   -F "file=@photo.jpg"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -57,7 +57,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/info \
 }
 ```
 
-## Response Fields
+## Response Fields {#response-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/info \
 | pages | number | Number of pages (for multi-page formats like TIFF, GIF) |
 | histogram | array | Per-channel statistics (min, max, mean, standard deviation) |
 
-## Notes
+## Notes {#notes}
 
 - This is a read-only endpoint. It does not produce a downloadable output file or a `jobId`.
 - For RAW format images (DNG, CR2, NEF, ARW, etc.), ExifTool is used to extract true sensor dimensions and metadata flags that Sharp cannot read directly.

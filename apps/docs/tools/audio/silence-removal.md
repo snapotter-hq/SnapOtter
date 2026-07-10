@@ -2,24 +2,24 @@
 description: Strip silent sections from an audio file.
 ---
 
-# Silence Removal
+# Silence Removal {#silence-removal}
 
 Detect and remove silent sections from an audio file based on a configurable threshold and minimum duration.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/silence-removal`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | thresholdDb | number | No | `-50` | Silence threshold in dB (-80 to -20). Audio below this level is considered silent. |
 | minSilenceS | number | No | `0.5` | Minimum silence duration in seconds to remove (0.1 to 5) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/silence-removal \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/silence-removal \
   -F 'settings={"thresholdDb": -45, "minSilenceS": 1}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/silence-removal \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - A higher (less negative) threshold is more aggressive and removes quieter passages as well as true silence.
 - Increase `minSilenceS` to only strip longer pauses while keeping short natural gaps.

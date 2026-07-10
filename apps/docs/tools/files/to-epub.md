@@ -2,21 +2,21 @@
 description: Convert Word, Markdown, HTML, or plain text files to EPUB.
 ---
 
-# Convert to EPUB
+# Convert to EPUB {#convert-to-epub}
 
 Convert Word documents, Markdown, HTML, or plain text files into the EPUB e-book format.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/to-epub`
 
 Accepts multipart form data with a Word/Markdown/HTML/TXT file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a document and it will be converted to EPUB.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/to-epub \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/to-epub \
   -F "file=@manuscript.docx"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.docx`, `.md`, `.html`, `.txt`.
 - The EPUB output follows the EPUB 3 specification.

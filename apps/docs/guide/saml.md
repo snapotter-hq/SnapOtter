@@ -2,7 +2,7 @@
 description: Set up SAML 2.0 Single Sign-On for SnapOtter. Step-by-step guides for Okta, Azure AD / Entra ID, Google Workspace, and other SAML identity providers.
 ---
 
-# SAML SSO
+# SAML SSO {#saml-sso}
 
 SnapOtter supports SAML 2.0 for single sign-on. Users can log in via an external identity provider (Okta, Azure AD / Entra ID, Google Workspace, or any standard SAML 2.0 IdP) instead of local username/password authentication.
 
@@ -10,14 +10,14 @@ SnapOtter supports SAML 2.0 for single sign-on. Users can log in via an external
 SAML SSO requires a **team** or **enterprise** license with the `saml_sso` feature. If `SAML_ENABLED=true` is set without a valid license, the SAML routes are silently skipped and a warning is logged.
 :::
 
-## Prerequisites
+## Prerequisites {#prerequisites}
 
 - A running SnapOtter instance reachable at a public URL
 - `EXTERNAL_URL` set to that public URL (e.g. `https://photos.example.com`)
 - A team or enterprise license key with the `saml_sso` feature
 - Admin access to your SAML identity provider
 
-## Quick start
+## Quick start {#quick-start}
 
 Add these environment variables to your `docker-compose.yml`:
 
@@ -38,7 +38,7 @@ services:
 
 Restart the container. A "Sign in with SAML" button (or the label set by `SAML_PROVIDER_NAME`) appears on the login page.
 
-## Configuration reference
+## Configuration reference {#configuration-reference}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -63,7 +63,7 @@ Both `wantAuthnResponseSigned` and `wantAssertionsSigned` are hardcoded to `true
 Only SP-initiated login is supported. SnapOtter does not support IdP-initiated (unsolicited) login or Single Logout (SLO). Logging out of SnapOtter does not log the user out of the IdP.
 :::
 
-## SP metadata and URLs
+## SP metadata and URLs {#sp-metadata-and-urls}
 
 Your IdP needs three values from SnapOtter:
 
@@ -81,9 +81,9 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`:
 
 Some IdPs can import the SP metadata URL directly, which auto-fills the ACS URL and Entity ID.
 
-## Provider setup
+## Provider setup {#provider-setup}
 
-### Okta
+### Okta {#okta}
 
 1. In the Okta admin console, go to **Applications > Create App Integration**.
 2. Select **SAML 2.0** and click **Next**.
@@ -99,7 +99,7 @@ Some IdPs can import the SP metadata URL directly, which auto-fills the ACS URL 
    - **Identity Provider Single Sign-On URL** into `SAML_IDP_SSO_URL`
    - **X.509 Certificate** into `SAML_IDP_CERTIFICATE`
 
-### Azure AD / Entra ID
+### Azure AD / Entra ID {#azure-ad-entra-id}
 
 1. In the Azure portal, go to **Microsoft Entra ID > Enterprise applications > New application**.
 2. Click **Create your own application**, name it "SnapOtter", and select **Integrate any other application you don't find in the gallery**.
@@ -111,7 +111,7 @@ Some IdPs can import the SP metadata URL directly, which auto-fills the ACS URL 
 6. Set `SAML_IDP_SSO_URL` to the Login URL and `SAML_IDP_CERTIFICATE` to the downloaded certificate contents.
 7. Assign users or groups to the application under **Users and groups**.
 
-### Google Workspace
+### Google Workspace {#google-workspace}
 
 1. In the Google Admin console, go to **Apps > Web and mobile apps > Add app > Add custom SAML app**.
 2. Name the app "SnapOtter" and click **Continue**.
@@ -125,7 +125,7 @@ Some IdPs can import the SP metadata URL directly, which auto-fills the ACS URL 
 6. Turn the app **ON** for your organizational units.
 7. Set `SAML_IDP_SSO_URL` to the SSO URL from step 3 and `SAML_IDP_CERTIFICATE` to the downloaded certificate contents.
 
-### Generic SAML 2.0 IdP
+### Generic SAML 2.0 IdP {#generic-saml-2-0-idp}
 
 For any SAML 2.0 compliant identity provider:
 
@@ -135,9 +135,9 @@ For any SAML 2.0 compliant identity provider:
 4. Configure the IdP to send the user's email in an attribute named `email` (or set `SAML_EMAIL_ATTRIBUTE` to match your IdP's attribute name).
 5. Copy the **IdP SSO URL** and **signing certificate** into `SAML_IDP_SSO_URL` and `SAML_IDP_CERTIFICATE`.
 
-## User provisioning
+## User provisioning {#user-provisioning}
 
-### Auto-create
+### Auto-create {#auto-create}
 
 When `SAML_AUTO_CREATE_USERS` is `true` (the default), a local user account is created the first time someone logs in via SAML. The role is set to `SAML_DEFAULT_ROLE`.
 
@@ -149,7 +149,7 @@ The username is derived in this order:
 
 If a username collision occurs, a numeric suffix is appended (e.g. `jane` becomes `jane_2`).
 
-### Auto-link
+### Auto-link {#auto-link}
 
 When `SAML_AUTO_LINK_USERS` is `true`, SnapOtter links a SAML identity to an existing local account if the email addresses match. This is useful when you have pre-created user accounts and want them to start using SSO without losing their data.
 
@@ -157,7 +157,7 @@ When `SAML_AUTO_LINK_USERS` is `true`, SnapOtter links a SAML identity to an exi
 Only enable auto-link if you trust your SAML IdP to verify email addresses. An unverified email from a misconfigured IdP could allow someone to take over another user's account.
 :::
 
-### Attribute mapping
+### Attribute mapping {#attribute-mapping}
 
 | SnapOtter field | Source | Configuration |
 |---|---|---|
@@ -165,7 +165,7 @@ Only enable auto-link if you trust your SAML IdP to verify email addresses. An u
 | Username | Assertion attribute, email, or NameID | `SAML_USERNAME_ATTRIBUTE` (see derivation order above) |
 | External ID | NameID | Always the SAML NameID, not configurable |
 
-## SSO enforcement
+## SSO enforcement {#sso-enforcement}
 
 If you want to require all users to log in via SAML (or OIDC) and block local password login, enable SSO enforcement:
 
@@ -179,15 +179,15 @@ When SSO enforcement is active, any local login attempt (except for the break-gl
 Always configure a break-glass username before enabling SSO enforcement. Without it, you could be locked out of SnapOtter if your IdP goes down.
 :::
 
-## Using SAML alongside OIDC
+## Using SAML alongside OIDC {#using-saml-alongside-oidc}
 
 SAML and OIDC can be enabled simultaneously. When both are active, the login page shows separate buttons for each provider (labeled by `SAML_PROVIDER_NAME` and `OIDC_PROVIDER_NAME`). Users can log in with either method.
 
 Both providers share the same auto-create, auto-link, and SSO enforcement settings independently: each has its own `*_AUTO_CREATE_USERS`, `*_AUTO_LINK_USERS`, and `*_DEFAULT_ROLE` variables.
 
-## Troubleshooting
+## Troubleshooting {#troubleshooting}
 
-### Assertion validation failed
+### Assertion validation failed {#assertion-validation-failed}
 
 The SAML response signature or assertion signature could not be verified. Check:
 
@@ -196,7 +196,7 @@ The SAML response signature or assertion signature could not be verified. Check:
 - The certificate is the full text, not a file path
 - The ACS URL and Entity ID configured in your IdP match SnapOtter's values exactly (scheme, host, port, path)
 
-### Missing attributes
+### Missing attributes {#missing-attributes}
 
 If usernames or emails are empty after login, your IdP may not be sending the expected attributes. Check:
 
@@ -204,15 +204,15 @@ If usernames or emails are empty after login, your IdP may not be sending the ex
 - If using `SAML_USERNAME_ATTRIBUTE`, verify that attribute is included in the assertion
 - Some IdPs require explicit attribute mapping configuration before they release claims
 
-### Clock skew
+### Clock skew {#clock-skew}
 
 SAML assertions include timestamp conditions (`NotBefore`, `NotOnOrAfter`). If your server clock and the IdP clock are out of sync, assertion validation fails. Run NTP on both machines to keep clocks aligned.
 
-### "SAML is enabled via env but saml_sso enterprise feature is not licensed"
+### "SAML is enabled via env but saml_sso enterprise feature is not licensed" {#saml-is-enabled-via-env-but-saml-sso-enterprise-feature-is-not-licensed}
 
 This warning appears in the server logs when `SAML_ENABLED=true` but the license does not include the `saml_sso` feature. Verify your license key and plan. The `saml_sso` feature is available on team and enterprise plans.
 
-### Login redirects back with error
+### Login redirects back with error {#login-redirects-back-with-error}
 
 If clicking the SAML login button redirects back to the login page with an error, check the server logs for details. Common causes:
 

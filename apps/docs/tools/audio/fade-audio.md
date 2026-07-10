@@ -2,24 +2,24 @@
 description: Add fade-in and fade-out effects to audio.
 ---
 
-# Fade Audio
+# Fade Audio {#fade-audio}
 
 Add fade-in and fade-out effects to the beginning and end of an audio file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/fade-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | fadeInS | number | No | `1` | Fade-in duration in seconds (0 to 30) |
 | fadeOutS | number | No | `1` | Fade-out duration in seconds (0 to 30) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/fade-audio \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/fade-audio \
   -F 'settings={"fadeInS": 2, "fadeOutS": 3}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/fade-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Set either value to `0` to skip that fade direction. At least one must be greater than 0.
 - The fade duration is clamped to the audio length if it exceeds it.

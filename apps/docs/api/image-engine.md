@@ -2,13 +2,13 @@
 description: Image engine operations reference. All Sharp-based image processing operations and their parameters.
 ---
 
-# Image engine
+# Image engine {#image-engine}
 
 The `@snapotter/image-engine` package handles all non-AI image operations. It wraps [Sharp](https://sharp.pixelplumbing.com/) and runs entirely in-process with no external dependencies.
 
-## Operations
+## Operations {#operations}
 
-### resize
+### resize {#resize}
 
 Scale an image to specific dimensions or by percentage.
 
@@ -22,7 +22,7 @@ Scale an image to specific dimensions or by percentage.
 
 You can set `width`, `height`, or both. If you only set one, the other is calculated to maintain the aspect ratio.
 
-### crop
+### crop {#crop}
 
 Cut out a rectangular region from the image.
 
@@ -34,7 +34,7 @@ Cut out a rectangular region from the image.
 | `height` | number | Height of the crop area |
 | `unit` | string | `px` (default) or `percent` |
 
-### rotate
+### rotate {#rotate}
 
 Rotate the image by a given angle.
 
@@ -43,7 +43,7 @@ Rotate the image by a given angle.
 | `angle` | number | Rotation angle in degrees (0-360) |
 | `background` | string | Fill color for exposed area (default: `#000000`). Only applies to non-90-degree angles. |
 
-### flip
+### flip {#flip}
 
 Mirror the image horizontally, vertically, or both. At least one must be true.
 
@@ -52,7 +52,7 @@ Mirror the image horizontally, vertically, or both. At least one must be true.
 | `horizontal` | boolean | Mirror left to right |
 | `vertical` | boolean | Mirror top to bottom |
 
-### convert
+### convert {#convert}
 
 Change the image format.
 
@@ -63,7 +63,7 @@ Change the image format.
 
 The first seven formats (`jpg` through `jxl`) are encoded by Sharp in-process. The remaining formats use external encoders at the API layer: `heic`/`heif` via heif-enc, `bmp`/`ico` via ImageMagick, `jp2` via opj_compress, and `qoi` via an inline TypeScript codec.
 
-### compress
+### compress {#compress}
 
 Reduce file size while keeping the same format.
 
@@ -73,7 +73,7 @@ Reduce file size while keeping the same format.
 | `targetSizeBytes` | number | Optional target file size in bytes |
 | `format` | string | Optional format override |
 
-### strip-metadata
+### strip-metadata {#strip-metadata}
 
 Remove EXIF, IPTC, XMP, and ICC metadata from the image. With no parameters (or `stripAll: true`), strips everything. Pass individual flags for selective stripping.
 
@@ -85,7 +85,7 @@ Remove EXIF, IPTC, XMP, and ICC metadata from the image. With no parameters (or 
 | `stripIcc` | boolean | Strip ICC color profile |
 | `stripXmp` | boolean | Strip XMP metadata |
 
-### Color adjustments
+### Color adjustments {#color-adjustments}
 
 These operations modify the color properties of an image. Each takes a single numeric value.
 
@@ -95,7 +95,7 @@ These operations modify the color properties of an image. Each takes a single nu
 | `contrast` | `value` | -100 to 100 | Adjust contrast |
 | `saturation` | `value` | -100 to 100 | Adjust color saturation |
 
-### Color filters
+### Color filters {#color-filters}
 
 These apply a fixed color transformation. They take no parameters.
 
@@ -105,7 +105,7 @@ These apply a fixed color transformation. They take no parameters.
 | `sepia` | Apply a sepia tone |
 | `invert` | Invert all colors |
 
-### Color channels
+### Color channels {#color-channels}
 
 Adjust individual RGB color channels. Values are multipliers where 100 = no change.
 
@@ -115,7 +115,7 @@ Adjust individual RGB color channels. Values are multipliers where 100 = no chan
 | `green` | number | Green channel multiplier (0 to 200, 100 = unchanged) |
 | `blue` | number | Blue channel multiplier (0 to 200, 100 = unchanged) |
 
-### sharpen
+### sharpen {#sharpen}
 
 Simple sharpening controlled by a single value.
 
@@ -123,7 +123,7 @@ Simple sharpening controlled by a single value.
 |---|---|---|
 | `value` | number | Sharpening intensity (0 to 100). Mapped to a Gaussian sigma of 0.5-10. |
 
-### sharpen-advanced
+### sharpen-advanced {#sharpen-advanced}
 
 Advanced sharpening with three selectable methods and an optional noise-reduction pre-pass.
 
@@ -145,7 +145,7 @@ Advanced sharpening with three selectable methods and an optional noise-reductio
 
 Parameters are method-specific. Only supply the ones relevant to the chosen method.
 
-### color-blindness
+### color-blindness {#color-blindness}
 
 Simulate a color vision deficiency using a 3x3 color-recombination matrix.
 
@@ -153,7 +153,7 @@ Simulate a color vision deficiency using a 3x3 color-recombination matrix.
 |---|---|---|
 | `type` | string | One of: `protanopia`, `deuteranopia`, `tritanopia`, `protanomaly`, `deuteranomaly`, `tritanomaly`, `achromatopsia`, `blueConeMonochromacy` |
 
-### edit-metadata
+### edit-metadata {#edit-metadata}
 
 Write or remove individual EXIF/IPTC metadata fields without stripping the entire block.
 
@@ -170,7 +170,7 @@ Write or remove individual EXIF/IPTC metadata fields without stripping the entir
 
 All parameters are optional. Fields listed in `fieldsToRemove` are deleted from the existing EXIF block. Fields set via the named parameters are written (or overwritten). Binary/unsafe keys like MakerNote are silently ignored.
 
-## Format detection
+## Format detection {#format-detection}
 
 The engine detects input formats automatically from file headers, not just file extensions. This means a `.jpg` file that is actually a PNG will be handled correctly. Detection uses a multi-layer approach: magic bytes first, then file extension as fallback.
 
@@ -178,7 +178,7 @@ SnapOtter supports **55+ input formats** and **13 output formats**, including 23
 
 See the [Supported Formats](/guide/supported-formats) page for the complete list.
 
-## Metadata extraction
+## Metadata extraction {#metadata-extraction}
 
 The `info` tool returns image metadata. See [Image Info](/tools/image/info) for the full field reference.
 

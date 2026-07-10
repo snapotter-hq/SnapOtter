@@ -2,24 +2,24 @@
 description: Add solid-color bars to fit a target aspect ratio.
 ---
 
-# Aspect Pad
+# Aspect Pad {#aspect-pad}
 
 Add solid-color letterbox or pillarbox bars to fit a video into a target aspect ratio without cropping.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/aspect-pad`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | target | string | No | `"9:16"` | Target aspect ratio: `16:9`, `9:16`, `1:1`, `4:3`, `3:4` |
 | color | string | No | `"#000000"` | Hex color for the padding bars (e.g. `"#000000"` for black) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/aspect-pad \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/aspect-pad \
   -F 'settings={"target": "1:1", "color": "#ffffff"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/aspect-pad \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - If the video already matches the target aspect ratio, the file is returned unchanged.
 - Use `9:16` for vertical/portrait social media formats (TikTok, Reels, Shorts).

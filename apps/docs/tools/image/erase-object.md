@@ -2,11 +2,11 @@
 description: Remove unwanted objects from images with AI inpainting (LaMa), guided by a mask of the region to erase.
 ---
 
-# Object Eraser
+# Object Eraser {#object-eraser}
 
 Remove unwanted objects from images using AI inpainting (LaMa model). Accepts an image and a mask indicating the region to erase.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/erase-object`
 
@@ -14,7 +14,7 @@ Remove unwanted objects from images using AI inpainting (LaMa model). Accepts an
 
 **Model bundle:** `object-eraser-colorize` (1-2 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Remove unwanted objects from images using AI inpainting (LaMa model). Accepts an
 | format | string | No | `"auto"` | Output format: `auto`, `png`, `jpg`, `jpeg`, `webp`, `tiff`, `gif`, `avif`, `heic`, `heif`, `jxl` |
 | quality | integer | No | `95` | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/erase-object \
@@ -33,9 +33,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/erase-object \
   -F "quality=95"
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -44,14 +44,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/erase-object \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Inpainting...","percent":70}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -67,7 +67,7 @@ data: {"phase":"processing","stage":"Inpainting...","percent":70}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `object-eraser-colorize` model bundle to be installed (1-2 GB).
 - The mask must be the same dimensions as the source image. White pixels indicate areas to erase; the AI fills them with plausible content.

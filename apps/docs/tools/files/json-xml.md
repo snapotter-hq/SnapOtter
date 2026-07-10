@@ -2,23 +2,23 @@
 description: Convert between JSON and XML, both directions.
 ---
 
-# JSON to XML
+# JSON to XML {#json-to-xml}
 
 Convert between JSON and XML formats in both directions. Upload a JSON file to get XML, or upload an XML file to get JSON.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/json-xml`
 
 Accepts multipart form data with a JSON or XML file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | pretty | boolean | No | `true` | Pretty-print output with indentation |
 
-## Example Request
+## Example Request {#example-request}
 
 JSON to XML:
 
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/json-xml \
   -F 'settings={"pretty": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/json-xml \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Conversion direction is auto-detected from the input file extension: `.json` produces `.xml`, and `.xml` produces `.json`.
 - The `pretty` parameter applies to both directions. When `false`, the output is compact with no indentation.

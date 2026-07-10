@@ -2,11 +2,11 @@
 description: Extract text from images using AI-powered optical character recognition.
 ---
 
-# OCR / Text Extraction
+# OCR / Text Extraction {#ocr-text-extraction}
 
 Extract text from images using AI-powered optical character recognition. Supports multiple languages and quality tiers.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/ocr`
 
@@ -14,7 +14,7 @@ Extract text from images using AI-powered optical character recognition. Support
 
 **Model bundle:** `ocr` (5-6 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Extract text from images using AI-powered optical character recognition. Support
 | enhance | boolean | No | `true` | Pre-process image for better OCR accuracy |
 | engine | string | No | - | Deprecated. Use `quality` instead. Maps `tesseract` to `fast`, `paddleocr` to `balanced` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
@@ -32,7 +32,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Response (200 OK)
+## Response (200 OK) {#response-200-ok}
 
 ```json
 {
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
 }
 ```
 
-### Progress (SSE, optional)
+### Progress (SSE, optional) {#progress-sse-optional}
 
 If a `clientJobId` form field is provided, progress events are streamed:
 
@@ -52,7 +52,7 @@ event: progress
 data: {"phase":"processing","stage":"Recognizing text...","percent":50}
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `ocr` model bundle to be installed (5-6 GB).
 - OCR returns extracted text directly rather than an image download URL.

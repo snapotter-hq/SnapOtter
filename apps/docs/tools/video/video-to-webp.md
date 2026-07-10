@@ -2,17 +2,17 @@
 description: Convert a video clip into an animated WebP image.
 ---
 
-# Video to WebP
+# Video to WebP {#video-to-webp}
 
 Convert a video clip into an animated WebP image with configurable frame rate, width, and quality.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/video-to-webp`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 | quality | integer | No | `75` | WebP compression quality (1-100) |
 | loop | boolean | No | `true` | Loop the animation |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/video-to-webp \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-to-webp \
   -F 'settings={"fps": 15, "width": 640, "quality": 80}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-to-webp \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Animated WebP produces smaller files than GIF with better color support (24-bit vs 8-bit palette).
 - Lower `quality` values produce smaller files at the cost of visual fidelity.

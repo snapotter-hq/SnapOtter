@@ -2,17 +2,17 @@
 description: Cut a clip out of a video by specifying start and end times.
 ---
 
-# Trim Video
+# Trim Video {#trim-video}
 
 Cut a clip out of a video by specifying start and end times in seconds, with an option for frame-accurate cuts.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/trim-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 | endS | number | Yes | - | End time in seconds (must be after startS) |
 | precise | boolean | No | `false` | Re-encode for frame-accurate cuts instead of keyframe seek |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/trim-video \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/trim-video \
   -F 'settings={"startS": 5, "endS": 30, "precise": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/trim-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - When `precise` is `false` (the default), the tool uses keyframe seeking, which is fast but may start a few frames before the requested time.
 - Setting `precise` to `true` re-encodes the segment for exact frame boundaries, but takes longer.

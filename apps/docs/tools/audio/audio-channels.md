@@ -2,23 +2,23 @@
 description: Convert between mono and stereo or swap left and right channels.
 ---
 
-# Audio Channels
+# Audio Channels {#audio-channels}
 
 Convert audio between mono and stereo layouts, or swap the left and right channels of a stereo file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/audio-channels`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | mode | string | Yes | - | Channel operation: `stereo-to-mono`, `mono-to-stereo`, `swap` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/audio-channels \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-channels \
   -F 'settings={"mode": "stereo-to-mono"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-channels \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - `stereo-to-mono` mixes both channels into a single mono track.
 - `mono-to-stereo` duplicates the mono channel to both left and right.

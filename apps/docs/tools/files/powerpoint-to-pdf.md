@@ -2,21 +2,21 @@
 description: Convert presentations to PDF.
 ---
 
-# PowerPoint to PDF
+# PowerPoint to PDF {#powerpoint-to-pdf}
 
 Convert PowerPoint or OpenDocument presentations to PDF, with one slide per page.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/powerpoint-to-pdf`
 
 Accepts multipart form data with a PowerPoint/ODP file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a presentation and it will be converted to PDF.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/powerpoint-to-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/powerpoint-to-pdf \
   -F "file=@slides.pptx"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.pptx`, `.ppt`, `.odp`.
 - Each slide becomes one page in the PDF.

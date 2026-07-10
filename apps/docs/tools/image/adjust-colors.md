@@ -2,17 +2,17 @@
 description: Adjust brightness, contrast, saturation, temperature, hue, channels, and apply color effects.
 ---
 
-# Adjust Colors
+# Adjust Colors {#adjust-colors}
 
 Comprehensive color adjustment tool combining brightness, contrast, exposure, saturation, temperature, tint, hue rotation, per-channel levels, and one-click effects (grayscale, sepia, invert) in a single endpoint.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/adjust-colors`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -29,7 +29,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | blue | number | No | `100` | Blue channel level (0 to 200, 100 = unchanged) |
 | effect | string | No | `"none"` | Color effect: `none`, `grayscale`, `sepia`, `invert` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/adjust-colors \
@@ -47,7 +47,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/adjust-colors \
   -F 'settings={"temperature": 40, "saturation": -15, "contrast": 10, "effect": "sepia"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -58,7 +58,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/adjust-colors \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - All parameters default to neutral values so you can adjust only what you need.
 - Adjustments are applied in this order: brightness, contrast, exposure, saturation/hue, temperature/tint, sharpness, channels, effects.

@@ -2,17 +2,17 @@
 description: Pad an image to a target aspect ratio with a solid color, transparent, or blurred background.
 ---
 
-# Image Pad
+# Image Pad {#image-pad}
 
 Pad an image to a target aspect ratio by adding a solid color, transparent, or blurred background around it. Useful for fitting images into fixed aspect ratios for social media or print without cropping.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/image-pad`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | color | string | No | `"#ffffff"` | Background hex color (when background is `color`) |
 | padding | integer | No | `0` | Extra padding as percentage of canvas (0-50) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/image-pad \
@@ -32,7 +32,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-pad \
   -F 'settings={"target": "16:9", "background": "blur", "padding": 5}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-pad \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The `blur` background mode creates a blurred copy of the original image as the pad fill, producing a visually cohesive result.
 - When using `transparent` background, the output is converted to PNG to preserve alpha.

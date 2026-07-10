@@ -2,17 +2,17 @@
 description: Split audio by time intervals, equal parts, or silence detection.
 ---
 
-# Split Audio
+# Split Audio {#split-audio}
 
 Split an audio file into segments by fixed time intervals, equal parts, or automatic silence detection. Returns a ZIP archive of the segments.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/split-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with an audio file and a JSON `settings` field.
 | thresholdDb | number | No | `-40` | Silence threshold in dB, -80 to -20 (used when mode is `silence`) |
 | minSilenceS | number | No | `0.3` | Minimum silence gap in seconds, 0.1 to 10 (used when mode is `silence`) |
 
-## Example Request
+## Example Request {#example-request}
 
 Split into 30-second segments:
 
@@ -42,7 +42,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/split-audio \
   -F 'settings={"mode": "silence", "thresholdDb": -35, "minSilenceS": 0.5}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -53,7 +53,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/split-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The `downloadUrl` points to a ZIP archive containing all segments.
 - Only the parameters relevant to the chosen `mode` are used; others are ignored.

@@ -2,23 +2,23 @@
 description: Reduce camera shake with two-pass stabilization.
 ---
 
-# Stabilize Video
+# Stabilize Video {#stabilize-video}
 
 Reduce camera shake in handheld footage using FFmpeg's two-pass vidstab stabilization.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/stabilize-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field. This is an async endpoint - it returns `202 Accepted` immediately and progress is streamed via SSE at `GET /api/v1/jobs/{jobId}/progress`.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | smoothing | integer | No | `15` | Smoothing window size in frames (5-60). Higher values produce smoother motion |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/stabilize-video \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/stabilize-video \
   -F 'settings={"smoothing": 30}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -36,7 +36,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/stabilize-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Stabilization is a two-pass process: the first pass analyzes camera motion, and the second pass applies the correction. This takes roughly twice as long as single-pass tools.
 - Higher smoothing values remove more shake but may introduce a slight zoom crop at the edges.

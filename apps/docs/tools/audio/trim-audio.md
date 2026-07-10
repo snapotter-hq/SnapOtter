@@ -2,24 +2,24 @@
 description: Cut a section out of an audio file by specifying start and end times.
 ---
 
-# Trim Audio
+# Trim Audio {#trim-audio}
 
 Cut a section out of an audio file by specifying start and end times in seconds.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/trim-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | startS | number | No | `0` | Start time in seconds (minimum 0) |
 | endS | number | Yes | - | End time in seconds (must be after start) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
   -F 'settings={"startS": 10, "endS": 45}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Times are specified in seconds and can include decimals (e.g. `10.5`).
 - The `endS` value must be greater than `startS`.

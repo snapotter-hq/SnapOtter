@@ -2,17 +2,17 @@
 description: Convert animated GIF to WebP and vice versa, preserving all frames.
 ---
 
-# GIF/WebP Converter
+# GIF/WebP Converter {#gif-webp-converter}
 
 Convert animated GIF files to WebP and vice versa, preserving all frames and animation timing. WebP animations are typically 25-35% smaller than equivalent GIFs.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/gif-webp`
 
 Accepts multipart form data with a GIF or WebP file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with a GIF or WebP file and a JSON `settings` field.
 | lossless | boolean | No | `false` | Use lossless WebP compression |
 | resizePercent | integer | No | `100` | Scale the output by percentage (10-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-webp \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-webp \
   -F 'settings={"quality": 85, "resizePercent": 50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-webp \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Only `.gif` and `.webp` files are accepted. Other image formats are not supported by this tool.
 - The conversion direction is automatic: GIF input produces WebP output, and WebP input produces GIF output.

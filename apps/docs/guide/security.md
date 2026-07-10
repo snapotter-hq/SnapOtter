@@ -2,13 +2,13 @@
 description: Security hardening guide for SnapOtter. Container security, network isolation, Docker secrets, Kubernetes deployment, and compliance artifacts.
 ---
 
-# Security & Hardening
+# Security & Hardening {#security-hardening}
 
 SnapOtter processes files entirely on your infrastructure. It sends anonymous, content-free product analytics and crash reports by default to help improve the project. It never sends your files, file names, file contents, OCR output, image metadata, or document text. Optional feedback is sent only after a user submits it, only when analytics is enabled, and contact fields are included only with explicit contact consent. An administrator can turn analytics and feedback capture off in one click under Settings > System > Privacy, no rebuild required. File processing always stays inside your container.
 
 The container runs as a dedicated non-root user (`snapotter`) with all Linux capabilities dropped except the minimum required set. For the full vulnerability disclosure policy and security architecture, see [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) on GitHub.
 
-## Container Hardening
+## Container Hardening {#container-hardening}
 
 The [default docker-compose.yml](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) includes production security hardening. Here is a breakdown of each option and why it matters:
 
@@ -104,17 +104,17 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-### Why `no-new-privileges` Is Not Set
+### Why `no-new-privileges` Is Not Set {#why-no-new-privileges-is-not-set}
 
 `security_opt: [no-new-privileges:true]` is intentionally omitted. The entrypoint starts as root to fix volume ownership, then drops to the `snapotter` user via [gosu](https://github.com/tianon/gosu), which requires setuid. Once the privilege drop completes, the process runs as `snapotter` with all capabilities except the five listed above removed.
 
 If you use Kubernetes or Docker's `--user` flag to run as non-root directly (bypassing gosu), `no-new-privileges` is safe to enable.
 
-### Why `read_only` Is Not Set
+### Why `read_only` Is Not Set {#why-read-only-is-not-set}
 
 `read_only: true` is not set because PUID/PGID remapping writes to `/etc/passwd` and `/etc/group` at startup. If you use Docker's `--user` flag or Kubernetes `runAsUser` instead of PUID/PGID, you can safely enable a read-only root filesystem.
 
-## Network Isolation
+## Network Isolation {#network-isolation}
 
 During normal operation, the container makes **zero outbound network connections**. All file processing happens locally using bundled libraries.
 
@@ -134,7 +134,7 @@ The only exception is **AI model downloads**: when a user installs an AI feature
 
 For reverse proxy configuration (Nginx, Traefik, Caddy, Cloudflare Tunnels), see the [Deployment guide](/guide/deployment#reverse-proxy).
 
-## Docker Secrets
+## Docker Secrets {#docker-secrets}
 
 For production deployments, avoid passing secrets as plain-text environment variables. The entrypoint supports Docker's `_FILE` convention: mount a secret as a file and set the corresponding `_FILE` variable to its path.
 
@@ -175,7 +175,7 @@ secrets:
 Docker Compose secrets (without Swarm) require Compose v2.23 or later.
 :::
 
-## Kubernetes Deployment
+## Kubernetes Deployment {#kubernetes-deployment}
 
 The entrypoint detects when the container is already running as non-root (e.g., via Kubernetes `runAsUser`) and skips the gosu privilege drop automatically. In that case it cannot chown the mounted volumes itself, so it verifies they are writable and exits early with actionable guidance if they are not — see [Storage permissions](/guide/deployment#storage-permissions) for `fsGroup` and foreign-UID setups (TrueNAS, OpenShift).
 
@@ -250,7 +250,7 @@ Since `runAsUser: 999` is set at the pod level, the entrypoint skips gosu entire
 
 For resource sizing, see [Hardware Requirements](/guide/deployment#hardware-requirements).
 
-## Backup and Recovery
+## Backup and Recovery {#backup-and-recovery}
 
 Persistent state is split across two volumes:
 
@@ -267,7 +267,7 @@ Within the `/data` volume:
 | `/data/ai/` | Downloaded AI model files | No (re-downloadable) |
 | `/data/venv/` | Python virtual environment | No (rebuilt on start) |
 
-### Database backup
+### Database backup {#database-backup}
 
 Use `pg_dump` to back up the database while the stack is running:
 
@@ -287,7 +287,7 @@ docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
   alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
 ```
 
-### User files backup
+### User files backup {#user-files-backup}
 
 ```bash
 # Snapshot the app data volume (excluding re-downloadable AI models)
@@ -298,7 +298,7 @@ docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
 
 AI models total up to about 24 GB across all bundles. Since they are re-downloadable, exclude `/data/ai/` and `/data/venv/` from backups to save space. Only the database and user files are critical.
 
-## Compliance Artifacts
+## Compliance Artifacts {#compliance-artifacts}
 
 Each SnapOtter release includes the following security artifacts:
 

@@ -2,17 +2,17 @@
 description: View, edit, or strip audio metadata tags (ID3).
 ---
 
-# Audio Metadata
+# Audio Metadata {#audio-metadata}
 
 View, edit, or strip audio metadata tags such as title, artist, and album (ID3 and similar tag formats).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/audio-metadata`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with an audio file and a JSON `settings` field.
 | artist | string | No | - | Set the artist tag (max 500 characters) |
 | album | string | No | - | Set the album tag (max 500 characters) |
 
-## Example Request
+## Example Request {#example-request}
 
 Edit metadata tags:
 
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-metadata \
   -F 'settings={"strip": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -62,7 +62,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/audio-metadata \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The response includes a `metadata` object with container format, duration, bitrate, and current tags.
 - When `strip` is `true`, all tag fields are ignored and every existing tag is removed.

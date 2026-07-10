@@ -2,7 +2,7 @@
 description: Set up SCIM 2.0 provisioning to sync users and groups from your identity provider to SnapOtter. Covers Okta, Azure AD / Entra ID, and custom integrations.
 ---
 
-# SCIM Provisioning
+# SCIM Provisioning {#scim-provisioning}
 
 SnapOtter implements SCIM 2.0 (System for Cross-domain Identity Management) for automated user and group provisioning. Your identity provider can create, update, deactivate, and reactivate user accounts and sync group memberships automatically.
 
@@ -10,14 +10,14 @@ SnapOtter implements SCIM 2.0 (System for Cross-domain Identity Management) for 
 SCIM provisioning requires an **enterprise** license with the `scim` feature. It is not available on the team plan. Without the feature, all SCIM endpoints (except discovery) return 403.
 :::
 
-## Prerequisites
+## Prerequisites {#prerequisites}
 
 - A running SnapOtter instance reachable at a public URL
 - An enterprise license key with the `scim` feature
 - Admin access to SnapOtter (the `users:manage` permission is required to generate or revoke a SCIM token)
 - Admin access to your identity provider's provisioning settings
 
-## Quick start
+## Quick start {#quick-start}
 
 1. Generate a SCIM bearer token:
 
@@ -40,11 +40,11 @@ The response contains the token. Save it immediately; it cannot be retrieved aga
    - **Base URL**: `https://photos.example.com/api/v1/scim/v2`
    - **Authentication**: Bearer token (paste the token from step 1)
 
-## Authentication
+## Authentication {#authentication}
 
 SCIM endpoints use a dedicated Bearer token, separate from user sessions and API keys.
 
-### Generating a token
+### Generating a token {#generating-a-token}
 
 `POST /api/v1/enterprise/scim/token` generates a new SCIM token. This endpoint requires a valid session with the `users:manage` permission.
 
@@ -52,15 +52,15 @@ The token is returned in plaintext exactly once. SnapOtter stores only a scrypt 
 
 Only one SCIM token is active at a time. Generating a new token replaces the previous one.
 
-### Revoking a token
+### Revoking a token {#revoking-a-token}
 
 `DELETE /api/v1/enterprise/scim/token` revokes the current SCIM token. This endpoint also requires `users:manage`.
 
-### Rate limiting
+### Rate limiting {#rate-limiting}
 
 SCIM endpoints are rate-limited to 1000 requests per minute per token. Exceeding this limit returns HTTP 429.
 
-## Supported resources
+## Supported resources {#supported-resources}
 
 | SCIM resource | SnapOtter concept | Create | Read | Update | Delete |
 |---|---|---|---|---|---|
@@ -71,9 +71,9 @@ SCIM endpoints are rate-limited to 1000 requests per minute per token. Exceeding
 SCIM Groups map to SnapOtter **teams**, not roles. SCIM cannot set a user's role. All users created via SCIM are assigned the `user` role. To change a user's role, use the SnapOtter admin UI.
 :::
 
-## User operations
+## User operations {#user-operations}
 
-### Create user
+### Create user {#create-user}
 
 `POST /api/v1/scim/v2/Users`
 
@@ -81,7 +81,7 @@ Creates a new user account with `authProvider` set to `scim` and the `user` role
 
 Required attributes: `userName`. Optional: `externalId`, `emails`, `active` (default `true`).
 
-### List and filter users
+### List and filter users {#list-and-filter-users}
 
 `GET /api/v1/scim/v2/Users`
 
@@ -94,19 +94,19 @@ Filtering supports `eq` (equals) only, on these attributes:
 
 Other filter operators and attributes return HTTP 400.
 
-### Get user
+### Get user {#get-user}
 
 `GET /api/v1/scim/v2/Users/:id`
 
 Returns a single user by their SnapOtter user ID.
 
-### Replace user
+### Replace user {#replace-user}
 
 `PUT /api/v1/scim/v2/Users/:id`
 
 Replaces the user's attributes. Supports `userName`, `externalId`, `emails`, and `active`. Username changes are checked for conflicts (409 if the new username is taken by another user).
 
-### Patch user
+### Patch user {#patch-user}
 
 `PATCH /api/v1/scim/v2/Users/:id`
 
@@ -122,7 +122,7 @@ The `name.formatted` and `displayName` paths are accepted for compatibility but 
 
 Valueless `replace` operations (where the value is an object without a `path`) are also supported, with keys `userName`, `externalId`, `emails`, and `active`.
 
-### Deactivate user (soft delete)
+### Deactivate user (soft delete) {#deactivate-user-soft-delete}
 
 `DELETE /api/v1/scim/v2/Users/:id`
 
@@ -135,7 +135,7 @@ SnapOtter does not hard-delete users via SCIM. Instead, DELETE performs a soft d
 
 The user can no longer log in or use any API keys. Their data (files, history) is retained.
 
-### Reactivate user
+### Reactivate user {#reactivate-user}
 
 To reactivate a previously deactivated user, send a `PUT` or `PATCH` request with `active: true`. SnapOtter restores the original role from before deactivation (e.g. `disabled:editor` becomes `editor` again). If the original role cannot be determined, it falls back to `user`.
 
@@ -159,33 +159,33 @@ To reactivate a previously deactivated user, send a `PUT` or `PATCH` request wit
 ```
 :::
 
-## Group operations
+## Group operations {#group-operations}
 
 SCIM Groups map to SnapOtter teams. Creating a group creates a team. Group membership controls which team a user belongs to.
 
-### Create group
+### Create group {#create-group}
 
 `POST /api/v1/scim/v2/Groups`
 
 Required: `displayName`. Optional: `members` (array of `{ value: userId }`).
 
-### List and filter groups
+### List and filter groups {#list-and-filter-groups}
 
 `GET /api/v1/scim/v2/Groups`
 
 Filtering supports `displayName eq "..."` only. Paginated with `startIndex` and `count` (maximum 200 results per page).
 
-### Get group
+### Get group {#get-group}
 
 `GET /api/v1/scim/v2/Groups/:id`
 
-### Replace group
+### Replace group {#replace-group}
 
 `PUT /api/v1/scim/v2/Groups/:id`
 
 Replaces the group name and full membership list. Existing members not in the new list are moved to the Default team.
 
-### Patch group
+### Patch group {#patch-group}
 
 `PATCH /api/v1/scim/v2/Groups/:id`
 
@@ -198,15 +198,15 @@ Supports these operations:
 | `replace` | `displayName` | Renames the team |
 | `replace` | `members` | Replaces all members (removed members move to the Default team) |
 
-### Delete group
+### Delete group {#delete-group}
 
 `DELETE /api/v1/scim/v2/Groups/:id`
 
 Deletes the team. All members of the deleted team are moved to the Default team. Users are not deactivated or deleted.
 
-## IdP setup
+## IdP setup {#idp-setup}
 
-### Okta
+### Okta {#okta}
 
 1. In the Okta admin console, open your SnapOtter application (or create one).
 2. Go to the **Provisioning** tab and click **Configure API Integration**.
@@ -220,7 +220,7 @@ Deletes the team. All members of the deleted team are moved to the Default team.
    - **Deactivate Users**
 6. Under **Push Groups**, configure which Okta groups to sync as SnapOtter teams.
 
-### Azure AD / Entra ID
+### Azure AD / Entra ID {#azure-ad-entra-id}
 
 1. In the Azure portal, go to your SnapOtter enterprise application.
 2. Go to **Provisioning** and set **Provisioning Mode** to **Automatic**.
@@ -233,7 +233,7 @@ Deletes the team. All members of the deleted team are moved to the Default team.
 
 Azure provisions users and groups on a fixed sync cycle (typically every 40 minutes).
 
-## Discovery endpoints
+## Discovery endpoints {#discovery-endpoints}
 
 These three endpoints are available without authentication and describe the SCIM server's capabilities:
 
@@ -254,7 +254,7 @@ The `ServiceProviderConfig` advertises these capabilities:
 | Sort | No |
 | ETag | No |
 
-## Limitations
+## Limitations {#limitations}
 
 - **Filtering**: Only the `eq` operator is supported. Complex filters, `and`/`or` operators, `co` (contains), and `sw` (starts with) are not implemented.
 - **Bulk operations**: Not supported.
@@ -264,32 +264,32 @@ The `ServiceProviderConfig` advertises these capabilities:
 - **One token**: Only one SCIM token can be active at a time. If multiple IdPs need SCIM access, they must share the token.
 - **Groups are teams**: SCIM Groups correspond to teams, not roles or permission groups.
 
-## Troubleshooting
+## Troubleshooting {#troubleshooting}
 
-### 403 "SCIM provisioning requires an enterprise license with the scim feature"
+### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
 Your license does not include the `scim` feature, or no license is configured. SCIM requires an enterprise plan license. Verify `SNAPOTTER_LICENSE_KEY` is set and the license includes the `scim` feature.
 
-### 401 "Bearer token required"
+### 401 "Bearer token required" {#_401-bearer-token-required}
 
 The SCIM request did not include an `Authorization: Bearer <token>` header. Check your IdP's provisioning configuration.
 
-### 401 "Invalid token"
+### 401 "Invalid token" {#_401-invalid-token}
 
 The token does not match the stored hash. This happens if the token was revoked and regenerated. Update the token in your IdP's provisioning settings.
 
-### 401 "SCIM not configured"
+### 401 "SCIM not configured" {#_401-scim-not-configured}
 
 No SCIM token has been generated yet. Use the `POST /api/v1/enterprise/scim/token` endpoint to create one.
 
-### 409 "User already exists" / "userName already taken"
+### 409 "User already exists" / "userName already taken" {#_409-user-already-exists-username-already-taken}
 
 A user with the same username already exists. This can happen when an IdP retries a failed create. Check for duplicate usernames in the SnapOtter admin panel.
 
-### 429 "SCIM rate limit exceeded"
+### 429 "SCIM rate limit exceeded" {#_429-scim-rate-limit-exceeded}
 
 The IdP is sending more than 1000 requests per minute. This typically happens during a large initial sync. Most IdPs automatically retry after the rate limit window resets. If the problem persists, check your IdP's provisioning sync interval.
 
-### Users deprovisioned but not removed from the UI
+### Users deprovisioned but not removed from the UI {#users-deprovisioned-but-not-removed-from-the-ui}
 
 SCIM DELETE is a soft deactivation. Deactivated users still appear in the admin user list with a disabled status. This is by design so their data is preserved. Their role shows as `disabled:<original-role>`.

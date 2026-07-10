@@ -2,17 +2,17 @@
 description: Sharpen images using adaptive, unsharp mask, or high-pass methods with optional noise reduction.
 ---
 
-# Sharpening
+# Sharpening {#sharpening}
 
 Advanced sharpening tool with three methods: adaptive (smart edge-aware), unsharp mask (classic radius/amount), and high-pass (texture emphasis). Includes built-in noise reduction to prevent sharpening artifacts.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/sharpening`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -30,7 +30,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | kernelSize | number | No | `3` | High-pass: convolution kernel size (3 or 5) |
 | denoise | string | No | `"off"` | Pre-sharpening noise reduction: `off`, `light`, `medium`, `strong` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/sharpening \
@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/sharpening \
   -F 'settings={"method": "unsharp-mask", "amount": 150, "radius": 1.5, "threshold": 10}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -59,7 +59,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/sharpening \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Only parameters relevant to the chosen method are used. For example, `amount`, `radius`, and `threshold` are ignored when `method` is `adaptive`.
 - The adaptive method uses Sharp's built-in adaptive sharpening with configurable flat/jagged region behavior.

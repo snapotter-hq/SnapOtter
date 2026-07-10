@@ -2,11 +2,11 @@
 description: AI-powered detection and correction of red eye caused by camera flash.
 ---
 
-# Red Eye Removal
+# Red Eye Removal {#red-eye-removal}
 
 AI-powered detection and correction of red eye caused by camera flash.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/red-eye-removal`
 
@@ -14,7 +14,7 @@ AI-powered detection and correction of red eye caused by camera flash.
 
 **Model bundle:** `face-detection` (200-300 MB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ AI-powered detection and correction of red eye caused by camera flash.
 | format | string | No | - | Output format (optional override) |
 | quality | number | No | `90` | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/red-eye-removal \
@@ -32,9 +32,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/red-eye-removal \
   -F 'settings={"sensitivity":60,"strength":80}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -43,14 +43,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/red-eye-removal \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Detecting red eyes...","percent":40}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -67,7 +67,7 @@ data: {"phase":"processing","stage":"Detecting red eyes...","percent":40}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `face-detection` model bundle to be installed (200-300 MB).
 - First detects faces, then locates eye regions within each face, and finally identifies and corrects red-eye pixels.

@@ -2,17 +2,17 @@
 description: Dedicated conversion preset endpoints generated from the SnapOtter tool catalog.
 ---
 
-# Conversion Presets
+# Conversion Presets {#conversion-presets}
 
 SnapOtter exposes 83 dedicated conversion preset endpoints in addition to the base converter tools. Each preset locks the output format and delegates to its base processing pipeline, so the behavior, validation, and output contract match the base tool listed below.
 
-## API Endpoint Pattern
+## API Endpoint Pattern {#api-endpoint-pattern}
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Send `multipart/form-data` with a `file` part and optional `settings` JSON string. Presets follow the response contract of the base tool. Fast presets usually return `200` with a `downloadUrl`, but can return `202` if they exceed the synchronous wait window. Video presets and long file/document presets return `202` and progress streams from `/api/v1/jobs/<jobId>/progress`. PDF-to-image presets return page download URLs plus a ZIP URL.
 
-## Image Presets
+## Image Presets {#image-presets}
 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
@@ -58,7 +58,7 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `gif-to-pdf` | GIF to PDF | `/api/v1/tools/image/gif-to-pdf` | `image-to-pdf` | `.gif` | pageSize, orientation, margin, targetSize, collate |
 | `eps-to-pdf` | EPS to PDF | `/api/v1/tools/image/eps-to-pdf` | `image-to-pdf` | `.eps` | pageSize, orientation, margin, targetSize, collate |
 
-## Video Presets
+## Video Presets {#video-presets}
 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
@@ -91,7 +91,7 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `mov-to-wav` | MOV to WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 to OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
 
-## Audio Presets
+## Audio Presets {#audio-presets}
 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
@@ -106,7 +106,7 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `mp3-to-wav` | MP3 to WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | none |
 | `flac-to-mp3` | FLAC to MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | none |
 
-## PDF Presets
+## PDF Presets {#pdf-presets}
 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
@@ -114,13 +114,13 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `pdf-to-png` | PDF to PNG | `/api/v1/tools/pdf/pdf-to-png` | `pdf-to-image` | `.pdf` | dpi, quality, colorMode, pages |
 | `pdf-to-tiff` | PDF to TIFF | `/api/v1/tools/pdf/pdf-to-tiff` | `pdf-to-image` | `.pdf` | dpi, quality, colorMode, pages |
 
-## Files Presets
+## Files Presets {#files-presets}
 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
 
-## Notes
+## Notes {#notes}
 
 - Presets are first-class API endpoints and are also valid in batch requests where their base route supports batch processing.
 - Presets that use video conversion can return `202 Accepted`; connect to the job progress SSE endpoint before downloading the result.

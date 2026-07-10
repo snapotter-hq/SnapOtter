@@ -2,21 +2,21 @@
 description: Attempt to repair a damaged or corrupted PDF.
 ---
 
-# Repair PDF
+# Repair PDF {#repair-pdf}
 
 Attempt to repair a damaged or corrupted PDF by reconstructing its internal structure.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/repair-pdf`
 
 Accepts multipart form data with a PDF file. No `settings` field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Upload the damaged PDF file directly.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/repair-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/repair-pdf \
   -F "file=@damaged.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/repair-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Structural validation is skipped on input to allow malformed files through.
 - Repair is best-effort; severely corrupted files may not be fully recoverable.

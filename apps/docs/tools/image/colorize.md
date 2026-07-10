@@ -2,11 +2,11 @@
 description: Colorize black-and-white or grayscale photos automatically with the DDColor AI model.
 ---
 
-# AI Colorization
+# AI Colorization {#ai-colorization}
 
 Convert black-and-white or grayscale photos to full color using AI (DDColor model with OpenCV DNN fallback).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/colorize`
 
@@ -14,7 +14,7 @@ Convert black-and-white or grayscale photos to full color using AI (DDColor mode
 
 **Model bundle:** `object-eraser-colorize` (1-2 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Convert black-and-white or grayscale photos to full color using AI (DDColor mode
 | intensity | number | No | `1.0` | Color intensity (0-1). Lower values produce more subtle colorization |
 | model | string | No | `"auto"` | Model to use: `auto`, `ddcolor`, `opencv` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/colorize \
@@ -30,9 +30,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/colorize \
   -F 'settings={"intensity":0.9,"model":"auto"}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -41,14 +41,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/colorize \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Colorizing...","percent":55}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -67,7 +67,7 @@ data: {"phase":"processing","stage":"Colorizing...","percent":55}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `object-eraser-colorize` model bundle to be installed (1-2 GB).
 - DDColor produces higher quality results but is slower; OpenCV DNN is faster with slightly lower quality. `auto` uses DDColor when available with OpenCV fallback.

@@ -2,13 +2,13 @@
 description: All SnapOtter environment variables with defaults. Configure auth, storage, AI models, analytics, and more.
 ---
 
-# Configuration
+# Configuration {#configuration}
 
 All configuration is done through environment variables. Every variable has a sensible default, so SnapOtter works out of the box without setting any of them.
 
-## Environment variables
+## Environment variables {#environment-variables}
 
-### Server
+### Server {#server}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -18,7 +18,7 @@ All configuration is done through environment variables. Every variable has a se
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `true` | Trust `X-Forwarded-For` headers from a reverse proxy. Set to `false` if not behind a proxy. |
 
-### Authentication
+### Authentication {#authentication}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -29,7 +29,7 @@ All configuration is done through environment variables. Every variable has a se
 | `SESSION_DURATION_HOURS` | `168` | Login session lifetime in hours (default is 7 days). |
 | `SKIP_MUST_CHANGE_PASSWORD` | - | Set to any non-empty value to bypass the forced password-change prompt on first login |
 
-### Storage
+### Storage {#storage}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -39,7 +39,7 @@ All configuration is done through environment variables. Every variable has a se
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). |
 
-### Embedded mode
+### Embedded mode {#embedded-mode}
 
 Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own PostgreSQL 17 and Redis inside the container, bound to loopback, with all data on the `/data` volume. This restores the single-command `docker run` experience for quick start, homelab, and upgrades from 1.x. It is a convenience path, not a production deployment: for production, run the 3-container Compose stack with separate PostgreSQL and Redis. Embedded mode requires running the container as root and is incompatible with arbitrary-UID runtimes (OpenShift, Kubernetes `runAsNonRoot`); use Compose there.
 
@@ -52,7 +52,7 @@ Upgrading from 1.x: put your old `snapotter.db` at `/data/snapotter.db` in the v
 
 Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, or use the in-app admin opt-out, to disable it.
 
-### Processing limits
+### Processing limits {#processing-limits}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -68,14 +68,14 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_SPLIT_GRID` | `100` | Maximum grid dimension for the image split tool. |
 | `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
 
-### Cleanup
+### Cleanup {#cleanup}
 
 | Variable | Default | Description |
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | How long unsaved processing results (raw uploads and tool outputs) are kept before automatic deletion. Files you explicitly save to the Files library are not affected and persist until you delete them. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup job runs. |
 
-### Appearance
+### Appearance {#appearance}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -83,14 +83,14 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `DEFAULT_LOCALE` | `en` | Default interface language. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Default tool layout. `sidebar` or `fullscreen`. |
 
-### Docker permissions
+### Docker permissions {#docker-permissions}
 
 | Variable | Default | Description |
 |---|---|---|
 | `PUID` | `999` | Run the container process as this UID. Set to match your host user for bind mounts (`id -u`). |
 | `PGID` | `999` | Run the container process as this GID. Set to match your host group for bind mounts (`id -g`). |
 
-## Docker example
+## Docker example {#docker-example}
 
 ```yaml
 services:
@@ -151,7 +151,7 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-## Volumes
+## Volumes {#volumes}
 
 The Docker Compose stack uses four volumes:
 

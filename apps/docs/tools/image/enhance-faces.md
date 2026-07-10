@@ -2,11 +2,11 @@
 description: Restore and sharpen blurry or low-quality faces in images with GFPGAN and CodeFormer AI models.
 ---
 
-# Face Enhancement
+# Face Enhancement {#face-enhancement}
 
 Restore and enhance faces in images using AI models (GFPGAN/CodeFormer).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/enhance-faces`
 
@@ -14,7 +14,7 @@ Restore and enhance faces in images using AI models (GFPGAN/CodeFormer).
 
 **Model bundles:** `upscale-enhance` (5-6 GB) and `face-detection` (200-300 MB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Restore and enhance faces in images using AI models (GFPGAN/CodeFormer).
 | onlyCenterFace | boolean | No | `false` | Only enhance the most central/prominent face |
 | sensitivity | number | No | `0.5` | Face detection sensitivity (0-1) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/enhance-faces \
@@ -32,9 +32,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/enhance-faces \
   -F 'settings={"model":"codeformer","strength":0.7,"onlyCenterFace":false}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -43,14 +43,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/enhance-faces \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Enhancing faces...","percent":60}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -72,7 +72,7 @@ data: {"phase":"processing","stage":"Enhancing faces...","percent":60}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires both the `upscale-enhance` model bundle (5-6 GB) and the `face-detection` model bundle (200-300 MB).
 - GFPGAN produces more aggressive enhancement; CodeFormer better preserves identity. `auto` selects the best model for the input.

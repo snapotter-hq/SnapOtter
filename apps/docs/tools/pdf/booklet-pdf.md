@@ -2,23 +2,23 @@
 description: Arrange PDF pages for folding into a booklet.
 ---
 
-# Booklet PDF
+# Booklet PDF {#booklet-pdf}
 
 Impose pages for duplex printing so the printed sheets can be folded into a booklet.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/booklet-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | perSheet | integer | No | `2` | Pages per sheet: `2`, `4`, `6`, or `8` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/booklet-pdf \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/booklet-pdf \
   -F 'settings={"perSheet": 2}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/booklet-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The default `perSheet: 2` places two pages side by side on each sheet, which is the standard booklet layout for duplex printing.
 - Blank pages are added automatically if the total page count is not a multiple of the sheet size.

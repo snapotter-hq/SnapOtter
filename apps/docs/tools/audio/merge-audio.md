@@ -2,23 +2,23 @@
 description: Combine multiple audio files into one sequential track.
 ---
 
-# Merge Audio
+# Merge Audio {#merge-audio}
 
 Combine two or more audio files into a single sequential track, concatenated in the order they are uploaded.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/merge-audio`
 
 Accepts multipart form data with multiple audio files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | No | `"mp3"` | Output format: `mp3`, `wav`, `flac`, `m4a` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/merge-audio \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/merge-audio \
   -F 'settings={"format": "mp3"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/merge-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepts 2 to 10 audio files per request.
 - Files are concatenated in upload order.
