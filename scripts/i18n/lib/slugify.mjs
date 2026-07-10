@@ -5,6 +5,7 @@
 // would produce, so pre-existing #deep-links keep resolving after we add
 // explicit anchors. Regexes copied verbatim from vitepress/dist/node, with
 // explicit unicode escapes for the control and combining ranges.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: byte-exact port of mdit-vue slugify; the control-char range is required for VitePress anchor parity.
 const rControl = /[\u0000-\u001f]/g;
 const rSpecial = /[\s~`!@#$%^&*()\-_+=[\]{}|\\;:"'“”‘’<>,.?/]+/g;
 const rCombining = /[\u0300-\u036f]/g;
