@@ -2,11 +2,11 @@
 description: 21 supported languages and how to create or improve translations for SnapOtter using the TypeScript-enforced i18n system.
 ---
 
-# Translation guide
+# Translation guide {#translation-guide}
 
 SnapOtter ships with 21 languages out of the box. The i18n system uses a lightweight custom runtime with TypeScript-enforced locale completeness and dynamic code-splitting.
 
-## Supported languages
+## Supported languages {#supported-languages}
 
 | Code | Language | Native Name | Direction |
 |------|----------|-------------|-----------|
@@ -32,7 +32,7 @@ SnapOtter ships with 21 languages out of the box. The i18n system uses a lightwe
 | `id` | Indonesian | Bahasa Indonesia | LTR |
 | `th` | Thai | ไทย | LTR |
 
-## How language detection works
+## How language detection works {#how-language-detection-works}
 
 SnapOtter uses a three-tier resolution order:
 
@@ -48,7 +48,7 @@ Users can change language from:
 - The **mobile sidebar** language dropdown
 - The **Settings > System** section sets the instance-wide default (admin only)
 
-## How translations work
+## How translations work {#how-translations-work}
 
 All UI strings live in `packages/shared/src/i18n/`. The reference file is `en.ts`, which exports a typed object with every string the app uses (~1500 keys). Other languages are separate files (e.g., `de.ts`, `fr.ts`) that export the same shape.
 
@@ -56,7 +56,7 @@ The `TranslationKeys` type uses `DeepStringRecord` to accept any string value wh
 
 Only the active locale is loaded at runtime via dynamic `import()`, keeping the main bundle small.
 
-## Using translations in components
+## Using translations in components {#using-translations-in-components}
 
 ```tsx
 import { useTranslation } from "@/contexts/i18n-context";
@@ -75,7 +75,7 @@ function MyComponent() {
 }
 ```
 
-## Contributing a translation
+## Contributing a translation {#contributing-a-translation}
 
 We welcome translation PRs directly. You can improve an existing locale or add a new one.
 
@@ -85,9 +85,9 @@ To report a mistranslation without submitting code, open a [GitHub Issue](https:
 Translation PRs do not require prior approval. Fork the repo, make your changes, and open a PR. See the [Contributing Guide](/guide/contributing) for the full PR process and CLA requirement.
 :::
 
-## How to create or update a translation
+## How to create or update a translation {#how-to-create-or-update-a-translation}
 
-### 1. Fork and clone
+### 1. Fork and clone {#_1-fork-and-clone}
 
 ```bash
 git clone https://github.com/<your-username>/snapotter.git
@@ -95,7 +95,7 @@ cd snapotter
 pnpm install
 ```
 
-### 2. Copy the reference file (new language only)
+### 2. Copy the reference file (new language only) {#_2-copy-the-reference-file-new-language-only}
 
 Skip this step if you are improving an existing translation.
 
@@ -103,7 +103,7 @@ Skip this step if you are improving an existing translation.
 cp packages/shared/src/i18n/en.ts packages/shared/src/i18n/XX.ts
 ```
 
-### 3. Translate the strings
+### 3. Translate the strings {#_3-translate-the-strings}
 
 Open your new file and translate every string value. Keep the object structure and keys exactly the same.
 
@@ -127,7 +127,7 @@ Rules:
 - Arrays (`rotatingPhrases`, `progressMessages`) must have the same number of entries
 - Do not translate: SnapOtter, JPEG, PNG, WebP, EXIF, API, and other technical terms
 
-### 4. Register the locale (new language only)
+### 4. Register the locale (new language only) {#_4-register-the-locale-new-language-only}
 
 Add your locale to `SUPPORTED_LOCALES` in `packages/shared/src/i18n/index.ts`:
 
@@ -135,7 +135,7 @@ Add your locale to `SUPPORTED_LOCALES` in `packages/shared/src/i18n/index.ts`:
 { code: "xx", name: "Language Name", nativeName: "Native Name", dir: "ltr" },
 ```
 
-### 5. Verify
+### 5. Verify {#_5-verify}
 
 ```bash
 pnpm typecheck    # catches missing or mistyped keys
@@ -143,11 +143,11 @@ pnpm lint         # formatting check
 pnpm dev          # manually verify strings appear correctly
 ```
 
-### 6. Submit
+### 6. Submit {#_6-submit}
 
 Open a PR against `main` with a title like `feat(i18n): add Swedish translation` or `fix(i18n): correct German typos`. The CLA bot will ask you to sign on your first contribution.
 
-## Adding new translation keys
+## Adding new translation keys {#adding-new-translation-keys}
 
 When adding a new feature that needs new UI strings:
 
@@ -155,7 +155,7 @@ When adding a new feature that needs new UI strings:
 2. Run `pnpm typecheck` - every locale file will fail if missing the new key
 3. Add the new key to all locale files (use English as a temporary fallback)
 
-## Configuration
+## Configuration {#configuration}
 
 Set the instance default language via environment variable:
 
@@ -163,7 +163,7 @@ Set the instance default language via environment variable:
 DEFAULT_LOCALE: "de"  # German as the default for all new users
 ```
 
-## File reference
+## File reference {#file-reference}
 
 | File | Purpose |
 |------|---------|
