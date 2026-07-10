@@ -3872,7 +3872,7 @@ export const uk: TranslationKeys = {
     connectionError: "Помилка з'єднання",
   },
   sidebar: {
-    sponsor: "Нехай буде безкоштовним",
+    sponsor: "Підтримайте нас",
     tools: "Інструменти",
     grid: "Сітка",
     automate: "Автоматизація",

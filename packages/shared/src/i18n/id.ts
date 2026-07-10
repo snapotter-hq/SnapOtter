@@ -3868,7 +3868,7 @@ export const id: TranslationKeys = {
     connectionError: "Kesalahan koneksi",
   },
   sidebar: {
-    sponsor: "Jaga tetap gratis",
+    sponsor: "Dukung kami",
     tools: "Alat",
     grid: "Kisi",
     automate: "Otomasi",

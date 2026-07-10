@@ -3875,7 +3875,7 @@ export const tr: TranslationKeys = {
     connectionError: "Bağlantı hatası",
   },
   sidebar: {
-    sponsor: "Ücretsiz kalsın",
+    sponsor: "Bize destek olun",
     tools: "Araçlar",
     grid: "Izgara",
     automate: "Otomatikleştir",

@@ -3817,7 +3817,7 @@ export const en = {
     automate: "Automate",
     editor: "Editor",
     files: "Files",
-    sponsor: "Keep it free",
+    sponsor: "Support us",
     help: "Help",
     settings: "Settings",
   },

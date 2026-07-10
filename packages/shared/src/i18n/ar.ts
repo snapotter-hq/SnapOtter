@@ -3841,7 +3841,7 @@ export const ar: TranslationKeys = {
     connectionError: "خطأ في الاتصال",
   },
   sidebar: {
-    sponsor: "أبقِه مجانيًا",
+    sponsor: "ادعمنا",
     tools: "الأدوات",
     grid: "شبكة",
     automate: "أتمتة",

@@ -3891,7 +3891,7 @@ export const de: TranslationKeys = {
     connectionError: "Verbindungsfehler",
   },
   sidebar: {
-    sponsor: "Kostenlos halten",
+    sponsor: "Uns unterstützen",
     tools: "Werkzeuge",
     grid: "Raster",
     automate: "Automatisieren",

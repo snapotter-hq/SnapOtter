@@ -3871,7 +3871,7 @@ export const ru: TranslationKeys = {
     connectionError: "Ошибка подключения",
   },
   sidebar: {
-    sponsor: "Пусть будет бесплатным",
+    sponsor: "Поддержите нас",
     tools: "Инструменты",
     grid: "Сетка",
     automate: "Автоматизация",

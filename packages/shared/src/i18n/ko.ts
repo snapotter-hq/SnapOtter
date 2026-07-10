@@ -3800,7 +3800,7 @@ export const ko: TranslationKeys = {
     connectionError: "연결 오류",
   },
   sidebar: {
-    sponsor: "무료로 유지하기",
+    sponsor: "후원하기",
     tools: "도구",
     grid: "그리드",
     automate: "자동화",

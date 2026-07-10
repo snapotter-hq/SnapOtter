@@ -3820,7 +3820,7 @@ export const ja: TranslationKeys = {
     connectionError: "接続エラー",
   },
   sidebar: {
-    sponsor: "無料を守る",
+    sponsor: "支援する",
     tools: "ツール",
     grid: "グリッド",
     automate: "自動化",

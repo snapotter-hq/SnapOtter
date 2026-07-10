@@ -3864,7 +3864,7 @@ export const sv: TranslationKeys = {
     connectionError: "Anslutningsfel",
   },
   sidebar: {
-    sponsor: "Håll det gratis",
+    sponsor: "Stöd oss",
     tools: "Verktyg",
     grid: "Rutnät",
     automate: "Automatisera",

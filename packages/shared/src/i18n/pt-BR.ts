@@ -3875,7 +3875,7 @@ export const ptBR: TranslationKeys = {
     connectionError: "Erro de conexão",
   },
   sidebar: {
-    sponsor: "Mantenha gratuito",
+    sponsor: "Apoie-nos",
     tools: "Ferramentas",
     grid: "Grade",
     automate: "Automatizar",

@@ -3877,7 +3877,7 @@ export const nl: TranslationKeys = {
     connectionError: "Verbindingsfout",
   },
   sidebar: {
-    sponsor: "Houd het gratis",
+    sponsor: "Steun ons",
     tools: "Tools",
     grid: "Raster",
     automate: "Automatiseren",

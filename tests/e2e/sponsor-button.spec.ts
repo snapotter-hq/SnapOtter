@@ -14,7 +14,7 @@ test.describe("Sponsor button", () => {
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute("target", "_blank");
     await expect(link).toHaveAttribute("rel", "noopener noreferrer");
-    await expect(link).toContainText(/keep it free/i);
+    await expect(link).toContainText(/support us/i);
     await expect(link).toHaveClass(/bg-pink-50/);
     await expect(link).toHaveClass(/text-pink-700/);
     await expect(link).toHaveClass(/border-pink-200/);

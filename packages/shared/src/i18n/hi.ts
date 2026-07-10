@@ -3671,7 +3671,7 @@ export const hi: TranslationKeys = {
     connectionError: "कनेक्शन त्रुटि",
   },
   sidebar: {
-    sponsor: "इसे मुफ़्त रखें",
+    sponsor: "हमारा समर्थन करें",
     tools: "टूल्स",
     grid: "ग्रिड",
     automate: "ऑटोमेट",

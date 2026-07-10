@@ -3821,7 +3821,7 @@ export const th: TranslationKeys = {
     connectionError: "ข้อผิดพลาดในการเชื่อมต่อ",
   },
   sidebar: {
-    sponsor: "ให้ใช้ฟรีต่อไป",
+    sponsor: "สนับสนุนเรา",
     tools: "เครื่องมือ",
     grid: "กริด",
     automate: "อัตโนมัติ",

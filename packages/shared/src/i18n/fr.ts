@@ -3893,7 +3893,7 @@ export const fr: TranslationKeys = {
     connectionError: "Erreur de connexion",
   },
   sidebar: {
-    sponsor: "Gardons-le gratuit",
+    sponsor: "Soutenez-nous",
     tools: "Outils",
     grid: "Grille",
     automate: "Automatiser",

@@ -3603,7 +3603,7 @@ export const zhCN: TranslationKeys = {
     connectionError: "连接错误",
   },
   sidebar: {
-    sponsor: "保持免费",
+    sponsor: "支持我们",
     tools: "工具",
     grid: "网格",
     automate: "自动化",

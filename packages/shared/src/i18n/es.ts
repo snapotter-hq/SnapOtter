@@ -3868,7 +3868,7 @@ export const es: TranslationKeys = {
     connectionError: "Error de conexión",
   },
   sidebar: {
-    sponsor: "Mantenlo gratis",
+    sponsor: "Apóyanos",
     tools: "Herramientas",
     grid: "Cuadrícula",
     automate: "Automatizar",

@@ -3604,7 +3604,7 @@ export const zhTW: TranslationKeys = {
     connectionError: "連線錯誤",
   },
   sidebar: {
-    sponsor: "保持免費",
+    sponsor: "支持我們",
     tools: "工具",
     grid: "格線",
     automate: "自動化",

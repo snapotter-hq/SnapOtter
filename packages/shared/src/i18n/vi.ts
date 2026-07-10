@@ -3865,7 +3865,7 @@ export const vi: TranslationKeys = {
     connectionError: "Lỗi kết nối",
   },
   sidebar: {
-    sponsor: "Giữ nó miễn phí",
+    sponsor: "Ủng hộ chúng tôi",
     tools: "Công cụ",
     grid: "Lưới",
     automate: "Tự động hóa",

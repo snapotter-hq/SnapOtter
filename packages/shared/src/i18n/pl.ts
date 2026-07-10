@@ -3882,7 +3882,7 @@ export const pl: TranslationKeys = {
     connectionError: "Błąd połączenia",
   },
   sidebar: {
-    sponsor: "Zachowaj darmowość",
+    sponsor: "Wesprzyj nas",
     tools: "Narzędzia",
     grid: "Siatka",
     automate: "Automatyzacja",
