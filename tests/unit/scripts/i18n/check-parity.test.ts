@@ -6,8 +6,10 @@ import { makeFakeAdapter } from "./fake-adapter";
 
 // Seed a locale store on the fake adapter with a full, in-sync translation,
 // so checkAdapter has something complete to validate against.
+// biome-ignore lint/suspicious/noExplicitAny: fake in-memory adapter, untyped by design
 async function seedComplete(adapter: any, locale: string) {
   const units = await adapter.extract();
+  // biome-ignore lint/suspicious/noExplicitAny: stored entry shape mirrors core.mjs StoredEntry
   const entries = new Map<string, any>();
   for (const u of units) {
     const sourceHash = hash(u.sourceText);
@@ -43,6 +45,7 @@ describe("checkAdapter", () => {
     ]);
     await seedComplete(adapter, "de");
     // Drop unit "b" from the German store to simulate an untranslated unit.
+    // biome-ignore lint/suspicious/noExplicitAny: fake store is untyped by design
     const de = adapter._store.get("de") as Map<string, any>;
     de.delete("b");
     const report = await checkAdapter(adapter, ["de"]);
@@ -57,6 +60,7 @@ describe("checkAdapter", () => {
     const adapter = makeFakeAdapter([{ id: "a", sourceText: "hi" }]);
     await seedComplete(adapter, "de");
     // Corrupt the stored sourceHash so it no longer matches the English source.
+    // biome-ignore lint/suspicious/noExplicitAny: fake store is untyped by design
     const de = adapter._store.get("de") as Map<string, any>;
     de.get("a").sourceHash = "deadbeefdead";
     const report = await checkAdapter(adapter, ["de"]);
