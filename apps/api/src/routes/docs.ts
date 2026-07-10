@@ -327,6 +327,13 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     hiddenClients: true,
   };
 
+  // i18n scope: the OpenAPI spec CONTENT is localized (served via
+  // /api/v1/openapi.yaml?lang=<code> and per-locale /llms.<code>.txt above).
+  // The Scalar interactive UI chrome (nav, auth panel, buttons) is NOT
+  // localized: @scalar/fastify-api-reference exposes no locale option and bakes
+  // its content at registration, so the shell stays English by design. This is
+  // a documented limitation, not a gap to fix here. See the web-surfaces i18n
+  // spec, "API reference (Scalar), scoped".
   await app.register(scalarPlugin, {
     routePrefix: "/api/docs",
     configuration,
