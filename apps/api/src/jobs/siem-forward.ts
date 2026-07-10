@@ -35,7 +35,24 @@ async function readSettingValue(key: string): Promise<string | null> {
   return row?.value ?? null;
 }
 
+/**
+ * In-memory license check, no DB access. This job fires every 30s on every
+ * instance; before this gate existed, the readSiemConfig settings read below
+ * ran on unlicensed instances too and turned every DB outage into a Sentry
+ * event storm (NODE-1E, July 2026).
+ */
+async function siemLicensed(): Promise<boolean> {
+  try {
+    const { isFeatureEnabled } = await import("@snapotter/enterprise");
+    return isFeatureEnabled("siem_forwarding");
+  } catch {
+    return false;
+  }
+}
+
 export async function runSiemForward(): Promise<{ forwarded: number } | undefined> {
+  if (!(await siemLicensed())) return;
+
   // 1. Read SIEM config
   const config = await readSiemConfig();
   if (!config?.enabled || !config.webhookUrl) {
