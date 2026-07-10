@@ -6,9 +6,7 @@ test.describe("Landing Homepage", () => {
   });
 
   test("page loads with self-hosted title", async ({ page }) => {
-    await expect(page).toHaveTitle(
-      /SnapOtter \| Self-Hosted File Processing for Privacy-Sensitive Teams/,
-    );
+    await expect(page).toHaveTitle(/SnapOtter \| Self-Hosted File-Processing Infrastructure/);
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
@@ -23,12 +21,12 @@ test.describe("Landing Homepage", () => {
   });
 
   test("hero renders the headline", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("File processing for privacy-sensitive teams.");
+    await expect(page.locator("h1")).toContainText("Private file processing for data that");
   });
 
   test("hero renders the subtitle", async ({ page }) => {
     await expect(
-      page.getByText("Run image, video, audio, PDF, and file tools with local AI"),
+      page.getByText("run local AI across image, video, audio, PDF, and documents"),
     ).toBeVisible();
   });
 
