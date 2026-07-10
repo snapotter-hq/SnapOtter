@@ -593,7 +593,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       },
       {
         feature: "Tool count",
-        snapotter: "241",
+        snapotter: "200+",
         competitor: "60+ PDF operations",
         snapotterWins: true,
       },
@@ -669,7 +669,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       },
       {
         feature: "Tool count",
-        snapotter: "241",
+        snapotter: "200+",
         competitor: "1000+ conversion formats",
         snapotterWins: false,
       },
