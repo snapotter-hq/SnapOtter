@@ -3,8 +3,8 @@
 // check-parity.mjs import this so the surface list is defined once.
 // Surface plans (02-04) uncomment/add their entry as each adapter lands.
 export const ADAPTERS = {
-  // "landing-ui": () => import("./landing-ui.mjs"),
-  // "landing-seo": () => import("./landing-seo.mjs"),
+  "landing-ui": () => import("./landing-ui.mjs"),
+  "landing-seo": () => import("./landing-seo.mjs"),
   // docs: () => import("./docs-md.mjs"),
   // api: () => import("./api-spec.mjs"),
 };
