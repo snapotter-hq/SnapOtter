@@ -117,8 +117,8 @@ const collectionJsonLd = {
 ---
 
 <Base
-  title={`All ${toolCount} File Processing Tools | SnapOtter`}
-  description={`Browse all ${toolCount} self-hosted file processing tools: resize, compress, convert, remove backgrounds, upscale with AI, add watermarks, generate QR codes, and more. Free, open source, runs on your hardware.`}
+  title={t(locale, "toolsIndex.metaTitle", { count: toolCount })}
+  description={t(locale, "toolsIndex.metaDescription", { count: toolCount })}
   canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
   locale={locale}
   path={PATH}
