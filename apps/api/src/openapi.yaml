@@ -6414,7 +6414,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string

@@ -2722,7 +2722,8 @@ describe("useAnalyticsStore", () => {
       posthogApiKey: "phc_test",
       posthogHost: "https://ph.example.com",
       sentryDsn: "https://sentry.example.com",
-      sampleRate: 0.5,
+      sentryDsnWeb: "https://sentry.example.com/web",
+      posthogSampleRate: 0.5,
       instanceId: "inst-123",
     };
     fetchMock.mockResolvedValueOnce({

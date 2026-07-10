@@ -8,14 +8,16 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "phc_test123",
       posthogHost: "https://us.i.posthog.com",
       sentryDsn: "https://abc@sentry.io/123",
-      sampleRate: 1.0,
+      sentryDsnWeb: "https://abc@sentry.io/456",
+      posthogSampleRate: 1.0,
       instanceId: "inst-abc-123",
     };
     expect(config.enabled).toBe(true);
     expect(config.posthogApiKey).toBe("phc_test123");
     expect(config.posthogHost).toBe("https://us.i.posthog.com");
     expect(config.sentryDsn).toBe("https://abc@sentry.io/123");
-    expect(config.sampleRate).toBe(1.0);
+    expect(config.sentryDsnWeb).toBe("https://abc@sentry.io/456");
+    expect(config.posthogSampleRate).toBe(1.0);
     expect(config.instanceId).toBe("inst-abc-123");
   });
 
@@ -25,11 +27,12 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "",
       posthogHost: "",
       sentryDsn: "",
-      sampleRate: 0,
+      sentryDsnWeb: "",
+      posthogSampleRate: 0,
       instanceId: "",
     };
     expect(config.enabled).toBe(false);
-    expect(config.sampleRate).toBe(0);
+    expect(config.posthogSampleRate).toBe(0);
   });
 
   it("accepts fractional sample rates", () => {
@@ -38,10 +41,11 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "key",
       posthogHost: "https://host.com",
       sentryDsn: "https://dsn",
-      sampleRate: 0.5,
+      sentryDsnWeb: "https://dsn-web",
+      posthogSampleRate: 0.5,
       instanceId: "id",
     };
-    expect(config.sampleRate).toBe(0.5);
+    expect(config.posthogSampleRate).toBe(0.5);
   });
 
   it("has exactly the expected keys", () => {
@@ -50,12 +54,21 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "key",
       posthogHost: "host",
       sentryDsn: "dsn",
-      sampleRate: 1,
+      sentryDsnWeb: "dsn-web",
+      posthogSampleRate: 1,
       instanceId: "id",
     };
     const keys = Object.keys(config).sort();
     expect(keys).toEqual(
-      ["enabled", "instanceId", "posthogApiKey", "posthogHost", "sampleRate", "sentryDsn"].sort(),
+      [
+        "enabled",
+        "instanceId",
+        "posthogApiKey",
+        "posthogHost",
+        "posthogSampleRate",
+        "sentryDsn",
+        "sentryDsnWeb",
+      ].sort(),
     );
   });
 });

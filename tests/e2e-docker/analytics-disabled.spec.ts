@@ -34,7 +34,8 @@ test.describe("Analytics disabled by build-time config", () => {
       posthogApiKey: "",
       posthogHost: "",
       sentryDsn: "",
-      sampleRate: 0,
+      sentryDsnWeb: "",
+      posthogSampleRate: 0,
       instanceId: "",
     });
   });

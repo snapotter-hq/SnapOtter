@@ -4,5 +4,6 @@ export const ANALYTICS_BAKED = {
   posthogApiKey: "",
   posthogHost: "",
   sentryDsn: "",
-  sampleRate: 0,
+  sentryDsnWeb: "",
+  posthogSampleRate: 0,
 } as const;

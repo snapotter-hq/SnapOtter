@@ -87,8 +87,13 @@ export async function trackEvent(
 ): Promise<void> {
   try {
     if (!analyticsEnabled() || !posthogClient) return;
-    if (ANALYTICS_BAKED.sampleRate < 1.0) {
-      if (ANALYTICS_BAKED.sampleRate <= 0.0 || Math.random() >= ANALYTICS_BAKED.sampleRate) return;
+    if (ANALYTICS_BAKED.posthogSampleRate < 1.0) {
+      if (
+        ANALYTICS_BAKED.posthogSampleRate <= 0.0 ||
+        Math.random() >= ANALYTICS_BAKED.posthogSampleRate
+      ) {
+        return;
+      }
     }
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),

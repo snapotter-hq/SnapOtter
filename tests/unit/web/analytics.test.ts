@@ -44,7 +44,8 @@ const enabledConfig = {
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
   sentryDsn: "https://sentry.test/123",
-  sampleRate: 1,
+  sentryDsnWeb: "https://sentry.test/web/456",
+  posthogSampleRate: 1,
   instanceId: "inst-1",
 };
 
@@ -53,7 +54,8 @@ const disabledConfig = {
   posthogApiKey: "key",
   posthogHost: "https://ph.test",
   sentryDsn: "",
-  sampleRate: 1,
+  sentryDsnWeb: "",
+  posthogSampleRate: 1,
   instanceId: "inst-1",
 };
 
@@ -91,19 +93,19 @@ describe("analytics lib (baked model)", () => {
       );
     });
 
-    it("initializes Sentry when sentryDsn is provided", async () => {
+    it("initializes Sentry with the web DSN when sentryDsnWeb is provided", async () => {
       await mod.initAnalytics(enabledConfig);
       expect(mockSentryInit).toHaveBeenCalledOnce();
       expect(mockSentryInit).toHaveBeenCalledWith(
         expect.objectContaining({
-          dsn: "https://sentry.test/123",
+          dsn: "https://sentry.test/web/456",
           sendDefaultPii: false,
         }),
       );
     });
 
-    it("skips Sentry when sentryDsn is empty", async () => {
-      await mod.initAnalytics({ ...enabledConfig, sentryDsn: "" });
+    it("skips Sentry when sentryDsnWeb is empty", async () => {
+      await mod.initAnalytics({ ...enabledConfig, sentryDsnWeb: "" });
       expect(mockSentryInit).not.toHaveBeenCalled();
     });
 
