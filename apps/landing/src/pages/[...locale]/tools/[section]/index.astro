@@ -5,13 +5,22 @@ import { CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { loadToolStrings } from "@/lib/tool-strings";
 import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
-  return SECTIONS.map((s) => ({
-    params: { section: s.id },
-    props: { section: s, tools: TOOLS.filter((t) => toolSection(t) === s.id) },
-  }));
+  const paths = [];
+  for (const locale of LANDING_LOCALES) {
+    for (const s of SECTIONS) {
+      paths.push({
+        params: { locale: locale === "en" ? undefined : locale, section: s.id },
+        props: { locale, section: s, tools: TOOLS.filter((t) => toolSection(t) === s.id) },
+      });
+    }
+  }
+  return paths;
 }
 
 function renderIcon(iconName: string): string {
@@ -28,28 +37,35 @@ function renderIcon(iconName: string): string {
     .join("");
 }
 
-const { section, tools } = Astro.props;
+const { locale, section, tools } = Astro.props;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
-const canonical = `https://snapotter.com/tools/${section.id}/`;
-const title = `${section.name} Tools | SnapOtter`;
+const PATH = `/tools/${section.id}/`;
+const canonical = `https://snapotter.com${localizeHref(locale, PATH)}`;
+const title = t(locale, "section.title", { section: section.name });
+
+const toolStrings = await loadToolStrings(locale);
+const toolName = (id: string, fallback: string) => toolStrings[id]?.name ?? fallback;
+const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description ?? fallback;
 ---
 
 <Base
   canonical={canonical}
-  title={title}
-  description={`Browse SnapOtter's ${section.name.toLowerCase()} tools.`}
+  title={`${title} | SnapOtter`}
+  description={t(locale, "section.metaDescription", { section: section.name })}
+  locale={locale}
+  path={PATH}
 >
-  <Navbar />
+  <Navbar locale={locale} path={PATH} />
 
   <main id="main">
     <nav class="mx-auto max-w-6xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2 text-sm text-muted">
         <li>
-          <a href="/" class="transition-colors hover:text-foreground">Home</a>
+          <a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a>
         </li>
         <li aria-hidden="true">/</li>
         <li>
-          <a href="/tools" class="transition-colors hover:text-foreground">Tools</a>
+          <a href={localizeHref(locale, "/tools")} class="transition-colors hover:text-foreground">{t(locale, "common.tools")}</a>
         </li>
         <li aria-hidden="true">/</li>
         <li class="font-medium text-foreground">{section.name}</li>
@@ -58,7 +74,7 @@ const title = `${section.name} Tools | SnapOtter`;
 
     <section class="mx-auto max-w-6xl px-6 pt-8 pb-16">
       <div class="reveal">
-        <h1 class="font-display text-3xl font-bold">{section.name} Tools</h1>
+        <h1 class="font-display text-3xl font-bold">{title}</h1>
         <ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tools.map((tool) => {
             const cat = categoryMap.get(tool.category);
@@ -67,7 +83,7 @@ const title = `${section.name} Tools | SnapOtter`;
               <li>
                 <a
                   class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
-                  href={`/tools/${section.id}/${tool.id}/`}
+                  href={localizeHref(locale, `/tools/${section.id}/${tool.id}/`)}
                 >
                   <div
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -85,10 +101,10 @@ const title = `${section.name} Tools | SnapOtter`;
                     />
                   </div>
                   <div class="min-w-0">
-                    <span class="text-sm font-bold">{tool.name}</span>
-                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">{tool.description}</p>
+                    <span class="text-sm font-bold">{toolName(tool.id, tool.name)}</span>
+                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">{toolDesc(tool.id, tool.description)}</p>
                     <span class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary transition-all group-hover:gap-2">
-                      Learn more
+                      {t(locale, "common.learnMore")}
                       <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                       </svg>
