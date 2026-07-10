@@ -12,4 +12,5 @@ export * from "./permissions.js";
 export * from "./pipeline-templates.js";
 export * from "./search/format-aliases.js";
 export * from "./section.js";
+export * from "./tool-errors.js";
 export * from "./types.js";
