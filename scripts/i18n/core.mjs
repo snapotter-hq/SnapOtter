@@ -58,16 +58,26 @@ export async function runTranslation({ adapter, locales, translate, log = () => 
 
     for (let i = 0; i < todo.length; i += CHUNK) {
       const chunk = todo.slice(i, i + CHUNK);
-      const result = await translate(chunk.map((t) => t.unit), locale);
+      const result = await translate(
+        chunk.map((t) => t.unit),
+        locale,
+      );
       for (const { unit, srcHash } of chunk) {
         const text = result.get(unit.id);
-        const check = text == null ? { ok: false, errors: ["no output"] } : validate(unit.sourceText, text);
+        const check =
+          text == null ? { ok: false, errors: ["no output"] } : validate(unit.sourceText, text);
         if (!check.ok) {
           stats.failed++;
           log(`[${locale}] FAIL ${unit.id}: ${check.errors.join("; ")}`);
           continue;
         }
-        merged.set(unit.id, { text, sourceHash: srcHash, provenance: "machine", outputHash: hash(text), stale: false });
+        merged.set(unit.id, {
+          text,
+          sourceHash: srcHash,
+          provenance: "machine",
+          outputHash: hash(text),
+          stale: false,
+        });
         stats.translated++;
       }
       await adapter.write(locale, merged); // checkpoint each chunk -> resumable
