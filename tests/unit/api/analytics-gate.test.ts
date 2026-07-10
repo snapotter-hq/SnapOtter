@@ -5,21 +5,26 @@ import {
   analyticsEnabled,
   bakedEnabled,
   refreshAnalyticsGate,
+  telemetryEnvKilled,
 } from "../../../apps/api/src/lib/analytics-gate.js";
 
 const origEnv = process.env.NODE_ENV;
 const origOverride = process.env.ANALYTICS_BAKED_OVERRIDE;
+const origTelemetry = process.env.SNAPOTTER_TELEMETRY;
 
 beforeEach(() => {
   __resetGateForTests();
   process.env.NODE_ENV = "test";
   process.env.ANALYTICS_BAKED_OVERRIDE = "on"; // force bake on for these unit tests
+  delete process.env.SNAPOTTER_TELEMETRY; // ambient kill switch would poison the suite
 });
 
 afterEach(() => {
   process.env.NODE_ENV = origEnv;
   if (origOverride === undefined) delete process.env.ANALYTICS_BAKED_OVERRIDE;
   else process.env.ANALYTICS_BAKED_OVERRIDE = origOverride;
+  if (origTelemetry === undefined) delete process.env.SNAPOTTER_TELEMETRY;
+  else process.env.SNAPOTTER_TELEMETRY = origTelemetry;
   __setReaderForTests(null);
 });
 
@@ -55,6 +60,30 @@ describe("effective enabled = baked AND toggle", () => {
     __setReaderForTests(async () => true);
     await refreshAnalyticsGate();
     expect(analyticsEnabled()).toBe(false);
+  });
+});
+
+describe("SNAPOTTER_TELEMETRY runtime kill switch", () => {
+  it("outranks ANALYTICS_BAKED_OVERRIDE=on outside production", () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    process.env.SNAPOTTER_TELEMETRY = "0";
+    expect(bakedEnabled()).toBe(false);
+  });
+  it("telemetryEnvKilled matches 0, false, off and nothing else", () => {
+    for (const v of ["0", "false", "off"]) {
+      process.env.SNAPOTTER_TELEMETRY = v;
+      expect(telemetryEnvKilled()).toBe(true);
+    }
+    delete process.env.SNAPOTTER_TELEMETRY;
+    expect(telemetryEnvKilled()).toBe(false);
+    process.env.SNAPOTTER_TELEMETRY = "1";
+    expect(telemetryEnvKilled()).toBe(false);
+  });
+  it("is honored in production builds", () => {
+    process.env.NODE_ENV = "production";
+    process.env.SNAPOTTER_TELEMETRY = "0";
+    expect(bakedEnabled()).toBe(false);
+    expect(telemetryEnvKilled()).toBe(true);
   });
 });
 

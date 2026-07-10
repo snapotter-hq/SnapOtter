@@ -25,8 +25,15 @@ async function defaultReader(): Promise<boolean | undefined> {
   return rows[0].value !== "false";
 }
 
+/** Runtime kill switch honored in ALL builds: SNAPOTTER_TELEMETRY=0|false|off. */
+export function telemetryEnvKilled(): boolean {
+  const v = process.env.SNAPOTTER_TELEMETRY;
+  return v === "0" || v === "false" || v === "off";
+}
+
 /** Compile-time bake, with a NON-PRODUCTION-only override so tests can force it on. */
 export function bakedEnabled(): boolean {
+  if (telemetryEnvKilled()) return false;
   if (process.env.NODE_ENV !== "production") {
     const o = process.env.ANALYTICS_BAKED_OVERRIDE;
     if (o === "on") return true;
