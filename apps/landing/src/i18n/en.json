@@ -36,5 +36,21 @@
   "alt.tryDemo": "Try the live demo",
   "alt.moreComparisons": "More comparisons",
   "alt.allAlternatives": "All alternatives",
-  "alt.runOnYourServer": "Run it on your own server"
+  "alt.runOnYourServer": "Run it on your own server",
+  "faq.q1.q": "Are my files safe and private?",
+  "faq.q1.a": "All processing happens on your own server. Your files are never sent to any external service. SnapOtter runs entirely on your infrastructure.",
+  "faq.q2.q": "Is SnapOtter really free?",
+  "faq.q2.a": "Yes. SnapOtter is open source under AGPL-3.0 with no hidden fees, no subscription plans, no usage limits, and no premium-only features. A commercial license is available for organizations that need proprietary use.",
+  "faq.q3.q": "Do I need an internet connection?",
+  "faq.q3.a": "No. SnapOtter runs fully offline once deployed. No external API calls are made. It works in completely air-gapped environments.",
+  "faq.q4.q": "Are there any file size or usage limitations?",
+  "faq.q4.a": "No artificial limits. You can process as many files as you want, at any size. The only constraint is your server's hardware resources.",
+  "faq.q5.q": "What AI features are included?",
+  "faq.q5.a": "SnapOtter includes 19 local AI tools for background removal, upscaling, OCR, transcription, face detection, colorization, noise removal, photo restoration, and more. All models run on your hardware.",
+  "faq.q6.q": "Does SnapOtter collect any analytics?",
+  "faq.q6.a": "Anonymous product analytics is on by default and never includes your files or their contents. Turn it off any time with a one-click admin toggle in Settings > System > Privacy.",
+  "faq.q7.q": "Can I use SnapOtter in my company?",
+  "faq.q7.a": "Yes. Under AGPL-3.0, you can use it freely as long as you comply with the license terms. For proprietary or closed-source use, a commercial license is available.",
+  "faq.q8.q": "How do I update SnapOtter?",
+  "faq.q8.a": "Pull the latest Docker image and restart the container. Your data persists in the mounted volume."
 }
