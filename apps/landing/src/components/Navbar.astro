@@ -10,7 +10,6 @@ const links = [
   { label: "Enterprise", href: "/#enterprise" },
   { label: "Pricing", href: "/#pricing" },
   { label: "Alternatives", href: "/alternatives" },
-  { label: "Developers", href: "/self-hosted/file-conversion-api" },
   { label: "Docs", href: "https://docs.snapotter.com", external: true },
   { label: "Talk to a human", href: "/contact" },
 ];
@@ -19,17 +18,17 @@ const links = [
 <nav class="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-transparent after:via-primary/20 after:to-transparent">
   <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
     <!-- Logo -->
-    <a href="/" class="flex items-center gap-2.5">
+    <a href="/" class="flex shrink-0 items-center gap-2.5">
       <img src="/logo.png" alt="SnapOtter" class="h-8 w-8" width="32" height="32" />
       <span class="font-display text-lg font-bold tracking-tight">SnapOtter</span>
     </a>
 
     <!-- Desktop nav links -->
-    <div class="hidden items-center gap-7 lg:flex">
+    <div class="hidden items-center gap-6 min-[1120px]:flex">
       {links.map((item) => (
         <a
           href={item.href}
-          class="text-sm font-medium text-muted transition-colors hover:text-foreground"
+          class="whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground"
           {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         >
           {item.label}
@@ -38,7 +37,7 @@ const links = [
     </div>
 
     <!-- Desktop CTAs -->
-    <div class="hidden items-center gap-3 md:flex">
+    <div class="hidden shrink-0 items-center gap-3 md:flex">
       <a
         href="https://github.com/snapotter-hq/snapotter"
         target="_blank"
@@ -51,7 +50,7 @@ const links = [
       </a>
       <a
         href="/contact"
-        class="rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
+        class="whitespace-nowrap rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
       >
         Book a Demo
       </a>
@@ -59,14 +58,14 @@ const links = [
         href="https://docs.snapotter.com/guide/getting-started.html"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-primary rounded-lg px-4 py-1.5 text-sm font-semibold"
+        class="btn-primary whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-semibold"
       >
         Get Started Free
       </a>
     </div>
 
     <!-- Mobile menu toggle (CSS-only) -->
-    <label for="mobile-menu-toggle" class="cursor-pointer text-muted lg:hidden" aria-label="Toggle menu">
+    <label for="mobile-menu-toggle" class="cursor-pointer text-muted min-[1120px]:hidden" aria-label="Toggle menu">
       <svg class="menu-open h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       <svg class="menu-close hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </label>
@@ -76,7 +75,7 @@ const links = [
   <input type="checkbox" id="mobile-menu-toggle" class="peer hidden" aria-hidden="true" />
 
   <!-- Mobile menu panel -->
-  <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block lg:hidden">
+  <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block min-[1120px]:hidden">
     {links.map((item) => (
       <a
         href={item.href}
