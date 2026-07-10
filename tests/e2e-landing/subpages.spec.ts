@@ -45,7 +45,7 @@ test.describe("Privacy Page", () => {
       "Overview",
       "Website (snapotter.com)",
       "Self-Hosted Software",
-      "Optional Analytics",
+      "Analytics",
       "Contact Form",
       "Open Source",
       "Changes",
@@ -115,16 +115,16 @@ test.describe("Cross-Page Navigation", () => {
     await expect(page.getByText("Frequently Asked Questions")).toBeVisible();
   });
 
-  test("navbar Contact link navigates to /contact", async ({ page }) => {
+  test("navbar Talk to a human link navigates to /contact", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Contact" }).first().click();
+    await page.getByRole("link", { name: "Talk to a human" }).first().click();
     await expect(page).toHaveURL("/contact");
     await expect(page.getByText("Get in touch")).toBeVisible();
   });
 
-  test("pricing Contact Sales links to /contact", async ({ page }) => {
+  test("pricing enterprise CTA links to /contact", async ({ page }) => {
     await page.goto("/");
-    const contactSales = page.getByRole("link", { name: /Contact Sales/ });
-    await expect(contactSales).toHaveAttribute("href", "/contact");
+    const enterpriseCta = page.getByRole("link", { name: /Let.s talk/ }).first();
+    await expect(enterpriseCta).toHaveAttribute("href", "/contact");
   });
 });
