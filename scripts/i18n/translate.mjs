@@ -1,24 +1,28 @@
 // scripts/i18n/translate.mjs
-import { runTranslation } from "./core.mjs";
-import { makeTranslator } from "./lib/claude.mjs";
+import { mkdirSync } from "node:fs";
+import { ADAPTERS, resolveSurfaces } from "./adapters/registry.mjs";
+import { collectPending, runTranslation } from "./core.mjs";
+import { batchResultTranslator, readDone, writePending } from "./lib/batch.mjs";
 import { localeCodes } from "./lib/shared-i18n.mjs";
 
-// Surface adapters are registered here as Plans 02-05 land them.
-// Each module must `export const adapter = { name, extract, load, write }`.
-const ADAPTERS = {
-  // landing-ui: () => import("./adapters/landing-ui.mjs"),
-  // landing-seo: () => import("./adapters/landing-seo.mjs"),
-  // docs: () => import("./adapters/docs-md.mjs"),
-  // api: () => import("./adapters/api-spec.mjs"),
-};
-
 function parseArgs(argv) {
-  const args = { surface: "all", locale: "all", dryRun: false, help: false };
+  const args = {
+    surface: "all",
+    locale: "all",
+    engine: "claude-code",
+    mode: "export",
+    batchDir: ".i18n-batches",
+    help: false,
+  };
   for (const a of argv) {
     if (a === "--help" || a === "-h") args.help = true;
-    else if (a === "--dry-run") args.dryRun = true;
+    else if (a === "--export") args.mode = "export";
+    else if (a === "--import") args.mode = "import";
+    else if (a === "--dry-run") args.mode = "dry-run";
+    else if (a.startsWith("--engine=")) args.engine = a.slice("--engine=".length);
     else if (a.startsWith("--surface=")) args.surface = a.slice("--surface=".length);
     else if (a.startsWith("--locale=")) args.locale = a.slice("--locale=".length);
+    else if (a.startsWith("--batch-dir=")) args.batchDir = a.slice("--batch-dir=".length);
   }
   return args;
 }
@@ -32,23 +36,21 @@ function resolveLocales(spec) {
     .filter((c) => all.includes(c));
 }
 
-function resolveSurfaces(spec) {
-  const keys = Object.keys(ADAPTERS);
-  if (spec === "all") return keys;
-  return spec
-    .split(",")
-    .map((s) => s.trim())
-    .filter((k) => keys.includes(k));
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
       [
-        "Usage: tsx scripts/i18n/translate.mjs [--surface=all|<name,..>] [--locale=all|<code,..>] [--dry-run]",
+        "Usage: tsx scripts/i18n/translate.mjs --export|--import|--dry-run [options]",
+        "  --surface=all|<name,..>   default all",
+        "  --locale=all|<code,..>    default all (minus en)",
+        "  --engine=claude-code|api  default claude-code (no key). api needs ANTHROPIC_API_KEY.",
+        "  --batch-dir=<path>        default .i18n-batches",
+        "",
+        "Claude Code flow: --export writes pending masked strings; a Claude Code session",
+        "translates each <surface>.<locale>.pending.json into <surface>.<locale>.done.json",
+        "(keeping every mask token); --import restores, validates, and writes via adapters.",
         `Surfaces: ${Object.keys(ADAPTERS).join(", ") || "(none registered yet)"}`,
-        "Requires ANTHROPIC_API_KEY. Set I18N_MODEL to override the model.",
       ].join("\n"),
     );
     return;
@@ -60,20 +62,51 @@ async function main() {
     console.log("No adapters registered yet. Nothing to do.");
     return;
   }
-
-  const translate = args.dryRun
-    ? async (units, locale) => new Map(units.map((u) => [u.id, `${locale}:${u.sourceText}`]))
-    : makeTranslator();
+  mkdirSync(args.batchDir, { recursive: true });
 
   for (const surface of surfaces) {
     const mod = await ADAPTERS[surface]();
+    const adapter = mod.adapter;
+
+    if (args.mode === "export") {
+      const units = await adapter.extract();
+      for (const locale of locales) {
+        const stored = await adapter.load(locale);
+        const { pending } = collectPending(units, stored);
+        if (pending.length === 0) continue;
+        const path = writePending(args.batchDir, surface, locale, pending);
+        console.log(`export ${surface} ${locale}: ${pending.length} -> ${path}`);
+      }
+      continue;
+    }
+
+    if (args.mode === "import") {
+      for (const locale of locales) {
+        let doneMap;
+        try {
+          doneMap = readDone(args.batchDir, surface, locale);
+        } catch {
+          continue; // no done file for this locale yet
+        }
+        const summary = await runTranslation({
+          adapter,
+          locales: [locale],
+          translate: batchResultTranslator(doneMap),
+          log: (m) => process.stdout.write(`${m}\n`),
+        });
+        console.log(`import ${surface} ${locale}:`, JSON.stringify(summary[locale]));
+      }
+      continue;
+    }
+
+    // dry-run: stub translator, no batch files, proves wiring
     const summary = await runTranslation({
-      adapter: mod.adapter,
+      adapter,
       locales,
-      translate,
-      log: (m) => process.stdout.write(`${m}\n`),
+      translate: async (units, locale) =>
+        new Map(units.map((u) => [u.id, `${locale}:${u.sourceText}`])),
     });
-    console.log(`\n${surface}:`, JSON.stringify(summary, null, 2));
+    console.log(`dry-run ${surface}:`, JSON.stringify(summary, null, 2));
   }
 }
 

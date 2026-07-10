@@ -89,3 +89,6 @@ run-ai-*.py
 .secrets/
 *client_secret*.json
 *service_account*.json
+
+# i18n Claude Code batch handoff scratch (export/import intermediates)
+.i18n-batches/
