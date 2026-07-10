@@ -6,7 +6,24 @@ import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { loadToolStrings } from "@/lib/tool-strings";
 import Base from "@/layouts/Base.astro";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/tools";
+
+const toolStrings = await loadToolStrings(locale);
+const toolName = (id: string, fallback: string) => toolStrings[id]?.name ?? fallback;
+const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description ?? fallback;
 
 function renderIcon(iconName: string): string {
   const iconData = (lucideIcons as Record<string, unknown>)[iconName];
@@ -30,17 +47,40 @@ const groups = CATEGORIES.map((cat) => ({
 const toolCount = TOOLS.length;
 
 const modalityFilters = [
-  { id: "all", label: "All", count: TOOLS.length },
-  { id: "image", label: "Image", count: TOOLS.filter((t) => t.modality === "image").length },
-  { id: "video", label: "Video", count: TOOLS.filter((t) => t.modality === "video").length },
-  { id: "audio", label: "Audio", count: TOOLS.filter((t) => t.modality === "audio").length },
+  { id: "all", label: t(locale, "toolsIndex.filter.all"), count: TOOLS.length },
+  {
+    id: "image",
+    label: t(locale, "toolsIndex.filter.image"),
+    count: TOOLS.filter((t) => t.modality === "image").length,
+  },
+  {
+    id: "video",
+    label: t(locale, "toolsIndex.filter.video"),
+    count: TOOLS.filter((t) => t.modality === "video").length,
+  },
+  {
+    id: "audio",
+    label: t(locale, "toolsIndex.filter.audio"),
+    count: TOOLS.filter((t) => t.modality === "audio").length,
+  },
   {
     id: "document",
-    label: "PDF & Docs",
+    label: t(locale, "toolsIndex.filter.document"),
     count: TOOLS.filter((t) => t.modality === "document").length,
   },
-  { id: "file", label: "Files", count: TOOLS.filter((t) => t.modality === "file").length },
+  {
+    id: "file",
+    label: t(locale, "toolsIndex.filter.file"),
+    count: TOOLS.filter((t) => t.modality === "file").length,
+  },
 ];
+
+const searchPlaceholder = t(locale, "toolsIndex.searchPlaceholder", { count: toolCount });
+const showingAll = t(locale, "toolsIndex.showingAll", { count: toolCount });
+// Templates the client script fills in with live counts (kept build-time to avoid
+// bundling the i18n catalog into browser JS).
+const showingCountTpl = t(locale, "toolsIndex.showingCount");
+const showingCountAllTpl = t(locale, "toolsIndex.showingCountAll");
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
@@ -79,23 +119,25 @@ const collectionJsonLd = {
 <Base
   title={`All ${toolCount} File Processing Tools | SnapOtter`}
   description={`Browse all ${toolCount} self-hosted file processing tools: resize, compress, convert, remove backgrounds, upscale with AI, add watermarks, generate QR codes, and more. Free, open source, runs on your hardware.`}
-  canonical="https://snapotter.com/tools"
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
 >
   <Fragment slot="head">
     <JsonLd data={[breadcrumbJsonLd, collectionJsonLd]} />
   </Fragment>
 
-  <Navbar />
+  <Navbar locale={locale} path={PATH} />
 
   <main id="main">
     <!-- Breadcrumb -->
     <nav class="mx-auto max-w-5xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2 text-sm text-muted">
         <li>
-          <a href="/" class="transition-colors hover:text-foreground">Home</a>
+          <a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a>
         </li>
         <li aria-hidden="true">/</li>
-        <li class="font-medium text-foreground">Tools</li>
+        <li class="font-medium text-foreground">{t(locale, "common.tools")}</li>
       </ol>
     </nav>
 
@@ -103,11 +145,10 @@ const collectionJsonLd = {
     <section class="mx-auto max-w-5xl px-6 pt-8 pb-16">
       <div class="reveal">
         <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">
-          All {toolCount} tools
+          {t(locale, "toolsIndex.title", { count: toolCount })}
         </h1>
         <p class="mt-4 max-w-2xl text-lg leading-relaxed text-muted md:text-xl">
-          Every tool runs 100% on your hardware. No cloud uploads, no usage limits, no
-          watermarks. Deploy once with Docker and use them all.
+          {t(locale, "toolsIndex.subtitle")}
         </p>
       </div>
     </section>
@@ -121,8 +162,8 @@ const collectionJsonLd = {
             id="tools-search"
             type="text"
             autocomplete="off"
-            placeholder={`Search ${toolCount} tools by name...`}
-            class="w-full rounded-xl border border-border bg-surface py-2.5 pr-4 pl-11 text-sm outline-none transition-colors placeholder:text-muted focus:border-primary"
+            placeholder={searchPlaceholder}
+            class="w-full rounded-xl border border-border bg-surface py-2.5 pe-4 ps-11 text-sm outline-none transition-colors placeholder:text-muted focus:border-primary"
           />
         </div>
         <div class="mt-3 flex flex-wrap gap-2">
@@ -139,7 +180,13 @@ const collectionJsonLd = {
             </button>
           ))}
         </div>
-        <p id="tools-count" class="mt-3 text-sm text-muted">Showing all {toolCount} tools</p>
+        <p
+          id="tools-count"
+          class="mt-3 text-sm text-muted"
+          data-showing-all={showingAll}
+          data-showing-count={showingCountTpl}
+          data-showing-count-all={showingCountAllTpl}
+        >{showingAll}</p>
       </div>
     </section>
 
@@ -180,17 +227,19 @@ const collectionJsonLd = {
                 {group.category.name}
               </h2>
               <span class="text-sm text-muted">
-                {group.tools.length} {group.tools.length === 1 ? "tool" : "tools"}
+                {group.tools.length === 1
+                  ? t(locale, "toolsIndex.toolCountOne", { count: group.tools.length })
+                  : t(locale, "toolsIndex.toolCountOther", { count: group.tools.length })}
               </span>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.tools.map((tool) => (
                 <a
-                  href={`/tools/${toolSection(tool)}/${tool.id}/`}
+                  href={localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`)}
                   class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
-                  data-name={tool.name.toLowerCase()}
-                  data-desc={tool.description.toLowerCase()}
+                  data-name={toolName(tool.id, tool.name).toLowerCase()}
+                  data-desc={toolDesc(tool.id, tool.description).toLowerCase()}
                   data-modality={tool.modality}
                   data-keywords={(tool.keywords ?? []).join(" ")}
                 >
@@ -210,12 +259,12 @@ const collectionJsonLd = {
                     />
                   </div>
                   <div class="min-w-0">
-                    <span class="text-sm font-bold">{tool.name}</span>
+                    <span class="text-sm font-bold">{toolName(tool.id, tool.name)}</span>
                     <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
-                      {tool.description}
+                      {toolDesc(tool.id, tool.description)}
                     </p>
                     <span class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary transition-all group-hover:gap-2">
-                      Learn more
+                      {t(locale, "common.learnMore")}
                       <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                       </svg>
@@ -231,7 +280,7 @@ const collectionJsonLd = {
 
     <!-- Empty state -->
     <p id="tools-empty" class="hidden border-t border-border py-20 text-center text-muted">
-      No tools match your search. Try a different term or modality.
+      {t(locale, "toolsIndex.empty")}
     </p>
 
     <!-- Bottom CTA -->
@@ -239,10 +288,10 @@ const collectionJsonLd = {
       <div class="mx-auto max-w-5xl px-6 text-center">
         <div class="reveal">
           <h2 class="font-display text-3xl font-bold tracking-tight">
-            Deploy all {toolCount} tools with one command
+            {t(locale, "toolsIndex.ctaTitle", { count: toolCount })}
           </h2>
           <p class="mx-auto mt-4 max-w-lg text-muted">
-            One Docker Compose stack. No cloud services. Open source and free forever.
+            {t(locale, "toolsIndex.ctaBody")}
           </p>
           <div class="mt-8 flex flex-wrap justify-center gap-4">
             <a
@@ -251,16 +300,16 @@ const collectionJsonLd = {
               rel="noopener noreferrer"
               class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
             >
-              Get Started
+              {t(locale, "common.getStarted")}
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
               </svg>
             </a>
             <a
-              href="/#pricing"
+              href={localizeHref(locale, "/#pricing")}
               class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
             >
-              View Pricing
+              {t(locale, "common.viewPricing")}
             </a>
           </div>
         </div>
@@ -269,7 +318,7 @@ const collectionJsonLd = {
   </main>
 
   <script>
-    import { matchTool } from "../../lib/tool-search";
+    import { matchTool } from "../../../lib/tool-search";
 
     const search = document.getElementById("tools-search") as HTMLInputElement | null;
     const countEl = document.getElementById("tools-count");
@@ -280,7 +329,13 @@ const collectionJsonLd = {
     const total = items.length;
     let activeMod = "all";
 
+    const fill = (tpl: string, vars: Record<string, string | number>) =>
+      tpl.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
+
     if (search && countEl && emptyEl) {
+      const showingCountTpl = countEl.getAttribute("data-showing-count") ?? "";
+      const showingCountAllTpl = countEl.getAttribute("data-showing-count-all") ?? "";
+
       const setBtns = () => {
         for (const b of modBtns) {
           const on = b.getAttribute("data-modality") === activeMod;
@@ -312,8 +367,8 @@ const collectionJsonLd = {
         emptyEl.style.display = visible === 0 ? "block" : "none";
         countEl.textContent =
           q || activeMod !== "all"
-            ? `Showing ${visible} of ${total} tools`
-            : `Showing all ${total} tools`;
+            ? fill(showingCountTpl, { visible, total })
+            : fill(showingCountAllTpl, { total });
       };
 
       search.addEventListener("input", filter);
