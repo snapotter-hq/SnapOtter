@@ -8,7 +8,7 @@ Edit image metadata fields including EXIF, IPTC, GPS coordinates, dates, and key
 
 ## API Endpoints {#api-endpoints}
 
-### Edit Metadata {#edit-metadata}
+### Edit Metadata {#edit-metadata-1}
 
 `POST /api/v1/tools/image/edit-metadata`
 

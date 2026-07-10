@@ -100,7 +100,7 @@ Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached i
 | imageWidth | number | Yes | - | Image width from Phase 1 response |
 | imageHeight | number | Yes | - | Image height from Phase 1 response |
 
-#### Example Request {#example-request}
+#### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
@@ -122,7 +122,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
   }'
 ```
 
-#### Response (200 OK) {#response-200-ok}
+#### Response (200 OK) {#response-200-ok-1}
 
 ```json
 {

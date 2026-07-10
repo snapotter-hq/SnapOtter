@@ -84,7 +84,7 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 
 Re-applies background effects without re-running the AI model. Uses cached mask and original from Phase 1.
 
-### Parameters {#parameters}
+### Parameters {#parameters-1}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -108,7 +108,7 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 | shadowOpacity | number | No | Shadow opacity (0-100) |
 | outputFormat | string | No | `png`, `webp`, or `avif` |
 
-### Example Request {#example-request}
+### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects \

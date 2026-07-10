@@ -45,6 +45,19 @@ describe("docs-md adapter", () => {
     expect(again).toBe(onDisk);
   });
 
+  it("de-duplicates repeated heading slugs like markdown-it-anchor (-1, -2)", async () => {
+    await seed(
+      "guide/z.md",
+      "## Example Request\n\ntext\n\n## Example Request\n\nmore\n\n## Example Request\n",
+    );
+    const adapter = createDocsAdapter({ root });
+    await adapter.extract();
+    const onDisk = await readFile(join(root, "guide/z.md"), "utf8");
+    expect(onDisk).toContain("## Example Request {#example-request}");
+    expect(onDisk).toContain("## Example Request {#example-request-1}");
+    expect(onDisk).toContain("## Example Request {#example-request-2}");
+  });
+
   it("does not treat fenced # lines as headings", async () => {
     await seed("guide/y.md", "# Real Heading\n\n```bash\n# not a heading\n```\n");
     const adapter = createDocsAdapter({ root });

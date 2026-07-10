@@ -60,20 +60,20 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement \
 
 Analyzes an image and returns correction recommendations without applying them.
 
-### Parameters {#parameters}
+### Parameters {#parameters-1}
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | file | file | Yes | Image file (multipart) |
 
-### Example Request {#example-request}
+### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement/analyze \
   -F "file=@photo.jpg"
 ```
 
-### Response (200 OK) {#response-200-ok}
+### Response (200 OK) {#response-200-ok-1}
 
 ```json
 {

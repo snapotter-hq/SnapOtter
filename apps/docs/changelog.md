@@ -66,7 +66,7 @@ docker compose pull && docker compose up -d
 
 New HTML to Image tool, WCAG 2.2 AA accessibility, security hardening from penetration testing, and 5 critical Docker fixes.
 
-### New features {#new-features}
+### New features {#new-features-1}
 
 - **HTML to Image**: Capture screenshots of URLs or raw HTML as PNG/JPEG/WebP. Full-page captures, custom viewports, dark mode.
 - **Docker _FILE secret convention**: Mount sensitive env vars as files instead of plain-text. (#205)
@@ -74,7 +74,7 @@ New HTML to Image tool, WCAG 2.2 AA accessibility, security hardening from penet
 - **Shape editor improvements**: Fill/stroke transparency, RGBA color picker, dash line styles.
 - **Pre-built release archives**: Download tarballs from GitHub Releases for non-Docker installs (Proxmox, bare metal, LXC). (#202)
 
-### Improvements {#improvements}
+### Improvements {#improvements-1}
 
 - **WCAG 2.2 AA accessibility**: Skip navigation, focus trapping, aria-live regions, reduced motion support, correct contrast ratios. (#209)
 - **Mobile responsiveness**: Responsive settings, SSE auto-reconnect on mobile tab switch. (#203, #204)
@@ -83,7 +83,7 @@ New HTML to Image tool, WCAG 2.2 AA accessibility, security hardening from penet
 - **Per-tool API documentation**: 53 doc pages with parameters, examples, and response formats.
 - **AI model downloads**: Retry logic with exponential backoff for HuggingFace. (#201)
 
-### Bug fixes {#bug-fixes}
+### Bug fixes {#bug-fixes-1}
 
 - Fresh Docker containers were completely unusable (rate limit blocked all requests).
 - Face detection AI tools (blur-faces, red-eye-removal, enhance-faces, passport-photo) failed on all platforms.
@@ -101,7 +101,7 @@ New HTML to Image tool, WCAG 2.2 AA accessibility, security hardening from penet
 - SSRF hex IPv6 bypass blocked. (Credit: @tonghuaroot)
 - Dockerfile base images pinned by digest.
 
-### Upgrade {#upgrade}
+### Upgrade {#upgrade-1}
 
 ```bash
 docker pull snapotter/snapotter:1.17.2
@@ -121,7 +121,7 @@ docker compose pull && docker compose up -d
 
 Live demo, per-tool landing pages, and a batch of polish fixes.
 
-### New features {#new-features}
+### New features {#new-features-2}
 
 - **Live demo** - [demo.snapotter.com](https://demo.snapotter.com) lets people try SnapOtter without installing anything.
 - **Tools index page** - Browse all 50+ tools at `/tools` with search and category filters.
@@ -129,7 +129,7 @@ Live demo, per-tool landing pages, and a batch of polish fixes.
 - **Background preview** - Before-after slider shows a checkered background behind transparent images.
 - **Strong password generator** - One-click button in the Add Members form.
 
-### Bug fixes {#bug-fixes}
+### Bug fixes {#bug-fixes-2}
 
 - HEIC/HEIF info tool no longer fails (pre-decode added).
 - AI model bundle install shows better error messages and respects resource limits.
@@ -146,7 +146,7 @@ Live demo, per-tool landing pages, and a batch of polish fixes.
 - CI tests parallelized into 4 shards with downsized fixtures.
 - 41 dependency updates.
 
-### Upgrade {#upgrade}
+### Upgrade {#upgrade-2}
 
 ```bash
 docker pull snapotter/snapotter:1.17.1
@@ -166,7 +166,7 @@ docker compose pull && docker compose up -d
 
 Five new tools, a full image editor, SSO login, 20 languages. Probably should have been three separate releases, but here we are.
 
-### New features {#new-features}
+### New features {#new-features-3}
 
 - **Image editor** - Layers, brushes, shapes, adjustments, filters, curves, keyboard shortcuts. Runs in your browser, processes on your hardware.
 - **OIDC / SSO authentication** - Login with Google, GitHub, Okta, or any OpenID Connect provider. Set a few env vars and your team uses their existing accounts.
@@ -181,7 +181,7 @@ Five new tools, a full image editor, SSO login, 20 languages. Probably should ha
 - **Pipeline import/export** - Save tool chains as JSON, share them with others.
 - **17 new camera RAW formats** via exiftool, plus QOI, JP2, EPS, DDS, CUR, DPX, FITS, PPM/PGM/PBM, SVGZ, and APNG input. New output codecs for BMP, ICO, JP2, QOI. AVIF, TIFF, GIF, JXL, and PSD export recovered from a previously lost branch.
 
-### Improvements {#improvements}
+### Improvements {#improvements-2}
 
 - **Image enhancement** - Replaced the old pipeline with CLAHE + normalise + gamma. New Deep Enhance toggle uses the AI model for more aggressive results.
 - **Restore photo** - Scratch detection rewritten with 8-angle Otsu filtering. LaMa inpainting now runs at native resolution.
@@ -192,7 +192,7 @@ Five new tools, a full image editor, SSO login, 20 languages. Probably should ha
 - **Auth-disabled mode** - Anonymous user is seeded in the DB with admin role. API keys, pipelines, and user files no longer break on FK constraints.
 - **2,705+ new tests** across unit, integration, and E2E.
 
-### Bug fixes {#bug-fixes}
+### Bug fixes {#bug-fixes-3}
 
 - Upscale on CPU no longer times out on NAS boxes and low-power hardware.
 - QR code logo no longer makes the preview vanish permanently.
@@ -206,7 +206,7 @@ Five new tools, a full image editor, SSO login, 20 languages. Probably should ha
 - SVGZ handled by SVG-to-raster.
 - Non-ASCII filenames fixed via percent-encoded X-File-Results header.
 
-### Upgrade {#upgrade}
+### Upgrade {#upgrade-3}
 
 ```bash
 docker pull snapotter/snapotter:1.17.0

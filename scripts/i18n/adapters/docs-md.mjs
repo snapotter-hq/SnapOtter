@@ -93,13 +93,32 @@ function segmentFences(body) {
  * @returns {string}
  */
 function injectAnchors(body) {
+  // De-duplicate slugs exactly like markdown-it-anchor: a base slug already used
+  // in the file gets "-1", "-2", ... appended (start index 1). Explicit {#id}
+  // anchors already in the source claim their slot too, so injected slugs never
+  // collide with them. Seen-set spans every prose segment, matching VitePress.
+  const seen = new Set();
+  const unique = (base) => {
+    let slug = base;
+    let i = 1;
+    while (seen.has(slug)) {
+      slug = `${base}-${i}`;
+      i += 1;
+    }
+    seen.add(slug);
+    return slug;
+  };
   return segmentFences(body)
     .map((seg) => {
       if (seg.code) return seg.text;
       return seg.text.replace(/^(#{1,6})[ \t]+(.+?)[ \t]*$/gm, (line, hashes, title) => {
-        if (/\{#[^}]+\}\s*$/.test(title)) return line; // already anchored
+        const explicit = title.match(/\{#([^}]+)\}\s*$/);
+        if (explicit) {
+          seen.add(explicit[1]); // pre-existing anchor claims its slug
+          return line;
+        }
         const clean = title.replace(/[ \t]+#*$/, ""); // drop optional closing ATX hashes
-        return `${hashes} ${clean} {#${slugify(clean)}}`;
+        return `${hashes} ${clean} {#${unique(slugify(clean))}}`;
       });
     })
     .join("");

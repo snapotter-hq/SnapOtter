@@ -180,7 +180,7 @@ Audio is also processed by FFmpeg.
 | AMR | .amr | Lossy | Speech / mobile |
 | AC-3 | .ac3 | Lossy | Dolby Digital |
 
-### Output Formats {#output-formats}
+### Output Formats {#output-formats-1}
 
 | Format | Extension | Codec | Produced by |
 |--------|-----------|-------|-------------|
@@ -209,7 +209,7 @@ Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
 | HTML | .html | WeasyPrint | Rendered to PDF |
 | EPUB | .epub | Pandoc, LibreOffice | E-book format |
 
-### Output Formats {#output-formats}
+### Output Formats {#output-formats-2}
 
 | Format | Extensions | Produced by |
 |--------|-----------|-------------|
