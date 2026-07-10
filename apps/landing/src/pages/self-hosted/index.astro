@@ -1,0 +1,45 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import EnterpriseCtaBand from "@/components/EnterpriseCtaBand.astro";
+import Footer from "@/components/Footer.astro";
+import Navbar from "@/components/Navbar.astro";
+import { USE_CASES } from "@/data/use-cases";
+import Base from "@/layouts/Base.astro";
+
+const canonical = "https://snapotter.com/self-hosted";
+const title = "Self-Hosted File Processing | SnapOtter";
+const description =
+  "Self-hosted, private alternatives to the online file tools your team pastes sensitive files into. Image compression, PDF OCR, video conversion, background removal, transcription, and a REST API, on infrastructure you control.";
+---
+
+<Base title={title} description={description} canonical={canonical}>
+  <Navbar />
+  <main id="main">
+    <section class="mx-auto max-w-4xl px-6 pt-28 pb-12 text-center md:pt-36">
+      <div class="reveal">
+        <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">Self-hosted file processing</h1>
+        <p class="mx-auto mt-4 max-w-2xl text-lg text-muted md:text-xl">
+          Every online file tool your team pastes sensitive files into, running on infrastructure you control. Open source, air-gap capable, with a REST API.
+        </p>
+      </div>
+    </section>
+
+    <section class="py-8">
+      <div class="mx-auto max-w-5xl px-6">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {USE_CASES.map((uc) => (
+            <a href={`/self-hosted/${uc.slug}`} class="group flex flex-col rounded-xl border border-border bg-surface p-6 transition-all hover:border-primary hover:shadow-md">
+              <span class="font-display text-lg font-bold">{uc.h1}</span>
+              <span class="mt-2 text-sm text-muted">{uc.intro}</span>
+              <span class="mt-4 text-xs font-semibold text-primary">Read more →</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <EnterpriseCtaBand />
+  </main>
+  <Footer />
+</Base>
