@@ -2,6 +2,23 @@ import { defineConfig } from "vitepress";
 import llmstxt from "vitepress-plugin-llms";
 import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
+import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
+
+const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
+const HOSTNAME = "https://docs.snapotter.com";
+
+// Prefix every `link` in a sidebar/nav tree with /<locale>.
+// biome-ignore lint/suspicious/noExplicitAny: VitePress nav/sidebar item trees are recursively typed.
+function prefixLinks(items: any[], locale: string): any[] {
+  return (items ?? []).map((it) => {
+    const next = { ...it };
+    if (typeof next.link === "string" && next.link.startsWith("/")) {
+      next.link = `/${locale}${next.link}`;
+    }
+    if (Array.isArray(next.items)) next.items = prefixLinks(next.items, locale);
+    return next;
+  });
+}
 
 export default defineConfig({
   title: "SnapOtter",
@@ -17,7 +34,16 @@ export default defineConfig({
 
   head: [
     ["meta", { name: "theme-color", content: "#E07832" }],
-    ["link", { rel: "preload", href: "/fonts/bricolage-grotesque-var.woff2", as: "font", type: "font/woff2", crossorigin: "" }],
+    [
+      "link",
+      {
+        rel: "preload",
+        href: "/fonts/bricolage-grotesque-var.woff2",
+        as: "font",
+        type: "font/woff2",
+        crossorigin: "",
+      },
+    ],
     ["link", { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon.png" }],
     ["link", { rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
     ["link", { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }],
@@ -28,7 +54,6 @@ export default defineConfig({
     ["meta", { property: "og:image:width", content: "1280" }],
     ["meta", { property: "og:image:height", content: "640" }],
     ["meta", { property: "og:image:alt", content: "SnapOtter - Self-Hosted File Processing" }],
-    ["meta", { property: "og:locale", content: "en_US" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:site", content: "@SnapOtterHQ" }],
     ["meta", { name: "twitter:image", content: "https://docs.snapotter.com/og-image.png" }],
@@ -36,8 +61,25 @@ export default defineConfig({
 
   transformHead({ pageData }) {
     const head: Array<[string, Record<string, string>]> = [];
-    const canonicalUrl = `https://docs.snapotter.com/${pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "")}`;
-    head.push(["meta", { property: "og:url", content: canonicalUrl }]);
+    const rel = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "");
+    const codes = NON_EN.map((l) => l.code);
+    const firstSeg = rel.split("/")[0];
+    const isLocale = codes.includes(firstSeg);
+    const enRel = isLocale ? rel.split("/").slice(1).join("/") : rel;
+    const current = isLocale ? firstSeg : "en";
+
+    const urlFor = (code: string) =>
+      code === "en" ? `${HOSTNAME}/${enRel}` : `${HOSTNAME}/${code}/${enRel}`;
+
+    head.push(["link", { rel: "canonical", href: urlFor(current) }]);
+    head.push(["link", { rel: "alternate", hreflang: "x-default", href: urlFor("en") }]);
+    head.push(["link", { rel: "alternate", hreflang: "en", href: urlFor("en") }]);
+    for (const l of NON_EN) {
+      head.push(["link", { rel: "alternate", hreflang: l.code, href: urlFor(l.code) }]);
+    }
+    const ogLocale = current === "en" ? "en_US" : current.replace("-", "_");
+    head.push(["meta", { property: "og:locale", content: ogLocale }]);
+    head.push(["meta", { property: "og:url", content: urlFor(current) }]);
     head.push(["meta", { property: "og:title", content: pageData.title }]);
     if (pageData.description) {
       head.push(["meta", { property: "og:description", content: pageData.description }]);
@@ -69,6 +111,21 @@ export default defineConfig({
         heading: "{{searchResult}} results",
         // Show a few sub-section matches per page so deep-linked headings surface.
         pageResultCount: 3,
+        // Per-locale placeholders. No forceLanguage: Pagefind auto-detects per
+        // <html lang> (VitePress sets it per locale) and langReload loads the
+        // right index on switch. Strings stay English until Plan 05 localizes them.
+        locales: Object.fromEntries(
+          NON_EN.map((l) => [
+            l.code,
+            {
+              btnPlaceholder: "Search",
+              placeholder: "Search tools, guides, and the API…",
+              emptyText: "No matches found. Try a different term or check the spelling.",
+              heading: "{{searchResult}} results",
+              pageResultCount: 3,
+            },
+          ]),
+        ),
       }),
       llmstxt({
         domain: "https://docs.snapotter.com",
@@ -107,7 +164,37 @@ export default defineConfig({
     ],
   },
 
-  themeConfig: {
+  themeConfig: buildBaseTheme(),
+
+  locales: {
+    root: { label: "English", lang: "en" },
+    ...Object.fromEntries(
+      NON_EN.map((l) => [
+        l.code,
+        {
+          label: l.nativeName,
+          lang: l.code,
+          dir: l.dir,
+          link: `/${l.code}/`,
+          themeConfig: {
+            nav: prefixLinks(buildBaseTheme().nav, l.code),
+            sidebar: prefixLinks(buildBaseTheme().sidebar, l.code),
+            editLink: {
+              pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",
+              text: "Edit this page on GitHub",
+            },
+          },
+        },
+      ]),
+    ),
+  },
+});
+
+// Function declaration (hoisted) so defineConfig above can call it while the
+// nav/sidebar/footer tree stays defined once. Root uses it verbatim; each locale
+// gets a /<locale>-prefixed copy of nav + sidebar via prefixLinks().
+function buildBaseTheme() {
+  return {
     logo: "/logo.png",
 
     nav: [
@@ -154,110 +241,110 @@ export default defineConfig({
             text: "Image",
             collapsed: false,
             items: [
-          {
-            text: "Essentials",
-            items: [
-              { text: "Resize", link: "/tools/image/resize" },
-              { text: "Crop", link: "/tools/image/crop" },
-              { text: "Rotate & Flip", link: "/tools/image/rotate" },
-              { text: "Convert", link: "/tools/image/convert" },
-              { text: "Compress", link: "/tools/image/compress" },
-            ],
-          },
-          {
-            text: "Optimization",
-            items: [
-              { text: "Optimize for Web", link: "/tools/image/optimize-for-web" },
-              { text: "Remove Metadata", link: "/tools/image/strip-metadata" },
-              { text: "Edit Metadata", link: "/tools/image/edit-metadata" },
-              { text: "Bulk Rename", link: "/tools/image/bulk-rename" },
-              { text: "Image to PDF", link: "/tools/image/image-to-pdf" },
-              { text: "Favicon Generator", link: "/tools/image/favicon" },
-            ],
-          },
-          {
-            text: "Adjustments",
-            items: [
-              { text: "Adjust Colors", link: "/tools/image/adjust-colors" },
-              { text: "Sharpening", link: "/tools/image/sharpening" },
-              { text: "Replace & Invert Color", link: "/tools/image/replace-color" },
-              { text: "Color Blindness Simulation", link: "/tools/image/color-blindness" },
-              { text: "Duotone", link: "/tools/image/duotone" },
-              { text: "Pixelate", link: "/tools/image/pixelate" },
-              { text: "Vignette", link: "/tools/image/vignette" },
-            ],
-          },
-          {
-            text: "Watermark & Overlay",
-            items: [
-              { text: "Text Watermark", link: "/tools/image/watermark-text" },
-              { text: "Image Watermark", link: "/tools/image/watermark-image" },
-              { text: "Text Overlay", link: "/tools/image/text-overlay" },
-              { text: "Image Composition", link: "/tools/image/compose" },
-              { text: "Meme Generator", link: "/tools/image/meme-generator" },
-            ],
-          },
-          {
-            text: "Utilities",
-            items: [
-              { text: "Image Info", link: "/tools/image/info" },
-              { text: "Image Compare", link: "/tools/image/compare" },
-              { text: "Find Duplicates", link: "/tools/image/find-duplicates" },
-              { text: "Color Palette", link: "/tools/image/color-palette" },
-              { text: "QR Code Generator", link: "/tools/image/qr-generate" },
-              { text: "HTML to Image", link: "/tools/image/html-to-image" },
-              { text: "Barcode Reader", link: "/tools/image/barcode-read" },
-              { text: "Image to Base64", link: "/tools/image/image-to-base64" },
-              { text: "Histogram", link: "/tools/image/histogram" },
-              { text: "LQIP Placeholder", link: "/tools/image/lqip-placeholder" },
-              { text: "Barcode Generator", link: "/tools/image/barcode-generate" },
-            ],
-          },
-          {
-            text: "Layout",
-            items: [
-              { text: "Collage / Grid", link: "/tools/image/collage" },
-              { text: "Stitch / Combine", link: "/tools/image/stitch" },
-              { text: "Image Splitting", link: "/tools/image/split" },
-              { text: "Border & Frame", link: "/tools/image/border" },
-              { text: "Beautify Screenshot", link: "/tools/image/beautify" },
-              { text: "Circle Crop", link: "/tools/image/circle-crop" },
-              { text: "Image Pad", link: "/tools/image/image-pad" },
-              { text: "Sprite Sheet", link: "/tools/image/sprite-sheet" },
-            ],
-          },
-          {
-            text: "Format",
-            items: [
-              { text: "SVG to Raster", link: "/tools/image/svg-to-raster" },
-              { text: "Image to SVG", link: "/tools/image/vectorize" },
-              { text: "GIF Tools", link: "/tools/image/gif-tools" },
-              { text: "GIF/WebP Converter", link: "/tools/image/gif-webp" },
-            ],
-          },
-          {
-            text: "AI Tools",
-            items: [
-              { text: "Remove Background", link: "/tools/image/remove-background" },
-              { text: "Image Upscaling", link: "/tools/image/upscale" },
-              { text: "Object Eraser", link: "/tools/image/erase-object" },
-              { text: "OCR / Text Extraction", link: "/tools/image/ocr" },
-              { text: "Face / PII Blur", link: "/tools/image/blur-faces" },
-              { text: "Smart Crop", link: "/tools/image/smart-crop" },
-              { text: "Image Enhancement", link: "/tools/image/image-enhancement" },
-              { text: "Face Enhancement", link: "/tools/image/enhance-faces" },
-              { text: "AI Colorization", link: "/tools/image/colorize" },
-              { text: "Noise Removal", link: "/tools/image/noise-removal" },
-              { text: "Red Eye Removal", link: "/tools/image/red-eye-removal" },
-              { text: "Photo Restoration", link: "/tools/image/restore-photo" },
-              { text: "Passport Photo", link: "/tools/image/passport-photo" },
-              { text: "Content-Aware Resize", link: "/tools/image/content-aware-resize" },
-              { text: "AI Canvas Expand", link: "/tools/image/ai-canvas-expand" },
-              { text: "PNG Transparency Fixer", link: "/tools/image/transparency-fixer" },
-              { text: "Background Replace", link: "/tools/image/background-replace" },
-              { text: "Blur Background", link: "/tools/image/blur-background" },
-            ],
-          },
+              {
+                text: "Essentials",
+                items: [
+                  { text: "Resize", link: "/tools/image/resize" },
+                  { text: "Crop", link: "/tools/image/crop" },
+                  { text: "Rotate & Flip", link: "/tools/image/rotate" },
+                  { text: "Convert", link: "/tools/image/convert" },
+                  { text: "Compress", link: "/tools/image/compress" },
+                ],
+              },
+              {
+                text: "Optimization",
+                items: [
+                  { text: "Optimize for Web", link: "/tools/image/optimize-for-web" },
+                  { text: "Remove Metadata", link: "/tools/image/strip-metadata" },
+                  { text: "Edit Metadata", link: "/tools/image/edit-metadata" },
+                  { text: "Bulk Rename", link: "/tools/image/bulk-rename" },
+                  { text: "Image to PDF", link: "/tools/image/image-to-pdf" },
+                  { text: "Favicon Generator", link: "/tools/image/favicon" },
+                ],
+              },
+              {
+                text: "Adjustments",
+                items: [
+                  { text: "Adjust Colors", link: "/tools/image/adjust-colors" },
+                  { text: "Sharpening", link: "/tools/image/sharpening" },
+                  { text: "Replace & Invert Color", link: "/tools/image/replace-color" },
+                  { text: "Color Blindness Simulation", link: "/tools/image/color-blindness" },
+                  { text: "Duotone", link: "/tools/image/duotone" },
+                  { text: "Pixelate", link: "/tools/image/pixelate" },
+                  { text: "Vignette", link: "/tools/image/vignette" },
+                ],
+              },
+              {
+                text: "Watermark & Overlay",
+                items: [
+                  { text: "Text Watermark", link: "/tools/image/watermark-text" },
+                  { text: "Image Watermark", link: "/tools/image/watermark-image" },
+                  { text: "Text Overlay", link: "/tools/image/text-overlay" },
+                  { text: "Image Composition", link: "/tools/image/compose" },
+                  { text: "Meme Generator", link: "/tools/image/meme-generator" },
+                ],
+              },
+              {
+                text: "Utilities",
+                items: [
+                  { text: "Image Info", link: "/tools/image/info" },
+                  { text: "Image Compare", link: "/tools/image/compare" },
+                  { text: "Find Duplicates", link: "/tools/image/find-duplicates" },
+                  { text: "Color Palette", link: "/tools/image/color-palette" },
+                  { text: "QR Code Generator", link: "/tools/image/qr-generate" },
+                  { text: "HTML to Image", link: "/tools/image/html-to-image" },
+                  { text: "Barcode Reader", link: "/tools/image/barcode-read" },
+                  { text: "Image to Base64", link: "/tools/image/image-to-base64" },
+                  { text: "Histogram", link: "/tools/image/histogram" },
+                  { text: "LQIP Placeholder", link: "/tools/image/lqip-placeholder" },
+                  { text: "Barcode Generator", link: "/tools/image/barcode-generate" },
+                ],
+              },
+              {
+                text: "Layout",
+                items: [
+                  { text: "Collage / Grid", link: "/tools/image/collage" },
+                  { text: "Stitch / Combine", link: "/tools/image/stitch" },
+                  { text: "Image Splitting", link: "/tools/image/split" },
+                  { text: "Border & Frame", link: "/tools/image/border" },
+                  { text: "Beautify Screenshot", link: "/tools/image/beautify" },
+                  { text: "Circle Crop", link: "/tools/image/circle-crop" },
+                  { text: "Image Pad", link: "/tools/image/image-pad" },
+                  { text: "Sprite Sheet", link: "/tools/image/sprite-sheet" },
+                ],
+              },
+              {
+                text: "Format",
+                items: [
+                  { text: "SVG to Raster", link: "/tools/image/svg-to-raster" },
+                  { text: "Image to SVG", link: "/tools/image/vectorize" },
+                  { text: "GIF Tools", link: "/tools/image/gif-tools" },
+                  { text: "GIF/WebP Converter", link: "/tools/image/gif-webp" },
+                ],
+              },
+              {
+                text: "AI Tools",
+                items: [
+                  { text: "Remove Background", link: "/tools/image/remove-background" },
+                  { text: "Image Upscaling", link: "/tools/image/upscale" },
+                  { text: "Object Eraser", link: "/tools/image/erase-object" },
+                  { text: "OCR / Text Extraction", link: "/tools/image/ocr" },
+                  { text: "Face / PII Blur", link: "/tools/image/blur-faces" },
+                  { text: "Smart Crop", link: "/tools/image/smart-crop" },
+                  { text: "Image Enhancement", link: "/tools/image/image-enhancement" },
+                  { text: "Face Enhancement", link: "/tools/image/enhance-faces" },
+                  { text: "AI Colorization", link: "/tools/image/colorize" },
+                  { text: "Noise Removal", link: "/tools/image/noise-removal" },
+                  { text: "Red Eye Removal", link: "/tools/image/red-eye-removal" },
+                  { text: "Photo Restoration", link: "/tools/image/restore-photo" },
+                  { text: "Passport Photo", link: "/tools/image/passport-photo" },
+                  { text: "Content-Aware Resize", link: "/tools/image/content-aware-resize" },
+                  { text: "AI Canvas Expand", link: "/tools/image/ai-canvas-expand" },
+                  { text: "PNG Transparency Fixer", link: "/tools/image/transparency-fixer" },
+                  { text: "Background Replace", link: "/tools/image/background-replace" },
+                  { text: "Blur Background", link: "/tools/image/blur-background" },
+                ],
+              },
             ],
           },
           {
@@ -406,5 +493,5 @@ export default defineConfig({
       pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",
       text: "Edit this page on GitHub",
     },
-  },
-});
+  };
+}
