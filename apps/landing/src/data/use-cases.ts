@@ -246,7 +246,7 @@ export const USE_CASES: UseCase[] = [
       "SnapOtter runs background removal with a local model after a one-time bundle install. Drop images in the UI or POST them to the API, get transparent PNGs back, and nothing leaves your network. No per-image credit, and a GPU is used automatically if you have one.",
     toolIds: ["remove-background"],
     toolRoutes: ["/tools/image/remove-background"],
-    // alternativeSlug "removebg" is wired in Phase E once that alternative exists.
+    alternativeSlug: "removebg",
     docker: DOCKER_CMD,
     curl: apiExample({
       isLong: true,

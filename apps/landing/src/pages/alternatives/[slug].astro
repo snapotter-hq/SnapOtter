@@ -1,9 +1,12 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import EnterpriseCtaBand from "@/components/EnterpriseCtaBand.astro";
 import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
+import QuickstartBlock from "@/components/QuickstartBlock.astro";
+import RiskCallout from "@/components/RiskCallout.astro";
 import { ALTERNATIVES } from "@/data/alternatives";
 import Base from "@/layouts/Base.astro";
 
@@ -193,6 +196,39 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
       </div>
     </section>
 
+    <!-- What you do today + why risky (optional deepening) -->
+    {(alt.whatYouDoToday || alt.whyRisky) && (
+      <section class="border-t border-border bg-background-alt py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          {alt.whatYouDoToday && (
+            <div class="reveal">
+              <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">What you do today with {alt.competitor}</h2>
+              <p class="mt-4 text-sm leading-relaxed text-muted md:text-base">{alt.whatYouDoToday}</p>
+            </div>
+          )}
+          {alt.whyRisky && (
+            <div class="mt-8">
+              <RiskCallout title="Why that matters for sensitive files" body={alt.whyRisky} />
+            </div>
+          )}
+        </div>
+      </section>
+    )}
+
+    <!-- Run it yourself (optional deepening) -->
+    {(alt.dockerSnippet || alt.apiSnippet) && (
+      <section class="py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          <div class="reveal">
+            <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">Run it yourself</h2>
+            <div class="mt-8">
+              <QuickstartBlock docker={alt.dockerSnippet ?? ""} curl={alt.apiSnippet} />
+            </div>
+          </div>
+        </div>
+      </section>
+    )}
+
     <!-- FAQs -->
     {alt.faqs.length > 0 && (
       <section class="border-t border-border bg-background-alt py-16">
@@ -267,6 +303,8 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
         </div>
       </div>
     </section>
+
+    <EnterpriseCtaBand />
   </main>
 
   <Footer />
