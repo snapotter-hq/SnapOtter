@@ -1,14 +1,23 @@
 <script setup>
+import { useData } from "vitepress";
 import VPSwitchAppearance from "vitepress/dist/client/theme-default/components/VPSwitchAppearance.vue";
 import DefaultTheme from "vitepress/theme";
+import { computed } from "vue";
+import { normalizeLocale, t } from "../i18n/ui.mjs";
 import FundButton from "./FundButton.vue";
 import GitHubStars from "./GitHubStars.vue";
+import MachineTranslationBanner from "./MachineTranslationBanner.vue";
 
 const { Layout } = DefaultTheme;
+const { lang } = useData();
+const locale = computed(() => normalizeLocale(lang.value));
 </script>
 
 <template>
   <Layout>
+    <template #layout-top>
+      <MachineTranslationBanner />
+    </template>
     <template #nav-bar-content-after>
       <div class="nav-bar-right">
         <VPSwitchAppearance />
@@ -19,9 +28,9 @@ const { Layout } = DefaultTheme;
     <template #not-found>
       <div class="not-found-page">
         <span class="not-found-otter">🦦</span>
-        <h1 class="not-found-heading">Hello from the otter side!</h1>
-        <p class="not-found-text">This page swam away. Let's get you back on track.</p>
-        <a href="/" class="not-found-link">Back to docs</a>
+        <h1 class="not-found-heading">{{ t(locale, "notFound.heading") }}</h1>
+        <p class="not-found-text">{{ t(locale, "notFound.text") }}</p>
+        <a href="/" class="not-found-link">{{ t(locale, "notFound.link") }}</a>
       </div>
     </template>
   </Layout>

@@ -1,5 +1,14 @@
 <script setup lang="ts">
-const command = "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
+import { useData } from "vitepress";
+import { computed, ref } from "vue";
+import { normalizeLocale, t } from "../i18n/ui.mjs";
+
+const { lang } = useData();
+const locale = computed(() => normalizeLocale(lang.value));
+const tt = (key: string) => t(locale.value, key);
+
+const command =
+  "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
 
 const selfLinks = [
   { label: "Quick start", href: "/guide/getting-started#quick-start" },
@@ -30,20 +39,21 @@ const shared = [
   { label: "llms.txt", sub: "AI-friendly docs", href: "/llms.txt" },
 ];
 
-import { ref } from "vue";
-const copyLabel = ref("Copy");
+const copyLabel = ref(t(locale.value, "home.copy"));
 function copyCommand() {
   navigator.clipboard?.writeText(command);
-  copyLabel.value = "Copied!";
-  setTimeout(() => { copyLabel.value = "Copy"; }, 1500);
+  copyLabel.value = t(locale.value, "home.copied");
+  setTimeout(() => {
+    copyLabel.value = t(locale.value, "home.copy");
+  }, 1500);
 }
 </script>
 
 <template>
   <div class="so-home">
     <section class="hero">
-      <p class="eyebrow">Self-hosted · Open source · AGPLv3</p>
-      <h1 class="hero-title">SnapOtter Documentation</h1>
+      <p class="eyebrow">{{ tt("home.eyebrow") }}</p>
+      <h1 class="hero-title">{{ tt("home.title") }}</h1>
       <p class="hero-sub">
         <strong>Self-hosted file processing.</strong> 200+ tools across image, video, audio, PDF &amp;
         files, all on your own hardware. Choose your path below, or get running in one command:
@@ -65,13 +75,13 @@ function copyCommand() {
           <span class="door-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
           </span>
-          <h2>Self-hosting</h2>
+          <h2>{{ tt("home.selfHosting") }}</h2>
         </div>
         <p class="door-sub">Get SnapOtter running and keep it healthy.</p>
         <ul class="door-links">
           <li v-for="l in selfLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
         </ul>
-        <a class="door-cta" href="/guide/getting-started">Start self-hosting →</a>
+        <a class="door-cta" href="/guide/getting-started">{{ tt("home.startSelfHosting") }}</a>
       </div>
 
       <div class="door ent">
@@ -79,18 +89,18 @@ function copyCommand() {
           <span class="door-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
           </span>
-          <h2>Enterprise</h2>
+          <h2>{{ tt("home.enterprise") }}</h2>
         </div>
         <p class="door-sub">Evaluate, secure &amp; govern your deployment.</p>
         <ul class="door-links">
           <li v-for="l in entLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
         </ul>
-        <a class="door-cta" href="/guide/architecture">Evaluate for your org →</a>
+        <a class="door-cta" href="/guide/architecture">{{ tt("home.evaluate") }}</a>
       </div>
     </section>
 
     <section class="mod">
-      <p class="mod-head"><strong>200+ tools across 5 modalities</strong> <span>browse the full reference by type</span></p>
+      <p class="mod-head"><strong>{{ tt("home.modalities") }}</strong> <span>{{ tt("home.browseByType") }}</span></p>
       <div class="chips">
         <a v-for="m in modalities" :key="m.href" class="chip" :href="m.href">
           <span class="chip-label">{{ m.label }}</span>
