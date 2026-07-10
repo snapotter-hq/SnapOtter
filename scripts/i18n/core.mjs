@@ -14,6 +14,39 @@ const CHUNK = 20; // units per write, for resumability
  */
 
 /**
+ * Classify units for a locale against stored translations.
+ * @param {any[]} units
+ * @param {Map<string, StoredEntry>} stored
+ * @returns {{ pending: Array<{unit: any, srcHash: string}>, merged: Map<string, StoredEntry>, stats: { skipped: number, stale: number } }}
+ */
+export function collectPending(units, stored) {
+  const merged = new Map(stored);
+  const pending = [];
+  const stats = { skipped: 0, stale: 0 };
+  for (const unit of units) {
+    const srcHash = hash(unit.sourceText);
+    const prev = stored.get(unit.id);
+    if (!prev) {
+      pending.push({ unit, srcHash });
+      continue;
+    }
+    const provenance = hash(prev.text) === prev.outputHash ? prev.provenance : "human";
+    if (prev.sourceHash === srcHash) {
+      merged.set(unit.id, { ...prev, provenance, stale: false });
+      stats.skipped++;
+      continue;
+    }
+    if (provenance === "human") {
+      merged.set(unit.id, { ...prev, provenance, stale: true });
+      stats.stale++;
+      continue;
+    }
+    pending.push({ unit, srcHash });
+  }
+  return { pending, merged, stats };
+}
+
+/**
  * Translate every unit for every locale, gating on source hashes.
  * @param {{
  *   adapter: { name: string, extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, StoredEntry>>, write: (l: string, e: Map<string, StoredEntry>) => Promise<void> },
@@ -30,31 +63,8 @@ export async function runTranslation({ adapter, locales, translate, log = () => 
   for (const locale of locales) {
     if (locale === "en") continue; // English is the source
     const stored = await adapter.load(locale);
-    const merged = new Map(stored);
-    const stats = { translated: 0, skipped: 0, stale: 0, failed: 0 };
-    const todo = [];
-
-    for (const unit of units) {
-      const srcHash = hash(unit.sourceText);
-      const prev = stored.get(unit.id);
-      if (!prev) {
-        todo.push({ unit, srcHash });
-        continue;
-      }
-      // Detect a human edit: stored text no longer matches what we last wrote.
-      const provenance = hash(prev.text) === prev.outputHash ? prev.provenance : "human";
-      if (prev.sourceHash === srcHash) {
-        merged.set(unit.id, { ...prev, provenance, stale: false });
-        stats.skipped++;
-        continue;
-      }
-      if (provenance === "human") {
-        merged.set(unit.id, { ...prev, provenance, stale: true });
-        stats.stale++;
-        continue;
-      }
-      todo.push({ unit, srcHash });
-    }
+    const { pending: todo, merged, stats: base } = collectPending(units, stored);
+    const stats = { translated: 0, skipped: base.skipped, stale: base.stale, failed: 0 };
 
     for (let i = 0; i < todo.length; i += CHUNK) {
       const chunk = todo.slice(i, i + CHUNK);

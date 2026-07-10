@@ -1,6 +1,7 @@
 // tests/unit/scripts/i18n/core.test.ts
 import { describe, expect, it, vi } from "vitest";
-import { runTranslation } from "../../../../scripts/i18n/core.mjs";
+import { collectPending, runTranslation } from "../../../../scripts/i18n/core.mjs";
+import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 import { makeFakeAdapter } from "./fake-adapter";
 
 const echo = (units: any[], locale: string) =>
@@ -57,5 +58,44 @@ describe("runTranslation", () => {
     const summary = await runTranslation({ adapter, locales: ["de"], translate: bad });
     expect(summary.de.failed).toBe(1);
     expect(summary.de.translated).toBe(0);
+  });
+});
+
+describe("collectPending", () => {
+  it("marks a new unit pending", () => {
+    const units = [{ id: "a", sourceText: "hi" }];
+    const { pending, merged, stats } = collectPending(units, new Map());
+    expect(pending.map((p) => p.unit.id)).toEqual(["a"]);
+    expect(stats).toMatchObject({ skipped: 0, stale: 0 });
+    expect(merged.has("a")).toBe(false);
+  });
+
+  it("skips a unit whose stored hash matches", () => {
+    const units = [{ id: "a", sourceText: "hi" }];
+    const stored = new Map([
+      ["a", { text: "de", sourceHash: hash("hi"), provenance: "machine", outputHash: hash("de") }],
+    ]);
+    const { pending, stats } = collectPending(units, stored);
+    expect(pending).toEqual([]);
+    expect(stats.skipped).toBe(1);
+  });
+
+  it("marks a human-edited unit stale when source changed, not pending", () => {
+    const units = [{ id: "a", sourceText: "hello" }];
+    const stored = new Map([
+      [
+        "a",
+        {
+          text: "menschlich",
+          sourceHash: hash("hi"),
+          provenance: "machine",
+          outputHash: hash("de"),
+        },
+      ],
+    ]);
+    const { pending, merged, stats } = collectPending(units, stored);
+    expect(pending).toEqual([]);
+    expect(stats.stale).toBe(1);
+    expect(merged.get("a")).toMatchObject({ provenance: "human", stale: true, text: "menschlich" });
   });
 });
