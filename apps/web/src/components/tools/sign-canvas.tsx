@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { useTranslation } from "@/contexts/i18n-context";
 import { toNormalizedRect } from "@/lib/sign-geometry";
 import type { SavedSignature } from "@/lib/signature-store";
+import { safeRandomUUID } from "@/lib/uuid";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -241,7 +242,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           layer.add(node);
           tr.nodes([node]);
           layer.batchDraw();
-          placementsRef.current.push({ id: crypto.randomUUID(), page, node });
+          placementsRef.current.push({ id: safeRandomUUID(), page, node });
           onSelectionChange?.(true);
           emitCount();
         };
