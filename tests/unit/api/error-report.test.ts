@@ -42,6 +42,14 @@ describe("classifyError", () => {
       "bug",
     );
   });
+  it("worker source: zod is a bug (schema drift) and bare resets are operational", () => {
+    const zod = Object.assign(new Error("z"), { name: "ZodError", issues: [] });
+    expect(classifyError(zod, "worker")).toBe("bug");
+    expect(classifyError(zod, "http")).toBe("expected");
+    const reset = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+    expect(classifyError(reset, "worker")).toBe("operational");
+    expect(classifyError(reset, "http")).toBe("expected");
+  });
 });
 
 describe("throttle", () => {

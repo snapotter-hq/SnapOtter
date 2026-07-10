@@ -35,16 +35,23 @@ export interface ReportContext {
   subsystem?: string;
 }
 
-export function classifyError(err: unknown): ErrorClass {
+export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
   if (isToolInputError(err)) return "expected";
-  if (isClientAbort(err)) return "expected";
   const e = err as { name?: string; message?: string; code?: string } | null;
   if (e && typeof e.message === "string" && /^(Canceled$|Timed out after )/.test(e.message)) {
     return "expected";
   }
-  // ZodError = settings validation; InputValidationError = upload validation
-  // (apps/api/src/modality/contract.ts). Both are user-input problems.
-  if (e?.name === "ZodError" || e?.name === "InputValidationError") return "expected";
+  // The next two shortcuts only make sense at the HTTP boundary (undefined
+  // keeps the http-ish default for direct calls). Off the request path a bare
+  // ECONNRESET is an upstream socket loss, not a client abort, and a ZodError
+  // means schema drift: settings were already validated at the boundary, so a
+  // worker-side parse failure is our bug.
+  if (source === "http" || source === undefined) {
+    if (isClientAbort(err)) return "expected";
+    // ZodError = settings validation; InputValidationError = upload validation
+    // (apps/api/src/modality/contract.ts). Both are user-input problems.
+    if (e?.name === "ZodError" || e?.name === "InputValidationError") return "expected";
+  }
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
   if (e?.code && OPERATIONAL_CODES.has(e.code)) return "operational";
@@ -89,7 +96,7 @@ export function errorSignature(err: unknown): string {
 export async function reportError(err: unknown, ctx: ReportContext): Promise<void> {
   try {
     if (!analyticsEnabled()) return;
-    const cls = classifyError(err);
+    const cls = classifyError(err, ctx.source);
     if (cls === "expected") return;
     if (!shouldReport(cls, errorSignature(err))) return;
 

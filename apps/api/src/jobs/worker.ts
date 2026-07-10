@@ -30,9 +30,10 @@ import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { captureException, trackEvent } from "../lib/analytics.js";
+import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
+import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -383,7 +384,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Record error on the OTel span
       if (span) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: finalError });
-        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        span.recordException(err instanceof Error ? err : String(err));
         span.addEvent("job.failed");
       }
 
@@ -447,9 +448,6 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           },
           data.analyticsDistinctId,
         );
-        if (!isCanceled && !isTimeout) {
-          void captureException(err instanceof Error ? err : new Error(String(err)));
-        }
       }
 
       if (isCanceled) throw new UnrecoverableError("Canceled");
@@ -888,9 +886,12 @@ export function startWorkers(): void {
       });
 
       worker.on("failed", (job, err) => {
-        if (analyticsEnabled() && job) {
-          void captureException(err instanceof Error ? err : new Error(String(err)));
-        }
+        if (!job) return;
+        void reportError(err, {
+          source: "worker",
+          pool,
+          toolId: (job.data as ToolJobData | undefined)?.toolId,
+        });
       });
 
       workers.push(worker);
@@ -916,9 +917,12 @@ export function startWorkers(): void {
     });
 
     worker.on("failed", (job, err) => {
-      if (analyticsEnabled() && job) {
-        void captureException(err instanceof Error ? err : new Error(String(err)));
-      }
+      if (!job) return;
+      void reportError(err, {
+        source: "worker",
+        pool,
+        toolId: (job.data as ToolJobData | undefined)?.toolId,
+      });
     });
 
     workers.push(worker);

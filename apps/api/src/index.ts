@@ -17,9 +17,10 @@ import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enq
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
-import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
+import { initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
+import { reportError } from "./lib/error-report.js";
 import { stripInternalPaths } from "./lib/errors.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { logger } from "./lib/logger.js";
@@ -276,7 +277,12 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
       { err: error, url: request.url, method: request.method },
       "Unhandled request error",
     );
-    captureException(error);
+    void reportError(error, {
+      source: "http",
+      route: request.routeOptions?.url ?? undefined,
+      method: request.method,
+      statusCode,
+    });
   } else {
     request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
   }

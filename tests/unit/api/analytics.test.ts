@@ -20,6 +20,13 @@ const MockPostHog = vi.hoisted(() =>
 const mockSentryCapture = vi.hoisted(() => vi.fn());
 const mockSentryClose = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockSentryInit = vi.hoisted(() => vi.fn());
+// The captureException shim routes through reportError, which captures
+// inside Sentry.withScope; the mock must invoke the callback.
+const mockSentryWithScope = vi.hoisted(() =>
+  vi.fn((cb: (scope: unknown) => unknown) =>
+    cb({ setTag: () => {}, setLevel: () => {}, setFingerprint: () => {} }),
+  ),
+);
 
 vi.mock("@snapotter/shared", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -56,6 +63,7 @@ vi.mock("@sentry/node", () => ({
   init: mockSentryInit,
   captureException: mockSentryCapture,
   close: mockSentryClose,
+  withScope: mockSentryWithScope,
 }));
 
 type AnalyticsModule = typeof import("../../../apps/api/src/lib/analytics.js");
@@ -74,6 +82,7 @@ beforeEach(async () => {
   mockSentryCapture.mockClear();
   mockSentryClose.mockClear();
   mockSentryInit.mockClear();
+  mockSentryWithScope.mockClear();
 
   vi.resetModules();
   mod = await import("../../../apps/api/src/lib/analytics.js");
