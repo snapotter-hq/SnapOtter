@@ -5,24 +5,51 @@ import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { ALTERNATIVES } from "@/data/alternatives";
+import { LANDING_LOCALES, t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { seoText } from "@/lib/seo-content";
 import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
-  return ALTERNATIVES.map((alt) => ({
-    params: { slug: alt.slug },
-    props: { alt },
-  }));
+  const paths = [];
+  for (const locale of LANDING_LOCALES) {
+    for (const alt of ALTERNATIVES) {
+      paths.push({
+        params: { locale: locale === "en" ? undefined : locale, slug: alt.slug },
+        props: { alt, locale },
+      });
+    }
+  }
+  return paths;
 }
 
-const { alt } = Astro.props;
-const canonical = `https://snapotter.com/alternatives/${alt.slug}`;
+const { alt, locale } = Astro.props;
+const PATH = `/alternatives/${alt.slug}`;
+const canonical = `https://snapotter.com${localizeHref(locale, PATH)}`;
 const others = ALTERNATIVES.filter((a) => a.slug !== alt.slug);
-const reviewedOn = new Intl.DateTimeFormat("en-US", {
+const reviewedOn = new Intl.DateTimeFormat(locale, {
   month: "long",
   day: "numeric",
   year: "numeric",
   timeZone: "UTC",
 }).format(new Date(`${alt.lastReviewed}T00:00:00Z`));
+
+const base = `alt:${alt.slug}`;
+const pageTitle = seoText(locale, `${base}:pageTitle`, alt.pageTitle);
+const h1 = seoText(locale, `${base}:h1`, alt.h1);
+const metaDescription = seoText(locale, `${base}:metaDescription`, alt.metaDescription);
+const intro = seoText(locale, `${base}:intro`, alt.intro);
+const breadth = seoText(locale, `${base}:breadth`, alt.breadth);
+const rows = alt.rows.map((row, i) => ({
+  ...row,
+  feature: seoText(locale, `${base}:rows.${i}.feature`, row.feature),
+  snapotter: seoText(locale, `${base}:rows.${i}.snapotter`, row.snapotter),
+  competitor: seoText(locale, `${base}:rows.${i}.competitor`, row.competitor),
+}));
+const faqs = alt.faqs.map((faq, i) => ({
+  q: seoText(locale, `${base}:faqs.${i}.q`, faq.q),
+  a: seoText(locale, `${base}:faqs.${i}.a`, faq.a),
+}));
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
@@ -40,11 +67,11 @@ const breadcrumbJsonLd = {
 };
 
 const faqJsonLd =
-  alt.faqs.length > 0
+  faqs.length > 0
     ? {
         "@context": "https://schema.org",
         "@type": "FAQPage",
-        mainEntity: alt.faqs.map((faq) => ({
+        mainEntity: faqs.map((faq) => ({
           "@type": "Question",
           name: faq.q,
           acceptedAnswer: { "@type": "Answer", text: faq.a },
@@ -55,21 +82,27 @@ const faqJsonLd =
 const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
 ---
 
-<Base title={`${alt.pageTitle} | SnapOtter`} description={alt.metaDescription} canonical={canonical}>
+<Base
+  title={`${pageTitle} | SnapOtter`}
+  description={metaDescription}
+  canonical={canonical}
+  locale={locale}
+  path={PATH}
+>
   <Fragment slot="head">
     <JsonLd data={allJsonLd} />
   </Fragment>
 
-  <Navbar />
+  <Navbar locale={locale} path={PATH} />
 
   <main id="main">
     <!-- Breadcrumb -->
     <nav class="mx-auto max-w-4xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2 text-sm text-muted">
-        <li><a href="/" class="transition-colors hover:text-foreground">Home</a></li>
+        <li><a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a></li>
         <li aria-hidden="true">/</li>
         <li>
-          <a href="/alternatives" class="transition-colors hover:text-foreground">Alternatives</a>
+          <a href={localizeHref(locale, "/alternatives")} class="transition-colors hover:text-foreground">{t(locale, "nav.alternatives")}</a>
         </li>
         <li aria-hidden="true">/</li>
         <li class="font-medium text-foreground">{alt.competitor}</li>
@@ -83,10 +116,10 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
           {alt.category}
         </span>
         <h1 class="mt-5 font-display text-4xl font-bold tracking-tight md:text-5xl">
-          {alt.h1}
+          {h1}
         </h1>
         <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">
-          {alt.intro}
+          {intro}
         </p>
         <div class="mt-8 flex flex-wrap gap-4">
           <a
@@ -95,7 +128,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             rel="noopener noreferrer"
             class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
           >
-            Deploy with Docker
+            {t(locale, "alt.deployWithDocker")}
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
             </svg>
@@ -106,7 +139,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             rel="noopener noreferrer"
             class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
           >
-            Try the live demo
+            {t(locale, "alt.tryDemo")}
           </a>
         </div>
       </div>
@@ -117,7 +150,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
       <div class="mx-auto max-w-4xl px-6">
         <div class="reveal">
           <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
-            SnapOtter vs {alt.competitor}
+            {t(locale, "altSlug.snapotterVs", { competitor: alt.competitor })}
           </h2>
           <div class="mt-8 overflow-x-auto rounded-xl border border-border bg-surface">
             <table class="w-full text-sm">
@@ -129,7 +162,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
                 </tr>
               </thead>
               <tbody>
-                {alt.rows.map((row) => (
+                {rows.map((row) => (
                   <tr class="border-b border-border last:border-0">
                     <td class="px-5 py-4 font-medium">{row.feature}</td>
                     <td class="px-5 py-4">
@@ -149,13 +182,10 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             </table>
           </div>
           <p class="mt-4 text-xs text-muted">
-            Last reviewed {reviewedOn}. Comparison uses publicly available vendor pages and focuses
-            on deployment model, file location, auditability, and workflow fit. Vendor features and
-            plans change; check current docs before deciding. SnapOtter is not affiliated with
-            {alt.competitor}.
+            {t(locale, "altSlug.lastReviewed", { date: reviewedOn, competitor: alt.competitor })}
           </p>
           <div class="mt-5">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Sources reviewed</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">{t(locale, "altSlug.sourcesReviewed")}</p>
             <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs">
               {alt.sources.map((source) => (
                 <li>
@@ -186,23 +216,23 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             <line x1="6" x2="6.01" y1="18" y2="18" />
           </svg>
           <div>
-            <h2 class="font-display text-xl font-bold">One stack, all five file types</h2>
-            <p class="mt-2 text-sm leading-relaxed text-muted">{alt.breadth}</p>
+            <h2 class="font-display text-xl font-bold">{t(locale, "altSlug.breadthTitle")}</h2>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{breadth}</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- FAQs -->
-    {alt.faqs.length > 0 && (
+    {faqs.length > 0 && (
       <section class="border-t border-border bg-background-alt py-16">
         <div class="mx-auto max-w-4xl px-6">
           <div class="reveal">
             <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
-              Frequently asked questions
+              {t(locale, "altSlug.faqTitle")}
             </h2>
             <dl class="mt-8 space-y-6">
-              {alt.faqs.map((faq) => (
+              {faqs.map((faq) => (
                 <div class="rounded-xl border border-border bg-surface p-6">
                   <dt class="text-sm font-semibold">{faq.q}</dt>
                   <dd class="mt-3 text-sm leading-relaxed text-muted">{faq.a}</dd>
@@ -218,14 +248,14 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
     <section class="py-16">
       <div class="mx-auto max-w-4xl px-6">
         <div class="reveal">
-          <h2 class="font-display text-2xl font-bold tracking-tight">More comparisons</h2>
+          <h2 class="font-display text-2xl font-bold tracking-tight">{t(locale, "alt.moreComparisons")}</h2>
           <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {others.map((o) => (
               <a
-                href={`/alternatives/${o.slug}`}
+                href={localizeHref(locale, `/alternatives/${o.slug}`)}
                 class="group flex flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
               >
-                <span class="text-sm font-bold">SnapOtter vs {o.competitor}</span>
+                <span class="text-sm font-bold">{t(locale, "altSlug.cardVs", { competitor: o.competitor })}</span>
                 <span class="mt-1 text-xs text-muted">{o.category}</span>
               </a>
             ))}
@@ -239,11 +269,10 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
       <div class="mx-auto max-w-4xl px-6 text-center">
         <div class="reveal">
           <h2 class="font-display text-3xl font-bold tracking-tight">
-            Run it on your own server
+            {t(locale, "alt.runOnYourServer")}
           </h2>
           <p class="mx-auto mt-4 max-w-lg text-muted">
-            200+ tools across image, video, audio, PDF, and files. Open source, free forever, and your
-            files never leave your network.
+            {t(locale, "altSlug.ctaBody")}
           </p>
           <div class="mt-8 flex flex-wrap justify-center gap-4">
             <a
@@ -252,16 +281,16 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
               rel="noopener noreferrer"
               class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
             >
-              Get started
+              {t(locale, "common.getStarted")}
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
               </svg>
             </a>
             <a
-              href="/alternatives"
+              href={localizeHref(locale, "/alternatives")}
               class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
             >
-              All alternatives
+              {t(locale, "alt.allAlternatives")}
             </a>
           </div>
         </div>
