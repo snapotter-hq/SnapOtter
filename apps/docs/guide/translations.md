@@ -173,3 +173,59 @@ DEFAULT_LOCALE: "de"  # German as the default for all new users
 | `apps/web/src/contexts/i18n-context.tsx` | `I18nProvider`, `useTranslation()` hook |
 | `apps/web/src/lib/format.ts` | `format()`, `plural()`, `formatFileSize()` helpers |
 | `apps/api/src/routes/config.ts` | `GET /api/v1/config/locale` public endpoint |
+
+## Translating the website, docs, and API reference {#translating-the-web-surfaces}
+
+The 21-language support above covers the **app**. The public website
+(snapotter.com), this documentation site, and the REST API reference are also
+translated into all 21 languages, by a separate hash-gated pipeline that reuses
+the same tool names and descriptions from `packages/shared/src/i18n`, so
+terminology stays consistent everywhere.
+
+### Machine-translated by default {#machine-translated-by-default}
+
+Every non-English page on the website and docs is **machine-translated** on the
+first pass (by a Claude Code session, not a third-party service) and carries a
+small, dismissible banner saying so, with a link back here. That is deliberate:
+it ships all 21 languages quickly and honestly, then invites the community to
+refine the pages that matter most. Machine translation gets the meaning across;
+human review makes it read naturally.
+
+### How the pipeline decides what to translate {#how-the-web-pipeline-decides}
+
+Each translatable unit of English source is hashed, and the hash is stored next
+to its translation. On each run the pipeline:
+
+- translates any unit that has no translation yet,
+- skips any unit whose stored hash still matches the English source,
+- re-translates a **machine** unit when its English source changes,
+- and flags a **human**-refined unit as `stale` (needs review) when its English
+  source changes, instead of overwriting your work.
+
+### Refining a web translation by PR {#refining-a-web-translation-by-pr}
+
+You improve a website, docs, or API-reference translation the same way you
+improve an app locale: by editing the generated file and opening a PR.
+
+1. Find the generated translation for your language:
+   - website UI strings: `apps/landing/src/i18n/<locale>.json`
+   - a docs page: `apps/docs/<locale>/**.md`
+   - the API reference: `apps/api/src/openapi.<locale>.yaml`
+2. Edit the text. Keep code, links, `{placeholders}`, and any `⸤I18N…⸥` markers
+   exactly as they are; the pipeline's validator rejects a translation that drops
+   or reorders them.
+3. Open a PR. Editing a unit flips its provenance from `machine` to `human`, so
+   the pipeline will **never overwrite it** on a later run. If the English source
+   changes afterwards, your unit is flagged `stale` for review rather than
+   silently replaced.
+
+To report a mistranslation without submitting code, open a
+[GitHub Issue](https://github.com/snapotter-hq/SnapOtter/issues) with the page
+URL, the language, the incorrect text, and your suggested fix.
+
+::: tip
+Maintainers run the translation pipeline; you do not need an API key to
+contribute. Just edit the generated file and open a PR. See
+[`scripts/i18n/README.md`](https://github.com/snapotter-hq/SnapOtter/blob/main/scripts/i18n/README.md)
+for how the pipeline runs.
+:::
