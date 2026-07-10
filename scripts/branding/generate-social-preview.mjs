@@ -1,12 +1,12 @@
 // Generates branding/social-preview.png (1280x640) -- the SnapOtter social/OG card.
-// Echoes the landing hero: trust badges, the "Every file tool you need / Your files
+// Echoes the landing hero: trust badges, the "Private file processing / Your files
 // never leave your network" headline, the supporting subhead, and the five modality
 // cards. Rendered from HTML with the real brand fonts via headless Chromium.
 // Run (tsx, because it imports the shared TS catalog for live tool counts):
 //   apps/api/node_modules/.bin/tsx scripts/branding/generate-social-preview.mjs
 //
-// The same output is the canonical OG image; sync it to apps/landing/public/og-image.png
-// and apps/web/public/og-image.png (see scripts/branding/sync-og.sh).
+// The same output is the canonical OG image; sync it to the app og-image.png files
+// (landing, web, docs) via scripts/branding/sync-og.sh.
 
 import { rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -79,7 +79,6 @@ const CARDS = [
     icon: ICON.database,
   },
 ];
-const total = CARDS.reduce((s, c) => s + c.count, 0);
 
 const badgesHtml = BADGES.map(
   (b) =>
@@ -130,10 +129,10 @@ html,body{width:1280px;height:640px}
 .card-label{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;line-height:1.1;margin-top:34px}
 .card-blurb{font-size:14px;color:rgba(255,255,255,.84);margin-top:6px}
 </style></head><body><div class="canvas">
-<div class="brand"><img src="logo-512.png" alt=""/><span class="wm">Snap<span class="o">Otter</span></span><span class="pill">${total} tools</span></div>
+<div class="brand"><img src="logo-512.png" alt=""/><span class="wm">Snap<span class="o">Otter</span></span><span class="pill">200+ tools</span></div>
 <div class="badges">${badgesHtml}</div>
-<div class="headline">Every <span class="f">file</span> tool you need.<span class="hl2">Your files never leave your network.</span></div>
-<div class="subhead">The file-processing suite for teams that keep sensitive data in-house.</div>
+<div class="headline">Private <span class="f">file</span> processing.<span class="hl2">Your files never leave your network.</span></div>
+<div class="subhead">Open-source, self-hosted infrastructure. Convert, compress, OCR, transcribe, and run local AI on hardware you own.</div>
 <div class="cards">${cardsHtml}</div>
 </div></body></html>`;
 
