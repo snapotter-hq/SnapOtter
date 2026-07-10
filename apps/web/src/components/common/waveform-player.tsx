@@ -55,7 +55,9 @@ export function WaveformPlayer({ src, className }: WaveformPlayerProps) {
 
     wsRef.current = ws;
 
-    ws.load(src);
+    // load() rejects with AbortError when destroy() runs mid-decode (route
+    // change / src swap). That rejection is expected teardown, not an error.
+    ws.load(src).catch(() => {});
 
     ws.on("ready", () => {
       readyRef.current = true;

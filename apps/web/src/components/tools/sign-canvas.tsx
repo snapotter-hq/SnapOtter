@@ -91,7 +91,11 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       setPageCount(doc.numPages);
       setPage(0);
       setDocReady(true);
-    })();
+    })().catch(() => {
+      // loadingTask.destroy() in the cleanup rejects the in-flight promise;
+      // swallowing it is the fix for Sentry NODE-1N. A genuine load failure
+      // leaves docReady false, which the existing UI already handles.
+    });
     return () => {
       cancelled = true;
       docRef.current?.loadingTask.destroy();
@@ -182,7 +186,10 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       }
       layer.batchDraw();
       onSelectionChange?.(false);
-    })();
+    })().catch(() => {
+      // getPage()/render() reject when the loadingTask is destroyed mid-render
+      // (file swap or unmount); expected teardown, same as the load effect.
+    });
     return () => {
       cancelled = true;
     };
